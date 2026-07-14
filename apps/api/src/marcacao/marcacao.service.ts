@@ -1,0 +1,121 @@
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import {
+  pontoRep, pontoMarcacao, empregado, tenant, usuario, comTenant, type Db,
+} from '@ponto/db';
+import { proximaMarcacao, gerarComprovante, assinarPdfPAdES } from '@ponto/rep-core';
+import { Coletor, OnlineOffline, TipoIdentificador } from '@ponto/shared';
+import { DB } from '../database/database.module';
+import { CertificadoService } from '../certificado/certificado.service';
+
+export interface BaterParams {
+  tenantId: string; cpf: string; coletor: Coletor;
+  onlineOffline?: OnlineOffline; dtMarcacao?: Date;
+  ipOrigem?: string | null; latitude?: number | null; longitude?: number | null;
+}
+
+@Injectable()
+export class MarcacaoService {
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly certs: CertificadoService,
+  ) {}
+
+  async bater(p: BaterParams) {
+    return comTenant(this.db, p.tenantId, async (tx) => {
+      const reps = await tx.select().from(pontoRep)
+        .where(eq(pontoRep.tenantId, p.tenantId)).for('update').limit(1);
+      const rep = reps[0];
+      if (!rep) throw new NotFoundException('REP-P não configurado para este tenant');
+
+      const anterior = rep.ultimoNsr > 0 && rep.ultimoHash
+        ? { nsr: rep.ultimoNsr, hashRegistro: rep.ultimoHash } : null;
+
+      const dtMarcacao = p.dtMarcacao ?? new Date();
+      const dtGravacao = new Date();
+      const onlineOffline = p.onlineOffline ?? OnlineOffline.ONLINE;
+
+      const g = proximaMarcacao(
+        { cpf: p.cpf, dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline }, anterior);
+
+      await tx.insert(pontoMarcacao).values({
+        tenantId: p.tenantId, repId: rep.id, nsr: g.nsr, cpf: p.cpf,
+        dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline,
+        hashRegistro: g.hashRegistro, hashAnterior: g.hashAnterior,
+        ipOrigem: p.ipOrigem ?? null,
+        latitude: p.latitude != null ? String(p.latitude) : null,
+        longitude: p.longitude != null ? String(p.longitude) : null,
+      });
+      await tx.update(pontoRep).set({ ultimoNsr: g.nsr, ultimoHash: g.hashRegistro }).where(eq(pontoRep.id, rep.id));
+      return g;
+    });
+  }
+
+  async baterAutenticado(
+    usuarioId: string, tenantId: string, coletor: Coletor,
+    geo?: { latitude?: number | null; longitude?: number | null; ipOrigem?: string | null },
+  ) {
+    const cpf = await comTenant(this.db, tenantId, async (tx) => {
+      const us = await tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1);
+      const u = us[0];
+      if (!u?.empregadoId) throw new BadRequestException('Usuário não vinculado a um empregado');
+      const es = await tx.select().from(empregado).where(eq(empregado.id, u.empregadoId)).limit(1);
+      const e = es[0];
+      if (!e) throw new NotFoundException('Empregado não encontrado');
+      return e.cpf;
+    });
+    return this.bater({ tenantId, cpf, coletor, ...geo });
+  }
+
+  /** Lista as marcações do próprio usuário autenticado (opcionalmente de um dia). */
+  async listarDoUsuario(usuarioId: string, tenantId: string, dataStr?: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const us = (await tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
+      if (!us?.empregadoId) throw new BadRequestException('Usuário não vinculado a um empregado');
+      const e = (await tx.select().from(empregado).where(eq(empregado.id, us.empregadoId)).limit(1))[0];
+      if (!e) throw new NotFoundException('Empregado não encontrado');
+      const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
+      if (!rep) throw new NotFoundException('REP-P não configurado');
+
+      const conds = [eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, e.cpf)];
+      if (dataStr) {
+        conds.push(gte(pontoMarcacao.dtMarcacao, new Date(`${dataStr}T00:00:00-0300`)));
+        conds.push(lte(pontoMarcacao.dtMarcacao, new Date(`${dataStr}T23:59:59-0300`)));
+      }
+      const linhas = await tx.select({
+        nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao, coletor: pontoMarcacao.coletor,
+      }).from(pontoMarcacao).where(and(...conds)).orderBy(asc(pontoMarcacao.dtMarcacao));
+
+      return { nome: e.nome, marcacoes: linhas.map((m) => ({ nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao, coletor: m.coletor })) };
+    });
+  }
+
+  /** Comprovante em PDF; assina em PAdES se o tenant tiver certificado. */
+  async gerarComprovantePdf(tenantId: string, nsr: number): Promise<Buffer> {
+    const pdf = await comTenant(this.db, tenantId, async (tx) => {
+      const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
+      if (!rep) throw new NotFoundException('REP-P não encontrado');
+      const m = (await tx.select().from(pontoMarcacao)
+        .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.nsr, nsr))).limit(1))[0];
+      if (!m) throw new NotFoundException('Marcação não encontrada');
+      const emp = (await tx.select().from(empregado)
+        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.cpf, m.cpf))).limit(1))[0];
+      const ten = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      return gerarComprovante({
+        rep: {
+          razaoSocial: rep.razaoSocial, tipoIdEmpregador: rep.tipoIdEmpregador as TipoIdentificador,
+          documentoEmpregador: rep.documentoEmpregador, numeroInpi: rep.numeroInpi,
+        },
+        empregado: { nome: emp?.nome ?? m.cpf, cpf: m.cpf },
+        marcacao: { nsr: m.nsr, dtMarcacao: m.dtMarcacao, hashRegistro: m.hashRegistro },
+        localPrestacao: ten?.localPrestacao ?? '',
+      });
+    });
+
+    if (await this.certs.temCertificado(tenantId)) {
+      const { pfxBuffer, senha } = await this.certs.carregar(tenantId);
+      return assinarPdfPAdES(pdf, { pfxBuffer, senha }, { motivo: 'Comprovante de Registro de Ponto' });
+    }
+    return pdf;
+  }
+}

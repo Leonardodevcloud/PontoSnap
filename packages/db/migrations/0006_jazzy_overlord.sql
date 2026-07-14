@@ -1,0 +1,1 @@
+ALTER TABLE "empregado" ADD COLUMN "salario_mensal" numeric(12, 2);

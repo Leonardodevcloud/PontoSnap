@@ -1,0 +1,12 @@
+.btn{
+  border:none; border-radius:var(--r-pill); width:100%;
+  padding:15px 22px; font-family:var(--ff-display); font-weight:600; font-size:16px;
+  cursor:pointer; transition:transform .08s ease, filter .15s ease;
+}
+.btn:active{ transform:scale(0.98); }
+.btn:disabled{ opacity:.55; cursor:not-allowed; }
+.coral{ background:var(--coral); color:var(--white); }
+.coral:hover:not(:disabled){ background:var(--coral-dark); }
+.lime{ background:var(--lime); color:var(--ink); }
+.ghost{ background:transparent; color:var(--ash); font-family:var(--ff-body); font-weight:700; font-size:14px; padding:11px; }
+.ghost:hover:not(:disabled){ color:var(--ink); }

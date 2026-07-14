@@ -1,0 +1,18 @@
+.head{ margin-bottom:24px; }
+.head h2{ font-size:28px; }
+.head p{ margin:6px 0 0; color:var(--ash); font-size:14.5px; }
+.grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:20px; align-items:start; }
+.statusCard{ background:var(--ink); color:var(--cream); border-radius:var(--r-md); padding:26px; }
+.lbl{ font-family:var(--ff-mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--lime); }
+.cn{ font-size:18px; font-weight:700; margin:10px 0 4px; }
+.val{ font-family:var(--ff-mono); font-size:12.5px; color:rgba(255,248,238,.8); }
+.badge{ display:inline-flex; align-items:center; gap:7px; margin-top:18px; background:rgba(203,245,77,.16); color:var(--lime); border-radius:var(--r-pill); padding:6px 14px; font-size:12.5px; font-weight:700; font-family:var(--ff-mono); }
+.vazioCard{ background:var(--peach); border-radius:var(--r-md); padding:26px; }
+.vazioCard .lbl{ color:var(--coral-dark); }
+.vazioCard p{ color:var(--ash); font-size:14px; margin:10px 0 0; }
+.drop{ background:var(--white); border:2px dashed rgba(16,64,63,.15); border-radius:var(--r-md); padding:24px; }
+.big{ font-family:var(--ff-display); font-weight:600; font-size:18px; }
+.sub{ color:var(--ash); font-size:13.5px; margin:6px 0 16px; }
+.selArq{ width:100%; background:var(--cream); border:2px solid rgba(16,64,63,.12); border-radius:var(--r-md); padding:12px 14px; font-family:var(--ff-mono); font-size:13px; color:var(--ink); cursor:pointer; margin-bottom:12px; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:600; margin:0 0 12px; }
+.ok{ color:#5f9400; font-family:var(--ff-mono); font-size:13px; margin:0 0 12px; }

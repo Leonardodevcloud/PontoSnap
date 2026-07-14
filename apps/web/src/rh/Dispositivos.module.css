@@ -1,0 +1,17 @@
+.head{ margin-bottom:24px; }
+.head h2{ font-size:28px; }
+.head p{ margin:6px 0 0; color:var(--ash); font-size:14.5px; }
+.grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+.card{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); padding:24px 26px; }
+.kicker{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
+.card h3{ font-size:22px; margin:8px 0; }
+.card p{ color:var(--ash); font-size:14px; margin:0 0 16px; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:600; margin:0 0 12px; }
+.tokenCard{ background:var(--ink); color:var(--cream); border-radius:var(--r-md); padding:24px 26px; }
+.lbl{ font-family:var(--ff-mono); font-size:12px; color:var(--lime); font-weight:500; }
+.aviso{ font-size:13.5px; color:rgba(255,248,238,.7); margin:8px 0 14px; }
+.token{ font-family:var(--ff-mono); font-size:13px; background:rgba(255,255,255,.08); border-radius:12px; padding:14px; word-break:break-all; line-height:1.6; }
+.acoes{ margin-top:14px; }
+.copiar{ background:var(--lime); color:var(--ink); border:none; border-radius:var(--r-pill); padding:10px 20px; font-family:var(--ff-display); font-weight:600; font-size:14px; cursor:pointer; }
+.passo{ margin-top:16px; font-size:13px; color:rgba(255,248,238,.7); }
+.passo code{ font-family:var(--ff-mono); background:rgba(255,255,255,.1); padding:2px 8px; border-radius:6px; }

@@ -1,0 +1,1 @@
+ALTER TABLE "ponto_horario_contratual" ADD COLUMN "regime" varchar(10) DEFAULT 'normal' NOT NULL;

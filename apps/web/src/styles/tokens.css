@@ -1,0 +1,8 @@
+:root{
+  --coral:#FF6B4A; --coral-dark:#E5502F; --ink:#10403F; --lime:#CBF54D;
+  --cream:#FFF8EE; --peach:#FFE2D1; --ash:#5C4F49; --white:#FFFFFF;
+  --r-lg:28px; --r-md:16px; --r-pill:100px;
+  --ff-display:'Fredoka', sans-serif;
+  --ff-body:'Nunito Sans', sans-serif;
+  --ff-mono:'JetBrains Mono', monospace;
+}

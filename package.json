@@ -1,0 +1,17 @@
+{
+  "name": "ponto-eletronico",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "build": "turbo build",
+    "build:api": "tsc -p tsconfig.build.json && node scripts/reescrever-aliases.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "reflect-metadata": "^0.2.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.9.3"
+  }
+}

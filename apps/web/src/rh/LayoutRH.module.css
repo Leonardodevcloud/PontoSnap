@@ -1,0 +1,18 @@
+.app{ display:grid; grid-template-columns:236px 1fr; min-height:100vh; }
+.side{ background:var(--ink); color:var(--cream); padding:24px 18px; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; }
+.wm{ font-family:var(--ff-display); font-weight:600; font-size:24px; padding:4px 10px 22px; }
+.snap{ color:var(--lime); }
+.nav{ display:flex; flex-direction:column; }
+.link{
+  display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:12px;
+  color:rgba(255,248,238,.72); text-decoration:none; font-weight:600; font-size:14.5px; margin-bottom:3px;
+}
+.link:hover{ color:var(--cream); }
+.ic{ width:8px; height:8px; border-radius:2px; background:currentColor; opacity:.55; }
+.on{ background:rgba(255,255,255,.08); color:var(--cream); }
+.on .ic{ background:var(--coral); opacity:1; }
+.foot{ margin-top:auto; padding-top:18px; border-top:1px solid rgba(255,255,255,.12); }
+.who{ font-size:13.5px; font-weight:700; }
+.sair{ margin-top:12px; background:none; border:none; cursor:pointer; font-family:var(--ff-mono); font-size:12px; color:rgba(255,248,238,.6); padding:0; }
+.sair:hover{ color:var(--cream); }
+.content{ padding:34px 40px; max-width:1120px; }

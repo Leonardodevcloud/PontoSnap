@@ -1,0 +1,1 @@
+ALTER TABLE "usuario" ADD COLUMN "deve_trocar_senha" boolean DEFAULT false NOT NULL;

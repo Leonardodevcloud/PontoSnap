@@ -1,0 +1,91 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { useAuth } from './lib/auth';
+import type { Perfil } from './tipos';
+import { Login } from './telas/Login';
+import { TrocarSenha } from './telas/TrocarSenha';
+import { BaterPonto } from './telas/BaterPonto';
+import { EspelhoDia } from './telas/EspelhoDia';
+import { LayoutRH } from './rh/LayoutRH';
+import { PainelRH } from './rh/PainelRH';
+import { Funcionarios } from './rh/Funcionarios';
+import { Escalas } from './rh/Escalas';
+import { Espelhos } from './rh/Espelhos';
+import { ApuracaoCLT } from './rh/ApuracaoCLT';
+import { Feriados } from './rh/Feriados';
+import { Fiscal } from './rh/Fiscal';
+import { Relatorios } from './rh/Relatorios';
+import { Certificado } from './rh/Certificado';
+import { Dispositivos } from './rh/Dispositivos';
+import { LayoutMaster } from './master/LayoutMaster';
+import { Clientes } from './master/Clientes';
+import { Quiosque } from './quiosque/Quiosque';
+import { Flash } from './components/Flash';
+
+const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
+
+function Splash() {
+  return (
+    <div className="appshell" style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Flash tamanho={64} girando />
+    </div>
+  );
+}
+
+/** Exige sessão; força troca de senha pendente; checa perfis. */
+function Protegida({ perfis, children }: { perfis?: Perfil[]; children: ReactNode }) {
+  const { sessao, carregando } = useAuth();
+  if (carregando) return <Splash />;
+  if (!sessao) return <Navigate to="/login" replace />;
+  if (sessao.deveTrocarSenha) return <Navigate to="/trocar-senha" replace />;
+  if (perfis && !perfis.includes(sessao.perfil)) return <Navigate to={rotaInicial(sessao.perfil)} replace />;
+  return <>{children}</>;
+}
+
+/** Só exige sessão (usada na troca de senha, que não pode se auto-redirecionar). */
+function SoLogado({ children }: { children: ReactNode }) {
+  const { sessao, carregando } = useAuth();
+  if (carregando) return <Splash />;
+  if (!sessao) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+const PERFIS_RH: Perfil[] = ['RH', 'ADMIN_CLIENTE'];
+
+export function App() {
+  const { sessao, carregando } = useAuth();
+  return (
+    <Routes>
+      <Route path="/login" element={carregando ? <Splash /> : sessao ? <Navigate to={rotaInicial(sessao.perfil)} replace /> : <Login />} />
+      <Route path="/trocar-senha" element={<SoLogado><TrocarSenha /></SoLogado>} />
+
+      {/* Quiosque — tablet compartilhado, autenticado por token de dispositivo */}
+      <Route path="/quiosque" element={<Quiosque />} />
+
+      {/* Colaborador (mobile) */}
+      <Route path="/" element={<Protegida perfis={['COLABORADOR']}><BaterPonto /></Protegida>} />
+      <Route path="/espelho" element={<Protegida perfis={['COLABORADOR']}><EspelhoDia /></Protegida>} />
+
+      {/* RH / Admin (desktop) */}
+      <Route path="/rh" element={<Protegida perfis={PERFIS_RH}><LayoutRH /></Protegida>}>
+        <Route index element={<PainelRH />} />
+        <Route path="funcionarios" element={<Funcionarios />} />
+        <Route path="escalas" element={<Escalas />} />
+        <Route path="espelhos" element={<Espelhos />} />
+        <Route path="apuracao" element={<ApuracaoCLT />} />
+        <Route path="relatorios" element={<Relatorios />} />
+        <Route path="feriados" element={<Feriados />} />
+        <Route path="fiscal" element={<Fiscal />} />
+        <Route path="certificado" element={<Certificado />} />
+        <Route path="dispositivos" element={<Dispositivos />} />
+      </Route>
+
+      {/* Master (desktop) */}
+      <Route path="/master" element={<Protegida perfis={['MASTER']}><LayoutMaster /></Protegida>}>
+        <Route index element={<Clientes />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}

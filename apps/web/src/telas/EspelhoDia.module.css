@@ -1,0 +1,28 @@
+.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; margin-top:6px; }
+.d{ font-family:var(--ff-mono); font-size:12px; color:var(--ash); margin-top:2px; margin-bottom:18px; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:600; }
+.vazio{ color:var(--ash); font-size:14.5px; }
+
+.row{
+  display:grid; grid-template-columns:18px 1fr auto auto; gap:12px; align-items:center;
+  width:100%; text-align:left; background:transparent; border:none; cursor:pointer;
+  padding:13px 4px; border-top:1px solid rgba(16,64,63,.1);
+}
+.row:first-of-type{ border-top:none; }
+.dot{ width:9px; height:9px; border-radius:50%; }
+.e{ background:var(--coral); }
+.s{ background:var(--ink); }
+.kk{ font-weight:700; font-size:14.5px; color:var(--ink); }
+.tt{ font-family:var(--ff-mono); font-size:15px; color:var(--ink); }
+.pdf{ font-family:var(--ff-mono); font-size:10.5px; color:var(--coral-dark); letter-spacing:.05em; padding-left:6px; }
+
+.saldo{
+  background:var(--peach); border-radius:var(--r-md); padding:16px 18px; margin-top:18px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.l{ font-size:13px; color:var(--ash); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.v{ font-family:var(--ff-display); font-weight:600; font-size:22px; color:var(--ink); }
+.afd{ font-family:var(--ff-mono); font-size:11.5px; color:var(--ash); text-align:center; margin-top:14px; letter-spacing:.03em; }
+.ok{ color:#7ea800; }
+.aviso{ font-size:13.5px; color:var(--coral-dark); font-weight:600; text-align:center; margin-top:12px; }
+.espaco{ flex:1; min-height:16px; }

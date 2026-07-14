@@ -1,0 +1,16 @@
+.campo{
+  display:block; background:var(--white); border:2px solid rgba(16,64,63,.1);
+  border-radius:var(--r-md); padding:11px 16px; margin-bottom:12px;
+  transition:border-color .15s ease;
+}
+.campo:focus-within{ border-color:var(--coral); }
+.rotulo{
+  display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--ash); font-weight:700;
+}
+.input{
+  border:none; outline:none; background:transparent; width:100%;
+  font-family:var(--ff-body); font-size:16px; font-weight:600; color:var(--ink);
+  margin-top:2px; padding:0;
+}
+.input::placeholder{ color:#a8b3b0; font-weight:400; }

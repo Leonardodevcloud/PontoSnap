@@ -1,0 +1,12 @@
+.overlay{
+  position:fixed; inset:0; background:rgba(16,64,63,.32);
+  display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;
+}
+.card{
+  background:var(--cream); border-radius:var(--r-lg); padding:28px; width:100%; max-width:420px;
+  box-shadow:0 30px 70px -20px rgba(16,64,63,.5);
+}
+.head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.head h3{ font-size:22px; }
+.x{ border:none; background:transparent; color:var(--ash); font-size:16px; cursor:pointer; padding:6px; }
+.x:hover{ color:var(--ink); }

@@ -1,0 +1,4 @@
+.topo{ text-align:center; margin:30px 0 30px; }
+.h{ font-size:26px; margin-top:12px; }
+.sub{ color:var(--ash); font-size:15px; margin:8px 0 0; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 12px; }

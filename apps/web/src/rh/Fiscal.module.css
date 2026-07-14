@@ -1,0 +1,20 @@
+.head{ margin-bottom:24px; }
+.head h2{ font-size:28px; }
+.head p{ margin:6px 0 0; color:var(--ash); font-size:14.5px; }
+.filtro{ margin-bottom:18px; }
+.selpill{ display:inline-flex; align-items:center; background:var(--white); border:2px solid rgba(16,64,63,.1); border-radius:var(--r-pill); padding:8px 16px; }
+.cal{ font-family:var(--ff-mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ash); margin-right:10px; }
+.mesInput{ border:none; background:transparent; font-family:var(--ff-body); font-weight:700; font-size:14px; color:var(--ink); outline:none; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
+.ok{ color:#5f9400; font-family:var(--ff-mono); font-size:13px; font-weight:500; }
+.duo{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.card{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); padding:24px 26px; }
+.kicker{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
+.card h3{ font-size:22px; margin:8px 0; }
+.card p{ color:var(--ash); font-size:14px; margin:0 0 18px; }
+.acts{ display:flex; gap:10px; flex-wrap:wrap; }
+.btn{ border:none; border-radius:var(--r-pill); padding:11px 18px; font-family:var(--ff-display); font-weight:600; font-size:14px; cursor:pointer; }
+.btn:disabled{ opacity:.55; cursor:wait; }
+.coral{ background:var(--coral); color:var(--white); }
+.ghost{ background:transparent; color:var(--ash); border:2px solid rgba(16,64,63,.12); }
+.nota{ margin-top:18px; color:var(--ash); font-size:13px; }

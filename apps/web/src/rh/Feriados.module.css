@@ -1,0 +1,29 @@
+.head{ margin-bottom:20px; }
+.head h2{ font-size:28px; }
+.head p{ margin:6px 0 0; color:var(--ash); font-size:14.5px; }
+.form{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); padding:16px; margin-bottom:18px; }
+.form > *{ margin:0; }
+.sel{ display:flex; flex-direction:column; gap:6px; }
+.lb{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
+.sel select{ padding:11px 12px; border:1px solid rgba(16,64,63,.18); border-radius:12px; font:inherit; background:var(--white); }
+.add{ width:auto; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin-bottom:14px; }
+
+.anoBar{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+.anoBar span{ font-family:var(--ff-display); font-weight:600; font-size:20px; }
+.anoBar button{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(16,64,63,.18); background:var(--white); cursor:pointer; font-size:16px; color:var(--ink); }
+.anoBar button:hover{ background:var(--peach); }
+
+.table{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); overflow:hidden; }
+.vazio{ padding:20px 16px; color:var(--ash); font-size:14px; }
+.row{ display:grid; grid-template-columns:110px 100px 1fr 110px 90px; align-items:center; gap:12px; padding:12px 16px; border-top:1px solid rgba(16,64,63,.08); }
+.row:first-child{ border-top:none; }
+.mono{ font-family:var(--ff-mono); font-size:13px; }
+.dsem{ color:var(--ash); font-size:13px; }
+.nome{ font-weight:600; font-size:14.5px; }
+.tipo{ font-family:var(--ff-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:8px; text-align:center; background:#eef; color:var(--ink); }
+.t_nacional{ background:var(--peach); color:var(--coral-dark); }
+.t_estadual{ background:#e6f3e6; color:#3a7a3a; }
+.t_municipal{ background:#e9edff; color:#3a4a9a; }
+.del{ border:none; background:none; cursor:pointer; font-family:var(--ff-mono); font-size:12px; color:var(--ash); }
+.del:hover{ color:var(--coral-dark); }

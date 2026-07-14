@@ -1,0 +1,12 @@
+.pad{ display:grid; grid-template-columns:repeat(3, 120px); gap:14px; }
+.key{
+  height:78px; border-radius:20px; background:var(--white); border:2px solid rgba(16,64,63,.1);
+  font-family:var(--ff-display); font-weight:600; font-size:30px; color:var(--ink); cursor:pointer;
+  transition:transform .06s ease, background .12s ease;
+}
+.key:active{ transform:scale(.95); background:var(--peach); }
+.key.small{ font-family:var(--ff-body); font-weight:700; font-size:16px; color:var(--ash); }
+.key.go{ background:var(--coral); color:var(--white); border-color:var(--coral); font-size:18px; }
+.key.go:disabled{ opacity:.5; cursor:not-allowed; }
+.key.go:active:not(:disabled){ background:var(--coral-dark); }
+@media (max-width:520px){ .pad{ grid-template-columns:repeat(3, 1fr); } .key{ height:66px; font-size:26px; } }

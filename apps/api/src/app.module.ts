@@ -1,0 +1,19 @@
+import { Module } from '@nestjs/common';
+import { DatabaseModule } from './database/database.module';
+import { AuthModule } from './auth/auth.module';
+import { TenantModule } from './tenant/tenant.module';
+import { EmpregadoModule } from './empregado/empregado.module';
+import { CertificadoModule } from './certificado/certificado.module';
+import { MarcacaoModule } from './marcacao/marcacao.module';
+import { TratamentoModule } from './tratamento/tratamento.module';
+import { FiscalModule } from './fiscal/fiscal.module';
+import { HealthModule } from './health/health.module';
+import { JobsModule } from './jobs/jobs.module';
+
+@Module({
+  imports: [
+    DatabaseModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
+    MarcacaoModule, TratamentoModule, FiscalModule, HealthModule, JobsModule,
+  ],
+})
+export class AppModule {}
