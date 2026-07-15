@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PontoSnap — Bater ponto num estalo</title>
+<meta name="description" content="Ponto eletrônico para empresas com funcionários CLT. Seu time bate ponto pelo celular, você fecha o mês em minutos. Sem relógio na parede." />
+<meta name="theme-color" content="#FF6B4A" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23FF6B4A'/%3E%3Cpath d='M256 96 L288 224 L416 256 L288 288 L256 416 L224 288 L96 256 L224 224 Z' fill='%23FFF8EE'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* Tokens — idênticos ao produto (apps/web/src/styles/tokens.css) */
+:root{
+  --coral:#FF6B4A; --coral-dark:#E5502F; --ink:#10403F; --lime:#CBF54D;
+  --cream:#FFF8EE; --peach:#FFE2D1; --ash:#5C4F49; --white:#FFFFFF;
+  --r-lg:28px; --r-md:16px; --r-pill:100px;
+  --ff-display:'Fredoka', sans-serif;
+  --ff-body:'Nunito Sans', sans-serif;
+  --ff-mono:'JetBrains Mono', monospace;
+  --linha:rgba(16,64,63,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--cream); color:var(--ink); font-family:var(--ff-body); font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--ff-display); font-weight:600; line-height:1.06; letter-spacing:-.015em}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--coral); outline-offset:3px; border-radius:6px}
+.wrap{max-width:1140px; margin:0 auto; padding:0 24px}
+
+.eyebrow{font-family:var(--ff-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--coral-dark); display:flex; align-items:center; gap:9px}
+.eyebrow::before{content:''; width:22px; height:1.5px; background:var(--coral)}
+
+.nav{position:sticky; top:0; z-index:50; background:rgba(255,248,238,.88); backdrop-filter:blur(12px); border-bottom:1px solid var(--linha)}
+.nav .wrap{display:flex; align-items:center; justify-content:space-between; height:68px; gap:20px}
+.logo{display:flex; align-items:center; gap:9px; font-family:var(--ff-display); font-weight:600; font-size:21px; text-decoration:none}
+.logo b{color:var(--coral)}
+.navlinks{display:flex; gap:26px; font-size:15px; font-weight:600}
+.navlinks a{text-decoration:none; color:var(--ash)}
+.navlinks a:hover{color:var(--ink)}
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:8px; font-family:var(--ff-body); font-weight:800; font-size:15.5px; text-decoration:none; padding:13px 24px; border-radius:var(--r-pill); border:none; cursor:pointer; transition:transform .12s, filter .12s}
+.btn:active{transform:translateY(1px)}
+.btn-coral{background:var(--coral); color:var(--white)}
+.btn-coral:hover{filter:brightness(1.06)}
+.btn-ink{background:var(--ink); color:var(--cream)}
+.btn-ghost{background:transparent; color:var(--ink); border:1.5px solid rgba(16,64,63,.22)}
+.btn-ghost:hover{background:var(--white)}
+.btn-sm{padding:9px 18px; font-size:14px}
+.nav-acoes{display:flex; gap:9px; align-items:center}
+@media (max-width:560px){ .nav-acoes .btn-coral{display:none} }
+
+.hero{padding:80px 0 90px; position:relative; overflow:hidden}
+/* Flashes de fundo: o giro é lento de propósito — presença, não distração. */
+.ambiente{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0}
+.amb{position:absolute; opacity:.055; transform-origin:center}
+.amb-1{width:520px; top:-160px; right:-140px; animation:gira-lento 90s linear infinite}
+.amb-2{width:300px; bottom:-90px; left:-90px; animation:gira-lento 64s linear infinite reverse}
+.amb-3{width:130px; top:38%; left:44%; opacity:.045; animation:gira-lento 46s linear infinite}
+@keyframes gira-lento{to{transform:rotate(360deg)}}
+.hero .wrap{position:relative; z-index:1}
+.hero .wrap{display:grid; grid-template-columns:1.05fr .95fr; gap:60px; align-items:center}
+.hero h1{font-size:clamp(46px,5.8vw,74px); margin:18px 0 0}
+.hero h1 .snap{color:var(--coral)}
+.hero .lead{font-size:20px; color:var(--ash); margin:22px 0 32px; max-width:32ch}
+.hero .lead strong{color:var(--ink); font-weight:800}
+.cta-row{display:flex; gap:12px; flex-wrap:wrap}
+.hero-nota{margin-top:28px; font-size:14.5px; color:var(--ash); display:flex; gap:18px; flex-wrap:wrap}
+.hero-nota span{display:flex; align-items:center; gap:7px}
+.tick{width:16px; height:16px; border-radius:50%; background:var(--lime); display:flex; align-items:center; justify-content:center; flex:none}
+
+.palco{display:flex; justify-content:center}
+.fone{width:282px; background:var(--ink); border-radius:42px; padding:9px; box-shadow:0 34px 64px -22px rgba(16,64,63,.45); position:relative}
+.fone-notch{position:absolute; top:9px; left:50%; transform:translateX(-50%); width:92px; height:21px; background:var(--ink); border-radius:0 0 14px 14px; z-index:3}
+.fone-tela{background:var(--cream); border-radius:34px; padding:30px 24px 24px; height:552px; display:flex; flex-direction:column; overflow:hidden; position:relative}
+.oi{font-family:var(--ff-display); font-weight:600; font-size:28px; margin-top:12px}
+.hoje{font-size:13.5px; color:var(--ash); margin-top:3px}
+.snapbtn{position:relative; margin:26px auto 20px; width:196px; height:196px; border-radius:50%; border:none; cursor:pointer; background:var(--coral); color:var(--white); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; box-shadow:0 14px 34px -10px rgba(229,80,47,.62); transition:transform .14s; font-family:var(--ff-display)}
+.snapbtn::after{
+  content:''; position:absolute; width:196px; height:196px; border-radius:50%;
+  border:2px solid var(--coral); opacity:0; animation:convite 3.4s ease-out infinite;
+}
+.snapbtn:hover{transform:scale(1.03)}
+.snapbtn:hover::after{animation-play-state:paused; opacity:0}
+@keyframes convite{
+  0%{transform:scale(1); opacity:.5}
+  70%{transform:scale(1.26); opacity:0}
+  100%{opacity:0}
+}
+.snapbtn:active{transform:scale(.96)}
+.snapbtn .big{font-size:30px; font-weight:600; line-height:1.05}
+.snapbtn .sm{font-family:var(--ff-body); font-size:12px; font-weight:700; opacity:.82}
+.sofar .h{font-family:var(--ff-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); margin-bottom:8px}
+.linha-batida{display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid var(--linha); font-size:14.5px}
+.linha-batida:first-of-type{border-top:none}
+.linha-batida .k{font-weight:700}
+.linha-batida .t{font-family:var(--ff-mono); font-size:14px}
+.vazio{font-size:13.5px; color:var(--ash)}
+
+.bateu-tela{position:absolute; inset:0; background:var(--coral); border-radius:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; opacity:0; pointer-events:none; transition:opacity .18s}
+.bateu-tela.on{opacity:1; pointer-events:auto}
+.bateu-flash{animation:gira 14s linear infinite; position:absolute; top:52px}
+@keyframes gira{to{transform:rotate(360deg)}}
+.check{width:92px; height:92px; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; margin-bottom:16px; animation:pop .4s cubic-bezier(.2,.9,.3,1.4) both}
+@keyframes pop{from{transform:scale(.5); opacity:0} to{transform:none; opacity:1}}
+.bateu{font-family:var(--ff-display); font-size:46px; font-weight:600; color:var(--white); line-height:1.1}
+.bateu-sub{font-size:15px; color:rgba(255,255,255,.94); text-align:center; margin-top:4px}
+.bateu-sub .tm{font-family:var(--ff-mono); font-weight:500}
+.bateu-volta{margin-top:26px; background:transparent; border:1.5px solid rgba(255,255,255,.5); color:var(--white); border-radius:var(--r-pill); padding:10px 22px; font:inherit; font-weight:800; font-size:14px; cursor:pointer}
+
+.faixa{background:var(--white); border-top:1px solid var(--linha); border-bottom:1px solid var(--linha)}
+.faixa .wrap{display:grid; grid-template-columns:repeat(3,1fr); gap:30px; padding-top:34px; padding-bottom:34px}
+.ben h3{font-size:19px; margin-bottom:5px}
+.ben p{font-size:15px; color:var(--ash)}
+
+.secao{padding:92px 0}
+.cab{max-width:620px; margin-bottom:46px}
+.cab h2{font-size:clamp(32px,3.8vw,48px); margin:14px 0 0}
+.cab p{color:var(--ash); font-size:18px; margin-top:14px}
+
+.passos{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+.passo{background:var(--white); border:1px solid var(--linha); border-radius:var(--r-md); padding:26px}
+.passo .n{font-family:var(--ff-mono); font-size:11px; color:var(--coral-dark); letter-spacing:.1em}
+.passo h3{font-size:21px; margin:12px 0 8px}
+.passo p{font-size:15.5px; color:var(--ash)}
+
+.tela-bloco{display:grid; grid-template-columns:.85fr 1.15fr; gap:52px; align-items:center; padding:46px 0; border-top:1px solid var(--linha)}
+.tela-bloco:first-of-type{border-top:none}
+.tela-bloco.inv{grid-template-columns:1.15fr .85fr}
+.tela-bloco.inv .tela-txt{order:2}
+.tela-txt h3{font-size:28px; margin:12px 0 12px}
+.tela-txt p{color:var(--ash); font-size:16.5px}
+.lista{list-style:none; margin-top:18px; display:flex; flex-direction:column; gap:10px}
+.lista li{display:flex; gap:11px; font-size:16px; align-items:flex-start}
+.lista li::before{content:''; width:7px; height:7px; border-radius:50%; background:var(--coral); flex:none; margin-top:9px}
+
+.tablet{background:var(--ink); border-radius:26px; padding:12px; box-shadow:0 24px 50px -20px rgba(16,64,63,.4)}
+.tablet-tela{background:var(--cream); border-radius:18px; padding:26px; display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:center; min-height:326px}
+.q-relogio{font-family:var(--ff-mono); font-size:44px; font-weight:500; letter-spacing:-.02em}
+.q-data{font-size:13px; color:var(--ash)}
+.q-tit{font-family:var(--ff-display); font-size:26px; font-weight:600; margin-top:20px}
+.q-campo{margin-top:14px; background:var(--white); border-radius:var(--r-md); padding:12px 14px; border:1.5px solid var(--peach)}
+.q-lb{font-family:var(--ff-mono); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--coral-dark)}
+.q-val{font-family:var(--ff-mono); font-size:24px; letter-spacing:.22em; margin-top:2px}
+.q-cursor{display:inline-block; width:2px; height:20px; background:var(--coral); vertical-align:-3px; animation:pisca 1.1s steps(2) infinite}
+@keyframes pisca{50%{opacity:0}}
+.teclado{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.tecla{background:var(--white); border:1px solid var(--linha); border-radius:14px; padding:14px 0; font-family:var(--ff-mono); font-size:20px; text-align:center}
+.tecla.acao{background:var(--peach); border-color:transparent; font-family:var(--ff-body); font-size:13px; font-weight:800}
+.tecla.ok{background:var(--coral); color:var(--white); border-color:transparent}
+
+.desk{background:var(--white); border-radius:var(--r-md); border:1px solid var(--linha); overflow:hidden; box-shadow:0 24px 50px -24px rgba(16,64,63,.3)}
+.desk-bar{background:#F3ECE1; padding:9px 13px; display:flex; gap:6px; align-items:center; border-bottom:1px solid var(--linha)}
+.pt{width:9px; height:9px; border-radius:50%; background:#D9CEC0}
+.desk-url{margin-left:10px; font-family:var(--ff-mono); font-size:10px; color:var(--ash)}
+.desk-corpo{display:grid; grid-template-columns:130px 1fr; min-height:326px}
+.desk-nav{background:var(--cream); border-right:1px solid var(--linha); padding:16px 10px; display:flex; flex-direction:column; gap:3px}
+.desk-nav .item{font-size:11.5px; font-weight:700; color:var(--ash); padding:6px 9px; border-radius:9px}
+.desk-nav .item.on{background:var(--ink); color:var(--cream)}
+.desk-main{padding:18px}
+.desk-h{font-family:var(--ff-display); font-size:19px; font-weight:600}
+.desk-sub{font-size:11px; color:var(--ash); margin-top:2px}
+.cards4{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px}
+.stat{background:var(--white); border:1px solid var(--linha); border-radius:12px; padding:10px}
+.stat.destaque{background:var(--peach); border-color:transparent}
+.stat .k{font-family:var(--ff-mono); font-size:7.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--coral-dark)}
+.stat .v{font-family:var(--ff-display); font-size:21px; font-weight:600; line-height:1.15}
+.ap-tab{margin-top:10px; border:1px solid var(--linha); border-radius:12px; overflow:hidden}
+.ap-linha{display:grid; grid-template-columns:1fr .6fr .6fr .6fr .7fr; gap:6px; padding:8px 10px; border-top:1px solid var(--linha); font-size:10.5px; align-items:center}
+.ap-linha:first-child{border-top:none; background:#FBF4E8}
+.ap-linha:first-child span{font-family:var(--ff-mono); font-size:7.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ash)}
+.ap-linha .m{font-family:var(--ff-mono)}
+.ap-linha.total{background:var(--ink); color:var(--cream)}
+.ap-linha.total span{font-weight:700}
+.alerta{color:var(--coral-dark); font-weight:700}
+.desk-acoes{display:flex; gap:6px; margin-top:10px}
+.mini-btn{font-size:10px; font-weight:800; padding:6px 12px; border-radius:var(--r-pill); background:var(--coral); color:var(--white)}
+.mini-btn.g{background:transparent; border:1px solid var(--linha); color:var(--ink)}
+
+.secao-ink{background:var(--ink); color:var(--cream)}
+.secao-ink h2{color:var(--cream)}
+.secao-ink .eyebrow{color:var(--lime)}
+.secao-ink .eyebrow::before{background:var(--lime)}
+.secao-ink .cab p{color:rgba(255,248,238,.72)}
+.conf{display:grid; grid-template-columns:repeat(4,1fr); gap:18px}
+.conf-item{border-top:2px solid rgba(203,245,77,.35); padding-top:16px}
+.conf-item h3{font-size:17.5px; color:var(--cream); margin-bottom:7px}
+.conf-item p{font-size:14px; color:rgba(255,248,238,.72); line-height:1.6}
+.conf-pe{margin-top:34px; font-size:13.5px; color:rgba(255,248,238,.6); border-top:1px solid rgba(255,248,238,.14); padding-top:20px; max-width:72ch}
+
+.cta{background:var(--coral); color:var(--white); border-radius:var(--r-lg); padding:64px 44px; text-align:center; position:relative; overflow:hidden}
+.cta h2{font-size:clamp(32px,3.6vw,44px); color:var(--white)}
+.cta p{margin:14px auto 28px; max-width:42ch; font-size:17.5px; color:rgba(255,255,255,.93)}
+.cta-flash{position:absolute; opacity:.14; pointer-events:none; transform-origin:center; animation:gira-lento 80s linear infinite}
+.cta-flash.b{animation-duration:58s; animation-direction:reverse}
+
+.pe{border-top:1px solid var(--linha); padding:38px 0; background:var(--white)}
+.pe .wrap{display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; align-items:flex-start}
+.pe-legal{font-family:var(--ff-mono); font-size:10.5px; color:var(--ash); line-height:1.9}
+.pe-links{display:flex; gap:22px; font-size:14px; font-weight:600}
+.pe-links a{text-decoration:none; color:var(--ash)}
+
+@media (max-width:980px){
+  .hero .wrap{grid-template-columns:1fr; gap:48px}
+  .faixa .wrap, .passos, .conf{grid-template-columns:1fr; gap:22px}
+  .tela-bloco, .tela-bloco.inv{grid-template-columns:1fr; gap:28px}
+  .tela-bloco.inv .tela-txt{order:0}
+  .navlinks{display:none}
+  .desk-corpo{grid-template-columns:1fr}
+  .desk-nav{flex-direction:row; overflow:auto; border-right:none; border-bottom:1px solid var(--linha)}
+  .cards4{grid-template-columns:repeat(2,1fr)}
+  .tablet-tela{grid-template-columns:1fr}
+  .secao{padding:62px 0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important} html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="logo" href="#topo">
+      <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#FF6B4A"/></svg>
+      Ponto<b>Snap</b>
+    </a>
+    <div class="navlinks">
+      <a href="#como">Como funciona</a>
+      <a href="#telas">As telas</a>
+      <a href="#lei">A lei</a>
+    </div>
+    <div class="nav-acoes">
+      <a class="btn btn-ghost btn-sm" href="https://ponto-snap-web.vercel.app/login">Acessar área do cliente</a>
+      <a class="btn btn-coral btn-sm" href="#falar">Falar com a gente</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="topo">
+  <div class="ambiente" aria-hidden="true">
+    <svg class="amb amb-1" viewBox="0 0 100 100"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#FF6B4A"/></svg>
+    <svg class="amb amb-2" viewBox="0 0 100 100"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#10403F"/></svg>
+    <svg class="amb amb-3" viewBox="0 0 100 100"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#E5502F"/></svg>
+  </div>
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Ponto eletrônico · empresas com CLT</div>
+      <h1>Bater ponto<br />num <span class="snap">estalo</span>.</h1>
+      <p class="lead">
+        Seu time registra o ponto no celular que já está no bolso.
+        Um toque e acabou. E você <strong>fecha o mês em minutos</strong>,
+        sem planilha, sem papel e sem discussão.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-coral" href="#falar">Quero conhecer</a>
+        <a class="btn btn-ghost" href="#telas">Ver as telas</a>
+      </div>
+      <div class="hero-nota">
+        <span><i class="tick"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M4 12.5 L9.5 18 L20 6" stroke="#10403F" stroke-width="4" stroke-linecap="round"/></svg></i> Sem relógio na parede</span>
+        <span><i class="tick"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M4 12.5 L9.5 18 L20 6" stroke="#10403F" stroke-width="4" stroke-linecap="round"/></svg></i> Sem instalar nada</span>
+      </div>
+    </div>
+
+    <div class="palco">
+      <div class="fone">
+        <div class="fone-notch"></div>
+        <div class="fone-tela">
+          <div class="oi">Oi, Maria</div>
+          <div class="hoje" id="hoje">ter, 15 de jul</div>
+          <button class="snapbtn" id="bater">
+            <span class="big" id="btn-txt">Bater<br />ponto</span>
+            <span class="sm">toque pra registrar</span>
+          </button>
+          <div class="sofar">
+            <div class="h">Hoje</div>
+            <div id="batidas"><div class="vazio">Nada por aqui ainda. Bate o primeiro ponto do dia?</div></div>
+          </div>
+
+          <div class="bateu-tela" id="bateu-tela">
+            <svg class="bateu-flash" width="86" height="86" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#FFE2D1"/></svg>
+            <div class="check">
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M4 12.5 L9.5 18 L20 6" stroke="#FFF8EE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="bateu">Bateu!</div>
+            <div class="bateu-sub"><span id="bateu-tipo">Entrada</span> registrada às <span class="tm" id="bateu-hora">08:00</span></div>
+            <button class="bateu-volta" id="voltar">Voltar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="faixa">
+  <div class="wrap">
+    <div class="ben">
+      <h3>Zero equipamento</h3>
+      <p>Nada de relógio caro na parede, manutenção ou bobina de papel acabando na sexta.</p>
+    </div>
+    <div class="ben">
+      <h3>Todo mundo consegue usar</h3>
+      <p>Um botão grande no celular. Quem não tem celular bate no tablet da recepção, com matrícula e PIN.</p>
+    </div>
+    <div class="ben">
+      <h3>O mês fecha sozinho</h3>
+      <p>Horas extras, faltas e atrasos somados. Sai em PDF ou Excel pro seu contador.</p>
+    </div>
+  </div>
+</div>
+
+<section class="secao" id="como">
+  <div class="wrap">
+    <div class="cab">
+      <div class="eyebrow">Como funciona</div>
+      <h2>Três passos.<br />Nenhum deles é difícil.</h2>
+    </div>
+    <div class="passos">
+      <div class="passo">
+        <div class="n">PASSO 1</div>
+        <h3>Cadastre o time</h3>
+        <p>Nome, CPF e o horário de trabalho de cada um. Uma tarde e está no ar — sem técnico, sem instalação.</p>
+      </div>
+      <div class="passo">
+        <div class="n">PASSO 2</div>
+        <h3>Cada um bate do seu jeito</h3>
+        <p>Pelo celular ou no tablet da recepção. O funcionário vê as próprias horas e recebe o comprovante de cada batida.</p>
+      </div>
+      <div class="passo">
+        <div class="n">PASSO 3</div>
+        <h3>Feche o mês</h3>
+        <p>Escolhe a competência e o relatório sai pronto, com as horas e o custo em reais. É só mandar pro contador.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="telas" style="background:var(--white)">
+  <div class="wrap">
+    <div class="cab">
+      <div class="eyebrow">As telas</div>
+      <h2>Do jeito que seu time<br />vai ver todo dia</h2>
+      <p>Nada de sistema empresarial cheio de menu. Cada pessoa vê só o que precisa.</p>
+    </div>
+
+    <div class="tela-bloco">
+      <div class="tela-txt">
+        <div class="eyebrow">Tablet na recepção</div>
+        <h3>Quem não tem celular também bate</h3>
+        <p>Um tablet configurado uma vez atende a equipe inteira. Digita a matrícula, digita o PIN, pronto.</p>
+        <ul class="lista">
+          <li>Ninguém digita senha de e-mail em público</li>
+          <li>Serve pra chão de fábrica, obra, cozinha, portaria</li>
+          <li>Um tablet velho resolve — não precisa comprar nada caro</li>
+        </ul>
+      </div>
+      <div class="tablet">
+        <div class="tablet-tela">
+          <div>
+            <div class="q-relogio" id="relogio">08:00</div>
+            <div class="q-data">terça, 15 de julho</div>
+            <div class="q-tit">Bate o ponto</div>
+            <div class="q-campo">
+              <div class="q-lb">Matrícula</div>
+              <div class="q-val">041<span class="q-cursor"></span></div>
+            </div>
+          </div>
+          <div class="teclado">
+            <div class="tecla">1</div><div class="tecla">2</div><div class="tecla">3</div>
+            <div class="tecla">4</div><div class="tecla">5</div><div class="tecla">6</div>
+            <div class="tecla">7</div><div class="tecla">8</div><div class="tecla">9</div>
+            <div class="tecla acao">apagar</div><div class="tecla">0</div><div class="tecla ok">OK</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tela-bloco inv">
+      <div class="desk">
+        <div class="desk-bar">
+          <span class="pt"></span><span class="pt"></span><span class="pt"></span>
+          <span class="desk-url">app.pontosnap.com.br/rh/relatorios</span>
+        </div>
+        <div class="desk-corpo">
+          <div class="desk-nav">
+            <div class="item">Painel</div><div class="item">Funcionários</div><div class="item">Escalas</div>
+            <div class="item">Espelhos</div><div class="item">Apuração</div><div class="item on">Relatórios</div>
+          </div>
+          <div class="desk-main">
+            <div class="desk-h">Relatórios</div>
+            <div class="desk-sub">Fechamento de julho/2026 · 24 funcionários</div>
+            <div class="cards4">
+              <div class="stat destaque"><div class="k">Custo em extras</div><div class="v">R$ 4.182</div></div>
+              <div class="stat"><div class="k">Horas extras</div><div class="v">37h20</div></div>
+              <div class="stat"><div class="k">Faltas</div><div class="v">16h00</div></div>
+              <div class="stat"><div class="k">Atrasos</div><div class="v">2h05</div></div>
+            </div>
+            <div class="ap-tab">
+              <div class="ap-linha"><span>Funcionário</span><span>Trabalhou</span><span>Extra</span><span>Faltou</span><span>Extras R$</span></div>
+              <div class="ap-linha"><span>Maria da Silva</span><span class="m">176h00</span><span class="m">8h30</span><span class="m">—</span><span class="m">R$ 1.020,00</span></div>
+              <div class="ap-linha"><span>João Pereira</span><span class="m">168h00</span><span class="m">4h10</span><span class="m alerta">8h00</span><span class="m">R$ 512,50</span></div>
+              <div class="ap-linha"><span>Ana Souza</span><span class="m">176h00</span><span class="m">12h00</span><span class="m">—</span><span class="m">R$ 1.440,00</span></div>
+              <div class="ap-linha total"><span>Total</span><span class="m">520h00</span><span class="m">24h40</span><span class="m">8h00</span><span class="m">R$ 2.972,50</span></div>
+            </div>
+            <div class="desk-acoes"><span class="mini-btn">Gerar</span><span class="mini-btn g">PDF</span><span class="mini-btn g">Excel</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="tela-txt">
+        <div class="eyebrow">RH · no computador</div>
+        <h3>O mês fechado numa tela</h3>
+        <p>Escolhe o mês, clica em gerar. As horas de todo mundo somadas, com o custo das extras em reais.</p>
+        <ul class="lista">
+          <li>Baixa em PDF ou Excel e manda pro contador</li>
+          <li>Painel do dia: quem bateu, quem faltou, quem está atrasado</li>
+          <li>Escalas normais, 12x36 e feriados já vêm prontos</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao secao-ink" id="lei">
+  <div class="wrap">
+    <div class="cab">
+      <div class="eyebrow">A parte séria</div>
+      <h2>E quando o fiscal pedir?</h2>
+      <p>Ponto eletrônico tem regra do Ministério do Trabalho. O PontoSnap foi feito por ela — você não precisa entender de nada disso, só saber que está resolvido.</p>
+    </div>
+    <div class="conf">
+      <div class="conf-item">
+        <h3>Portaria MTP 671</h3>
+        <p>É a norma que diz como o ponto eletrônico tem que funcionar. O sistema segue o formato que ela exige, do jeito que ela exige.</p>
+      </div>
+      <div class="conf-item">
+        <h3>Arquivo na hora</h3>
+        <p>O fiscal pede o arquivo do período e o RH baixa ali mesmo, assinado com o certificado digital da sua empresa.</p>
+      </div>
+      <div class="conf-item">
+        <h3>Registro não se apaga</h3>
+        <p>Nem o RH, nem nós. Corrigir um ponto cria um registro novo e o original continua lá. É isso que te protege numa discussão.</p>
+      </div>
+      <div class="conf-item">
+        <h3>Dados protegidos</h3>
+        <p>LGPD levada a sério: cada empresa isolada da outra, e cada funcionário enxerga só o próprio ponto.</p>
+      </div>
+    </div>
+    <p class="conf-pe">
+      Software registrado no INPI: o número do registro vai dentro de cada arquivo gerado — é assim que o fiscal
+      liga o arquivo ao programa que o produziu. Destinado ao registro de jornada de empregados CLT.
+    </p>
+  </div>
+</section>
+
+<section class="secao" id="falar">
+  <div class="wrap">
+    <div class="cta">
+      <svg class="cta-flash" style="width:280px; top:-90px; right:-60px" viewBox="0 0 100 100"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#FFF8EE"/></svg>
+      <svg class="cta-flash b" style="width:150px; bottom:-50px; left:-30px" viewBox="0 0 100 100"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#FFF8EE"/></svg>
+      <h2>Bora ver funcionando<br />com o seu time?</h2>
+      <p>A gente mostra o sistema com os horários e a escala da sua empresa. Leva 20 minutos.</p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn btn-ink" href="mailto:contato@pontosnap.com.br">Agendar uma conversa</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="pe">
+  <div class="wrap">
+    <div>
+      <a class="logo" href="#topo" style="margin-bottom:12px">
+        <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 0 L58 40 L100 50 L58 60 L50 100 L42 60 L0 50 L42 40 Z" fill="#FF6B4A"/></svg>
+        Ponto<b>Snap</b>
+      </a>
+      <p class="pe-legal">
+        Ponto eletrônico conforme a Portaria MTP 671/2021<br />
+        Para registro de jornada de empregados CLT
+      </p>
+    </div>
+    <div class="pe-links">
+      <a href="#como">Como funciona</a>
+      <a href="#telas">As telas</a>
+      <a href="#lei">A lei</a>
+      <a href="https://ponto-snap-web.vercel.app/login">Área do cliente</a>
+      <a href="mailto:contato@pontosnap.com.br">Contato</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const pad = (v) => String(v).padStart(2, '0');
+
+const ROTULOS = ['Entrada', 'Saída almoço', 'Volta almoço', 'Saída'];
+const HORAS = ['08:00', '12:00', '13:00', '17:00'];
+let batidas = [];
+
+function render() {
+  $('batidas').innerHTML = batidas.length === 0
+    ? '<div class="vazio">Nada por aqui ainda. Bate o primeiro ponto do dia?</div>'
+    : batidas.map((b) => `<div class="linha-batida"><span class="k">${b.rotulo}</span><span class="t">${b.hora}</span></div>`).join('');
+  $('btn-txt').innerHTML = batidas.length >= 4 ? 'Recomeçar' : 'Bater<br />ponto';
+}
+
+$('bater').addEventListener('click', () => {
+  if (batidas.length >= 4) { batidas = []; render(); return; }
+  const i = batidas.length;
+  batidas.push({ rotulo: ROTULOS[i], hora: HORAS[i] });
+  render();
+  $('bateu-tipo').textContent = ROTULOS[i];
+  $('bateu-hora').textContent = HORAS[i];
+  $('bateu-tela').classList.add('on');
+});
+$('voltar').addEventListener('click', () => $('bateu-tela').classList.remove('on'));
+render();
+
+const agora = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+$('relogio').textContent = agora();
+setInterval(() => { $('relogio').textContent = agora(); }, 20000);
+
+$('hoje').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })
+  .replace('.', '').replace('-feira', '');
+</script>
+</body>
+</html>
