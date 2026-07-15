@@ -1,12 +1,106 @@
-.topo{ text-align:center; margin:30px 0 34px; }
-.marca{ font-family:var(--ff-display); font-weight:600; font-size:34px; margin-top:10px; }
-.snap{ color:var(--coral); }
-.tag{ font-family:var(--ff-display); font-weight:500; font-size:16px; color:var(--ash); margin-top:4px; }
+.tela{ min-height:100dvh; display:grid; grid-template-columns:1.05fr .95fr; }
+
+/* ── Painel da marca (desktop) ── */
+.marca{
+  background:var(--ink); color:var(--cream); padding:52px 48px;
+  display:flex; flex-direction:column; position:relative; overflow:hidden;
+}
+.ambiente{ position:absolute; inset:0; pointer-events:none; }
+.amb{ position:absolute; opacity:.07; transform-origin:center; }
+.amb1{ top:-130px; right:-150px; animation:gira-devagar 90s linear infinite; }
+.amb2{ bottom:-60px; left:-60px; animation:gira-devagar 64s linear infinite reverse; }
+.ambMob{ top:-80px; right:-90px; opacity:.09; animation:gira-devagar 90s linear infinite; }
+@keyframes gira-devagar{ to{ transform:rotate(360deg); } }
+
+.marcaLogo{
+  position:relative; z-index:1; display:flex; align-items:center; gap:10px;
+  font-family:var(--ff-display); font-weight:600; font-size:23px; color:var(--cream);
+}
+.marcaLogo b{ color:var(--coral); }
+.giraLogo{ animation:gira-devagar 22s linear infinite; transform-origin:center; }
+.marcaTit{
+  position:relative; z-index:1; margin:auto 0;
+  font-family:var(--ff-display); font-weight:600; font-size:40px; line-height:1.08; letter-spacing:-.02em;
+}
+.marcaTit span{ color:var(--coral); }
+
+/* ── Faixa da marca (celular) ── */
+.faixaMob{ display:none; }
+
+/* ── Formulário ── */
+.lado{
+  background:var(--cream); padding:52px 56px;
+  display:flex; flex-direction:column; justify-content:center;
+}
+.caixa{ width:100%; max-width:352px; margin:0 auto; }
+.titulo{ font-family:var(--ff-display); font-weight:600; font-size:31px; letter-spacing:-.015em; }
+.sub{ color:var(--ash); font-size:15px; margin:6px 0 28px; }
+
+.campo{ margin-bottom:14px; }
+.campo label{
+  display:block; font-family:var(--ff-mono); font-size:9.5px; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--coral-dark); margin-bottom:6px;
+}
+.entrada{
+  display:flex; align-items:center; gap:11px; background:var(--white);
+  border:1.5px solid transparent; border-radius:var(--r-md); padding:14px 16px;
+  transition:border-color .15s, box-shadow .15s; color:var(--ink);
+}
+.entrada:focus-within{ border-color:var(--coral); box-shadow:0 0 0 4px rgba(255,107,74,.14); }
+.entrada > svg{ flex:none; opacity:.4; }
+.entrada input{
+  border:none; outline:none; background:transparent; font:inherit; font-size:15.5px;
+  width:100%; color:var(--ink); min-width:0;
+}
+.entrada input::placeholder{ color:#B9AEA2; }
+.olho{ background:none; border:none; cursor:pointer; padding:0; opacity:.4; color:var(--ink); display:flex; }
+.olho:hover{ opacity:.75; }
+
 .erro{
   background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
-  padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 12px;
+  padding:11px 14px; font-size:14px; font-weight:600; margin:4px 0 12px;
 }
-.rodape{
-  margin-top:auto; text-align:center; font-family:var(--ff-mono);
-  font-size:11.5px; color:var(--ash); letter-spacing:.03em; padding-top:24px;
+
+.entrar{
+  width:100%; margin-top:6px; background:var(--coral); color:var(--white); border:none;
+  border-radius:var(--r-pill); padding:16px; font-family:var(--ff-body); font-weight:800;
+  font-size:16.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px;
+  transition:transform .12s, filter .12s;
+}
+.entrar:hover:not(:disabled){ filter:brightness(1.06); }
+.entrar:active:not(:disabled){ transform:translateY(1px); }
+.entrar:disabled{ opacity:.55; cursor:not-allowed; }
+.giraBtn{ animation:gira-devagar 8s linear infinite; transform-origin:center; }
+
+.ajuda{ margin-top:14px; font-size:13px; color:var(--ash); text-align:center; }
+
+.quiosque{
+  margin-top:22px; border-top:1px solid rgba(16,64,63,.1); padding-top:20px;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.quiosque p{ font-size:13.5px; color:var(--ash); line-height:1.45; }
+.quiosque button{
+  flex:none; font-family:var(--ff-body); font-size:13px; font-weight:800; color:var(--ink);
+  background:transparent; border:1.5px solid rgba(16,64,63,.2); border-radius:var(--r-pill);
+  padding:9px 16px; cursor:pointer;
+}
+.quiosque button:hover{ background:var(--white); }
+
+/* ── Celular: painel vira faixa ── */
+@media (max-width:900px){
+  .tela{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+  .marca{ display:none; }
+  .faixaMob{
+    display:block; background:var(--ink); padding:34px 26px 26px;
+    position:relative; overflow:hidden; border-radius:0 0 26px 26px;
+  }
+  .faixaMob .marcaLogo{ font-size:21px; }
+  .faixaTag{ position:relative; z-index:1; color:rgba(255,248,238,.6); font-size:13px; margin-top:5px; }
+  .lado{ padding:30px 24px 40px; justify-content:flex-start; }
+  .titulo{ font-size:25px; }
+  .sub{ margin-bottom:20px; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .amb, .giraLogo, .giraBtn{ animation:none; }
 }
