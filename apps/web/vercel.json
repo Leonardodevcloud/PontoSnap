@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://pontoapi-production.up.railway.app/:path*"
+      "destination": "https://TROQUE-PELA-SUA-API.up.railway.app/:path*"
     },
     {
       "source": "/(.*)",

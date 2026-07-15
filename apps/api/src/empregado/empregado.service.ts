@@ -1,11 +1,23 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { empregado, pontoHorarioContratual, comTenant, type Db } from '@ponto/db';
+import { empregado, pontoHorarioContratual, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { hashPin } from '../auth/pin';
+import { hashSenha } from '../auth/senha';
+import { randomBytes } from 'node:crypto';
 
 export interface CriarEmpregadoParams {
   cpf: string; nome: string; matricula?: string; pin?: string; pis?: string; salarioMensal?: number;
+  email?: string;
+}
+
+/** Senha provisória legível: sem 0/O/1/l/I para não confundir na hora de digitar. */
+const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+function senhaProvisoria(tam = 10): string {
+  const bytes = randomBytes(tam);
+  let out = '';
+  for (const b of bytes) out += ALFABETO[b % ALFABETO.length];
+  return out;
 }
 
 type EmpregadoRow = typeof empregado.$inferSelect;
@@ -21,7 +33,7 @@ export class EmpregadoService {
   }
 
   async criar(tenantId: string, p: CriarEmpregadoParams) {
-    return comTenant(this.db, tenantId, async (tx) => {
+    const criado = await comTenant(this.db, tenantId, async (tx) => {
       const dup = await tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.cpf, p.cpf))).limit(1);
       if (dup[0]) throw new ConflictException('Já existe empregado com este CPF');
@@ -34,6 +46,61 @@ export class EmpregadoService {
       }).returning();
       return this.semSegredos(rows[0]!);
     });
+
+    // Acesso ao app é opcional: quem só bate no quiosque não precisa de login.
+    if (p.email) {
+      const acesso = await this.criarOuResetarAcesso(tenantId, criado.id, p.email);
+      return { ...criado, acesso };
+    }
+    return criado;
+  }
+
+  /**
+   * Cria (ou reseta) o login do colaborador. Devolve a senha provisória UMA vez —
+   * ela não é recuperável depois, só resetável. O primeiro login exige troca.
+   */
+  async criarOuResetarAcesso(tenantId: string, empregadoId: string, email?: string) {
+    const emp = (await comTenant(this.db, tenantId, (tx) =>
+      tx.select().from(empregado)
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1)))[0];
+    if (!emp) throw new NotFoundException('Empregado não encontrado');
+
+    const senha = senhaProvisoria();
+    const senhaHash = await hashSenha(senha);
+
+    // O e-mail é único global (é a chave do login), então o lookup roda como MASTER —
+    // igual ao login. A escrita continua carimbando o tenant do empregado.
+    return comoMaster(this.db, async (tx) => {
+      const atual = (await tx.select().from(usuario)
+        .where(eq(usuario.empregadoId, empregadoId)).limit(1))[0];
+
+      if (atual) {
+        await tx.update(usuario)
+          .set({ senhaHash, deveTrocarSenha: true, ativo: true, ...(email ? { email } : {}) })
+          .where(eq(usuario.id, atual.id));
+        return { email: email ?? atual.email, senhaProvisoria: senha, resetado: true };
+      }
+
+      if (!email) throw new ConflictException('Informe o e-mail para criar o acesso');
+      const emUso = (await tx.select().from(usuario).where(eq(usuario.email, email)).limit(1))[0];
+      if (emUso) throw new ConflictException('Este e-mail já está em uso');
+
+      await tx.insert(usuario).values({
+        tenantId, email, senhaHash, perfil: 'COLABORADOR',
+        empregadoId, deveTrocarSenha: true,
+      });
+      return { email, senhaProvisoria: senha, resetado: false };
+    });
+  }
+
+  /** Indica quais empregados já têm login (para a tela do RH). */
+  async listarComAcesso(tenantId: string) {
+    const emps = await this.listar(tenantId);
+    const contas = await comoMaster(this.db, (tx) =>
+      tx.select({ empregadoId: usuario.empregadoId, email: usuario.email })
+        .from(usuario).where(eq(usuario.tenantId, tenantId)));
+    const porEmpregado = new Map(contas.filter((c) => c.empregadoId).map((c) => [c.empregadoId!, c.email]));
+    return emps.map((e) => ({ ...e, emailAcesso: porEmpregado.get(e.id) ?? null }));
   }
 
   async listar(tenantId: string) {

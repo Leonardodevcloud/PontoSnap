@@ -18,6 +18,7 @@ export function Funcionarios() {
   const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
+  const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
 
   async function carregar() {
     try { setLista(await api.get<Empregado[]>('/empregados')); }
@@ -59,6 +60,7 @@ export function Funcionarios() {
               {menu === e.id && (
                 <div className={css.menu} onClick={(ev) => ev.stopPropagation()}>
                   <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
+                  <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
                   <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
                   <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
                   <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
@@ -75,6 +77,7 @@ export function Funcionarios() {
       {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
+      {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
     </div>
   );
 }
@@ -85,21 +88,34 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
   const [matricula, setMatricula] = useState('');
   const [pin, setPin] = useState('');
   const [salario, setSalario] = useState('');
+  const [email, setEmail] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [acessoCriado, setAcessoCriado] = useState<{ email: string; senhaProvisoria: string } | null>(null);
 
   async function salvar() {
     setErro(null); setEnviando(true);
     try {
       const sal = salario ? Number(salario.replace(',', '.')) : undefined;
-      await api.post('/empregados', {
+      const r = await api.post<{ acesso?: { email: string; senhaProvisoria: string } }>('/empregados', {
         nome: nome.trim(), cpf: soDigitos(cpf),
         matricula: matricula.trim() || undefined,
         pin: pin.trim() || undefined,
         salarioMensal: sal,
+        email: email.trim() || undefined,
       });
+      if (r.acesso) { setAcessoCriado(r.acesso); return; }
       onCriado();
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  }
+
+  if (acessoCriado) {
+    return (
+      <Modal titulo="Funcionário cadastrado" onFechar={onCriado}>
+        <Credencial email={acessoCriado.email} senha={acessoCriado.senhaProvisoria} />
+        <Botao variante="lime" onClick={onCriado}>Concluir</Botao>
+      </Modal>
+    );
   }
 
   return (
@@ -109,6 +125,8 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
       <Campo rotulo="Matrícula (opcional)" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="001" />
       <Campo rotulo="PIN do quiosque (opcional)" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="4 a 8 dígitos" />
       <Campo rotulo="Salário mensal (opcional)" inputMode="decimal" value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2200.00" />
+      <Campo rotulo="E-mail para acesso ao app (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com.br" />
+      <p className={css.aviso}>Com e-mail, ele recebe login no app. Sem e-mail, bate ponto só no quiosque (matrícula + PIN).</p>
       {erro && <p className={css.erro}>{erro}</p>}
       <Botao variante="coral" onClick={salvar} disabled={enviando || !nome || cpf.length < 11}>
         {enviando ? 'Salvando…' : 'Adicionar'}
@@ -239,6 +257,65 @@ function ModalEscala12x36({ empregado, onFechar, onSalvo }: { empregado: Emprega
       {resultado
         ? <Botao variante="lime" onClick={onSalvo}>Concluir</Botao>
         : <Botao variante="coral" onClick={gerar} disabled={enviando || !dataInicio}>{enviando ? 'Gerando…' : 'Gerar escala'}</Botao>}
+    </Modal>
+  );
+}
+
+/** Mostra a senha provisória. Ela não é recuperável depois — só resetável. */
+function Credencial({ email, senha }: { email: string; senha: string }) {
+  const [copiado, setCopiado] = useState(false);
+  async function copiar() {
+    await navigator.clipboard.writeText(`E-mail: ${email}\nSenha provisória: ${senha}`);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+  return (
+    <div className={css.credencial}>
+      <p className={css.credAviso}>Anote agora: esta senha <strong>não aparece de novo</strong>. Depois só dá para resetar.</p>
+      <div className={css.credLinha}><span>E-mail</span><strong>{email}</strong></div>
+      <div className={css.credLinha}><span>Senha provisória</span><strong className={css.credSenha}>{senha}</strong></div>
+      <button className={css.credCopiar} onClick={copiar}>{copiado ? 'Copiado!' : 'Copiar credenciais'}</button>
+      <p className={css.credNota}>No primeiro acesso o funcionário é obrigado a criar a senha dele.</p>
+    </div>
+  );
+}
+
+function ModalAcesso({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
+  const jaTem = !!empregado.emailAcesso;
+  const [email, setEmail] = useState(empregado.emailAcesso ?? '');
+  const [criado, setCriado] = useState<{ email: string; senhaProvisoria: string } | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  async function enviar() {
+    setErro(null); setEnviando(true);
+    try {
+      const r = await api.post<{ email: string; senhaProvisoria: string }>(
+        `/empregados/${empregado.id}/acesso`, jaTem ? {} : { email: email.trim() });
+      setCriado(r);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setEnviando(false); }
+  }
+
+  return (
+    <Modal titulo={jaTem ? `Resetar senha de ${empregado.nome.split(' ')[0]}` : `Criar acesso de ${empregado.nome.split(' ')[0]}`} onFechar={criado ? onSalvo : onFechar}>
+      {criado ? (
+        <>
+          <Credencial email={criado.email} senha={criado.senhaProvisoria} />
+          <Botao variante="lime" onClick={onSalvo}>Concluir</Botao>
+        </>
+      ) : (
+        <>
+          {jaTem
+            ? <p className={css.aviso}>Vai gerar uma nova senha provisória para <strong>{empregado.emailAcesso}</strong>. A senha atual deixa de funcionar.</p>
+            : <p className={css.aviso}>O funcionário passa a acessar o app pelo celular. Sem isso, ele bate ponto só no quiosque.</p>}
+          {!jaTem && <Campo rotulo="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com.br" />}
+          {erro && <p className={css.erroModal}>{erro}</p>}
+          <Botao variante="coral" onClick={enviar} disabled={enviando || (!jaTem && !email.trim())}>
+            {enviando ? 'Gerando…' : jaTem ? 'Resetar senha' : 'Criar acesso'}
+          </Botao>
+        </>
+      )}
     </Modal>
   );
 }

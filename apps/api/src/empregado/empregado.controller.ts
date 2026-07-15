@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { EmpregadoService } from './empregado.service';
-import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto } from './dto/empregado.dto';
+import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, AcessoDto } from './dto/empregado.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -25,7 +25,7 @@ export class EmpregadoController {
     return this.empregados.criar(this.tenant(u), dto);
   }
   @Get() listar(@UsuarioAtual() u: PayloadAcesso) {
-    return this.empregados.listar(this.tenant(u));
+    return this.empregados.listarComAcesso(this.tenant(u));
   }
   @Get(':id') obter(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.empregados.obter(this.tenant(u), id);
@@ -38,6 +38,10 @@ export class EmpregadoController {
   }
   @Patch(':id/horario') horario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirHorarioDto) {
     return this.empregados.definirHorario(this.tenant(u), id, dto.horarioContratualId);
+  }
+  /** Cria ou reseta o login do colaborador. A senha provisória aparece uma vez só. */
+  @Post(':id/acesso') acesso(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: AcessoDto) {
+    return this.empregados.criarOuResetarAcesso(this.tenant(u), id, dto.email);
   }
   @Patch(':id/salario') salario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirSalarioDto) {
     return this.empregados.definirSalario(this.tenant(u), id, dto.salarioMensal);

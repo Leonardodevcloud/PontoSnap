@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, Matches, MinLength, IsUUID, IsNumber, Min } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches, MinLength, IsUUID, IsNumber, Min, IsEmail } from 'class-validator';
 
 export class CriarEmpregadoDto {
   @Matches(/^\d{11}$/, { message: 'CPF deve ter 11 dígitos' }) cpf!: string;
@@ -7,6 +7,7 @@ export class CriarEmpregadoDto {
   @IsOptional() @Matches(/^\d{4,8}$/, { message: 'PIN deve ter de 4 a 8 dígitos' }) pin?: string;
   @IsOptional() @Matches(/^\d{11}$/) pis?: string;
   @IsOptional() @IsNumber() @Min(0) salarioMensal?: number;
+  @IsOptional() @IsEmail() email?: string;
 }
 
 export class DefinirPinDto {
@@ -23,4 +24,8 @@ export class DefinirHorarioDto {
 
 export class DefinirSalarioDto {
   @IsNumber() @Min(0) salarioMensal!: number;
+}
+
+export class AcessoDto {
+  @IsOptional() @IsEmail() email?: string;
 }

@@ -35,6 +35,7 @@ export interface Batida {
 }
 
 export interface Empregado {
+  emailAcesso?: string | null;
   salarioMensal?: string | null;
   id: string;
   cpf: string;

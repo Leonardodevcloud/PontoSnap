@@ -39,3 +39,13 @@
 .erroModal{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:10px 13px; font-size:13.5px; font-weight:600; margin:0 0 12px; }
 
 .sucesso{ background:#eef7d8; color:#5f7d0a; border-radius:var(--r-md); padding:11px 14px; font-size:13.5px; font-weight:600; margin:0 0 12px; }
+
+.credencial{ background:var(--cream); border:1px solid var(--peach); border-radius:var(--r-md); padding:16px 18px; margin-bottom:14px; }
+.credAviso{ margin:0 0 12px; font-size:13px; color:var(--coral-dark); line-height:1.45; }
+.credLinha{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 0; border-top:1px solid rgba(16,64,63,.08); font-size:13.5px; }
+.credLinha:first-of-type{ border-top:none; }
+.credLinha span{ color:var(--ash); }
+.credSenha{ font-family:var(--ff-mono); font-size:17px; letter-spacing:.06em; color:var(--ink); background:var(--white); padding:4px 10px; border-radius:8px; }
+.credCopiar{ width:100%; margin-top:12px; padding:9px; border:1px dashed rgba(16,64,63,.3); background:transparent; border-radius:12px; font:inherit; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer; }
+.credCopiar:hover{ background:var(--white); }
+.credNota{ margin:10px 0 0; font-size:12px; color:var(--ash); }
