@@ -21,6 +21,8 @@
 .marcaTit{
   position:relative; z-index:1; margin:auto 0;
   font-family:var(--ff-display); font-weight:600; font-size:40px; line-height:1.08; letter-spacing:-.02em;
+  /* global.css força color:var(--ink) em h1..h3 — sobre o painel escuro tem que ser explícito. */
+  color:var(--cream);
 }
 .marcaTit span{ color:var(--coral); }
 
@@ -33,7 +35,7 @@
   display:flex; flex-direction:column; justify-content:center;
 }
 .caixa{ width:100%; max-width:352px; margin:0 auto; }
-.titulo{ font-family:var(--ff-display); font-weight:600; font-size:31px; letter-spacing:-.015em; }
+.titulo{ font-family:var(--ff-display); font-weight:600; font-size:31px; letter-spacing:-.015em; color:var(--ink); }
 .sub{ color:var(--ash); font-size:15px; margin:6px 0 28px; }
 
 .campo{ margin-bottom:14px; }
@@ -91,7 +93,7 @@
   .tela{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
   .marca{ display:none; }
   .faixaMob{
-    display:block; background:var(--ink); padding:34px 26px 26px;
+    display:block; background:var(--ink); color:var(--cream); padding:34px 26px 26px;
     position:relative; overflow:hidden; border-radius:0 0 26px 26px;
   }
   .faixaMob .marcaLogo{ font-size:21px; }
