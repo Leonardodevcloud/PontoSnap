@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import {
-  pontoRep, pontoMarcacao, empregado, tenant, usuario, comTenant, type Db,
+  pontoRep, pontoMarcacao, empregado, tenant, usuario, pontoHorarioContratual, comTenant, type Db,
 } from '@ponto/db';
 import { proximaMarcacao, gerarComprovante, assinarPdfPAdES } from '@ponto/rep-core';
 import { Coletor, OnlineOffline, TipoIdentificador } from '@ponto/shared';
@@ -86,7 +86,23 @@ export class MarcacaoService {
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao, coletor: pontoMarcacao.coletor,
       }).from(pontoMarcacao).where(and(...conds)).orderBy(asc(pontoMarcacao.dtMarcacao));
 
-      return { nome: e.nome, marcacoes: linhas.map((m) => ({ nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao, coletor: m.coletor })) };
+      // Quantas marcações o dia prevê (2 por par do horário contratual).
+      // 0 = desconhecido: o app rotula pelo que já foi batido, sem inventar descanso.
+      let esperadas = 0;
+      if (e.horarioContratualId) {
+        const h = (await tx.select().from(pontoHorarioContratual)
+          .where(eq(pontoHorarioContratual.id, e.horarioContratualId)).limit(1))[0];
+        if (h) {
+          const dia = new Date(`${dataStr ?? new Date().toISOString().slice(0, 10)}T12:00:00-0300`).getDay();
+          if (h.diasSemana.includes(dia)) esperadas = h.pares.length * 2;
+        }
+      }
+
+      return {
+        nome: e.nome,
+        esperadas,
+        marcacoes: linhas.map((m) => ({ nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao, coletor: m.coletor })),
+      };
     });
   }
 

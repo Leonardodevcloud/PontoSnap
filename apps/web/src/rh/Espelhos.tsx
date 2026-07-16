@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { fmtHora, hojeSP, minutosParaHhMm, rotuloPorIndice } from '../lib/formato';
+import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato';
 import type { Empregado, EspelhoResp } from '../tipos';
 import css from './Espelhos.module.css';
 
@@ -57,7 +57,7 @@ export function Espelhos() {
             {esp.marcacoes.map((m, i) => (
               <div key={m.nsr} className={css.row}>
                 <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
-                <span className={css.k}>{rotuloPorIndice(i)}</span>
+                <span className={css.k}>{rotuloMarcacao(i, esp.marcacoes.length)}</span>
                 <span className={css.t}>{fmtHora(m.dtMarcacao)}</span>
                 <span className={css.nsr}>NSR #{String(m.nsr).padStart(5, '0')}</span>
               </div>

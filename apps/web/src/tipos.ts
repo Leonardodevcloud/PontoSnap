@@ -25,6 +25,8 @@ export interface Marcacao {
 
 export interface MinhasMarcacoes {
   nome: string;
+  /** Quantas marcações o dia prevê pelo horário contratual. 0 = desconhecido. */
+  esperadas?: number;
   marcacoes: Marcacao[];
 }
 

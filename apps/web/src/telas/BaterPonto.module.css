@@ -1,8 +1,10 @@
 .oi{ font-family:var(--ff-display); font-weight:600; font-size:26px; margin-top:6px; }
 .hoje{ font-family:var(--ff-mono); font-size:12.5px; color:var(--ash); margin-top:2px; }
 
+.btnzona{ display:flex; justify-content:center; margin:32px 0 6px; }
+
 .snapbtn{
-  margin:32px auto 6px; width:190px; height:190px; border-radius:50%;
+  position:relative; width:190px; height:190px; border-radius:50%;
   background:var(--coral); color:var(--white); border:none; cursor:pointer;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   font-family:var(--ff-display); font-weight:600;
@@ -10,6 +12,20 @@
   transition:transform .1s ease, box-shadow .2s ease;
 }
 .snapbtn:active{ transform:scale(.96); }
+/* touch-action:none — sem isso o navegador rola a tela em vez de deixar segurar */
+.snapbtn{ touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+
+/* Anel de progresso do "segurar pra registrar". */
+.anel{ position:absolute; inset:-8px; transform:rotate(-90deg); pointer-events:none; }
+.anel circle{
+  fill:none; stroke:var(--lime); stroke-width:5; stroke-linecap:round;
+  transition:stroke-dashoffset .06s linear;
+}
+
+.aviso{
+  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  padding:10px 14px; font-size:13px; font-weight:600; margin:10px 0 0; line-height:1.45;
+}
 .snapbtn:disabled{ opacity:.7; cursor:wait; }
 .big{ font-size:24px; line-height:1.05; text-align:center; }
 .sm{ font-size:12px; font-weight:500; opacity:.9; margin-top:8px; font-family:var(--ff-mono); letter-spacing:.04em; }

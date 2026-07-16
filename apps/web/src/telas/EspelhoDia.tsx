@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloPorIndice } from '../lib/formato';
+import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato';
 import type { MinhasMarcacoes } from '../tipos';
 import { Botao } from '../components/Botao';
 import css from './EspelhoDia.module.css';
@@ -49,7 +49,7 @@ export function EspelhoDia() {
       {marcs.map((m, i) => (
         <button key={m.nsr} className={css.row} onClick={() => baixarComprovante(m.nsr)} title="Baixar comprovante">
           <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
-          <span className={css.kk}>{rotuloPorIndice(i)}</span>
+          <span className={css.kk}>{rotuloMarcacao(i, marcs.length)}</span>
           <span className={css.tt}>{fmtHora(m.dtMarcacao)}</span>
           <span className={css.pdf}>PDF</span>
         </button>
