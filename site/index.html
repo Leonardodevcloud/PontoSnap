@@ -213,6 +213,50 @@ a{color:inherit}
   .secao{padding:62px 0}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important} html{scroll-behavior:auto}}
+
+/* ═══ Interatividade das telas ═══ */
+
+/* Anel do "segurar pra registrar" no herói */
+.anel-h{ position:absolute; inset:-7px; transform:rotate(-90deg); pointer-events:none; }
+.anel-h circle{
+  fill:none; stroke:var(--lime); stroke-width:5; stroke-linecap:round;
+  transition:stroke-dashoffset .06s linear;
+}
+#bater{ position:relative; touch-action:none; user-select:none; -webkit-user-select:none; }
+
+/* Teclado do quiosque */
+.tablet-tela{ position:relative; }
+.teclado .tecla{
+  font:inherit; color:inherit; cursor:pointer; border:none;
+  transition:transform .06s ease, background .12s ease;
+}
+.teclado .tecla:hover{ filter:brightness(.96); }
+.teclado .tecla:active{ transform:scale(.94); }
+
+.q-bateu{
+  position:absolute; inset:0; background:var(--coral); border-radius:inherit;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  opacity:0; pointer-events:none; transition:opacity .18s;
+}
+.q-bateu.on{ opacity:1; pointer-events:auto; }
+.q-check{
+  width:64px; height:64px; border-radius:50%; background:var(--ink);
+  display:flex; align-items:center; justify-content:center;
+  animation:qpop .4s cubic-bezier(.2,.9,.3,1.4) both;
+}
+@keyframes qpop{ from{ transform:scale(.5); opacity:0 } to{ transform:none; opacity:1 } }
+.q-bateu-t1{ font-family:var(--ff-display); font-weight:600; font-size:34px; color:var(--white); }
+.q-bateu-t2{ font-size:14px; color:rgba(255,255,255,.94); text-align:center; padding:0 20px; }
+.q-bateu-t2 b{ font-family:var(--ff-mono); font-weight:500; }
+
+/* Navegação de mês no desktop */
+.mes-btn{
+  border:none; background:rgba(16,64,63,.07); color:var(--ink); cursor:pointer;
+  width:20px; height:20px; border-radius:50%; font-family:var(--ff-display);
+  font-size:13px; line-height:1; padding:0; vertical-align:middle;
+}
+.mes-btn:hover:not(:disabled){ background:var(--peach); }
+.mes-btn:disabled{ opacity:.3; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -247,7 +291,7 @@ a{color:inherit}
       <h1>Bater ponto<br />num <span class="snap">estalo</span>.</h1>
       <p class="lead">
         Seu time registra o ponto no celular que já está no bolso.
-        Um toque e acabou. E você <strong>fecha o mês em minutos</strong>,
+        Segura o botão e acabou. E você <strong>fecha o mês em minutos</strong>,
         sem planilha, sem papel e sem discussão.
       </p>
       <div class="cta-row">
@@ -267,8 +311,9 @@ a{color:inherit}
           <div class="oi">Oi, Maria</div>
           <div class="hoje" id="hoje">ter, 15 de jul</div>
           <button class="snapbtn" id="bater">
+          <svg class="anel-h" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="94" id="anel-h-c"/></svg>
             <span class="big" id="btn-txt">Bater<br />ponto</span>
-            <span class="sm">toque pra registrar</span>
+            <span class="sm">segure pra registrar</span>
           </button>
           <div class="sofar">
             <div class="h">Hoje</div>
@@ -359,15 +404,22 @@ a{color:inherit}
             <div class="q-data">terça, 15 de julho</div>
             <div class="q-tit">Bate o ponto</div>
             <div class="q-campo">
-              <div class="q-lb">Matrícula</div>
-              <div class="q-val">041<span class="q-cursor"></span></div>
+              <div class="q-lb" id="q-lb">Matrícula</div>
+              <div class="q-val" id="q-val"><span class="q-cursor"></span></div>
             </div>
           </div>
-          <div class="teclado">
-            <div class="tecla">1</div><div class="tecla">2</div><div class="tecla">3</div>
-            <div class="tecla">4</div><div class="tecla">5</div><div class="tecla">6</div>
-            <div class="tecla">7</div><div class="tecla">8</div><div class="tecla">9</div>
-            <div class="tecla acao">apagar</div><div class="tecla">0</div><div class="tecla ok">OK</div>
+          <div class="teclado" id="teclado">
+            <button class="tecla" data-t="1">1</button><button class="tecla" data-t="2">2</button><button class="tecla" data-t="3">3</button>
+            <button class="tecla" data-t="4">4</button><button class="tecla" data-t="5">5</button><button class="tecla" data-t="6">6</button>
+            <button class="tecla" data-t="7">7</button><button class="tecla" data-t="8">8</button><button class="tecla" data-t="9">9</button>
+            <button class="tecla acao" data-t="del">apagar</button><button class="tecla" data-t="0">0</button><button class="tecla ok" data-t="ok">OK</button>
+          </div>
+          <div class="q-bateu" id="q-bateu">
+            <div class="q-check">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M4 12.5 L9.5 18 L20 6" stroke="#FFF8EE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="q-bateu-t1">Bateu!</div>
+            <div class="q-bateu-t2" id="q-bateu-t2"></div>
           </div>
         </div>
       </div>
@@ -386,14 +438,20 @@ a{color:inherit}
           </div>
           <div class="desk-main">
             <div class="desk-h">Relatórios</div>
-            <div class="desk-sub">Fechamento de julho/2026 · 24 funcionários</div>
-            <div class="cards4">
-              <div class="stat destaque"><div class="k">Custo em extras</div><div class="v">R$ 4.182</div></div>
-              <div class="stat"><div class="k">Horas extras</div><div class="v">37h20</div></div>
-              <div class="stat"><div class="k">Faltas</div><div class="v">16h00</div></div>
-              <div class="stat"><div class="k">Atrasos</div><div class="v">2h05</div></div>
+            <div class="desk-sub">
+              Fechamento de
+              <button class="mes-btn" id="mes-ant">‹</button>
+              <b id="desk-mes">julho/2026</b>
+              <button class="mes-btn" id="mes-prox">›</button>
+              · 24 funcionários
             </div>
-            <div class="ap-tab">
+            <div class="cards4">
+              <div class="stat destaque"><div class="k">Custo em extras</div><div class="v" id="s-custo">R$ 4.182</div></div>
+              <div class="stat"><div class="k">Horas extras</div><div class="v" id="s-extras">37h20</div></div>
+              <div class="stat"><div class="k">Faltas</div><div class="v" id="s-faltas">16h00</div></div>
+              <div class="stat"><div class="k">Atrasos</div><div class="v" id="s-atrasos">2h05</div></div>
+            </div>
+            <div class="ap-tab" id="ap-tab">
               <div class="ap-linha"><span>Funcionário</span><span>Trabalhou</span><span>Extra</span><span>Faltou</span><span>Extras R$</span></div>
               <div class="ap-linha"><span>Maria da Silva</span><span class="m">176h00</span><span class="m">8h30</span><span class="m">—</span><span class="m">R$ 1.020,00</span></div>
               <div class="ap-linha"><span>João Pereira</span><span class="m">168h00</span><span class="m">4h10</span><span class="m alerta">8h00</span><span class="m">R$ 512,50</span></div>
@@ -490,7 +548,7 @@ a{color:inherit}
 const $ = (id) => document.getElementById(id);
 const pad = (v) => String(v).padStart(2, '0');
 
-const ROTULOS = ['Entrada', 'Saída almoço', 'Volta almoço', 'Saída'];
+const ROTULOS = ['Entrada', 'Saída descanso', 'Retorno descanso', 'Saída'];
 const HORAS = ['08:00', '12:00', '13:00', '17:00'];
 let batidas = [];
 
@@ -501,7 +559,9 @@ function render() {
   $('btn-txt').innerHTML = batidas.length >= 4 ? 'Recomeçar' : 'Bater<br />ponto';
 }
 
-$('bater').addEventListener('click', () => {
+/* Segurar pra registrar — o mesmo gesto do app de verdade.
+   Tocar sem querer não bate ponto, e marcação não se apaga. */
+function registrarHeroi() {
   if (batidas.length >= 4) { batidas = []; render(); return; }
   const i = batidas.length;
   batidas.push({ rotulo: ROTULOS[i], hora: HORAS[i] });
@@ -509,7 +569,33 @@ $('bater').addEventListener('click', () => {
   $('bateu-tipo').textContent = ROTULOS[i];
   $('bateu-hora').textContent = HORAS[i];
   $('bateu-tela').classList.add('on');
+}
+
+const DUR_H = 900, VOL_H = 2 * Math.PI * 94;
+const anelH = $('anel-h-c');
+if (anelH) { anelH.style.strokeDasharray = VOL_H; anelH.style.strokeDashoffset = VOL_H; }
+let t0H = 0, rafH = null;
+function passoH() {
+  const p = Math.min(1, (performance.now() - t0H) / DUR_H);
+  if (anelH) anelH.style.strokeDashoffset = VOL_H * (1 - p);
+  if (p >= 1) { pararH(); registrarHeroi(); return; }
+  rafH = requestAnimationFrame(passoH);
+}
+function pararH() {
+  if (rafH) cancelAnimationFrame(rafH);
+  rafH = null;
+  if (anelH) anelH.style.strokeDashoffset = VOL_H;
+}
+const btnH = $('bater');
+btnH.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (batidas.length >= 4) { registrarHeroi(); return; }
+  t0H = performance.now(); rafH = requestAnimationFrame(passoH);
 });
+btnH.addEventListener('pointerup', pararH);
+btnH.addEventListener('pointerleave', pararH);
+btnH.addEventListener('pointercancel', pararH);
+btnH.addEventListener('contextmenu', (e) => e.preventDefault());
 $('voltar').addEventListener('click', () => $('bateu-tela').classList.remove('on'));
 render();
 
@@ -519,6 +605,109 @@ setInterval(() => { $('relogio').textContent = agora(); }, 20000);
 
 $('hoje').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })
   .replace('.', '').replace('-feira', '');
+
+/* ═══ TABLET: quiosque de verdade ═══
+   Matrícula → PIN → bateu. É o fluxo do app: quem não tem celular
+   também bate, sem digitar senha de e-mail na frente dos outros. */
+(function () {
+  const val = document.getElementById('q-val');
+  const lb = document.getElementById('q-lb');
+  const bateu = document.getElementById('q-bateu');
+  const bateuT2 = document.getElementById('q-bateu-t2');
+  if (!val || !lb) return;
+
+  const ROT_Q = ['Entrada', 'Saída descanso', 'Retorno descanso', 'Saída'];
+  let etapa = 'matricula', buffer = '', qtd = 0;
+
+  const pinta = () => {
+    const txt = etapa === 'pin' ? '•'.repeat(buffer.length) : buffer;
+    val.innerHTML = txt + '<span class="q-cursor"></span>';
+  };
+
+  const reset = () => { etapa = 'matricula'; buffer = ''; lb.textContent = 'Matrícula'; pinta(); };
+
+  document.getElementById('teclado').addEventListener('click', (e) => {
+    const t = e.target.closest('.tecla');
+    if (!t || bateu.classList.contains('on')) return;
+    const k = t.dataset.t;
+
+    if (k === 'del') { buffer = buffer.slice(0, -1); pinta(); return; }
+    if (k === 'ok') {
+      if (etapa === 'matricula') {
+        if (buffer.length < 1) return;
+        etapa = 'pin'; buffer = ''; lb.textContent = 'Seu PIN'; pinta();
+      } else {
+        if (buffer.length < 4) return;
+        bateuT2.innerHTML = `<b>${ROT_Q[qtd % 4]}</b> registrada às <b>${agora()}</b>`;
+        qtd++;
+        bateu.classList.add('on');
+        setTimeout(() => { bateu.classList.remove('on'); reset(); }, 2600);
+      }
+      return;
+    }
+    if (buffer.length >= 8) return;
+    buffer += k; pinta();
+  });
+
+  pinta();
+})();
+
+/* ═══ DESKTOP: trocar o mês e ver o fechamento mudar ═══ */
+(function () {
+  const rotulo = document.getElementById('desk-mes');
+  const tab = document.getElementById('ap-tab');
+  if (!rotulo || !tab) return;
+
+  const MESES = [
+    {
+      m: 'maio/2026', custo: 'R$ 2.940', extras: '26h10', faltas: '8h00', atrasos: '1h15',
+      linhas: [
+        ['Maria da Silva', '176h00', '5h00', '—', 'R$ 600,00'],
+        ['João Pereira', '176h00', '9h10', '—', 'R$ 1.128,00'],
+        ['Ana Souza', '168h00', '12h00', '8h00', 'R$ 1.212,00'],
+      ],
+      total: ['520h00', '26h10', '8h00', 'R$ 2.940,00'],
+    },
+    {
+      m: 'junho/2026', custo: 'R$ 3.615', extras: '31h40', faltas: '—', atrasos: '0h40',
+      linhas: [
+        ['Maria da Silva', '176h00', '11h30', '—', 'R$ 1.380,00'],
+        ['João Pereira', '176h00', '8h10', '—', 'R$ 1.005,00'],
+        ['Ana Souza', '176h00', '12h00', '—', 'R$ 1.230,00'],
+      ],
+      total: ['528h00', '31h40', '—', 'R$ 3.615,00'],
+    },
+    {
+      m: 'julho/2026', custo: 'R$ 4.182', extras: '37h20', faltas: '16h00', atrasos: '2h05',
+      linhas: [
+        ['Maria da Silva', '176h00', '8h30', '—', 'R$ 1.020,00'],
+        ['João Pereira', '168h00', '4h10', '8h00', 'R$ 512,50'],
+        ['Ana Souza', '176h00', '12h00', '—', 'R$ 1.440,00'],
+      ],
+      total: ['520h00', '24h40', '8h00', 'R$ 2.972,50'],
+    },
+  ];
+  let i = 2;
+
+  function pinta() {
+    const d = MESES[i];
+    rotulo.textContent = d.m;
+    document.getElementById('s-custo').textContent = d.custo;
+    document.getElementById('s-extras').textContent = d.extras;
+    document.getElementById('s-faltas').textContent = d.faltas;
+    document.getElementById('s-atrasos').textContent = d.atrasos;
+    tab.innerHTML =
+      '<div class="ap-linha"><span>Funcionário</span><span>Trabalhou</span><span>Extra</span><span>Faltou</span><span>Extras R$</span></div>' +
+      d.linhas.map((l) => `<div class="ap-linha"><span>${l[0]}</span><span class="m">${l[1]}</span><span class="m">${l[2]}</span><span class="m${l[3] !== '—' ? ' alerta' : ''}">${l[3]}</span><span class="m">${l[4]}</span></div>`).join('') +
+      `<div class="ap-linha total"><span>Total</span><span class="m">${d.total[0]}</span><span class="m">${d.total[1]}</span><span class="m">${d.total[2]}</span><span class="m">${d.total[3]}</span></div>`;
+    document.getElementById('mes-prox').disabled = i >= MESES.length - 1;
+    document.getElementById('mes-ant').disabled = i <= 0;
+  }
+
+  document.getElementById('mes-ant').addEventListener('click', () => { if (i > 0) { i--; pinta(); } });
+  document.getElementById('mes-prox').addEventListener('click', () => { if (i < MESES.length - 1) { i++; pinta(); } });
+  pinta();
+})();
 </script>
 </body>
 </html>
