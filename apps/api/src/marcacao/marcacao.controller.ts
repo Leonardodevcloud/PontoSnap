@@ -68,6 +68,32 @@ export class MarcacaoController {
     );
   }
 
+  /**
+   * A própria escala: jornada contratada, dias de folga e feriados do período.
+   * Só leitura — quem muda escala é o RH.
+   */
+  @Get('minha-escala')
+  async minhaEscala(
+    @UsuarioAtual() u: PayloadAcesso,
+    @Query('inicio') inicio?: string,
+    @Query('fim') fim?: string,
+  ) {
+    if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
+    if (!inicio || !fim) throw new BadRequestException('Informe inicio e fim (YYYY-MM-DD)');
+    const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
+    const [horario, escala, feriados] = await Promise.all([
+      this.marcacao.meuHorario(u.tenantId, empregadoId),
+      this.tratamento.listarEscala(u.tenantId, empregadoId, inicio, fim),
+      this.tratamento.listarFeriados(u.tenantId, inicio, fim),
+    ]);
+    return {
+      horario,
+      // Datas geradas por escala (ex.: 12x36). Vazio = segue os diasSemana do horário.
+      escala: escala.map((e) => e.data),
+      feriados: feriados.map((f) => ({ data: f.data, nome: f.nome })),
+    };
+  }
+
   /** Lista as batidas do próprio colaborador (para home e espelho do dia). */
   @Get('minhas')
   async minhas(@UsuarioAtual() u: PayloadAcesso, @Query('data') data?: string) {

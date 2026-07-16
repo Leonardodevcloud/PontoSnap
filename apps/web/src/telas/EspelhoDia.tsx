@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato';
 import type { MinhasMarcacoes } from '../tipos';
@@ -15,7 +15,8 @@ function deslocarDia(dataStr: string, dias: number): string {
 
 export function EspelhoDia() {
   const navegar = useNavigate();
-  const [data, setData] = useState(hojeSP());
+  const [params] = useSearchParams();
+  const [data, setData] = useState(params.get('data') ?? hojeSP());
   const [dados, setDados] = useState<MinhasMarcacoes | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);

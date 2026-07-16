@@ -135,6 +135,22 @@ export class MarcacaoService {
     });
   }
 
+  /** Horário contratual do empregado — o que está combinado no contrato. */
+  async meuHorario(tenantId: string, empregadoId: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const e = (await tx.select().from(empregado).where(eq(empregado.id, empregadoId)).limit(1))[0];
+      if (!e) throw new NotFoundException('Empregado não encontrado');
+      if (!e.horarioContratualId) return null;
+      const h = (await tx.select().from(pontoHorarioContratual)
+        .where(eq(pontoHorarioContratual.id, e.horarioContratualId)).limit(1))[0];
+      if (!h) return null;
+      return {
+        codigo: h.codigo, pares: h.pares, diasSemana: h.diasSemana,
+        durJornadaMin: h.durJornadaMin,
+      };
+    });
+  }
+
   /** Local do estabelecimento — usado só para decidir quando pedir observação. */
   async obterLocal(tenantId: string) {
     return comTenant(this.db, tenantId, async (tx) => {

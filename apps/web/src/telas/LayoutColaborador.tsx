@@ -37,6 +37,7 @@ export function LayoutColaborador() {
                 <div className={css.menuNome}>Minha conta</div>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/'); }}>Bater ponto</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
+                <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/trocar-senha'); }}>Trocar minha senha</button>
                 <button role="menuitem" className={css.sair} onClick={() => { sair(); navegar('/login', { replace: true }); }}>
                   Sair
@@ -55,6 +56,9 @@ export function LayoutColaborador() {
         </button>
         <button className={pathname.startsWith('/espelho') ? css.on : ''} onClick={() => navegar('/espelho')}>
           Meu espelho
+        </button>
+        <button className={pathname === '/escala' ? css.on : ''} onClick={() => navegar('/escala')}>
+          Minha escala
         </button>
       </nav>
     </div>

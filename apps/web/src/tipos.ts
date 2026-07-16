@@ -98,6 +98,10 @@ export interface ExtraClassificada { min: number; adicionalPct: number; motivo: 
 
 export interface ResultadoDiaCLT {
   data: string;
+  /** Eco das batidas do dia (ISO). */
+  marcacoes: string[];
+  ehDescansoDia: boolean;
+  faltaInjustificada: boolean;
   minutosTrabalhados: number;
   minutosContratados: number;
   minutosNoturnosReais: number;
@@ -205,4 +209,30 @@ export interface RelatorioResp {
     trabalhadoMin: number; extrasMin: number; faltaMin: number; atrasoMin: number; noturnoMin: number;
     extrasCentavos: number; adicionalNoturnoCentavos: number; liquidoProventosCentavos: number;
   };
+}
+
+// ---- Apuração e escala do próprio colaborador ----
+
+
+
+export interface ApuracaoResp {
+  nome: string;
+  matricula: string | null;
+  inicio: string;
+  fim: string;
+  resultado: ResultadoPeriodoCLT;
+}
+
+export interface ParEntradaSaida { entrada: string; saida: string; }
+
+export interface MinhaEscalaResp {
+  horario: {
+    codigo: string;
+    pares: ParEntradaSaida[];
+    diasSemana: number[];
+    durJornadaMin: number;
+  } | null;
+  /** Datas geradas por escala (12x36). Vazio = segue os diasSemana do horário. */
+  escala: string[];
+  feriados: { data: string; nome: string }[];
 }

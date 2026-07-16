@@ -114,6 +114,7 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
 
   return {
     data: dia.data,
+    marcacoes: dia.marcacoes,
     minutosTrabalhados: trabalhado,
     minutosContratados: esperado,
     minutosNoturnosReais: notReais,

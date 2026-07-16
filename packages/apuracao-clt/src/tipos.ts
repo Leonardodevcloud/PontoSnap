@@ -56,6 +56,8 @@ export interface ExtraClassificada {
 
 export interface ResultadoDia {
   data: string;
+  /** Eco das batidas do dia — quem lê o resultado quase sempre quer mostrá-las junto. */
+  marcacoes: Date[];
   minutosTrabalhados: number;
   minutosContratados: number;
   minutosNoturnosReais: number;

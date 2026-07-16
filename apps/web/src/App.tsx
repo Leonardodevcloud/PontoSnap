@@ -6,6 +6,8 @@ import { Login } from './telas/Login';
 import { TrocarSenha } from './telas/TrocarSenha';
 import { BaterPonto } from './telas/BaterPonto';
 import { LayoutColaborador } from './telas/LayoutColaborador';
+import { EspelhoMes } from './telas/EspelhoMes';
+import { MinhaEscala } from './telas/MinhaEscala';
 import { EspelhoDia } from './telas/EspelhoDia';
 import { LayoutRH } from './rh/LayoutRH';
 import { PainelRH } from './rh/PainelRH';
@@ -67,7 +69,9 @@ export function App() {
       {/* Colaborador (mobile) */}
       <Route path="/" element={<Protegida perfis={['COLABORADOR']}><LayoutColaborador /></Protegida>}>
         <Route index element={<BaterPonto />} />
-        <Route path="espelho" element={<EspelhoDia />} />
+        <Route path="espelho" element={<EspelhoMes />} />
+        <Route path="espelho/dia" element={<EspelhoDia />} />
+        <Route path="escala" element={<MinhaEscala />} />
       </Route>
 
       {/* RH / Admin (desktop) */}
