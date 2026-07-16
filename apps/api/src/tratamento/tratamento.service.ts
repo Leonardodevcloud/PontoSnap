@@ -4,6 +4,7 @@ import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, tenant,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
+import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarPeriodo, diaSemana, REGRAS_CLT_PADRAO, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
@@ -126,7 +127,11 @@ export class TratamentoService {
 
       const inicio = new Date(`${dataStr}T00:00:00-0300`);
       const fim = new Date(`${dataStr}T23:59:59-0300`);
-      const marcs = await tx.select({ nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao })
+      const marcs = await tx.select({
+        nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao,
+        latitude: pontoMarcacao.latitude, longitude: pontoMarcacao.longitude,
+        observacao: pontoMarcacao.observacao,
+      })
         .from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
           gte(pontoMarcacao.dtMarcacao, inicio), lte(pontoMarcacao.dtMarcacao, fim)))
@@ -137,9 +142,24 @@ export class TratamentoService {
             .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]?.durJornadaMin ?? 0
         : 0;
 
+      // Local do estabelecimento para o RH ver de onde cada batida saiu.
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const local = t?.latitude && t?.longitude
+        ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
+        : null;
+
       return {
         nome: emp.nome, matricula: emp.matricula,
-        marcacoes: marcs.map((m) => ({ nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao })),
+        marcacoes: marcs.map((m) => {
+          const pos = m.latitude != null && m.longitude != null
+            ? { latitude: Number(m.latitude), longitude: Number(m.longitude) } : null;
+          const { fora, distancia } = foraDoRaio(local, pos);
+          return {
+            nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao,
+            latitude: pos?.latitude ?? null, longitude: pos?.longitude ?? null,
+            observacao: m.observacao, fora, distancia,
+          };
+        }),
         resumo: apurarJornada(marcs.map((m) => m.dtMarcacao), dur),
       };
     });

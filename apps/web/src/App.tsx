@@ -16,6 +16,7 @@ import { Feriados } from './rh/Feriados';
 import { Fiscal } from './rh/Fiscal';
 import { Relatorios } from './rh/Relatorios';
 import { Certificado } from './rh/Certificado';
+import { Local } from './rh/Local';
 import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
@@ -77,6 +78,7 @@ export function App() {
         <Route path="feriados" element={<Feriados />} />
         <Route path="fiscal" element={<Fiscal />} />
         <Route path="certificado" element={<Certificado />} />
+        <Route path="local" element={<Local />} />
         <Route path="dispositivos" element={<Dispositivos />} />
       </Route>
 

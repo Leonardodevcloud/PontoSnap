@@ -12,6 +12,7 @@ export interface BaterParams {
   tenantId: string; cpf: string; coletor: Coletor;
   onlineOffline?: OnlineOffline; dtMarcacao?: Date;
   ipOrigem?: string | null; latitude?: number | null; longitude?: number | null;
+  observacao?: string | null;
 }
 
 @Injectable()
@@ -45,6 +46,8 @@ export class MarcacaoService {
         ipOrigem: p.ipOrigem ?? null,
         latitude: p.latitude != null ? String(p.latitude) : null,
         longitude: p.longitude != null ? String(p.longitude) : null,
+        // Vai no INSERT: o gatilho de imutabilidade nunca deixaria isso virar UPDATE.
+        observacao: p.observacao?.trim() || null,
       });
       await tx.update(pontoRep).set({ ultimoNsr: g.nsr, ultimoHash: g.hashRegistro }).where(eq(pontoRep.id, rep.id));
       return g;
@@ -53,7 +56,10 @@ export class MarcacaoService {
 
   async baterAutenticado(
     usuarioId: string, tenantId: string, coletor: Coletor,
-    geo?: { latitude?: number | null; longitude?: number | null; ipOrigem?: string | null },
+    geo?: {
+      latitude?: number | null; longitude?: number | null;
+      ipOrigem?: string | null; observacao?: string | null;
+    },
   ) {
     const cpf = await comTenant(this.db, tenantId, async (tx) => {
       const us = await tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1);
@@ -84,6 +90,8 @@ export class MarcacaoService {
       }
       const linhas = await tx.select({
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao, coletor: pontoMarcacao.coletor,
+        latitude: pontoMarcacao.latitude, longitude: pontoMarcacao.longitude,
+        observacao: pontoMarcacao.observacao,
       }).from(pontoMarcacao).where(and(...conds)).orderBy(asc(pontoMarcacao.dtMarcacao));
 
       // Quantas marcações o dia prevê (2 por par do horário contratual).
@@ -98,10 +106,62 @@ export class MarcacaoService {
         }
       }
 
+      // Local do estabelecimento: o app usa só para decidir se pede observação.
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const local = t?.latitude && t?.longitude
+        ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
+        : null;
+
       return {
         nome: e.nome,
         esperadas,
-        marcacoes: linhas.map((m) => ({ nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao, coletor: m.coletor })),
+        local,
+        marcacoes: linhas.map((m) => ({
+          nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao, coletor: m.coletor,
+          latitude: m.latitude != null ? Number(m.latitude) : null,
+          longitude: m.longitude != null ? Number(m.longitude) : null,
+          observacao: m.observacao,
+        })),
+      };
+    });
+  }
+
+  /** Local do estabelecimento — usado só para decidir quando pedir observação. */
+  async obterLocal(tenantId: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      if (!t) throw new NotFoundException('Cliente não encontrado');
+      return {
+        localPrestacao: t.localPrestacao,
+        latitude: t.latitude != null ? Number(t.latitude) : null,
+        longitude: t.longitude != null ? Number(t.longitude) : null,
+        raioMetros: t.raioMetros,
+      };
+    });
+  }
+
+  async definirLocal(tenantId: string, p: {
+    latitude?: number | null; longitude?: number | null;
+    raioMetros?: number | null; localPrestacao?: string;
+  }) {
+    if (p.raioMetros != null && (p.raioMetros < 20 || p.raioMetros > 50_000)) {
+      throw new BadRequestException('Raio deve ficar entre 20 e 50000 metros');
+    }
+    // Devolve o que foi gravado usando returning() — ler numa segunda transação
+    // enquanto esta não commitou traz o valor ANTIGO.
+    return comTenant(this.db, tenantId, async (tx) => {
+      const [t] = await tx.update(tenant).set({
+        latitude: p.latitude != null ? String(p.latitude) : null,
+        longitude: p.longitude != null ? String(p.longitude) : null,
+        raioMetros: p.raioMetros ?? null,
+        ...(p.localPrestacao !== undefined ? { localPrestacao: p.localPrestacao } : {}),
+      }).where(eq(tenant.id, tenantId)).returning();
+      if (!t) throw new NotFoundException('Cliente não encontrado');
+      return {
+        localPrestacao: t.localPrestacao,
+        latitude: t.latitude != null ? Number(t.latitude) : null,
+        longitude: t.longitude != null ? Number(t.longitude) : null,
+        raioMetros: t.raioMetros,
       };
     });
   }

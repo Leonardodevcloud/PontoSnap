@@ -4,6 +4,9 @@ import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato
 import type { Empregado, EspelhoResp } from '../tipos';
 import css from './Espelhos.module.css';
 
+const fmtDistancia = (m?: number | null) =>
+  m == null ? '' : m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+
 export function Espelhos() {
   const [emps, setEmps] = useState<Empregado[]>([]);
   const [empregadoId, setEmpregadoId] = useState('');
@@ -57,7 +60,19 @@ export function Espelhos() {
             {esp.marcacoes.map((m, i) => (
               <div key={m.nsr} className={css.row}>
                 <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
-                <span className={css.k}>{rotuloMarcacao(i, esp.marcacoes.length)}</span>
+                <span>
+                  <span className={css.k}>{rotuloMarcacao(i, esp.marcacoes.length)}</span>
+                  {(m.fora || m.observacao) && (
+                    <span className={css.geoLinha}>
+                      <span className={m.fora ? css.geoFora : css.geoSem}>
+                        {m.fora
+                          ? `Fora · ${fmtDistancia(m.distancia)}`
+                          : m.latitude == null ? 'Sem localização' : 'No escritório'}
+                      </span>
+                      {m.observacao && <span className={css.geoObs}>“{m.observacao}”</span>}
+                    </span>
+                  )}
+                </span>
                 <span className={css.t}>{fmtHora(m.dtMarcacao)}</span>
                 <span className={css.nsr}>NSR #{String(m.nsr).padStart(5, '0')}</span>
               </div>

@@ -99,6 +99,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ponto/shared':
+        specifier: workspace:^
+        version: link:../../packages/shared
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -205,7 +208,11 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)(terser@5.49.0)
 
-  packages/shared: {}
+  packages/shared:
+    devDependencies:
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.20.1)(terser@5.49.0)
 
 packages:
 

@@ -24,6 +24,8 @@ export const pontoMarcacao = pgTable('ponto_marcacao', {
   ipOrigem: varchar('ip_origem', { length: 45 }),
   latitude: numeric('latitude', { precision: 10, scale: 7 }),
   longitude: numeric('longitude', { precision: 10, scale: 7 }),
+  // Escrita só no INSERT — o gatilho de imutabilidade bloqueia UPDATE/DELETE.
+  observacao: varchar('observacao', { length: 200 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique('uq_marcacao_nsr').on(t.repId, t.nsr),

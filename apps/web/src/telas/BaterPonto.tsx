@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtDataCurta, fmtHora, hojeSP, rotuloMarcacao, rotuloProxima } from '../lib/formato';
+import { capturarPosicao, type ResultadoGeo } from '../lib/geolocalizacao';
+import { foraDoRaio } from '@ponto/shared';
 import type { Batida, MinhasMarcacoes } from '../tipos';
 import { Flash } from '../components/Flash';
 import { Botao } from '../components/Botao';
@@ -13,13 +15,22 @@ const DUR_SEGURAR = 900;
 const RAIO = 96;
 const VOLTA = 2 * Math.PI * RAIO;
 
+/** Atalhos para quem bate fora do raio — 1 toque em vez de digitar. */
+const MOTIVOS = ['Home office', 'Visita a cliente', 'Trabalho externo', 'Outro'];
+
+const formatarDistancia = (m: number) =>
+  m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
+
 export function BaterPonto() {
   const navegar = useNavigate();
   const [dados, setDados] = useState<MinhasMarcacoes | null>(null);
   const [batendo, setBatendo] = useState(false);
-  const [confirmada, setConfirmada] = useState<{ batida: Batida; tipo: string } | null>(null);
+  const [confirmada, setConfirmada] = useState<{ batida: Batida; tipo: string; obs?: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [progresso, setProgresso] = useState(0);
+  const [geo, setGeo] = useState<ResultadoGeo | null>(null);
+  const [motivo, setMotivo] = useState<string>(MOTIVOS[0]);
+  const [detalhe, setDetalhe] = useState('');
   const raf = useRef<number | null>(null);
   const inicio = useRef<number>(0);
 
@@ -31,18 +42,33 @@ export function BaterPonto() {
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
+  // Posição só no momento em que a tela é usada — nunca em segundo plano.
+  useEffect(() => { void capturarPosicao().then(setGeo); }, []);
+
   const marcs = dados?.marcacoes ?? [];
   const esperadas = dados?.esperadas ?? 0;
   const proxima = rotuloProxima(marcs.length, esperadas);
   const excedente = esperadas > 0 && marcs.length >= esperadas;
+
+  const posicao = geo?.estado === 'ok' ? geo.posicao : null;
+  const { fora, distancia } = foraDoRaio(dados?.local ?? null, posicao);
+  const semLocalizacao = geo != null && geo.estado !== 'ok';
+  // Só pedimos contexto quando ele ajuda o RH. Empresa sem endereço nunca vê isso.
+  const pedirObs = (fora || (semLocalizacao && !!dados?.local)) && !!dados?.local;
 
   async function bater() {
     setErro(null);
     setBatendo(true);
     try {
       const qtdAntes = marcs.length;
-      const batida = await api.post<Batida>('/marcacao', { coletor: 2 });
-      setConfirmada({ batida, tipo: rotuloProxima(qtdAntes, esperadas) });
+      const obs = pedirObs ? [motivo, detalhe.trim()].filter(Boolean).join(' — ') : undefined;
+      const batida = await api.post<Batida>('/marcacao', {
+        coletor: 2,
+        latitude: posicao?.latitude, longitude: posicao?.longitude,
+        observacao: obs,
+      });
+      setDetalhe('');
+      setConfirmada({ batida, tipo: rotuloProxima(qtdAntes, esperadas), obs });
       void carregar();
     } catch (e) {
       setErro((e as Error).message);
@@ -84,6 +110,7 @@ export function BaterPonto() {
         <div className={css.bateuSub}>
           {confirmada.tipo} registrada às <span className={css.tm}>{fmtHora(confirmada.batida.dtMarcacao)}</span>
         </div>
+        {confirmada.obs && <div className={css.bateuObs}>Anotado: {confirmada.obs}. O RH vai ver.</div>}
         <div className={css.espaco} />
         <Botao variante="lime" onClick={() => navegar('/espelho')}>Ver espelho do dia</Botao>
         <Botao variante="ghost" onClick={() => setConfirmada(null)}>Voltar</Botao>
@@ -101,6 +128,18 @@ export function BaterPonto() {
         {fmtDataCurta()}
         {marcs.length > 0 && ` · você entrou às ${fmtHora(marcs[0].dtMarcacao)}`}
       </div>
+
+      {/* Selo de localização: informa, nunca impede. */}
+      {dados?.local && geo && (
+        <div className={`${css.geo} ${fora ? css.geoFora : semLocalizacao ? css.geoSem : css.geoDentro}`}>
+          <span className={css.geoPt} />
+          {geo.estado === 'ok'
+            ? fora
+              ? `Fora do escritório · ${distancia != null ? formatarDistancia(distancia) : ''}`
+              : 'No escritório'
+            : geo.estado === 'negada' ? 'Sem localização' : 'Localização indisponível'}
+        </div>
+      )}
 
       <div className={css.btnzona}>
         <button
@@ -129,6 +168,32 @@ export function BaterPonto() {
         </button>
       </div>
 
+      {/* Fora do raio: pedimos contexto. O botão continua funcionando de qualquer jeito. */}
+      {pedirObs && (
+        <div className={css.obs}>
+          <div className={css.obsTit}>Onde você está?</div>
+          <p className={css.obsSub}>
+            {geo?.estado === 'ok'
+              ? 'Você está fora do endereço da empresa. Conta pro RH o motivo — leva 1 toque.'
+              : 'Não consegui ver sua localização. Se quiser, conta onde você está — mas pode bater sem isso.'}
+          </p>
+          <div className={css.chips}>
+            {MOTIVOS.map((m) => (
+              <button
+                key={m} type="button"
+                className={`${css.chip} ${motivo === m ? css.chipOn : ''}`}
+                onClick={() => setMotivo(m)}
+              >{m}</button>
+            ))}
+          </div>
+          <input
+            className={css.obsIn} value={detalhe} maxLength={150}
+            onChange={(e) => setDetalhe(e.target.value)}
+            placeholder="Quer detalhar? (opcional)"
+          />
+        </div>
+      )}
+
       {/* A lei proíbe restringir marcação: nunca bloqueamos, só avisamos. */}
       {excedente && (
         <p className={css.aviso}>
@@ -144,7 +209,10 @@ export function BaterPonto() {
         {marcs.length === 0 && <div className={css.vazio}>Nada por aqui ainda. Bate o primeiro ponto do dia?</div>}
         {marcs.map((m, i) => (
           <div key={m.nsr} className={css.row}>
-            <span className={css.k}>{rotuloMarcacao(i, esperadas || marcs.length)}</span>
+            <span>
+              <span className={css.k}>{rotuloMarcacao(i, esperadas || marcs.length)}</span>
+              {m.observacao && <span className={css.rowObs}>{m.observacao}</span>}
+            </span>
             <span className={css.t}>{fmtHora(m.dtMarcacao)}</span>
           </div>
         ))}

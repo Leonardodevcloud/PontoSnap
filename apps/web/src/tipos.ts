@@ -18,15 +18,26 @@ export interface Tenant {
 }
 
 export interface Marcacao {
+  latitude?: number | null;
+  longitude?: number | null;
+  observacao?: string | null;
   nsr: number;
   dtMarcacao: string;
   coletor: number;
+}
+
+export interface LocalEstabelecimento {
+  latitude: number;
+  longitude: number;
+  raioMetros: number | null;
 }
 
 export interface MinhasMarcacoes {
   nome: string;
   /** Quantas marcações o dia prevê pelo horário contratual. 0 = desconhecido. */
   esperadas?: number;
+  /** Local da empresa. null = sem endereço cadastrado (ex.: empresa remota). */
+  local?: LocalEstabelecimento | null;
   marcacoes: Marcacao[];
 }
 
@@ -64,10 +75,22 @@ export interface ResumoJornada {
   paresIncompletos: boolean;
 }
 
+export interface MarcacaoEspelho {
+  nsr: number;
+  dtMarcacao: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  observacao?: string | null;
+  /** true quando a batida saiu de fora do raio do estabelecimento. */
+  fora?: boolean;
+  /** Distância em metros até o estabelecimento. null = sem localização. */
+  distancia?: number | null;
+}
+
 export interface EspelhoResp {
   nome: string;
   matricula: string | null;
-  marcacoes: { nsr: number; dtMarcacao: string }[];
+  marcacoes: MarcacaoEspelho[];
   resumo: ResumoJornada;
 }
 
