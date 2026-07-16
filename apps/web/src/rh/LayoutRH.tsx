@@ -12,6 +12,7 @@ const ITENS = [
   { to: '/rh/feriados', rotulo: 'Feriados' },
   { to: '/rh/fiscal', rotulo: 'Arquivos fiscais' },
   { to: '/rh/local', rotulo: 'Local' },
+  { to: '/rh/banco', rotulo: 'Banco de horas' },
   { to: '/rh/certificado', rotulo: 'Certificado' },
   { to: '/rh/dispositivos', rotulo: 'Quiosques' },
 ];

@@ -1,0 +1,51 @@
+.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; }
+.s{ font-size:12.5px; color:var(--ash); margin:2px 0 14px; }
+
+.resumo{ background:var(--ink); border-radius:var(--r-md); padding:16px 17px; margin-bottom:12px; color:var(--cream); }
+.rL{ font-family:var(--ff-mono); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; opacity:.62; }
+.rV{ font-family:var(--ff-display); font-size:34px; font-weight:600; color:var(--lime); line-height:1.1; }
+.rVneg{ color:var(--peach); }
+.mini{ display:flex; gap:14px; border-top:1px solid rgba(255,248,238,.14); padding-top:10px; margin-top:10px; }
+.mini > div{ flex:1; }
+.mL{ font-size:9.5px; opacity:.62; text-transform:uppercase; letter-spacing:.06em; font-family:var(--ff-mono); }
+.mV{ font-family:var(--ff-mono); font-size:14px; margin-top:2px; }
+.mini .pos{ color:var(--lime); }
+.mini .neg{ color:var(--peach); }
+
+.prazo{
+  background:var(--peach); border-radius:11px; padding:11px 13px;
+  font-size:12.5px; color:var(--coral-dark); font-weight:600; line-height:1.5; margin-bottom:12px;
+}
+.prazoVencido{ border-left:3px solid var(--coral-dark); }
+.prazoOk{
+  background:rgba(16,64,63,.05); border-radius:11px; padding:10px 13px;
+  font-size:12.5px; color:var(--ash); line-height:1.5; margin-bottom:12px;
+}
+
+.hExtrato{
+  font-family:var(--ff-mono); font-size:10px; text-transform:uppercase;
+  letter-spacing:.09em; color:var(--ash); margin:18px 0 4px;
+}
+.ext{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 0; border-top:1px solid rgba(16,64,63,.09);
+}
+.extE{ font-size:13.5px; font-weight:700; }
+.extD{ font-family:var(--ff-mono); font-size:10.5px; color:var(--ash); margin-top:1px; }
+.extV{ font-family:var(--ff-mono); font-size:13.5px; font-weight:500; }
+.pos{ color:var(--ink); }
+.neg{ color:var(--coral-dark); }
+
+.semAcordo{
+  background:var(--white); border:1.5px dashed rgba(16,64,63,.14);
+  border-radius:var(--r-md); padding:22px; text-align:center; margin-top:14px;
+}
+.semAcordo b{ display:block; font-family:var(--ff-display); font-size:16px; margin-bottom:6px; }
+.semAcordo p{ font-size:13px; color:var(--ash); line-height:1.55; }
+.semAcordo strong{ color:var(--ink); }
+
+.vazio{ color:var(--ash); font-size:14px; padding:16px 0; text-align:center; }
+.erro{
+  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  padding:10px 14px; font-size:13.5px; font-weight:600;
+}

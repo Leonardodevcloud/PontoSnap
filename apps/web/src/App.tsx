@@ -8,6 +8,7 @@ import { BaterPonto } from './telas/BaterPonto';
 import { LayoutColaborador } from './telas/LayoutColaborador';
 import { EspelhoMes } from './telas/EspelhoMes';
 import { MinhaEscala } from './telas/MinhaEscala';
+import { MeuBanco } from './telas/MeuBanco';
 import { EspelhoDia } from './telas/EspelhoDia';
 import { LayoutRH } from './rh/LayoutRH';
 import { PainelRH } from './rh/PainelRH';
@@ -20,6 +21,7 @@ import { Fiscal } from './rh/Fiscal';
 import { Relatorios } from './rh/Relatorios';
 import { Certificado } from './rh/Certificado';
 import { Local } from './rh/Local';
+import { BancoHoras } from './rh/BancoHoras';
 import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
@@ -72,6 +74,7 @@ export function App() {
         <Route path="espelho" element={<EspelhoMes />} />
         <Route path="espelho/dia" element={<EspelhoDia />} />
         <Route path="escala" element={<MinhaEscala />} />
+        <Route path="banco" element={<MeuBanco />} />
       </Route>
 
       {/* RH / Admin (desktop) */}
@@ -86,6 +89,7 @@ export function App() {
         <Route path="fiscal" element={<Fiscal />} />
         <Route path="certificado" element={<Certificado />} />
         <Route path="local" element={<Local />} />
+        <Route path="banco" element={<BancoHoras />} />
         <Route path="dispositivos" element={<Dispositivos />} />
       </Route>
 

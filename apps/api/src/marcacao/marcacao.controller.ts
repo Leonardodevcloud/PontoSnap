@@ -4,6 +4,7 @@ import {
 import { Coletor, Perfil } from '@ponto/shared';
 import { MarcacaoService } from './marcacao.service';
 import { TratamentoService } from '../tratamento/tratamento.service';
+import { BancoService } from '../banco/banco.service';
 import { BaterDto, LocalDto } from './dto/bater.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -17,6 +18,7 @@ export class MarcacaoController {
   constructor(
     private readonly marcacao: MarcacaoService,
     private readonly tratamento: TratamentoService,
+    private readonly banco: BancoService,
   ) {}
 
   /** Colaborador bate ponto pelo próprio app. */
@@ -66,6 +68,15 @@ export class MarcacaoController {
       u.tenantId, empregadoId, inicio, fim,
       feriados.map((f) => f.data),
     );
+  }
+
+  /** O próprio banco de horas. Vazio e inativo quando a empresa não tem acordo. */
+  @Get('meu-banco')
+  async meuBanco(@UsuarioAtual() u: PayloadAcesso) {
+    if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
+    const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
+    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+    return this.banco.saldo(u.tenantId, empregadoId, hoje);
   }
 
   /**

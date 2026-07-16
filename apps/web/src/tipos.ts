@@ -236,3 +236,47 @@ export interface MinhaEscalaResp {
   escala: string[];
   feriados: { data: string; nome: string }[];
 }
+
+// ---- Banco de horas ----
+
+export type TipoAcordoBanco = 'NENHUM' | 'INDIVIDUAL' | 'COLETIVO';
+
+export interface LoteBanco {
+  data: string;
+  minutosRestantes: number;
+  venceEm: string;
+  vencido: boolean;
+}
+
+export interface SaldoBanco {
+  saldoMin: number;
+  creditadoMin: number;
+  compensadoMin: number;
+  pagoMin: number;
+  devedorMin: number;
+  vencidoMin: number;
+  aVencerMin: number;
+  proximoVencimento: string | null;
+  lotes: LoteBanco[];
+}
+
+export interface MovimentoBanco {
+  data: string;
+  minutos: number;
+  tipo: 'CREDITO' | 'DEBITO' | 'PAGAMENTO' | 'AJUSTE';
+  descricao?: string;
+}
+
+export interface BancoResp {
+  ativo: boolean;
+  tipoAcordo: TipoAcordoBanco;
+  prazoMeses: number | null;
+  saldo: SaldoBanco | null;
+  extrato: MovimentoBanco[];
+}
+
+export interface ConfigBanco {
+  tipoAcordo: TipoAcordoBanco;
+  prazoMeses: number | null;
+  ativo: boolean;
+}

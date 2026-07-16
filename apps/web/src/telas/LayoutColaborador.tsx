@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
 import { Flash } from '../components/Flash';
 import css from './LayoutColaborador.module.css';
 
@@ -10,6 +11,18 @@ export function LayoutColaborador() {
   const navegar = useNavigate();
   const { pathname } = useLocation();
   const [menu, setMenu] = useState(false);
+  const [temBanco, setTemBanco] = useState(false);
+
+  // A aba de banco de horas só existe pra quem tem acordo. Mostrar uma aba
+  // vazia seria pior do que não ter aba nenhuma.
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await api.get<{ ativo: boolean }>('/marcacao/meu-banco');
+        setTemBanco(b.ativo);
+      } catch { setTemBanco(false); }
+    })();
+  }, []);
 
   return (
     <div className={css.casca}>
@@ -38,6 +51,9 @@ export function LayoutColaborador() {
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/'); }}>Bater ponto</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
+                {temBanco && (
+                  <button role="menuitem" onClick={() => { setMenu(false); navegar('/banco'); }}>Banco de horas</button>
+                )}
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/trocar-senha'); }}>Trocar minha senha</button>
                 <button role="menuitem" className={css.sair} onClick={() => { sair(); navegar('/login', { replace: true }); }}>
                   Sair
@@ -58,8 +74,13 @@ export function LayoutColaborador() {
           Meu espelho
         </button>
         <button className={pathname === '/escala' ? css.on : ''} onClick={() => navegar('/escala')}>
-          Minha escala
+          Escala
         </button>
+        {temBanco && (
+          <button className={pathname === '/banco' ? css.on : ''} onClick={() => navegar('/banco')}>
+            Banco
+          </button>
+        )}
       </nav>
     </div>
   );

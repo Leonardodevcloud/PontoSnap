@@ -71,6 +71,13 @@
       "when": 1784165221182,
       "tag": "0009_smart_blockbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784168887890,
+      "tag": "0010_dry_wrecking_crew",
+      "breakpoints": true
     }
   ]
 }
