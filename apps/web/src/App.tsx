@@ -5,6 +5,7 @@ import type { Perfil } from './tipos';
 import { Login } from './telas/Login';
 import { TrocarSenha } from './telas/TrocarSenha';
 import { BaterPonto } from './telas/BaterPonto';
+import { LayoutColaborador } from './telas/LayoutColaborador';
 import { EspelhoDia } from './telas/EspelhoDia';
 import { LayoutRH } from './rh/LayoutRH';
 import { PainelRH } from './rh/PainelRH';
@@ -64,8 +65,10 @@ export function App() {
       <Route path="/quiosque" element={<Quiosque />} />
 
       {/* Colaborador (mobile) */}
-      <Route path="/" element={<Protegida perfis={['COLABORADOR']}><BaterPonto /></Protegida>} />
-      <Route path="/espelho" element={<Protegida perfis={['COLABORADOR']}><EspelhoDia /></Protegida>} />
+      <Route path="/" element={<Protegida perfis={['COLABORADOR']}><LayoutColaborador /></Protegida>}>
+        <Route index element={<BaterPonto />} />
+        <Route path="espelho" element={<EspelhoDia />} />
+      </Route>
 
       {/* RH / Admin (desktop) */}
       <Route path="/rh" element={<Protegida perfis={PERFIS_RH}><LayoutRH /></Protegida>}>

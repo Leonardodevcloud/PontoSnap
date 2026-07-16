@@ -3,8 +3,10 @@ const TZ = 'America/Sao_Paulo';
 export const fmtHora = (iso: string) =>
   new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
 
-export const fmtDataCurta = (d = new Date()) =>
-  d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: TZ })
+/** Aceita Date ou 'YYYY-MM-DD'. A string é lida ao meio-dia para não escorregar de fuso. */
+export const fmtDataCurta = (d: Date | string = new Date()) =>
+  (typeof d === 'string' ? new Date(`${d}T12:00:00-0300`) : d)
+    .toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: TZ })
     .replace('.', '');
 
 export function hojeSP(): string {

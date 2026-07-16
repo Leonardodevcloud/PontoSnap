@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { Coletor, Perfil } from '@ponto/shared';
 import { MarcacaoService } from './marcacao.service';
+import { TratamentoService } from '../tratamento/tratamento.service';
 import { BaterDto, LocalDto } from './dto/bater.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -13,7 +14,10 @@ import type { PayloadAcesso } from '../auth/token';
 @Controller('marcacao')
 @UseGuards(JwtAuthGuard)
 export class MarcacaoController {
-  constructor(private readonly marcacao: MarcacaoService) {}
+  constructor(
+    private readonly marcacao: MarcacaoService,
+    private readonly tratamento: TratamentoService,
+  ) {}
 
   /** Colaborador bate ponto pelo próprio app. */
   @Post()
@@ -42,6 +46,26 @@ export class MarcacaoController {
   async definirLocal(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LocalDto) {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     return this.marcacao.definirLocal(u.tenantId, dto);
+  }
+
+  /**
+   * Apuração do próprio colaborador num período. Ele vê os próprios números —
+   * a Portaria manda dar transparência ao trabalhador, não escondê-la dele.
+   */
+  @Get('minha-apuracao')
+  async minhaApuracao(
+    @UsuarioAtual() u: PayloadAcesso,
+    @Query('inicio') inicio?: string,
+    @Query('fim') fim?: string,
+  ) {
+    if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
+    if (!inicio || !fim) throw new BadRequestException('Informe inicio e fim (YYYY-MM-DD)');
+    const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
+    const feriados = await this.tratamento.listarFeriados(u.tenantId);
+    return this.tratamento.apurarPeriodoCLT(
+      u.tenantId, empregadoId, inicio, fim,
+      feriados.map((f) => f.data),
+    );
   }
 
   /** Lista as batidas do próprio colaborador (para home e espelho do dia). */

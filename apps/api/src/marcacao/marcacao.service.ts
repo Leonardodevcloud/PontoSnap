@@ -126,6 +126,15 @@ export class MarcacaoService {
     });
   }
 
+  /** Resolve o empregado do usuário logado. Usado pelas telas do colaborador. */
+  async empregadoDoUsuario(usuarioId: string, tenantId: string): Promise<string> {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const us = (await tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
+      if (!us?.empregadoId) throw new BadRequestException('Usuário não vinculado a um empregado');
+      return us.empregadoId;
+    });
+  }
+
   /** Local do estabelecimento — usado só para decidir quando pedir observação. */
   async obterLocal(tenantId: string) {
     return comTenant(this.db, tenantId, async (tx) => {
