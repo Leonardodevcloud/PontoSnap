@@ -280,3 +280,27 @@ export interface ConfigBanco {
   prazoMeses: number | null;
   ativo: boolean;
 }
+
+// ---- Atestados e declarações ----
+
+export type TipoDocumento = 'ATESTADO' | 'COMPARECIMENTO';
+export type StatusDocumento = 'EM_ANALISE' | 'ABONADO' | 'RECUSADO';
+
+export interface Documento {
+  id: string;
+  empregadoId: string;
+  tipo: TipoDocumento;
+  dataInicio: string;
+  dataFim: string;
+  minutos: number | null;
+  status: StatusDocumento;
+  motivoRecusa: string | null;
+  arquivoNome: string;
+  arquivoMime: string;
+  arquivoBytes: number;
+  enviadoEm: string;
+  analisadoEm: string | null;
+  /** Só na listagem do RH. */
+  nome?: string;
+  matricula?: string | null;
+}

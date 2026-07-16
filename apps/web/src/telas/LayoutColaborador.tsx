@@ -51,6 +51,7 @@ export function LayoutColaborador() {
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/'); }}>Bater ponto</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
+                <button role="menuitem" onClick={() => { setMenu(false); navegar('/atestados'); }}>Atestados</button>
                 {temBanco && (
                   <button role="menuitem" onClick={() => { setMenu(false); navegar('/banco'); }}>Banco de horas</button>
                 )}

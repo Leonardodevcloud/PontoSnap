@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, tenant,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, tenant,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -215,6 +215,13 @@ export class TratamentoService {
         gte(pontoEscala.data, inicioStr), lte(pontoEscala.data, fimStr))).orderBy(asc(pontoEscala.data)));
   }
 
+  /** Próximo dia de uma data YYYY-MM-DD, sem escorregar de fuso. */
+  private static somarDias(dataStr: string, dias: number): string {
+    const d = new Date(`${dataStr}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+  }
+
   /** Data no calendário de Brasília (-0300) a partir de um instante UTC. */
   private diaLocalISO(d: Date): string {
     return new Date(d.getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
@@ -255,11 +262,32 @@ export class TratamentoService {
       const durJornada = horario?.durJornadaMin ?? 0;
       const diasUteis = horario?.diasSemana ?? [1, 2, 3, 4, 5]; // seg–sex por padrão
 
+      // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
+      //  1 (DSR) e 4 (folga compensatória) marcam o dia como descanso;
+      //  2 é falta não justificada — o oposto de abono;
+      //  3 é movimento de banco de horas, que não mexe no esperado do dia.
+      // Abonar jornada por atestado vem de ponto_documento, mais abaixo.
       const aus = await tx.select().from(pontoAusencia).where(and(
         eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, empregadoId),
         gte(pontoAusencia.data, inicioStr), lte(pontoAusencia.data, fimStr)));
+      const descansoPorAusencia = new Set<string>(
+        aus.filter((a) => a.tipo === 1 || a.tipo === 4).map((a) => a.data));
+
+      // Atestados/declarações já analisados e abonados pelo RH.
+      // minutos = null significa dia inteiro: abate a jornada contratada daquele dia.
+      const docs = await tx.select().from(pontoDocumento).where(and(
+        eq(pontoDocumento.tenantId, tenantId), eq(pontoDocumento.empregadoId, empregadoId),
+        eq(pontoDocumento.status, 'ABONADO'),
+        lte(pontoDocumento.dataInicio, fimStr), gte(pontoDocumento.dataFim, inicioStr)));
       const abonoPorData = new Map<string, number>();
-      for (const a of aus) if (a.qtMinutos) abonoPorData.set(a.data, (abonoPorData.get(a.data) ?? 0) + a.qtMinutos);
+      const abonoDiaInteiro = new Set<string>();
+      for (const d of docs) {
+        for (let dt = d.dataInicio; dt <= d.dataFim; dt = TratamentoService.somarDias(dt, 1)) {
+          if (dt < inicioStr || dt > fimStr) continue;
+          if (d.minutos == null) abonoDiaInteiro.add(dt);
+          else abonoPorData.set(dt, (abonoPorData.get(dt) ?? 0) + d.minutos);
+        }
+      }
 
       // feriados do banco (calendário do cliente) + os passados por parâmetro
       const feriadosBanco = await tx.select({ data: pontoFeriado.data }).from(pontoFeriado).where(and(
@@ -286,19 +314,25 @@ export class TratamentoService {
           gte(pontoEscala.data, inicioStr), lte(pontoEscala.data, fimStr)));
         const escalaSet = new Set(escala.map((e) => e.data));
 
-        const datas = new Set<string>([...escalaSet, ...porDia.keys(), ...abonoPorData.keys()]);
+        const datas = new Set<string>([
+          ...escalaSet, ...porDia.keys(), ...abonoPorData.keys(), ...abonoDiaInteiro,
+        ]);
         for (const data of [...datas].sort()) {
-          const trabalhaHoje = escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data);
+          const trabalhaHoje = (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data))
+            && !descansoPorAusencia.has(data);
+          const jornada = trabalhaHoje ? durJornada : 0;
           dias.push({
             data,
             marcacoes: porDia.get(data) ?? [],
-            jornadaContratadaMin: trabalhaHoje ? durJornada : 0,
+            jornadaContratadaMin: jornada,
             ehDomingo: diaSemana(data) === 0,
             ehFeriado: feriadoSet.has(data),
-            ehDescanso: escalaSet.size > 0 ? !trabalhaHoje : false, // folga da escala
+            ehDescanso: (escalaSet.size > 0 ? !trabalhaHoje : false) || descansoPorAusencia.has(data),
             regime: 'r12x36',
             janelaPrevista: horario?.pares,
-            ausenciaAbonadaMin: abonoPorData.get(data),
+            // Atestado de dia inteiro abate a jornada daquele dia — é isso que
+            // impede o dia de virar falta na apuração.
+            ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
         }
       } else {
@@ -310,16 +344,18 @@ export class TratamentoService {
           const dow = diaSemana(data);
           const ehFeriado = feriadoSet.has(data);
           const ehDomingo = dow === 0;
-          const ehUtil = diasUteis.includes(dow) && !ehFeriado;
-          const ehDescanso = !ehDomingo && !ehFeriado && !diasUteis.includes(dow); // ex.: sábado de folga
+          const ehUtil = diasUteis.includes(dow) && !ehFeriado && !descansoPorAusencia.has(data);
+          const ehDescanso = descansoPorAusencia.has(data)
+            || (!ehDomingo && !ehFeriado && !diasUteis.includes(dow)); // ex.: sábado de folga
+          const jornada = ehUtil ? durJornada : 0;
           dias.push({
             data,
             marcacoes: porDia.get(data) ?? [],
-            jornadaContratadaMin: ehUtil ? durJornada : 0,
+            jornadaContratadaMin: jornada,
             ehDomingo, ehFeriado, ehDescanso,
             regime: 'normal',
             janelaPrevista: ehUtil ? horario?.pares : undefined,
-            ausenciaAbonadaMin: abonoPorData.get(data),
+            ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);
         }

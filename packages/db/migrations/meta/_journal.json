@@ -78,6 +78,13 @@
       "when": 1784168887890,
       "tag": "0010_dry_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784169797214,
+      "tag": "0011_curious_the_hunter",
+      "breakpoints": true
     }
   ]
 }

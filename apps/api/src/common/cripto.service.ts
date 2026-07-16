@@ -18,6 +18,21 @@ export class CriptoService {
     return [iv.toString('base64'), c.getAuthTag().toString('base64'), enc.toString('base64')].join(':');
   }
 
+  /** Cifra bytes crus (arquivo). Formato: iv(12) + tag(16) + cipher. */
+  cifrarBytes(dados: Buffer): Buffer {
+    const iv = randomBytes(12);
+    const c = createCipheriv('aes-256-gcm', this.chave(), iv);
+    const enc = Buffer.concat([c.update(dados), c.final()]);
+    return Buffer.concat([iv, c.getAuthTag(), enc]);
+  }
+
+  decifrarBytes(blob: Buffer): Buffer {
+    if (blob.length < 29) throw new Error('Blob cifrado inválido');
+    const d = createDecipheriv('aes-256-gcm', this.chave(), blob.subarray(0, 12));
+    d.setAuthTag(blob.subarray(12, 28));
+    return Buffer.concat([d.update(blob.subarray(28)), d.final()]);
+  }
+
   decifrar(blob: string): string {
     const [ivB, tagB, encB] = blob.split(':');
     if (!ivB || !tagB || !encB) throw new Error('Blob cifrado inválido');
