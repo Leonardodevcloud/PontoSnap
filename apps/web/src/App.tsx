@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useAuth } from './lib/auth';
 import type { Perfil } from './tipos';
 import { Login } from './telas/Login';
+import { RecuperarSenha } from './telas/RecuperarSenha';
+import { RedefinirSenha } from './telas/RedefinirSenha';
 import { TrocarSenha } from './telas/TrocarSenha';
 import { BaterPonto } from './telas/BaterPonto';
 import { LayoutColaborador } from './telas/LayoutColaborador';
@@ -68,6 +70,8 @@ export function App() {
     <Routes>
       <Route path="/login" element={carregando ? <Splash /> : sessao ? <Navigate to={rotaInicial(sessao.perfil)} replace /> : <Login />} />
       <Route path="/trocar-senha" element={<SoLogado><TrocarSenha /></SoLogado>} />
+      <Route path="/recuperar-senha" element={<RecuperarSenha />} />
+      <Route path="/redefinir" element={<RedefinirSenha />} />
 
       {/* Quiosque — tablet compartilhado, autenticado por token de dispositivo */}
       <Route path="/quiosque" element={<Quiosque />} />

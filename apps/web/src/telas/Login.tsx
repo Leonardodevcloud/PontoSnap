@@ -124,8 +124,12 @@ export function Login() {
             {enviando ? 'Entrando…' : 'Entrar'}
           </button>
 
-          {/* Ainda não existe recuperação por e-mail. Dizemos o que resolve hoje. */}
-          <p className={css.ajuda}>Esqueceu a senha? Peça ao RH da sua empresa para gerar uma nova.</p>
+          <p className={css.ajuda}>
+            Esqueceu a senha?{' '}
+            <button type="button" className={css.link} onClick={() => navegar('/recuperar-senha')}>
+              Recuperar por e-mail
+            </button>
+          </p>
 
           <div className={css.quiosque}>
             <p>Este aparelho é o<br />tablet do ponto?</p>

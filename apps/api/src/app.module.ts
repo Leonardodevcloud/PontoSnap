@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/database.module';
+import { EmailModule } from './email/email.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantModule } from './tenant/tenant.module';
 import { EmpregadoModule } from './empregado/empregado.module';
@@ -16,7 +17,7 @@ import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
-    DatabaseModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
+    DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
     BancoModule, DocumentoModule, AfastamentoModule, AuditoriaModule, FiscalModule, HealthModule, JobsModule,
   ],

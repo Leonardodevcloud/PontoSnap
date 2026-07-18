@@ -11,9 +11,10 @@ const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', use
 const db = drizzle(client, { schema });
 
 const tenantSvc = new TenantService(db);
-const empSvc = new EmpregadoService(db);
+const emailFake = { enviar: async () => true } as unknown as import('../src/email/email.service').EmailService;
+const empSvc = new EmpregadoService(db, emailFake);
 const tokens = new TokenService({ segredoAcesso: 'a', segredoRefresh: 'r', expiraAcesso: '15m', expiraRefresh: '7d' });
-const authSvc = new AuthService(db, tokens);
+const authSvc = new AuthService(db, tokens, emailFake);
 
 const ok = (cond: boolean, msg: string) => console.log(`${cond ? 'OK  ' : 'FALHA'} — ${msg}`);
 

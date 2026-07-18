@@ -8,6 +8,7 @@ export * from './banco';
 export * from './documento';
 export * from './afastamento';
 export * from './auditoria';
+export * from './tokenSenha';
 export * from './dispositivo';
 export * from './certificado';
 export * from './job';

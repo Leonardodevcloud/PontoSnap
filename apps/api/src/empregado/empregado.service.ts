@@ -2,6 +2,8 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { and, eq } from 'drizzle-orm';
 import { empregado, pontoHorarioContratual, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
+import { EmailService } from '../email/email.service';
+import { emailAcessoFuncionario } from '../email/templates';
 import { hashPin } from '../auth/pin';
 import { hashSenha } from '../auth/senha';
 import { randomBytes } from 'node:crypto';
@@ -24,7 +26,10 @@ type EmpregadoRow = typeof empregado.$inferSelect;
 
 @Injectable()
 export class EmpregadoService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly email: EmailService,
+  ) {}
 
   /** Remove campos sensíveis antes de devolver ao cliente. */
   private semSegredos(e: EmpregadoRow) {
@@ -70,7 +75,7 @@ export class EmpregadoService {
 
     // O e-mail é único global (é a chave do login), então o lookup roda como MASTER —
     // igual ao login. A escrita continua carimbando o tenant do empregado.
-    return comoMaster(this.db, async (tx) => {
+    const resultado = await comoMaster(this.db, async (tx) => {
       const atual = (await tx.select().from(usuario)
         .where(eq(usuario.empregadoId, empregadoId)).limit(1))[0];
 
@@ -91,6 +96,14 @@ export class EmpregadoService {
       });
       return { email, senhaProvisoria: senha, resetado: false };
     });
+
+    // Manda a senha provisória por e-mail. Best-effort: se o envio falhar, o
+    // acesso já foi criado e a senha volta na resposta da API do mesmo jeito.
+    const urlApp = process.env.APP_WEB_URL ?? 'https://ponto-snap-web.vercel.app';
+    const { assunto, html } = emailAcessoFuncionario(emp.nome, resultado.email, senha, urlApp);
+    await this.email.enviar({ para: resultado.email, assunto, html });
+
+    return resultado;
   }
 
   /** Indica quais empregados já têm login (para a tela do RH). */
