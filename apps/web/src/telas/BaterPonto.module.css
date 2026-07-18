@@ -99,3 +99,10 @@
   margin-top:14px; background:var(--peach); color:var(--coral-dark); border-radius:11px;
   padding:9px 13px; font-size:13px; font-weight:600; text-align:center; max-width:280px;
 }
+
+/* Estado da rede: informa sem assustar. A batida sempre acontece. */
+.redeSelo{
+  background:rgba(16,64,63,.06); color:var(--ash);
+  border-radius:var(--r-pill); padding:8px 14px; margin:12px 0 0;
+  font-size:12.5px; font-weight:600; text-align:center; line-height:1.4;
+}

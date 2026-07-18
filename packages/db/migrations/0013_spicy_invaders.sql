@@ -1,0 +1,1 @@
+ALTER TABLE "ponto_marcacao" ADD COLUMN "defasagem_seg" integer;

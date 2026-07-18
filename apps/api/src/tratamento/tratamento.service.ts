@@ -129,8 +129,10 @@ export class TratamentoService {
       const fim = new Date(`${dataStr}T23:59:59-0300`);
       const marcs = await tx.select({
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao,
+        dtGravacao: pontoMarcacao.dtGravacao,
         latitude: pontoMarcacao.latitude, longitude: pontoMarcacao.longitude,
         observacao: pontoMarcacao.observacao,
+        onlineOffline: pontoMarcacao.onlineOffline, defasagemSeg: pontoMarcacao.defasagemSeg,
       })
         .from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
@@ -158,6 +160,10 @@ export class TratamentoService {
             nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao,
             latitude: pos?.latitude ?? null, longitude: pos?.longitude ?? null,
             observacao: m.observacao, fora, distancia,
+            // Offline com defasagem relevante: o RH precisa saber que a hora
+            // veio do relógio do aparelho, não do servidor.
+            offline: m.onlineOffline === 1,
+            defasagemSeg: m.defasagemSeg ?? null,
           };
         }),
         resumo: apurarJornada(marcs.map((m) => m.dtMarcacao), dur),

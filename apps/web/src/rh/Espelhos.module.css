@@ -48,3 +48,10 @@
   background:rgba(16,64,63,.06); padding:2px 7px; border-radius:var(--r-pill);
 }
 .geoObs{ font-size:11.5px; color:var(--ash); font-style:italic; }
+
+/* Batida offline — a hora veio do aparelho, não do servidor. */
+.offSelo{
+  display:inline-block; margin-top:3px; margin-right:6px;
+  font-size:10.5px; font-weight:800; color:var(--coral-dark);
+  background:var(--peach); padding:2px 8px; border-radius:var(--r-pill);
+}

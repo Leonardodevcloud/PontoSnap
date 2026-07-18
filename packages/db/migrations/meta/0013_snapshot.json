@@ -1,0 +1,1877 @@
+{
+  "id": "ec39fe45-b76f-43ad-8cee-52a5969a197a",
+  "prevId": "072931f1-7ebf-4d55-8322-e310badf46be",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.tenant": {
+      "name": "tenant",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cnpj": {
+          "name": "cnpj",
+          "type": "varchar(14)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "razao_social": {
+          "name": "razao_social",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "local_prestacao": {
+          "name": "local_prestacao",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raio_metros": {
+          "name": "raio_metros",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "banco_tipo_acordo": {
+          "name": "banco_tipo_acordo",
+          "type": "varchar(12)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NENHUM'"
+        },
+        "banco_prazo_meses": {
+          "name": "banco_prazo_meses",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "tenant_cnpj_unique": {
+          "name": "tenant_cnpj_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "cnpj"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.usuario": {
+      "name": "usuario",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(180)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "senha_hash": {
+          "name": "senha_hash",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "perfil": {
+          "name": "perfil",
+          "type": "perfil",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "deve_trocar_senha": {
+          "name": "deve_trocar_senha",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "usuario_tenant_id_tenant_id_fk": {
+          "name": "usuario_tenant_id_tenant_id_fk",
+          "tableFrom": "usuario",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "usuario_email_unique": {
+          "name": "usuario_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_rep": {
+      "name": "ponto_rep",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_id_empregador": {
+          "name": "tipo_id_empregador",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "documento_empregador": {
+          "name": "documento_empregador",
+          "type": "varchar(14)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cno_caepf": {
+          "name": "cno_caepf",
+          "type": "varchar(14)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "razao_social": {
+          "name": "razao_social",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "numero_inpi": {
+          "name": "numero_inpi",
+          "type": "varchar(17)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_id_desenvolvedor": {
+          "name": "tipo_id_desenvolvedor",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "documento_desenvolvedor": {
+          "name": "documento_desenvolvedor",
+          "type": "varchar(14)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ultimo_nsr": {
+          "name": "ultimo_nsr",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "ultimo_hash": {
+          "name": "ultimo_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_rep_tenant_id_tenant_id_fk": {
+          "name": "ponto_rep_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_rep",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_rep_tenant": {
+          "name": "uq_rep_tenant",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.empregado": {
+      "name": "empregado",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cpf": {
+          "name": "cpf",
+          "type": "varchar(11)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "varchar(52)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pis": {
+          "name": "pis",
+          "type": "varchar(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matricula": {
+          "name": "matricula",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pin_hash": {
+          "name": "pin_hash",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "horario_contratual_id": {
+          "name": "horario_contratual_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matricula_esocial": {
+          "name": "matricula_esocial",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "salario_mensal": {
+          "name": "salario_mensal",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "empregado_tenant_id_tenant_id_fk": {
+          "name": "empregado_tenant_id_tenant_id_fk",
+          "tableFrom": "empregado",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_empregado_cpf": {
+          "name": "uq_empregado_cpf",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "cpf"
+          ]
+        },
+        "uq_empregado_matricula": {
+          "name": "uq_empregado_matricula",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "matricula"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_evento": {
+      "name": "ponto_evento",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rep_id": {
+          "name": "rep_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nsr": {
+          "name": "nsr",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_evento": {
+          "name": "tipo_evento",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dt_gravacao": {
+          "name": "dt_gravacao",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_evento_tenant_id_tenant_id_fk": {
+          "name": "ponto_evento_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_evento",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_evento_rep_id_ponto_rep_id_fk": {
+          "name": "ponto_evento_rep_id_ponto_rep_id_fk",
+          "tableFrom": "ponto_evento",
+          "tableTo": "ponto_rep",
+          "columnsFrom": [
+            "rep_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_evento_nsr": {
+          "name": "uq_evento_nsr",
+          "nullsNotDistinct": false,
+          "columns": [
+            "rep_id",
+            "nsr"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_marcacao": {
+      "name": "ponto_marcacao",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rep_id": {
+          "name": "rep_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nsr": {
+          "name": "nsr",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo_registro": {
+          "name": "tipo_registro",
+          "type": "char(1)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'7'"
+        },
+        "cpf": {
+          "name": "cpf",
+          "type": "varchar(11)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dt_marcacao": {
+          "name": "dt_marcacao",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dt_gravacao": {
+          "name": "dt_gravacao",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "coletor": {
+          "name": "coletor",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "online_offline": {
+          "name": "online_offline",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "hash_registro": {
+          "name": "hash_registro",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash_anterior": {
+          "name": "hash_anterior",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip_origem": {
+          "name": "ip_origem",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "numeric(10, 7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observacao": {
+          "name": "observacao",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "defasagem_seg": {
+          "name": "defasagem_seg",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_marcacao_emp": {
+          "name": "idx_marcacao_emp",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cpf",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dt_marcacao",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ponto_marcacao_tenant_id_tenant_id_fk": {
+          "name": "ponto_marcacao_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_marcacao",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_marcacao_rep_id_ponto_rep_id_fk": {
+          "name": "ponto_marcacao_rep_id_ponto_rep_id_fk",
+          "tableFrom": "ponto_marcacao",
+          "tableTo": "ponto_rep",
+          "columnsFrom": [
+            "rep_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_marcacao_nsr": {
+          "name": "uq_marcacao_nsr",
+          "nullsNotDistinct": false,
+          "columns": [
+            "rep_id",
+            "nsr"
+          ]
+        },
+        "uq_marcacao_hash": {
+          "name": "uq_marcacao_hash",
+          "nullsNotDistinct": false,
+          "columns": [
+            "rep_id",
+            "hash_registro"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_ausencia": {
+      "name": "ponto_ausencia",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "qt_minutos": {
+          "name": "qt_minutos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tipo_mov_bh": {
+          "name": "tipo_mov_bh",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rep_id": {
+          "name": "rep_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_ausencia_tenant_id_tenant_id_fk": {
+          "name": "ponto_ausencia_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_ausencia",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_ausencia_empregado_id_empregado_id_fk": {
+          "name": "ponto_ausencia_empregado_id_empregado_id_fk",
+          "tableFrom": "ponto_ausencia",
+          "tableTo": "empregado",
+          "columnsFrom": [
+            "empregado_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_ausencia_rep_id_ponto_rep_id_fk": {
+          "name": "ponto_ausencia_rep_id_ponto_rep_id_fk",
+          "tableFrom": "ponto_ausencia",
+          "tableTo": "ponto_rep",
+          "columnsFrom": [
+            "rep_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_escala": {
+      "name": "ponto_escala",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_escala_tenant_id_tenant_id_fk": {
+          "name": "ponto_escala_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_escala",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_escala_empregado_id_empregado_id_fk": {
+          "name": "ponto_escala_empregado_id_empregado_id_fk",
+          "tableFrom": "ponto_escala",
+          "tableTo": "empregado",
+          "columnsFrom": [
+            "empregado_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_feriado": {
+      "name": "ponto_feriado",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'nacional'"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_feriado_tenant_id_tenant_id_fk": {
+          "name": "ponto_feriado_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_feriado",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_horario_contratual": {
+      "name": "ponto_horario_contratual",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codigo": {
+          "name": "codigo",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dur_jornada_min": {
+          "name": "dur_jornada_min",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pares": {
+          "name": "pares",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "dias_semana": {
+          "name": "dias_semana",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[1,2,3,4,5]'::jsonb"
+        },
+        "regime": {
+          "name": "regime",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'normal'"
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_horario_contratual_tenant_id_tenant_id_fk": {
+          "name": "ponto_horario_contratual_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_horario_contratual",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_tratamento": {
+      "name": "ponto_tratamento",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marcacao_id": {
+          "name": "marcacao_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dt_marcacao": {
+          "name": "dt_marcacao",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tp_marc": {
+          "name": "tp_marc",
+          "type": "char(1)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seq_ent_saida": {
+          "name": "seq_ent_saida",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fonte_marc": {
+          "name": "fonte_marc",
+          "type": "char(1)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'O'"
+        },
+        "cod_hor_contratual": {
+          "name": "cod_hor_contratual",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_por": {
+          "name": "criado_por",
+          "type": "varchar(14)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_tratamento_tenant_id_tenant_id_fk": {
+          "name": "ponto_tratamento_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_tratamento",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_tratamento_empregado_id_empregado_id_fk": {
+          "name": "ponto_tratamento_empregado_id_empregado_id_fk",
+          "tableFrom": "ponto_tratamento",
+          "tableTo": "empregado",
+          "columnsFrom": [
+            "empregado_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_tratamento_marcacao_id_ponto_marcacao_id_fk": {
+          "name": "ponto_tratamento_marcacao_id_ponto_marcacao_id_fk",
+          "tableFrom": "ponto_tratamento",
+          "tableTo": "ponto_marcacao",
+          "columnsFrom": [
+            "marcacao_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_banco_mov": {
+      "name": "ponto_banco_mov",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "minutos": {
+          "name": "minutos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "varchar(12)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descricao": {
+          "name": "descricao",
+          "type": "varchar(160)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "competencia": {
+          "name": "competencia",
+          "type": "varchar(7)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_banco_mov_empregado": {
+          "name": "idx_banco_mov_empregado",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "empregado_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ponto_banco_mov_tenant_id_tenant_id_fk": {
+          "name": "ponto_banco_mov_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_banco_mov",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_banco_mov_empregado_id_empregado_id_fk": {
+          "name": "ponto_banco_mov_empregado_id_empregado_id_fk",
+          "tableFrom": "ponto_banco_mov",
+          "tableTo": "empregado",
+          "columnsFrom": [
+            "empregado_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_documento": {
+      "name": "ponto_documento",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_inicio": {
+          "name": "data_inicio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_fim": {
+          "name": "data_fim",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "minutos": {
+          "name": "minutos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(12)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'EM_ANALISE'"
+        },
+        "motivo_recusa": {
+          "name": "motivo_recusa",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "arquivo": {
+          "name": "arquivo",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "arquivo_nome": {
+          "name": "arquivo_nome",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "arquivo_mime": {
+          "name": "arquivo_mime",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "arquivo_bytes": {
+          "name": "arquivo_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enviado_em": {
+          "name": "enviado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "analisado_em": {
+          "name": "analisado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analisado_por": {
+          "name": "analisado_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_documento_empregado": {
+          "name": "idx_documento_empregado",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "empregado_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data_inicio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ponto_documento_tenant_id_tenant_id_fk": {
+          "name": "ponto_documento_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_documento",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_documento_empregado_id_empregado_id_fk": {
+          "name": "ponto_documento_empregado_id_empregado_id_fk",
+          "tableFrom": "ponto_documento",
+          "tableTo": "empregado",
+          "columnsFrom": [
+            "empregado_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_documento_analisado_por_usuario_id_fk": {
+          "name": "ponto_documento_analisado_por_usuario_id_fk",
+          "tableFrom": "ponto_documento",
+          "tableTo": "usuario",
+          "columnsFrom": [
+            "analisado_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_afastamento": {
+      "name": "ponto_afastamento",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empregado_id": {
+          "name": "empregado_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_inicio": {
+          "name": "data_inicio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_fim": {
+          "name": "data_fim",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observacao": {
+          "name": "observacao",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "criado_por": {
+          "name": "criado_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_afastamento_empregado": {
+          "name": "idx_afastamento_empregado",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "empregado_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data_inicio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ponto_afastamento_tenant_id_tenant_id_fk": {
+          "name": "ponto_afastamento_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_afastamento",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_afastamento_empregado_id_empregado_id_fk": {
+          "name": "ponto_afastamento_empregado_id_empregado_id_fk",
+          "tableFrom": "ponto_afastamento",
+          "tableTo": "empregado",
+          "columnsFrom": [
+            "empregado_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ponto_afastamento_criado_por_usuario_id_fk": {
+          "name": "ponto_afastamento_criado_por_usuario_id_fk",
+          "tableFrom": "ponto_afastamento",
+          "tableTo": "usuario",
+          "columnsFrom": [
+            "criado_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dispositivo": {
+      "name": "dispositivo",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dispositivo_tenant_id_tenant_id_fk": {
+          "name": "dispositivo_tenant_id_tenant_id_fk",
+          "tableFrom": "dispositivo",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.certificado": {
+      "name": "certificado",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pfx_cifrado": {
+          "name": "pfx_cifrado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "senha_cifrada": {
+          "name": "senha_cifrada",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cn": {
+          "name": "cn",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "validade": {
+          "name": "validade",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ativo": {
+          "name": "ativo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "certificado_tenant_id_tenant_id_fk": {
+          "name": "certificado_tenant_id_tenant_id_fk",
+          "tableFrom": "certificado",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_certificado_tenant": {
+          "name": "uq_certificado_tenant",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ponto_job": {
+      "name": "ponto_job",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendente'"
+        },
+        "params": {
+          "name": "params",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "resultado": {
+          "name": "resultado",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "erro": {
+          "name": "erro",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "criado_em": {
+          "name": "criado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "atualizado_em": {
+          "name": "atualizado_em",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ponto_job_tenant_id_tenant_id_fk": {
+          "name": "ponto_job_tenant_id_tenant_id_fk",
+          "tableFrom": "ponto_job",
+          "tableTo": "tenant",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.perfil": {
+      "name": "perfil",
+      "schema": "public",
+      "values": [
+        "MASTER",
+        "ADMIN_CLIENTE",
+        "RH",
+        "COLABORADOR"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

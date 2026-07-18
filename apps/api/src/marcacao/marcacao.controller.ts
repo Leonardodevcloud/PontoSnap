@@ -28,6 +28,8 @@ export class MarcacaoController {
     const g = await this.marcacao.baterAutenticado(u.sub, u.tenantId, dto.coletor ?? Coletor.MOBILE, {
       latitude: dto.latitude ?? null, longitude: dto.longitude ?? null,
       observacao: dto.observacao ?? null,
+      dtAparelho: dto.dtAparelho ? new Date(dto.dtAparelho) : null,
+      declaradoOffline: dto.declaradoOffline ?? false,
     });
     return { nsr: g.nsr, dtMarcacao: g.dtMarcacao, hash: g.hashRegistro };
   }

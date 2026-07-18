@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { fmtDataCurta, fmtHora, hojeSP, rotuloMarcacao, rotuloProxima } from '../lib/formato';
 import { capturarPosicao, type ResultadoGeo } from '../lib/geolocalizacao';
 import { foraDoRaio } from '@ponto/shared';
+import { enfileirar, sincronizar, contar, type BatidaPendente } from '../lib/filaOffline';
 import type { Batida, MinhasMarcacoes } from '../tipos';
 import { Flash } from '../components/Flash';
 import { Botao } from '../components/Botao';
@@ -25,12 +26,14 @@ export function BaterPonto() {
   const navegar = useNavigate();
   const [dados, setDados] = useState<MinhasMarcacoes | null>(null);
   const [batendo, setBatendo] = useState(false);
-  const [confirmada, setConfirmada] = useState<{ batida: Batida; tipo: string; obs?: string } | null>(null);
+  const [confirmada, setConfirmada] = useState<{ batida: Batida; tipo: string; obs?: string; offline?: boolean } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [progresso, setProgresso] = useState(0);
   const [geo, setGeo] = useState<ResultadoGeo | null>(null);
   const [motivo, setMotivo] = useState<string>(MOTIVOS[0]);
   const [detalhe, setDetalhe] = useState('');
+  const [online, setOnline] = useState(navigator.onLine);
+  const [naFila, setNaFila] = useState(0);
   const raf = useRef<number | null>(null);
   const inicio = useRef<number>(0);
 
@@ -44,6 +47,34 @@ export function BaterPonto() {
 
   // Posição só no momento em que a tela é usada — nunca em segundo plano.
   useEffect(() => { void capturarPosicao().then(setGeo); }, []);
+
+  // Envia uma batida da fila. Lança em erro de rede pra fila manter a ordem.
+  const enviarPendente = useCallback(async (b: BatidaPendente) => {
+    await api.post('/marcacao', {
+      coletor: b.coletor, latitude: b.latitude, longitude: b.longitude,
+      observacao: b.observacao, dtAparelho: b.dtAparelho, declaradoOffline: true,
+    });
+  }, []);
+
+  const escoar = useCallback(async () => {
+    const { restantes } = await sincronizar(enviarPendente);
+    setNaFila(restantes);
+    if (restantes === 0) void carregar();
+  }, [enviarPendente, carregar]);
+
+  // Ao abrir e sempre que a rede voltar, tenta escoar a fila.
+  useEffect(() => {
+    void contar().then(setNaFila);
+    void escoar();
+    const aoVoltar = () => { setOnline(true); void escoar(); };
+    const aoCair = () => setOnline(false);
+    window.addEventListener('online', aoVoltar);
+    window.addEventListener('offline', aoCair);
+    return () => {
+      window.removeEventListener('online', aoVoltar);
+      window.removeEventListener('offline', aoCair);
+    };
+  }, [escoar]);
 
   const marcs = dados?.marcacoes ?? [];
   const esperadas = dados?.esperadas ?? 0;
@@ -59,19 +90,35 @@ export function BaterPonto() {
   async function bater() {
     setErro(null);
     setBatendo(true);
+    const qtdAntes = marcs.length;
+    const obs = pedirObs ? [motivo, detalhe.trim()].filter(Boolean).join(' — ') : undefined;
+    const agora = new Date();
     try {
-      const qtdAntes = marcs.length;
-      const obs = pedirObs ? [motivo, detalhe.trim()].filter(Boolean).join(' — ') : undefined;
+      // Sem rede: guarda a batida com a hora do aparelho e segue a vida.
+      // O ponto não se perde por falta de sinal.
+      if (!navigator.onLine) throw new Error('offline');
+
       const batida = await api.post<Batida>('/marcacao', {
         coletor: 2,
         latitude: posicao?.latitude, longitude: posicao?.longitude,
-        observacao: obs,
+        observacao: obs, dtAparelho: agora.toISOString(), declaradoOffline: false,
       });
       setDetalhe('');
       setConfirmada({ batida, tipo: rotuloProxima(qtdAntes, esperadas), obs });
       void carregar();
-    } catch (e) {
-      setErro((e as Error).message);
+    } catch {
+      // Rede falhou (offline ou caiu no meio): enfileira.
+      await enfileirar({
+        id: `${agora.getTime()}-${Math.random().toString(36).slice(2, 7)}`,
+        dtAparelho: agora.toISOString(), coletor: 2,
+        latitude: posicao?.latitude, longitude: posicao?.longitude, observacao: obs,
+      });
+      setDetalhe('');
+      setNaFila(await contar());
+      setConfirmada({
+        batida: { nsr: 0, dtMarcacao: agora.toISOString(), coletor: 2 } as unknown as Batida,
+        tipo: rotuloProxima(qtdAntes, esperadas), obs, offline: true,
+      });
     } finally {
       setBatendo(false);
       setProgresso(0);
@@ -110,6 +157,11 @@ export function BaterPonto() {
         <div className={css.bateuSub}>
           {confirmada.tipo} registrada às <span className={css.tm}>{fmtHora(confirmada.batida.dtMarcacao)}</span>
         </div>
+        {confirmada.offline && (
+          <div className={css.bateuObs}>
+            Você está sem internet. Guardamos com a hora de agora e enviamos sozinho quando a rede voltar.
+          </div>
+        )}
         {confirmada.obs && <div className={css.bateuObs}>Anotado: {confirmada.obs}. O RH vai ver.</div>}
         <div className={css.espaco} />
         <Botao variante="lime" onClick={() => navegar('/espelho')}>Ver espelho do dia</Botao>
@@ -128,6 +180,16 @@ export function BaterPonto() {
         {fmtDataCurta()}
         {marcs.length > 0 && ` · você entrou às ${fmtHora(marcs[0].dtMarcacao)}`}
       </div>
+
+      {/* Sem rede, ou com batidas esperando pra subir. */}
+      {(!online || naFila > 0) && (
+        <div className={css.redeSelo}>
+          {!online ? 'Sem internet — suas batidas ficam guardadas' : null}
+          {naFila > 0 && (
+            <span>{online ? '' : ' · '}{naFila} batida{naFila > 1 ? 's' : ''} aguardando envio</span>
+          )}
+        </div>
+      )}
 
       {/* Selo de localização: informa, nunca impede. */}
       {dados?.local && geo && (

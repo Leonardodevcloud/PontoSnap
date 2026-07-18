@@ -3,7 +3,7 @@ import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import {
   pontoRep, pontoMarcacao, empregado, tenant, usuario, pontoHorarioContratual, comTenant, type Db,
 } from '@ponto/db';
-import { proximaMarcacao, gerarComprovante, assinarPdfPAdES } from '@ponto/rep-core';
+import { proximaMarcacao, gerarComprovante, assinarPdfPAdES, resolverBatida } from '@ponto/rep-core';
 import { Coletor, OnlineOffline, TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { CertificadoService } from '../certificado/certificado.service';
@@ -13,6 +13,10 @@ export interface BaterParams {
   onlineOffline?: OnlineOffline; dtMarcacao?: Date;
   ipOrigem?: string | null; latitude?: number | null; longitude?: number | null;
   observacao?: string | null;
+  /** Hora do relógio do aparelho (offline). */
+  dtAparelho?: Date | null;
+  /** O app capturou esta batida sem rede? */
+  declaradoOffline?: boolean;
 }
 
 @Injectable()
@@ -32,9 +36,14 @@ export class MarcacaoService {
       const anterior = rep.ultimoNsr > 0 && rep.ultimoHash
         ? { nsr: rep.ultimoNsr, hashRegistro: rep.ultimoHash } : null;
 
-      const dtMarcacao = p.dtMarcacao ?? new Date();
-      const dtGravacao = new Date();
-      const onlineOffline = p.onlineOffline ?? OnlineOffline.ONLINE;
+      // Resolve hora e flag: offline usa a hora do aparelho e marca a divergência;
+      // online confia no servidor. Nunca recusa — só sinaliza.
+      const r = resolverBatida(
+        { dtAparelho: p.dtAparelho ?? p.dtMarcacao ?? null, declaradoOffline: p.declaradoOffline },
+        new Date());
+      const dtMarcacao = r.dtMarcacao;
+      const dtGravacao = r.dtGravacao;
+      const onlineOffline = r.onlineOffline;
 
       const g = proximaMarcacao(
         { cpf: p.cpf, dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline }, anterior);
@@ -48,6 +57,7 @@ export class MarcacaoService {
         longitude: p.longitude != null ? String(p.longitude) : null,
         // Vai no INSERT: o gatilho de imutabilidade nunca deixaria isso virar UPDATE.
         observacao: p.observacao?.trim() || null,
+        defasagemSeg: r.defasagemSeg || null,
       });
       await tx.update(pontoRep).set({ ultimoNsr: g.nsr, ultimoHash: g.hashRegistro }).where(eq(pontoRep.id, rep.id));
       return g;
@@ -59,6 +69,7 @@ export class MarcacaoService {
     geo?: {
       latitude?: number | null; longitude?: number | null;
       ipOrigem?: string | null; observacao?: string | null;
+      dtAparelho?: Date | null; declaradoOffline?: boolean;
     },
   ) {
     const cpf = await comTenant(this.db, tenantId, async (tx) => {

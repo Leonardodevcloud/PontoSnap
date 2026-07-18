@@ -1,6 +1,4 @@
-import {
-  pgTable, uuid, varchar, char, smallint, bigint, numeric, timestamp, unique, index,
-} from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, char, smallint, bigint, numeric, timestamp, unique, index, integer } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 import { pontoRep } from './rep';
 
@@ -26,6 +24,9 @@ export const pontoMarcacao = pgTable('ponto_marcacao', {
   longitude: numeric('longitude', { precision: 10, scale: 7 }),
   // Escrita só no INSERT — o gatilho de imutabilidade bloqueia UPDATE/DELETE.
   observacao: varchar('observacao', { length: 200 }),
+  // Diferença aparelho→servidor em segundos, no momento da gravação. Contexto
+  // para o RH auditar batidas offline — não vai para o AFD.
+  defasagemSeg: integer('defasagem_seg'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique('uq_marcacao_nsr').on(t.repId, t.nsr),
