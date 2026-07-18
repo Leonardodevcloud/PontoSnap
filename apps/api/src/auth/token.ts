@@ -4,6 +4,7 @@ export interface PayloadAcesso {
   sub: string;              // id do usuário
   tenantId: string | null;  // null para MASTER
   perfil: string;
+  email?: string;           // para a trilha de auditoria
   deveTrocarSenha?: boolean;
 }
 

@@ -26,7 +26,7 @@ export class AuthService {
     const ok = await verificarSenha(senha, u.senhaHash);
     if (!ok) throw new UnauthorizedException('Credenciais inválidas');
 
-    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, deveTrocarSenha: u.deveTrocarSenha };
+    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, email: u.email, deveTrocarSenha: u.deveTrocarSenha };
     return {
       accessToken: this.tokens.assinarAcesso(payload),
       refreshToken: this.tokens.assinarRefresh(u.id),
@@ -47,7 +47,7 @@ export class AuthService {
       tx.select().from(usuario).where(and(eq(usuario.id, sub), eq(usuario.ativo, true))).limit(1));
     const u = rows[0];
     if (!u) throw new UnauthorizedException('Usuário inativo');
-    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, deveTrocarSenha: u.deveTrocarSenha };
+    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, email: u.email, deveTrocarSenha: u.deveTrocarSenha };
     return { accessToken: this.tokens.assinarAcesso(payload) };
   }
 

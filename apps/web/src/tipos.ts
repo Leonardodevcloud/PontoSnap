@@ -324,3 +324,16 @@ export interface Afastamento {
   observacao: string | null;
   nome?: string;
 }
+
+// ---- Trilha de auditoria ----
+
+export interface LinhaAuditoria {
+  id: string;
+  usuarioEmail: string | null;
+  usuarioPerfil: string | null;
+  acao: string;
+  detalhe: Record<string, unknown> | null;
+  statusHttp: string | null;
+  ip: string | null;
+  em: string;
+}
