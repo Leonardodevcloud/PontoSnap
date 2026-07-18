@@ -49,3 +49,42 @@
 .credCopiar{ width:100%; margin-top:12px; padding:9px; border:1px dashed rgba(16,64,63,.3); background:transparent; border-radius:12px; font:inherit; font-size:13px; font-weight:600; color:var(--ink); cursor:pointer; }
 .credCopiar:hover{ background:var(--white); }
 .credNota{ margin:10px 0 0; font-size:12px; color:var(--ash); }
+
+/* --- Importação em lote --- */
+.topoAcoes{ display:flex; gap:10px; align-items:center; }
+
+.importForm{ display:flex; flex-direction:column; gap:16px; }
+.importIntro{ font-size:14px; line-height:1.6; color:var(--ash); margin:0; }
+.importIntro strong{ color:var(--ink); }
+.importLink{
+  background:none; border:none; padding:0; font:inherit; font-weight:700;
+  color:var(--coral-dark); cursor:pointer; text-decoration:underline;
+}
+.importDrop{
+  display:flex; align-items:center; justify-content:center; min-height:88px;
+  border:2px dashed rgba(16,64,63,.2); border-radius:14px; cursor:pointer;
+  background:var(--cream); transition:border-color .15s;
+}
+.importDrop:hover{ border-color:var(--coral); }
+.importDrop input{ display:none; }
+.importPlaceholder{ color:var(--ash); font-size:14px; font-weight:600; }
+.importArquivo{ color:var(--ink); font-size:14px; font-weight:700; font-family:var(--ff-mono); }
+.importAcoes{ display:flex; gap:10px; justify-content:flex-end; }
+
+.importResultado{ display:flex; flex-direction:column; gap:14px; }
+.importResumo{
+  background:var(--lime); color:var(--ink); border-radius:12px; padding:14px 16px;
+  font-size:15px; line-height:1.5;
+}
+.importResumo strong{ font-size:20px; }
+.importTudoCerto{ color:var(--ink); font-weight:600; margin:0; }
+.importErrosTit{ font-size:14px; font-weight:700; color:var(--ink); margin:4px 0 0; }
+.importErros{ display:flex; flex-direction:column; gap:5px; max-height:220px; overflow-y:auto; }
+.importErroLinha{
+  display:flex; gap:10px; align-items:baseline; background:var(--peach);
+  border-radius:9px; padding:8px 12px; font-size:13px;
+}
+.importErroNum{ font-weight:800; color:var(--coral-dark); white-space:nowrap; }
+.importErroCpf{ font-family:var(--ff-mono); font-size:11.5px; color:var(--ash); }
+.importErroMotivo{ color:var(--ink); }
+.importDica{ font-size:12.5px; color:var(--ash); line-height:1.5; margin:0; }

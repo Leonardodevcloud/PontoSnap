@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Res, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+/** Mínimo da Response do Express que usamos, sem depender dos tipos do pacote. */
+interface RespostaHttp {
+  set(headers: Record<string, string>): void;
+  send(body: Buffer): void;
+}
 import { BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { EmpregadoService } from './empregado.service';
@@ -26,6 +33,29 @@ export class EmpregadoController {
   }
   @Get() listar(@UsuarioAtual() u: PayloadAcesso) {
     return this.empregados.listarComAcesso(this.tenant(u));
+  }
+
+  /** Baixa o modelo .xlsx de importação (sempre em sincronia com os campos). */
+  @Get('modelo-importacao')
+  async modelo(@Res() res: RespostaHttp) {
+    const buf = await this.empregados.gerarModeloImportacao();
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="modelo_funcionarios.xlsx"',
+    });
+    res.send(buf);
+  }
+
+  /** Importa funcionários de .xlsx ou .csv. Devolve criados + erros linha a linha. */
+  @Post('importar')
+  @UseInterceptors(FileInterceptor('arquivo', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  importar(@UsuarioAtual() u: PayloadAcesso, @UploadedFile() arquivo?: { buffer: Buffer; originalname: string }) {
+    if (!arquivo) throw new BadRequestException('Envie um arquivo .xlsx ou .csv');
+    const nome = arquivo.originalname.toLowerCase();
+    if (!nome.endsWith('.xlsx') && !nome.endsWith('.csv')) {
+      throw new BadRequestException('Formato não suportado. Use .xlsx ou .csv');
+    }
+    return this.empregados.importarLote(this.tenant(u), arquivo.buffer, arquivo.originalname);
   }
   @Get(':id') obter(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.empregados.obter(this.tenant(u), id);

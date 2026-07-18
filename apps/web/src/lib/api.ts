@@ -63,6 +63,22 @@ export const api = {
     }
     return res.blob();
   },
+  /** Envia um arquivo (multipart). Não seta Content-Type: o browser põe o boundary. */
+  async enviarArquivo<T>(path: string, arquivo: File, campo = 'arquivo'): Promise<T> {
+    const fd = new FormData();
+    fd.append(campo, arquivo);
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: acesso ? { Authorization: `Bearer ${acesso}` } : {},
+      body: fd,
+    });
+    if (res.status === 401 && (await tentarRefresh())) return this.enviarArquivo<T>(path, arquivo, campo);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message ?? 'Falha no envio.');
+    }
+    return res.json() as Promise<T>;
+  },
 };
 
 export { BASE };

@@ -1,4 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import ExcelJS from 'exceljs';
+import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
 import { and, eq } from 'drizzle-orm';
 import { empregado, pontoHorarioContratual, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
@@ -165,5 +167,98 @@ export class EmpregadoService {
         .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning());
     if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
     return this.semSegredos(rows[0]);
+  }
+
+  /**
+   * Importa funcionários de um .xlsx ou .csv.
+   *
+   * Reusa criar() linha a linha — assim cada funcionário passa pela MESMA
+   * validação de negócio e dispara o mesmo e-mail de acesso quando tem e-mail.
+   * Erros de parse (CPF inválido) e erros de criação (CPF já existe no banco)
+   * são acumulados e devolvidos juntos: as linhas boas entram, o RH recebe a
+   * lista do que falhou para corrigir e reenviar só isso.
+   */
+  async importarLote(tenantId: string, arquivo: Buffer, nomeArquivo: string) {
+    const ehCsv = nomeArquivo.toLowerCase().endsWith('.csv');
+    const parse = ehCsv ? parseCsv(arquivo.toString('utf8')) : await parseXlsx(arquivo);
+
+    const erros: ErroLinha[] = [...parse.erros];
+    let criados = 0;
+    let comAcesso = 0;
+
+    // Sequencial de propósito: cada criar() abre transação e pode mandar e-mail;
+    // paralelizar aqui viraria tempestade de conexões e de envios.
+    let linha = 2;
+    for (const v of parse.validas) {
+      try {
+        const r = await this.criar(tenantId, v);
+        criados++;
+        if ('acesso' in r && r.acesso) comAcesso++;
+      } catch (e) {
+        const msg = e instanceof ConflictException ? 'CPF já cadastrado no sistema' : 'não foi possível cadastrar';
+        erros.push({ linha, cpf: v.cpf, motivo: msg });
+      }
+      linha++;
+    }
+
+    return {
+      criados,
+      comAcesso,
+      totalLinhas: parse.validas.length + parse.erros.length,
+      erros,
+    };
+  }
+
+  /** Monta o modelo .xlsx de importação, sempre em sincronia com os campos aceitos. */
+  async gerarModeloImportacao(): Promise<Buffer> {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Funcionários');
+
+    const colunas = [
+      { h: 'CPF', larg: 16, dica: 'Obrigatório. 11 dígitos, só números.' },
+      { h: 'Nome completo', larg: 30, dica: 'Obrigatório.' },
+      { h: 'Matrícula', larg: 14, dica: 'Opcional. Código interno.' },
+      { h: 'PIS', larg: 16, dica: 'Opcional. 11 dígitos.' },
+      { h: 'PIN (4 a 8 dígitos)', larg: 18, dica: 'Opcional. Senha do quiosque.' },
+      { h: 'Salário mensal', larg: 16, dica: 'Opcional. Ex.: 2500.00' },
+      { h: 'E-mail', larg: 28, dica: 'Opcional. Preenchido cria o acesso e envia a senha.' },
+    ];
+    const cab = ws.addRow(colunas.map((c) => c.h));
+    cab.eachCell((cel, i) => {
+      cel.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10403F' } };
+      cel.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cel.note = colunas[i - 1]!.dica;
+      ws.getColumn(i).width = colunas[i - 1]!.larg;
+    });
+    cab.height = 32;
+
+    const ex = ws.addRow(['04561234567', 'Maria Aparecida Souza', 'F-1042', '12345678901', '4829', '2500.00', 'maria.souza@empresa.com.br']);
+    ex.eachCell((cel) => { cel.font = { name: 'Arial', italic: true, color: { argb: 'FF9A8F86' }, size: 10 }; });
+
+    // CPF e PIS como texto para não perder o zero da frente.
+    ws.getColumn(1).numFmt = '@';
+    ws.getColumn(4).numFmt = '@';
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const wi = wb.addWorksheet('Como preencher');
+    wi.getColumn(1).width = 90;
+    const inst = [
+      'Como importar funcionários no PontoSnap',
+      '',
+      'Só CPF e Nome são obrigatórios. Apague a linha de exemplo antes de salvar.',
+      'CPF e PIS: só números, mantenha os zeros da frente.',
+      'E-mail preenchido cria o acesso ao app e envia a senha por e-mail; em branco, só cadastra.',
+      'Salve como .xlsx ou .csv e envie na tela de importação.',
+      'Linhas com erro são apontadas uma a uma — as válidas entram normalmente.',
+    ];
+    inst.forEach((t, i) => {
+      const c = wi.getCell(i + 1, 1);
+      c.value = t;
+      c.font = i === 0 ? { name: 'Arial', bold: true, size: 15, color: { argb: 'FF10403F' } } : { name: 'Arial', size: 10.5 };
+      c.alignment = { wrapText: true, vertical: 'top' };
+    });
+
+    return (await wb.xlsx.writeBuffer()) as unknown as Buffer;
   }
 }

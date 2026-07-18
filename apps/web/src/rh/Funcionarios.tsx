@@ -13,6 +13,7 @@ export function Funcionarios() {
   const [lista, setLista] = useState<Empregado[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [addAberto, setAddAberto] = useState(false);
+  const [importarAberto, setImportarAberto] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [pinPara, setPinPara] = useState<Empregado | null>(null);
   const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
@@ -37,7 +38,10 @@ export function Funcionarios() {
     <div onClick={() => setMenu(null)}>
       <div className={css.head}>
         <div><h2>Funcionários</h2><p>{lista ? `${ativos} ativos · quem bate ponto na Cliente A` : 'carregando…'}</p></div>
-        <Botao variante="coral" className={css.add} onClick={() => setAddAberto(true)}>+ Adicionar funcionário</Botao>
+        <div className={css.topoAcoes}>
+          <Botao variante="ghost" className={css.add} onClick={() => setImportarAberto(true)}>Importar planilha</Botao>
+          <Botao variante="coral" className={css.add} onClick={() => setAddAberto(true)}>+ Adicionar funcionário</Botao>
+        </div>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -73,12 +77,115 @@ export function Funcionarios() {
       </div>
 
       {addAberto && <ModalAdicionar onFechar={() => setAddAberto(false)} onCriado={() => { setAddAberto(false); void carregar(); }} />}
+      {importarAberto && <ModalImportar onFechar={() => setImportarAberto(false)} onImportado={() => void carregar()} />}
       {pinPara && <ModalPin empregado={pinPara} onFechar={() => setPinPara(null)} onSalvo={() => { setPinPara(null); void carregar(); }} />}
       {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
     </div>
+  );
+}
+
+
+interface ResultadoImport {
+  criados: number;
+  comAcesso: number;
+  totalLinhas: number;
+  erros: { linha: number; cpf?: string; motivo: string }[];
+}
+
+function ModalImportar({ onFechar, onImportado }: { onFechar: () => void; onImportado: () => void }) {
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState<ResultadoImport | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function baixarModelo() {
+    try {
+      const blob = await api.baixar('/empregados/modelo-importacao');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'modelo_funcionarios.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setErro((e as Error).message); }
+  }
+
+  async function enviar() {
+    if (!arquivo || enviando) return;
+    setErro(null); setEnviando(true);
+    try {
+      const r = await api.enviarArquivo<ResultadoImport>('/empregados/importar', arquivo);
+      setResultado(r);
+      if (r.criados > 0) onImportado();
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <Modal titulo="Importar funcionários" onFechar={onFechar}>
+      {resultado ? (
+        <div className={css.importResultado}>
+          <div className={css.importResumo}>
+            <strong>{resultado.criados}</strong> cadastrado{resultado.criados !== 1 ? 's' : ''}
+            {resultado.comAcesso > 0 && <span> · {resultado.comAcesso} com acesso ao app enviado por e-mail</span>}
+          </div>
+          {resultado.erros.length > 0 ? (
+            <>
+              <p className={css.importErrosTit}>
+                {resultado.erros.length} linha{resultado.erros.length !== 1 ? 's' : ''} não {resultado.erros.length !== 1 ? 'entraram' : 'entrou'}:
+              </p>
+              <div className={css.importErros}>
+                {resultado.erros.map((e, i) => (
+                  <div key={i} className={css.importErroLinha}>
+                    <span className={css.importErroNum}>Linha {e.linha}</span>
+                    {e.cpf && <span className={css.importErroCpf}>{e.cpf}</span>}
+                    <span className={css.importErroMotivo}>{e.motivo}</span>
+                  </div>
+                ))}
+              </div>
+              <p className={css.importDica}>Corrija essas linhas na planilha e importe de novo — as que já entraram não duplicam.</p>
+            </>
+          ) : (
+            <p className={css.importTudoCerto}>Tudo certo, nenhuma linha com erro.</p>
+          )}
+          <Botao variante="coral" onClick={onFechar}>Fechar</Botao>
+        </div>
+      ) : (
+        <div className={css.importForm}>
+          <p className={css.importIntro}>
+            Suba um arquivo <strong>.xlsx</strong> ou <strong>.csv</strong> com os funcionários.
+            Não tem o modelo?
+            <button type="button" className={css.importLink} onClick={baixarModelo}> Baixar planilha modelo</button>.
+          </p>
+
+          <label className={css.importDrop}>
+            <input
+              type="file" accept=".xlsx,.csv"
+              onChange={(e) => { setArquivo(e.target.files?.[0] ?? null); setErro(null); }}
+            />
+            {arquivo ? (
+              <span className={css.importArquivo}>{arquivo.name}</span>
+            ) : (
+              <span className={css.importPlaceholder}>Clique para escolher o arquivo</span>
+            )}
+          </label>
+
+          {erro && <p className={css.erro}>{erro}</p>}
+
+          <div className={css.importAcoes}>
+            <Botao variante="ghost" onClick={onFechar}>Cancelar</Botao>
+            <Botao variante="coral" onClick={enviar} disabled={!arquivo || enviando}>
+              {enviando ? 'Importando…' : 'Importar'}
+            </Botao>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
