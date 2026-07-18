@@ -6,3 +6,4 @@ export * from './periodo.js';
 export * from './regras.js';
 export * from './valores.js';
 export * from './banco';
+export * from './cobranca';

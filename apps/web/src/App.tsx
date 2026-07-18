@@ -31,6 +31,8 @@ import { Auditoria } from './rh/Auditoria';
 import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
+import { Cobranca } from './master/Cobranca';
+import { Assinatura } from './rh/Assinatura';
 import { Quiosque } from './quiosque/Quiosque';
 import { Flash } from './components/Flash';
 
@@ -103,11 +105,13 @@ export function App() {
         <Route path="afastamentos" element={<Afastamentos />} />
         <Route path="auditoria" element={<Auditoria />} />
         <Route path="dispositivos" element={<Dispositivos />} />
+        <Route path="assinatura" element={<Assinatura />} />
       </Route>
 
       {/* Master (desktop) */}
       <Route path="/master" element={<Protegida perfis={['MASTER']}><LayoutMaster /></Protegida>}>
         <Route index element={<Clientes />} />
+        <Route path="cobranca" element={<Cobranca />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

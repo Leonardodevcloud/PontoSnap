@@ -1,0 +1,40 @@
+.tela{ max-width:560px; }
+.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; color:var(--ink); }
+.sub{ color:var(--ash); font-size:13.5px; margin:4px 0 20px; }
+.carregando{ color:var(--ash); font-family:var(--ff-mono); font-size:13px; }
+.semAss{ color:var(--ash); font-size:14px; background:var(--white); border-radius:12px; padding:18px; }
+.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
+
+.cartao{ background:var(--white); border:1px solid rgba(16,64,63,.08); border-radius:16px; padding:24px 26px; }
+.status{ display:flex; align-items:center; gap:10px; padding:13px 15px; border-radius:12px; margin-bottom:18px; }
+.stOk{ background:#E3F6EC; }
+.stAtraso{ background:var(--peach); }
+.bola{ width:10px; height:10px; border-radius:50%; }
+.stOk .bola{ background:#0FA968; }
+.stAtraso .bola{ background:var(--coral); }
+.stTexto{ font-weight:800; font-size:14px; }
+.stOk .stTexto{ color:#0FA968; }
+.stAtraso .stTexto{ color:var(--coral-dark); }
+
+.info{ display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid rgba(16,64,63,.06); }
+.info:last-of-type{ border-bottom:none; }
+.k{ color:var(--ash); font-size:14px; }
+.v{ font-weight:800; font-size:14px; color:var(--ink); }
+.mono{ font-family:var(--ff-mono); font-weight:700; }
+
+.boletoBox{ display:flex; gap:10px; margin-top:18px; }
+.btnCoral, .btnGhost{ flex:1; text-align:center; font:inherit; font-weight:800; font-size:13.5px; padding:11px; border-radius:var(--r-pill); border:none; cursor:pointer; text-decoration:none; }
+.btnCoral{ background:var(--coral); color:var(--white); }
+.btnGhost{ background:transparent; border:1.5px solid rgba(16,64,63,.15); color:var(--ink); }
+.btnGhost:disabled{ opacity:.5; cursor:default; }
+.nota{ font-size:12px; color:var(--ash); margin-top:14px; line-height:1.5; }
+
+.historico{ margin-top:24px; }
+.hHist{ font-size:15px; font-weight:800; color:var(--ink); margin-bottom:10px; }
+.linhaHist{ display:grid; grid-template-columns:1fr auto auto; gap:14px; align-items:center; background:var(--white); border-radius:11px; padding:12px 16px; margin-bottom:6px; }
+.comp{ font-weight:700; color:var(--ink); font-size:14px; text-transform:capitalize; }
+.valorHist{ font-family:var(--ff-mono); font-weight:700; font-size:13.5px; color:var(--ink); }
+.pill{ font-size:10.5px; font-weight:800; padding:3px 10px; border-radius:var(--r-pill); text-transform:uppercase; }
+.pillPaga{ background:#E3F6EC; color:#0FA968; }
+.pillAtraso{ background:var(--peach); color:var(--coral-dark); }
+.pillAberta{ background:#FCEFCE; color:#B7791F; }

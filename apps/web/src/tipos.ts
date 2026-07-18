@@ -337,3 +337,50 @@ export interface LinhaAuditoria {
   ip: string | null;
   em: string;
 }
+
+// ---- Cobrança ----
+
+export interface Plano {
+  id: string;
+  nome: string;
+  modo: 'FIXO' | 'POR_FUNCIONARIO';
+  valor: number;
+  descricao: string | null;
+}
+
+export interface Assinatura {
+  id: string;
+  tenantId: string;
+  planoId: string | null;
+  modoOverride: 'FIXO' | 'POR_FUNCIONARIO' | null;
+  valorOverride: string | null;
+  diaVencimento: number;
+  situacao: string;
+}
+
+export interface Cobranca {
+  id: string;
+  tenantId: string;
+  competencia: string;
+  valor: number;
+  qtdFuncionarios: number | null;
+  vencimento: string;
+  status: 'ABERTA' | 'PAGA' | 'ATRASADA' | 'CANCELADA';
+  boletoUrl: string | null;
+  pagoEm: string | null;
+  avisoPagamentoEm: string | null;
+  atrasada?: boolean;
+  diasAtraso?: number;
+}
+
+export interface PainelCobranca {
+  assinaturas: Assinatura[];
+  cobrancas: Cobranca[];
+  planos: Plano[];
+}
+
+export interface MinhaAssinatura {
+  assinatura: Assinatura | null;
+  cobrancas: Cobranca[];
+  emAberto: Cobranca | null;
+}

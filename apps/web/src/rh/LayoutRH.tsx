@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { BannerCobranca } from './BannerCobranca';
 import { useAuth } from '../lib/auth';
 import css from './LayoutRH.module.css';
 
@@ -18,6 +19,7 @@ const ITENS = [
   { to: '/rh/auditoria', rotulo: 'Auditoria' },
   { to: '/rh/certificado', rotulo: 'Certificado' },
   { to: '/rh/dispositivos', rotulo: 'Quiosques' },
+  { to: '/rh/assinatura', rotulo: 'Assinatura', soAdmin: true },
 ];
 
 const NOME_PERFIL: Record<string, string> = {
@@ -33,7 +35,7 @@ export function LayoutRH() {
       <aside className={css.side}>
         <div className={css.wm}>Ponto<span className={css.snap}>Snap</span></div>
         <nav className={css.nav}>
-          {ITENS.map((i) => (
+          {ITENS.filter((i) => !i.soAdmin || sessao?.perfil === 'ADMIN_CLIENTE').map((i) => (
             <NavLink key={i.to} to={i.to} end={i.fim}
               className={({ isActive }) => `${css.link} ${isActive ? css.on : ''}`}>
               <span className={css.ic} />{i.rotulo}
@@ -46,6 +48,7 @@ export function LayoutRH() {
         </div>
       </aside>
       <main className={css.content}>
+        {sessao?.perfil === 'ADMIN_CLIENTE' && <BannerCobranca />}
         <Outlet />
       </main>
     </div>

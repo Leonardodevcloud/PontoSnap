@@ -11,6 +11,7 @@ import { BancoModule } from './banco/banco.module';
 import { DocumentoModule } from './documento/documento.module';
 import { AfastamentoModule } from './afastamento/afastamento.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { CobrancaModule } from './cobranca/cobranca.module';
 import { FiscalModule } from './fiscal/fiscal.module';
 import { HealthModule } from './health/health.module';
 import { JobsModule } from './jobs/jobs.module';
@@ -19,7 +20,7 @@ import { JobsModule } from './jobs/jobs.module';
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, DocumentoModule, AfastamentoModule, AuditoriaModule, FiscalModule, HealthModule, JobsModule,
+    BancoModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule,
   ],
 })
 export class AppModule {}
