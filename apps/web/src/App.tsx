@@ -24,6 +24,7 @@ import { Certificado } from './rh/Certificado';
 import { Local } from './rh/Local';
 import { BancoHoras } from './rh/BancoHoras';
 import { Atestados } from './rh/Atestados';
+import { Afastamentos } from './rh/Afastamentos';
 import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
@@ -94,6 +95,7 @@ export function App() {
         <Route path="local" element={<Local />} />
         <Route path="banco" element={<BancoHoras />} />
         <Route path="atestados" element={<Atestados />} />
+        <Route path="afastamentos" element={<Afastamentos />} />
         <Route path="dispositivos" element={<Dispositivos />} />
       </Route>
 

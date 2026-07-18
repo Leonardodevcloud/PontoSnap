@@ -6,6 +6,7 @@ export * from './marcacao';
 export * from './tratamento';
 export * from './banco';
 export * from './documento';
+export * from './afastamento';
 export * from './dispositivo';
 export * from './certificado';
 export * from './job';

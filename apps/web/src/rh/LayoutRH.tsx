@@ -14,6 +14,7 @@ const ITENS = [
   { to: '/rh/local', rotulo: 'Local' },
   { to: '/rh/banco', rotulo: 'Banco de horas' },
   { to: '/rh/atestados', rotulo: 'Atestados' },
+  { to: '/rh/afastamentos', rotulo: 'Férias' },
   { to: '/rh/certificado', rotulo: 'Certificado' },
   { to: '/rh/dispositivos', rotulo: 'Quiosques' },
 ];

@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, tenant,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, tenant,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -279,8 +279,19 @@ export class TratamentoService {
         eq(pontoDocumento.tenantId, tenantId), eq(pontoDocumento.empregadoId, empregadoId),
         eq(pontoDocumento.status, 'ABONADO'),
         lte(pontoDocumento.dataInicio, fimStr), gte(pontoDocumento.dataFim, inicioStr)));
+      // Férias, INSS e licenças: o dia não é esperado, então não pode virar falta.
+      // Entra pelo mesmo cano do atestado (abono de dia inteiro), que já é testado.
+      const afast = await tx.select().from(pontoAfastamento).where(and(
+        eq(pontoAfastamento.tenantId, tenantId), eq(pontoAfastamento.empregadoId, empregadoId),
+        lte(pontoAfastamento.dataInicio, fimStr), gte(pontoAfastamento.dataFim, inicioStr)));
+
       const abonoPorData = new Map<string, number>();
       const abonoDiaInteiro = new Set<string>();
+      for (const a of afast) {
+        for (let dt = a.dataInicio; dt <= a.dataFim; dt = TratamentoService.somarDias(dt, 1)) {
+          if (dt >= inicioStr && dt <= fimStr) abonoDiaInteiro.add(dt);
+        }
+      }
       for (const d of docs) {
         for (let dt = d.dataInicio; dt <= d.dataFim; dt = TratamentoService.somarDias(dt, 1)) {
           if (dt < inicioStr || dt > fimStr) continue;
@@ -363,6 +374,12 @@ export class TratamentoService {
 
       const resultado = apurarPeriodo(dias, REGRAS_CLT_PADRAO);
 
+      // O motor é puro e não conhece "férias". O motivo vem junto do resultado
+      // para a tela poder escrever Férias em vez de deixar o dia em branco.
+      const afastamentos = afast.map((a) => ({
+        tipo: a.tipo, dataInicio: a.dataInicio, dataFim: a.dataFim, observacao: a.observacao,
+      }));
+
       let valores: ResultadoValores | null = null;
       if (emp.salarioMensal != null) {
         const salarioMensalCentavos = Math.round(Number(emp.salarioMensal) * 100);
@@ -372,6 +389,7 @@ export class TratamentoService {
       return {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
+        afastamentos,
       };
     });
   }

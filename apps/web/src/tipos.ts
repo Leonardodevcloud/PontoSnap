@@ -221,6 +221,8 @@ export interface ApuracaoResp {
   inicio: string;
   fim: string;
   resultado: ResultadoPeriodoCLT;
+  /** Férias/licenças do período — a tela escreve o motivo no dia. */
+  afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
 }
 
 export interface ParEntradaSaida { entrada: string; saida: string; }
@@ -303,4 +305,18 @@ export interface Documento {
   /** Só na listagem do RH. */
   nome?: string;
   matricula?: string | null;
+}
+
+// ---- Férias, INSS e licenças ----
+
+export type TipoAfastamento = 'FERIAS' | 'INSS' | 'MATERNIDADE' | 'PATERNIDADE' | 'SUSPENSAO' | 'OUTRO';
+
+export interface Afastamento {
+  id: string;
+  empregadoId: string;
+  tipo: TipoAfastamento;
+  dataInicio: string;
+  dataFim: string;
+  observacao: string | null;
+  nome?: string;
 }

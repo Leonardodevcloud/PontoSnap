@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm } from '../lib/formato';
-import type { ApuracaoResp } from '../tipos';
+import type { ApuracaoResp, TipoAfastamento } from '../tipos';
 import css from './EspelhoMes.module.css';
 
 /** Primeiro e último dia da competência YYYY-MM, no calendário de Brasília. */
@@ -24,6 +24,11 @@ const rotuloMes = (comp: string) =>
   new Date(`${comp}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
 const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+const ROTULO_AFAST: Record<TipoAfastamento, string> = {
+  FERIAS: 'Férias', INSS: 'Afastamento (INSS)', MATERNIDADE: 'Licença-maternidade',
+  PATERNIDADE: 'Licença-paternidade', SUSPENSAO: 'Suspensão', OUTRO: 'Afastamento',
+};
 
 /** Saldo com sinal, do jeito que se lê num espelho de ponto. */
 function comSinal(min: number): string {
@@ -52,6 +57,12 @@ export function EspelhoMes() {
   useEffect(() => { void carregar(comp); }, [carregar, comp]);
 
   const r = dados?.resultado;
+
+  /** Que afastamento cobre este dia, se algum. */
+  const motivoDoDia = (data: string): string | null => {
+    const a = (dados?.afastamentos ?? []).find((x) => data >= x.dataInicio && data <= x.dataFim);
+    return a ? ROTULO_AFAST[a.tipo] : null;
+  };
   const ehMesAtual = comp === competenciaDe(hojeSP());
   // Dias futuros não são "falta": o mês ainda não aconteceu.
   const dias = (r?.dias ?? []).filter((d) => d.data <= hojeSP()).reverse();
@@ -95,7 +106,8 @@ export function EspelhoMes() {
 
           {dias.map((d) => {
             const dia = new Date(`${d.data}T12:00:00-0300`);
-            const folga = d.ehDescansoDia && d.marcacoes.length === 0;
+            const motivo = motivoDoDia(d.data);
+            const folga = (d.ehDescansoDia || !!motivo) && d.marcacoes.length === 0;
             return (
               <button
                 key={d.data}
@@ -109,7 +121,7 @@ export function EspelhoMes() {
                 <span className={css.dM}>
                   {d.marcacoes.length > 0
                     ? d.marcacoes.map((m) => fmtHora(String(m))).join(' · ')
-                    : folga ? 'Descanso' : 'Sem batidas'}
+                    : motivo ?? (folga ? 'Descanso' : 'Sem batidas')}
                   {d.paresIncompletos && <span className={`${css.tag} ${css.tagF}`}>Em aberto</span>}
                   {d.faltaInjustificada && <span className={`${css.tag} ${css.tagF}`}>Falta</span>}
                 </span>
