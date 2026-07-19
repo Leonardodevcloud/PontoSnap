@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { Flash } from '../components/Flash';
+import { PromptInstalar } from '../components/PromptInstalar';
 import css from './LayoutColaborador.module.css';
 
 /** Casca das telas do funcionário: marca, navegação e a saída. */
@@ -64,6 +65,10 @@ export function LayoutColaborador() {
           )}
         </div>
       </header>
+
+      <div className={css.instalarZona}>
+        <PromptInstalar />
+      </div>
 
       <main className={css.conteudo}>
         <Outlet />

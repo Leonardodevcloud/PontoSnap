@@ -54,3 +54,6 @@
   padding:10px; border-radius:var(--r-pill);
 }
 .abas .on{ background:var(--white); border-color:rgba(16,64,63,.1); color:var(--ink); }
+
+/* Zona do banner de instalar o app (PWA) */
+.instalarZona{ padding:0 20px; }
