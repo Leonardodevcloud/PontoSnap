@@ -199,13 +199,6 @@ export function Local() {
           </div>
         </div>
       )}
-
-      <div className={css.lgpd}>
-        <strong>Sobre privacidade:</strong> a localização é capturada só no instante da batida —
-        nunca em segundo plano. Ela não vai para o arquivo fiscal (AFD), fica como contexto aqui
-        no PontoSnap, visível para você e para o próprio funcionário. Informe isso à sua equipe
-        no contrato ou em aditivo, e confira com seu advogado trabalhista antes de ativar.
-      </div>
     </div>
   );
 }

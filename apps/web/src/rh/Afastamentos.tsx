@@ -130,12 +130,6 @@ export function Afastamentos() {
           <button className={css.remover} onClick={() => remover(a.id)}>Apagar</button>
         </div>
       ))}
-
-      <div className={css.nota}>
-        <strong>Isso não vai para o arquivo fiscal.</strong> O registro de ausências do AEJ só tem
-        quatro códigos — DSR, falta não justificada, banco de horas e folga compensatória de feriado.
-        Férias não tem código. O efeito fica na apuração, que é onde importa.
-      </div>
     </div>
   );
 }

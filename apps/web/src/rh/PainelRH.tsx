@@ -23,6 +23,32 @@ export function PainelRH() {
       <div className={css.head}><h2>Painel</h2><p>Visão do dia · {p ? fmtDataExtenso(p.data) : '—'}</p></div>
       {erro && <p className={css.erro}>{erro}</p>}
 
+      {p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0) && (
+        <div className={css.pend}>
+          {p.pendencias.atestados > 0 && (
+            <Link to="/rh/atestados" className={`${css.pendCard} ${css.pendAlerta}`}>
+              <span className={css.pendN}>{p.pendencias.atestados}</span>
+              <span className={css.pendT}>
+                {p.pendencias.atestados === 1 ? 'atestado aguardando decisão' : 'atestados aguardando decisão'}
+                <em>abra pra abonar ou recusar →</em>
+              </span>
+            </Link>
+          )}
+          {p.pendencias.revisarTotal > 0 && (
+            <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendAviso}`}>
+              <span className={css.pendN}>{p.pendencias.revisarTotal}</span>
+              <span className={css.pendT}>
+                {p.pendencias.revisarTotal === 1 ? 'dia com batida faltando' : 'dias com batida faltando'}
+                <em>
+                  {p.pendencias.revisar.slice(0, 3).map((r) => `${r.nome.split(' ')[0]} ${fmtDiaCurto(r.data)}`).join(' · ')}
+                  {p.pendencias.revisarTotal > 3 ? '…' : ''} →
+                </em>
+              </span>
+            </Link>
+          )}
+        </div>
+      )}
+
       <div className={css.stats}>
         <Stat k="Funcionários ativos" v={p?.ativos ?? '—'} />
         <Stat k="Presentes hoje" v={p?.presentes ?? '—'} destaque />
@@ -86,6 +112,11 @@ function Stat({ k, v, destaque, alerta }: { k: string; v: number | string; desta
       <span className={css.statV}>{v}</span>
     </div>
   );
+}
+
+function fmtDiaCurto(iso: string) {
+  const [, m, d] = iso.split('-');
+  return `${d}/${m}`;
 }
 
 function fmtDataExtenso(iso: string) {

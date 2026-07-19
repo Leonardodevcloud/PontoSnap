@@ -189,6 +189,11 @@ export interface PainelResp {
   listaAusentes: { nome: string; matricula: string | null }[];
   marcacoesHoje: number;
   ultimas: { nome: string; dt: string; coletor: number }[];
+  pendencias: {
+    atestados: number;
+    revisar: { nome: string; data: string }[];
+    revisarTotal: number;
+  };
 }
 
 export interface RelatorioLinha {

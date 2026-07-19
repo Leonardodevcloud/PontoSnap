@@ -234,12 +234,6 @@ export function Atestados() {
           </div>
         </div>
       )}
-
-      <div className={css.lgpd}>
-        <strong>Dado sensível.</strong> Atestado com CID é dado de saúde na LGPD: fica cifrado no banco,
-        isolado por empresa, e só o RH desta empresa e o próprio funcionário conseguem abrir.
-        Todo acesso ao arquivo passa pelo login — não existe link público.
-      </div>
     </div>
   );
 }

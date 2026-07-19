@@ -555,6 +555,26 @@ export class TratamentoService {
         nome: nomePorCpf.get(m.cpf)?.nome ?? m.cpf, dt: m.dt, coletor: m.coletor,
       }));
 
+      // Pendências que pedem ação do RH.
+      // 1) Atestados enviados e ainda não decididos.
+      const pendDocs = await tx.select({ id: pontoDocumento.id }).from(pontoDocumento).where(and(
+        eq(pontoDocumento.tenantId, tenantId), eq(pontoDocumento.status, 'EM_ANALISE')));
+
+      // 2) Dias (passados, deste mês) com número ímpar de batidas: alguém esqueceu
+      //    de bater a entrada ou a saída. O dia de hoje fica de fora (ainda em curso).
+      const inicioMesTs = inicioDoDia(`${hojeISO.slice(0, 7)}-01`, fuso);
+      const marcsMes = await tx.select({ cpf: pontoMarcacao.cpf, dt: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
+        .where(and(eq(pontoMarcacao.tenantId, tenantId), gte(pontoMarcacao.dtMarcacao, inicioMesTs), lte(pontoMarcacao.dtMarcacao, fim)));
+      const porDia = new Map<string, number>();
+      for (const m of marcsMes) {
+        const k = `${m.cpf}|${this.diaLocalISO(m.dt, fuso)}`;
+        porDia.set(k, (porDia.get(k) ?? 0) + 1);
+      }
+      const revisar = [...porDia.entries()]
+        .filter(([k, n]) => n % 2 === 1 && (k.split('|')[1] ?? '') < hojeISO)
+        .map(([k]) => { const [cpf, data] = k.split('|') as [string, string]; return { nome: nomePorCpf.get(cpf)?.nome ?? cpf, data }; })
+        .sort((a, b) => (a.data < b.data ? 1 : -1));
+
       return {
         data: hojeISO,
         ativos: emps.length,
@@ -563,6 +583,11 @@ export class TratamentoService {
         listaAusentes: ausentes,
         marcacoesHoje: marcsHoje.length,
         ultimas,
+        pendencias: {
+          atestados: pendDocs.length,
+          revisar: revisar.slice(0, 12),
+          revisarTotal: revisar.length,
+        },
       };
     });
   }

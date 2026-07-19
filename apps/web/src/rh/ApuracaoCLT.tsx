@@ -95,8 +95,8 @@ export function ApuracaoCLT() {
             <Card k="Atrasos" v={minutosParaHhMm(r.totalAtrasoMin)} alerta={r.totalAtrasoMin > 0} />
             <Card k={r.saldoPeriodoMin >= 0 ? 'Saldo credor' : 'Saldo devedor'} v={minutosParaHhMm(r.saldoPeriodoMin)} />
             {r.bancoDeHorasMin !== 0 && <Card k="Banco de horas" v={minutosParaHhMm(r.bancoDeHorasMin)} />}
-            {r.reflexoDsrMin > 0 && <Card k="Reflexo DSR ~" v={minutosParaHhMm(r.reflexoDsrMin)} nota="estimativa" />}
-            {r.dsrPerdidoSemanas > 0 && <Card k="DSR perdido" v={`${r.dsrPerdidoSemanas} sem`} alerta />}
+            {r.reflexoDsrMin > 0 && <Card k="Reflexo do DSR" v={minutosParaHhMm(r.reflexoDsrMin)} nota="estimativa" dica="Reflexo do descanso semanal remunerado sobre as horas extras da semana. É uma estimativa — a folha de pagamento faz o cálculo exato." />}
+            {r.dsrPerdidoSemanas > 0 && <Card k="DSR perdido" v={`${r.dsrPerdidoSemanas} sem`} alerta dica="Semanas em que o funcionário perdeu o descanso semanal remunerado por falta ou atraso." />}
           </div>
 
           <div className={css.tabela}>
@@ -110,14 +110,20 @@ export function ApuracaoCLT() {
                   <span className={css.data}>{fmtDia(d.data)} <em>{diaSemanaCurto(d.data)}</em></span>
                   <span className={css.mono}>{d.minutosTrabalhados ? minutosParaHhMm(d.minutosTrabalhados) : '—'}</span>
                   <span className={css.mono}>{d.minutosContratados ? minutosParaHhMm(d.minutosContratados) : '—'}</span>
-                  <span className={css.mono}>{d.extras.length ? d.extras.map((e) => `${minutosParaHhMm(e.min)}@${e.adicionalPct}%`).join(' ') : '—'}</span>
+                  <span className={css.mono}>
+                    {d.extras.length
+                      ? d.extras.map((e, i) => (
+                          <span key={i} className={css.extraItem}>{minutosParaHhMm(e.min)} <em>+{e.adicionalPct}%</em></span>
+                        ))
+                      : '—'}
+                  </span>
                   <span className={css.mono}>{d.minutosNoturnosLegais ? minutosParaHhMm(d.minutosNoturnosLegais) : '—'}</span>
                   <span className={`${css.mono} ${d.faltaMin ? css.faltaTxt : ''}`}>{d.faltaMin ? minutosParaHhMm(d.faltaMin) : '—'}</span>
                   <span className={css.sinais}>
-                    {d.atrasoMin > 0 && <span className={`${css.tag} ${css.tagAtraso}`} title="Atraso/saída antecipada">atraso {minutosParaHhMm(d.atrasoMin)}</span>}
-                    {d.paresIncompletos && <span className={css.tag} title="Batidas ímpares">ímpar</span>}
-                    {d.penalidadeIntervaloMin > 0 && <span className={css.tag} title="Intervalo insuficiente (Art. 71 §4º)">interv.</span>}
-                    {d.violacaoInterjornada && <span className={css.tag} title="Interjornada < 11h (Art. 66)">11h</span>}
+                    {d.atrasoMin > 0 && <span className={`${css.tag} ${css.tagAtraso}`} title="Atraso na entrada ou saída antecipada">atraso {minutosParaHhMm(d.atrasoMin)}</span>}
+                    {d.paresIncompletos && <span className={css.tag} title="Número ímpar de batidas — alguém esqueceu de registrar a entrada ou a saída">faltou bater</span>}
+                    {d.penalidadeIntervaloMin > 0 && <span className={css.tag} title="Intervalo (almoço) abaixo do mínimo legal — Art. 71 §4º">intervalo curto</span>}
+                    {d.violacaoInterjornada && <span className={css.tag} title="Menos de 11h de descanso entre duas jornadas — Art. 66">descanso &lt; 11h</span>}
                   </span>
                 </div>
               );
@@ -151,9 +157,9 @@ export function ApuracaoCLT() {
   );
 }
 
-function Card({ k, v, destaque, alerta, nota }: { k: string; v: string; destaque?: boolean; alerta?: boolean; nota?: string }) {
+function Card({ k, v, destaque, alerta, nota, dica }: { k: string; v: string; destaque?: boolean; alerta?: boolean; nota?: string; dica?: string }) {
   return (
-    <div className={`${css.card} ${destaque ? css.cardDestaque : ''} ${alerta ? css.cardAlerta : ''}`}>
+    <div className={`${css.card} ${destaque ? css.cardDestaque : ''} ${alerta ? css.cardAlerta : ''}`} title={dica}>
       <div className={css.cardK}>{k}{nota && <em> {nota}</em>}</div>
       <div className={css.cardV}>{v}</div>
     </div>

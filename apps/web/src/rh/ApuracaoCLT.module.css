@@ -46,3 +46,7 @@
 .vForte span{ font-weight:700; }
 .vForte strong{ font-size:16px; }
 .vDesc{ color:var(--coral-dark); }
+
+/* Coluna Extra: cada faixa numa linha, adicional em coral */
+.extraItem{ display:block; line-height:1.35; }
+.extraItem em{ font-style:normal; color:var(--coral-dark); font-size:11px; }
