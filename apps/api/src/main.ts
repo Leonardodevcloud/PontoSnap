@@ -5,6 +5,13 @@ import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  // Atestado é dado de saúde (LGPD sensível) e depende de APP_CRYPTO_KEY para
+  // ser cifrado de verdade. Sem a chave, o CriptoService cai numa chave pública
+  // de zeros — inaceitável em produção. Aqui a subida é recusada nesse caso.
+  if (process.env.NODE_ENV === 'production' && !process.env.APP_CRYPTO_KEY) {
+    throw new Error('APP_CRYPTO_KEY ausente em produção: os atestados ficariam sem cifra real. Defina a chave (32 bytes em base64) antes de subir.');
+  }
+
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   // A foto do atestado vai como base64 no corpo JSON, e o padrão do Express é
