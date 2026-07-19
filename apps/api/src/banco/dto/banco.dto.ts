@@ -17,3 +17,7 @@ export class LancarCompetenciaDto {
   @IsUUID() empregadoId!: string;
   @Matches(/^\d{4}-\d{2}$/) competencia!: string;
 }
+
+export class LancarLoteDto {
+  @Matches(/^\d{4}-\d{2}$/, { message: 'Competência deve ser YYYY-MM' }) competencia!: string;
+}

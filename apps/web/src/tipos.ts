@@ -289,6 +289,21 @@ export interface ConfigBanco {
   ativo: boolean;
 }
 
+export interface CompetenciaFunc { nome: string; minutos: number; }
+export interface CompetenciaLancada {
+  competencia: string;
+  funcionarios: number;
+  totalMin: number;
+  lancadoEm: string;
+  porFuncionario: CompetenciaFunc[];
+}
+export interface LoteResultado {
+  competencia: string;
+  funcionarios: number;
+  totalMin: number;
+  porFuncionario: { empregadoId: string; nome: string; minutos: number }[];
+}
+
 // ---- Atestados e declarações ----
 
 export type TipoDocumento = 'ATESTADO' | 'COMPARECIMENTO';

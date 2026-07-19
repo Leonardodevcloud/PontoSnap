@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { BancoService } from './banco.service';
-import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto } from './dto/banco.dto';
+import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto, LancarLoteDto } from './dto/banco.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -52,5 +52,19 @@ export class BancoController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   lancar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LancarCompetenciaDto) {
     return this.banco.lancarCompetencia(this.tenant(u), dto.empregadoId, dto.competencia);
+  }
+
+  /** Lança a competência para todos os funcionários ativos de uma vez. */
+  @Post('lancar-lote')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  lancarLote(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LancarLoteDto) {
+    return this.banco.lancarCompetenciaLote(this.tenant(u), dto.competencia);
+  }
+
+  /** Histórico de competências já lançadas (agrupado, com detalhe por funcionário). */
+  @Get('competencias')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  competencias(@UsuarioAtual() u: PayloadAcesso) {
+    return this.banco.historicoCompetencias(this.tenant(u));
   }
 }

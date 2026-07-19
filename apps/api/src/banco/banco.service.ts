@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { pontoBancoMov, tenant, empregado, comTenant, type Db } from '@ponto/db';
 import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
 import { DB } from '../database/database.module';
@@ -139,7 +139,78 @@ export class BancoService {
         eq(pontoBancoMov.competencia, competencia),
       ));
       if (novos.length > 0) await tx.insert(pontoBancoMov).values(novos);
-      return { competencia, lancados: novos.length };
+      const totalMin = novos.reduce((s, n) => s + n.minutos, 0);
+      return { competencia, lancados: novos.length, totalMin };
+    });
+  }
+
+  /**
+   * Lança uma competência para TODOS os funcionários ativos de uma vez.
+   * Reaproveita o lançamento individual (idempotente), então relançar o mês
+   * substitui só o que veio da apuração — pagamentos e ajustes ficam intactos.
+   */
+  async lancarCompetenciaLote(tenantId: string, competencia: string) {
+    const cfg = await this.obterConfig(tenantId);
+    if (!cfg.ativo) throw new BadRequestException('Esta empresa não tem acordo de banco de horas');
+    if (!/^\d{4}-\d{2}$/.test(competencia)) throw new BadRequestException('Competência deve ser YYYY-MM');
+
+    const ativos = await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ id: empregado.id, nome: empregado.nome }).from(empregado)
+        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)))
+        .orderBy(asc(empregado.nome)));
+
+    const porFuncionario: { empregadoId: string; nome: string; minutos: number }[] = [];
+    for (const e of ativos) {
+      const r = await this.lancarCompetencia(tenantId, e.id, competencia);
+      porFuncionario.push({ empregadoId: e.id, nome: e.nome, minutos: r.totalMin });
+    }
+    const totalMin = porFuncionario.reduce((s, f) => s + f.minutos, 0);
+    return { competencia, funcionarios: ativos.length, totalMin, porFuncionario };
+  }
+
+  /**
+   * Histórico de competências já lançadas, derivado do extrato (a coluna
+   * `competencia` marca cada movimento que veio de um lançamento). Agrupa por
+   * competência com total, nº de funcionários, data do lançamento e detalhe.
+   */
+  async historicoCompetencias(tenantId: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const movs = await tx.select({
+        competencia: pontoBancoMov.competencia,
+        empregadoId: pontoBancoMov.empregadoId,
+        minutos: pontoBancoMov.minutos,
+        criadoEm: pontoBancoMov.criadoEm,
+      }).from(pontoBancoMov).where(and(
+        eq(pontoBancoMov.tenantId, tenantId),
+        isNotNull(pontoBancoMov.competencia),
+      ));
+
+      const nomes = new Map((await tx.select({ id: empregado.id, nome: empregado.nome })
+        .from(empregado).where(eq(empregado.tenantId, tenantId))).map((e) => [e.id, e.nome] as const));
+
+      const porComp = new Map<string, { lancadoEm: Date; func: Map<string, number> }>();
+      for (const m of movs) {
+        const comp = m.competencia!;
+        const g = porComp.get(comp) ?? { lancadoEm: m.criadoEm, func: new Map<string, number>() };
+        g.func.set(m.empregadoId, (g.func.get(m.empregadoId) ?? 0) + m.minutos);
+        if (m.criadoEm > g.lancadoEm) g.lancadoEm = m.criadoEm;
+        porComp.set(comp, g);
+      }
+
+      return [...porComp.entries()]
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // competência mais recente primeiro
+        .map(([competencia, g]) => {
+          const porFuncionario = [...g.func.entries()]
+            .map(([id, minutos]) => ({ nome: nomes.get(id) ?? '—', minutos }))
+            .sort((a, b) => b.minutos - a.minutos);
+          return {
+            competencia,
+            funcionarios: g.func.size,
+            totalMin: porFuncionario.reduce((s, f) => s + f.minutos, 0),
+            lancadoEm: g.lancadoEm,
+            porFuncionario,
+          };
+        });
     });
   }
 }

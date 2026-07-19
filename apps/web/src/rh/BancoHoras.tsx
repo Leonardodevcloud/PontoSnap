@@ -3,10 +3,16 @@ import { api } from '../lib/api';
 import { hojeSP, minutosParaHhMm } from '../lib/formato';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
-import type { BancoResp, ConfigBanco, Empregado, TipoAcordoBanco } from '../tipos';
+import type {
+  BancoResp, ConfigBanco, Empregado, TipoAcordoBanco,
+  CompetenciaLancada, LoteResultado,
+} from '../tipos';
 import css from './BancoHoras.module.css';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
+const fmtDataHora = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
+const fmtComp = (c: string) => new Date(`${c}-01T12:00:00-0300`)
+  .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
 
 const ACORDOS: { v: TipoAcordoBanco; t: string; d: string }[] = [
@@ -14,68 +20,91 @@ const ACORDOS: { v: TipoAcordoBanco; t: string; d: string }[] = [
   { v: 'INDIVIDUAL', t: 'Acordo individual', d: 'Escrito com cada funcionário. Compensar em até 6 meses.' },
   { v: 'COLETIVO', t: 'Acordo coletivo', d: 'Via sindicato. Compensar em até 12 meses.' },
 ];
+const rotuloAcordo = (t: TipoAcordoBanco) => ACORDOS.find((a) => a.v === t)?.t ?? '—';
 
 export function BancoHoras() {
   const [cfg, setCfg] = useState<ConfigBanco | null>(null);
   const [tipo, setTipo] = useState<TipoAcordoBanco>('NENHUM');
   const [prazo, setPrazo] = useState('');
+  const [editandoAcordo, setEditandoAcordo] = useState(false);
+
   const [emps, setEmps] = useState<Empregado[]>([]);
+  const [comp, setComp] = useState(hojeSP().slice(0, 7));
+  const [modoLancar, setModoLancar] = useState<'lote' | 'individual'>('lote');
+  const [selLancar, setSelLancar] = useState('');
+  const [resultado, setResultado] = useState<LoteResultado | null>(null);
+
+  const [historico, setHistorico] = useState<CompetenciaLancada[]>([]);
+  const [expandido, setExpandido] = useState<string | null>(null);
+
   const [sel, setSel] = useState('');
   const [banco, setBanco] = useState<BancoResp | null>(null);
-  const [comp, setComp] = useState(hojeSP().slice(0, 7));
+
   const [erro, setErro] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [lancando, setLancando] = useState(false);
 
   const carregarCfg = useCallback(async () => {
     try {
       const c = await api.get<ConfigBanco>('/banco/config');
-      setCfg(c);
-      setTipo(c.tipoAcordo);
+      setCfg(c); setTipo(c.tipoAcordo);
       setPrazo(c.prazoMeses != null ? String(c.prazoMeses) : '');
+      setEditandoAcordo(false);
     } catch (e) { setErro((e as Error).message); }
+  }, []);
+
+  const carregarHistorico = useCallback(async () => {
+    try { setHistorico(await api.get<CompetenciaLancada[]>('/banco/competencias')); }
+    catch { /* histórico é secundário */ }
   }, []);
 
   useEffect(() => { void carregarCfg(); }, [carregarCfg]);
   useEffect(() => {
-    (async () => {
-      try { setEmps(await api.get<Empregado[]>('/empregados')); }
-      catch { /* a lista é secundária aqui */ }
-    })();
+    (async () => { try { setEmps(await api.get<Empregado[]>('/empregados')); } catch { /* secundário */ } })();
   }, []);
+  useEffect(() => { if (cfg?.ativo) void carregarHistorico(); }, [cfg?.ativo, carregarHistorico]);
 
   const carregarBanco = useCallback(async (id: string) => {
     if (!id) { setBanco(null); return; }
     try { setBanco(await api.get<BancoResp>(`/banco/extrato?empregadoId=${id}&hoje=${hojeSP()}`)); }
     catch (e) { setErro((e as Error).message); }
   }, []);
-
   useEffect(() => { void carregarBanco(sel); }, [carregarBanco, sel]);
 
   async function salvarCfg() {
-    setErro(null); setMsg(null); setSalvando(true);
+    setErro(null); setSalvando(true);
     try {
       await api.post('/banco/config', {
         tipoAcordo: tipo,
         prazoMeses: tipo === 'NENHUM' ? null : (prazo.trim() ? Number(prazo) : undefined),
       });
       await carregarCfg();
-      setMsg('Acordo salvo.');
-      setTimeout(() => setMsg(null), 3000);
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
   }
 
-  async function lancar() {
-    setErro(null); setMsg(null);
+  async function lancarLote() {
+    setErro(null); setResultado(null); setLancando(true);
     try {
-      const r = await api.post<{ lancados: number }>('/banco/lancar-competencia', {
-        empregadoId: sel, competencia: comp,
-      });
-      setMsg(`${r.lancados} lançamento(s) de ${comp} no banco.`);
-      await carregarBanco(sel);
-      setTimeout(() => setMsg(null), 4000);
+      const r = await api.post<LoteResultado>('/banco/lancar-lote', { competencia: comp });
+      setResultado(r);
+      await Promise.all([carregarHistorico(), carregarBanco(sel)]);
     } catch (e) { setErro((e as Error).message); }
+    finally { setLancando(false); }
+  }
+
+  async function lancarIndividual() {
+    if (!selLancar) return;
+    setErro(null); setResultado(null); setLancando(true);
+    try {
+      const r = await api.post<{ competencia: string; lancados: number; totalMin: number }>(
+        '/banco/lancar-competencia', { empregadoId: selLancar, competencia: comp });
+      const nome = emps.find((e) => e.id === selLancar)?.nome ?? 'funcionário';
+      setResultado({ competencia: r.competencia, funcionarios: 1, totalMin: r.totalMin,
+        porFuncionario: [{ empregadoId: selLancar, nome, minutos: r.totalMin }] });
+      await Promise.all([carregarHistorico(), carregarBanco(sel)]);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setLancando(false); }
   }
 
   async function pagarVencido() {
@@ -84,124 +113,208 @@ export function BancoHoras() {
     try {
       await api.post('/banco/movimento', {
         empregadoId: sel, data: hojeSP(), minutos: -banco.saldo.vencidoMin,
-        tipo: 'PAGAMENTO', descricao: `Saldo vencido pago na folha`,
+        tipo: 'PAGAMENTO', descricao: 'Saldo vencido pago na folha',
       });
       await carregarBanco(sel);
-      setMsg('Saldo vencido baixado como pago.');
-      setTimeout(() => setMsg(null), 3000);
     } catch (e) { setErro((e as Error).message); }
   }
 
   const s = banco?.saldo;
+  const maxMes = hojeSP().slice(0, 7);
 
   return (
     <div className={css.tela}>
       <h2 className={css.h}>Banco de horas</h2>
       <p className={css.sub}>
-        Banco de horas só existe com acordo. Sem ele, a hora extra é paga na folha —
-        e é isso que a lei manda.
+        Só existe com acordo. Sem ele, a hora extra é paga na folha — e é isso que a lei manda.
       </p>
 
       {erro && <p className={css.erro}>{erro}</p>}
-      {msg && <p className={css.ok}>{msg}</p>}
 
-      <div className={css.bloco}>
-        <div className={css.blocoH}>Acordo da empresa</div>
-        <div className={css.opcoes}>
-          {ACORDOS.map((a) => (
-            <button
-              key={a.v}
-              className={`${css.opcao} ${tipo === a.v ? css.opcaoOn : ''}`}
-              onClick={() => {
-                setTipo(a.v);
-                setPrazo(a.v === 'INDIVIDUAL' ? '6' : a.v === 'COLETIVO' ? '12' : '');
-              }}
-            >
-              <b>{a.t}</b>
-              <span>{a.d}</span>
-            </button>
-          ))}
-        </div>
-
-        {tipo !== 'NENHUM' && (
-          <>
-            <Campo
-              rotulo="Prazo para compensar (meses)" inputMode="numeric"
-              value={prazo} onChange={(e) => setPrazo(e.target.value)} placeholder="6"
-            />
-            <p className={css.dica}>
-              A CLT dá 6 meses no acordo individual escrito e 12 no coletivo.
-              <strong> Se a convenção da sua categoria disser outra coisa, ela prevalece</strong> —
-              ajuste aqui conforme o seu acordo.
-            </p>
-          </>
-        )}
-
-        <Botao variante="coral" onClick={salvarCfg} disabled={salvando}>
-          {salvando ? 'Salvando…' : 'Salvar acordo'}
-        </Botao>
-      </div>
-
-      {cfg?.ativo && (
+      {/* ---------- ACORDO ---------- */}
+      {!editandoAcordo && cfg && (
         <div className={css.bloco}>
-          <div className={css.blocoH}>Saldo por funcionário</div>
-
-          <div className={css.linha}>
-            <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
-              <option value="">Escolha o funcionário…</option>
-              {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-            </select>
-            <input
-              className={css.mes} type="month" value={comp} max={hojeSP().slice(0, 7)}
-              onChange={(e) => e.target.value && setComp(e.target.value)}
-            />
-            <Botao variante="lime" onClick={lancar} disabled={!sel}>Lançar competência</Botao>
+          <div className={css.blocoH}>Acordo da empresa</div>
+          <div className={css.acordoSaved}>
+            {cfg.ativo
+              ? <>
+                  <span className={css.pillOk}><span className={css.dot} />Ativo</span>
+                  <span className={css.big}>{rotuloAcordo(cfg.tipoAcordo)}</span>
+                  <span className={css.sep}>·</span>
+                  <span className={css.muted}>compensar em até <b className={css.mono}>{cfg.prazoMeses} meses</b></span>
+                </>
+              : <>
+                  <span className={css.pillNeutro}><span className={css.dot} />Não usam</span>
+                  <span className={css.big}>Sem banco de horas</span>
+                  <span className={css.muted}>hora extra é paga na folha</span>
+                </>}
+            <button className={css.btnEditar} onClick={() => setEditandoAcordo(true)}>
+              {cfg.ativo ? 'Editar acordo' : 'Configurar acordo'}
+            </button>
           </div>
-          <p className={css.dica}>
-            "Lançar competência" leva o saldo de cada dia apurado do mês para o banco.
-            Rodar de novo o mesmo mês <strong>substitui</strong> o que aquele mês tinha lançado —
-            pagamentos e ajustes manuais não são tocados.
-          </p>
+        </div>
+      )}
 
-          {s && (
+      {editandoAcordo && (
+        <div className={css.bloco}>
+          <div className={css.blocoH}>Acordo da empresa</div>
+          <div className={css.opcoes}>
+            {ACORDOS.map((a) => (
+              <button key={a.v}
+                className={`${css.opcao} ${tipo === a.v ? css.opcaoOn : ''}`}
+                onClick={() => { setTipo(a.v); setPrazo(a.v === 'INDIVIDUAL' ? '6' : a.v === 'COLETIVO' ? '12' : ''); }}>
+                <b>{a.t}</b><span>{a.d}</span>
+              </button>
+            ))}
+          </div>
+          {tipo !== 'NENHUM' && (
             <>
-              <div className={css.cards}>
-                <div className={css.card}>
-                  <div className={css.cL}>Saldo</div>
-                  <div className={css.cV}>{comSinal(s.saldoMin)}</div>
-                </div>
-                <div className={css.card}>
-                  <div className={css.cL}>Vence em 30 dias</div>
-                  <div className={css.cV}>{s.aVencerMin > 0 ? minutosParaHhMm(s.aVencerMin) : '—'}</div>
-                </div>
-                <div className={`${css.card} ${s.vencidoMin > 0 ? css.cardAlerta : ''}`}>
-                  <div className={css.cL}>Vencido</div>
-                  <div className={css.cV}>{s.vencidoMin > 0 ? minutosParaHhMm(s.vencidoMin) : '—'}</div>
-                </div>
-              </div>
-
-              {s.vencidoMin > 0 && (
-                <div className={css.alerta}>
-                  <div>
-                    <b>{minutosParaHhMm(s.vencidoMin)} passaram do prazo.</b> Pela lei viraram hora extra
-                    e precisam ser pagos em dinheiro, com adicional. Pague na folha e baixe aqui.
-                  </div>
-                  <Botao variante="coral" onClick={pagarVencido}>Baixar como pago</Botao>
-                </div>
-              )}
-
-              <div className={css.blocoH} style={{ marginTop: 18 }}>Extrato</div>
-              {banco!.extrato.length === 0 && <p className={css.vazio}>Nenhum movimento.</p>}
-              {banco!.extrato.map((m, i) => (
-                <div key={`${m.data}-${i}`} className={css.ext}>
-                  <span className={css.extD}>{fmtData(m.data)}</span>
-                  <span className={css.extE}>{m.descricao || m.tipo}</span>
-                  <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
-                </div>
-              ))}
+              <Campo rotulo="Prazo para compensar (meses)" inputMode="numeric"
+                value={prazo} onChange={(e) => setPrazo(e.target.value)} placeholder="6" />
+              <p className={css.dica}>
+                A CLT dá 6 meses no individual e 12 no coletivo.
+                <strong> Se a convenção da sua categoria disser outra coisa, ela prevalece.</strong>
+              </p>
             </>
           )}
+          <div className={css.acoes}>
+            <Botao variante="coral" onClick={salvarCfg} disabled={salvando}>
+              {salvando ? 'Salvando…' : 'Salvar acordo'}
+            </Botao>
+            <Botao variante="ghost" onClick={() => { void carregarCfg(); }}>Cancelar</Botao>
+          </div>
         </div>
+      )}
+
+      {cfg?.ativo && (
+        <>
+          {/* ---------- LANÇAR COMPETÊNCIA ---------- */}
+          <div className={css.bloco}>
+            <div className={css.blocoH}>Lançar competência</div>
+            <div className={css.lote}>
+              <label className={css.campoMes}>
+                <span className={css.mesLb}>Competência</span>
+                <input className={css.mes} type="month" value={comp} max={maxMes}
+                  onChange={(e) => e.target.value && setComp(e.target.value)} />
+              </label>
+              {modoLancar === 'lote' ? (
+                <>
+                  <Botao variante="lime" onClick={lancarLote} disabled={lancando}>
+                    {lancando ? 'Lançando…' : 'Lançar para todos os ativos'}
+                  </Botao>
+                  <button className={css.linkish} onClick={() => setModoLancar('individual')}>Um funcionário…</button>
+                </>
+              ) : (
+                <>
+                  <select className={css.select} value={selLancar} onChange={(e) => setSelLancar(e.target.value)}>
+                    <option value="">Escolha o funcionário…</option>
+                    {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                  </select>
+                  <Botao variante="lime" onClick={lancarIndividual} disabled={lancando || !selLancar}>
+                    {lancando ? 'Lançando…' : 'Lançar'}
+                  </Botao>
+                  <button className={css.linkish} onClick={() => setModoLancar('lote')}>Todos</button>
+                </>
+              )}
+            </div>
+
+            {resultado && (
+              <div className={css.result}>
+                <span className={css.resultIc}>✓</span>
+                <div>
+                  <b>{fmtComp(resultado.competencia)} lançado para {resultado.funcionarios} {resultado.funcionarios === 1 ? 'funcionário' : 'funcionários'}.</b>{' '}
+                  Saldo do mês somou <b className={css.mono}>{comSinal(resultado.totalMin)}</b> ao banco.
+                </div>
+              </div>
+            )}
+
+            <p className={css.dica}>
+              Leva o saldo de cada dia apurado do mês para o banco. Rodar de novo o mesmo mês
+              <strong> substitui</strong> o que aquele mês tinha lançado — pagamentos e ajustes manuais não são tocados.
+            </p>
+          </div>
+
+          {/* ---------- HISTÓRICO ---------- */}
+          <div className={css.bloco}>
+            <div className={css.blocoH}>Competências lançadas</div>
+            {historico.length === 0 && <p className={css.vazio}>Nenhuma competência lançada ainda.</p>}
+            {historico.length > 0 && (
+              <div className={css.hist}>
+                <div className={`${css.hrow} ${css.hhead}`}>
+                  <span>Competência</span><span>Funcionários</span><span>Total</span><span>Lançado em</span><span />
+                </div>
+                {historico.map((h) => {
+                  const aberto = expandido === h.competencia;
+                  return (
+                    <div key={h.competencia}>
+                      <div className={css.hrow} onClick={() => setExpandido(aberto ? null : h.competencia)}>
+                        <span className={css.hcomp}>{fmtComp(h.competencia)}</span>
+                        <span className={css.mono}>{h.funcionarios}</span>
+                        <span className={`${css.mono} ${h.totalMin >= 0 ? css.pos : css.neg}`}>{comSinal(h.totalMin)}</span>
+                        <span className={css.mono}>{fmtDataHora(h.lancadoEm)}</span>
+                        <span className={css.chev}>{aberto ? '▾' : '▸'}</span>
+                      </div>
+                      {aberto && (
+                        <div className={css.detalhe}>
+                          <div className={css.detTit}>Por funcionário</div>
+                          <div className={css.det}>
+                            {h.porFuncionario.map((f, i) => (
+                              <div key={i} className={css.detItem}>
+                                <span className={css.detNome}>{f.nome}</span>
+                                <span className={`${css.detV} ${f.minutos >= 0 ? css.pos : css.neg}`}>{comSinal(f.minutos)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ---------- SALDO POR FUNCIONÁRIO ---------- */}
+          <div className={css.bloco}>
+            <div className={css.blocoH}>Saldo por funcionário</div>
+            <div className={css.linha}>
+              <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
+                <option value="">Escolha o funcionário…</option>
+                {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+            </div>
+
+            {s && (
+              <>
+                <div className={css.cards}>
+                  <div className={css.card}><div className={css.cL}>Saldo</div><div className={css.cV}>{comSinal(s.saldoMin)}</div></div>
+                  <div className={css.card}><div className={css.cL}>Vence em 30 dias</div><div className={css.cV}>{s.aVencerMin > 0 ? minutosParaHhMm(s.aVencerMin) : '—'}</div></div>
+                  <div className={`${css.card} ${s.vencidoMin > 0 ? css.cardAlerta : ''}`}><div className={css.cL}>Vencido</div><div className={css.cV}>{s.vencidoMin > 0 ? minutosParaHhMm(s.vencidoMin) : '—'}</div></div>
+                </div>
+
+                {s.vencidoMin > 0 && (
+                  <div className={css.alerta}>
+                    <div>
+                      <b>{minutosParaHhMm(s.vencidoMin)} passaram do prazo.</b> Pela lei viraram hora extra
+                      e precisam ser pagos em dinheiro, com adicional. Pague na folha e baixe aqui.
+                    </div>
+                    <Botao variante="coral" onClick={pagarVencido}>Baixar como pago</Botao>
+                  </div>
+                )}
+
+                <div className={css.blocoH} style={{ marginTop: 18 }}>Extrato</div>
+                {banco!.extrato.length === 0 && <p className={css.vazio}>Nenhum movimento.</p>}
+                {banco!.extrato.map((m, i) => (
+                  <div key={`${m.data}-${i}`} className={css.ext}>
+                    <span className={css.extD}>{fmtData(m.data)}</span>
+                    <span className={css.extE}>{m.descricao || m.tipo}</span>
+                    <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

@@ -64,3 +64,57 @@
   background:rgba(203,245,77,.4); color:var(--ink); border-radius:var(--r-md);
   padding:10px 14px; font-size:13.5px; font-weight:700; margin-bottom:12px;
 }
+
+/* ---------- acordo salvo ---------- */
+.acordoSaved{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.pillOk, .pillNeutro{
+  display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:800;
+  padding:5px 12px; border-radius:var(--r-pill); text-transform:uppercase; letter-spacing:.02em;
+}
+.pillOk{ background:var(--verde-bg); color:var(--verde); }
+.pillNeutro{ background:#eee; color:var(--ash); }
+.dot{ width:7px; height:7px; border-radius:50%; background:currentColor; }
+.big{ font-family:var(--ff-display); font-weight:600; font-size:20px; }
+.sep{ color:var(--ash); }
+.muted{ color:var(--ash); font-size:14px; }
+.muted b{ color:var(--ink); }
+.mono{ font-family:var(--ff-mono); font-weight:500; }
+.btnEditar{
+  margin-left:auto; background:transparent; border:1.5px solid rgba(16,64,63,.15);
+  color:var(--ink); font:inherit; font-weight:800; font-size:13.5px;
+  padding:9px 18px; border-radius:var(--r-pill); cursor:pointer;
+}
+.btnEditar:hover{ background:var(--cream); }
+.acoes{ display:flex; gap:10px; margin-top:6px; }
+
+/* ---------- lançar competência ---------- */
+.lote{ display:flex; gap:11px; align-items:flex-end; flex-wrap:wrap; }
+.campoMes{ display:flex; flex-direction:column; gap:6px; }
+.mesLb{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--coral-dark); }
+.linkish{ background:transparent; border:none; color:var(--coral-dark); font:inherit; font-weight:800; font-size:13.5px; cursor:pointer; padding:11px 6px; }
+.result{
+  display:flex; align-items:center; gap:12px; background:var(--verde-bg);
+  border:1px solid rgba(15,169,104,.25); border-radius:12px; padding:12px 16px;
+  margin-top:14px; font-size:13.5px; line-height:1.45;
+}
+.resultIc{ color:var(--verde); font-weight:800; font-size:16px; }
+.result b{ color:var(--ink); }
+
+/* ---------- histórico ---------- */
+.hist{ border:1px solid rgba(16,64,63,.1); border-radius:12px; overflow:hidden; }
+.hrow{
+  display:grid; grid-template-columns:1.2fr .9fr 1fr 1fr 40px; align-items:center; gap:12px;
+  padding:12px 16px; border-top:1px solid rgba(16,64,63,.07); font-size:13.5px; cursor:pointer;
+}
+.hrow:first-child{ border-top:none; }
+.hhead{ background:#fbf4e8; cursor:default; }
+.hhead span{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); }
+.hcomp{ font-family:var(--ff-display); font-weight:600; font-size:15px; text-transform:capitalize; }
+.pos{ color:var(--verde); font-weight:700; }
+.chev{ color:var(--ash); text-align:center; }
+.detalhe{ background:#fdfaf3; padding:4px 16px 14px; }
+.detTit{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); margin:12px 0 8px; }
+.det{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:4px 24px; max-width:560px; }
+.detItem{ display:flex; justify-content:space-between; gap:16px; }
+.detNome{ font-size:13.5px; }
+.detV{ font-family:var(--ff-mono); font-size:13px; }
