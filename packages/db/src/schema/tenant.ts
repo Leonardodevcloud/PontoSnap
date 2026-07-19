@@ -11,6 +11,11 @@ export const tenant = pgTable('tenant', {
   latitude: numeric('latitude', { precision: 10, scale: 7 }),
   longitude: numeric('longitude', { precision: 10, scale: 7 }),
   raioMetros: integer('raio_metros'),
+  // Fuso do estabelecimento (offset fixo — Brasil sem horário de verão desde
+  // 2019). Rege apuração, AFD/AEJ, espelhos e cobrança. Default Brasília.
+  // Editável, mas cada marcação grava o fuso vigente no momento da batida
+  // (ponto_marcacao.fuso), então mudar aqui só afeta batidas futuras.
+  fuso: varchar('fuso', { length: 6 }).notNull().default('-0300'),
   // Banco de horas. NENHUM = extra é paga na folha, e a aba nem aparece pro
   // funcionário. O prazo vem do acordo: 6 meses (individual escrito) ou
   // 12 (coletivo) — mas fica editável porque acordo coletivo pode dispor outro.

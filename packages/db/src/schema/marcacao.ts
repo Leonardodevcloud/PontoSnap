@@ -19,6 +19,10 @@ export const pontoMarcacao = pgTable('ponto_marcacao', {
   onlineOffline: smallint('online_offline').notNull().default(0),
   hashRegistro: char('hash_registro', { length: 64 }).notNull(),
   hashAnterior: char('hash_anterior', { length: 64 }),
+  // Fuso (offset "-0300") usado para formatar as datas ao calcular o hash desta
+  // marcação. Gravado por linha porque o hash é imutável: o AFD tem de
+  // reproduzir a MESMA formatação, para sempre. Linhas antigas = -0300.
+  fuso: varchar('fuso', { length: 6 }).notNull().default('-0300'),
   ipOrigem: varchar('ip_origem', { length: 45 }),
   latitude: numeric('latitude', { precision: 10, scale: 7 }),
   longitude: numeric('longitude', { precision: 10, scale: 7 }),

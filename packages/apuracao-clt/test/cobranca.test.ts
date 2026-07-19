@@ -85,4 +85,17 @@ describe('atraso', () => {
   it('em dia: zero dias de atraso', () => {
     expect(diasDeAtraso('2026-08-10', hoje)).toBe(0);
   });
+
+  it('o fim do dia do vencimento respeita o fuso do tenant', () => {
+    // 03:30Z do dia 15: em Brasília (-03) já passou do fim do dia 14 (venceu);
+    // em Manaus (-04) ainda é 23:30 do dia 14 (dentro do prazo, não venceu).
+    const instante = new Date('2026-07-15T03:30:00Z');
+    expect(estaAtrasada('2026-07-14', 'ABERTA', instante, '-0300')).toBe(true);
+    expect(estaAtrasada('2026-07-14', 'ABERTA', instante, '-0400')).toBe(false);
+  });
+
+  it('sem fuso explícito, mantém o comportamento de Brasília', () => {
+    const instante = new Date('2026-07-15T03:30:00Z');
+    expect(estaAtrasada('2026-07-14', 'ABERTA', instante)).toBe(true);
+  });
 });

@@ -3,7 +3,7 @@ import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import {
   pontoRep, pontoMarcacao, empregado, tenant, usuario, pontoHorarioContratual, comTenant, type Db,
 } from '@ponto/db';
-import { proximaMarcacao, gerarComprovante, assinarPdfPAdES, resolverBatida } from '@ponto/rep-core';
+import { proximaMarcacao, gerarComprovante, assinarPdfPAdES, resolverBatida, inicioDoDia, fimDoDia, diaDaSemanaLocal } from '@ponto/rep-core';
 import { Coletor, OnlineOffline, TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { CertificadoService } from '../certificado/certificado.service';
@@ -33,6 +33,10 @@ export class MarcacaoService {
       const rep = reps[0];
       if (!rep) throw new NotFoundException('REP-P não configurado para este tenant');
 
+      // Fuso vigente do tenant: entra no hash e fica gravado na marcação.
+      const t = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, p.tenantId)).limit(1))[0];
+      const fuso = t?.fuso ?? '-0300';
+
       const anterior = rep.ultimoNsr > 0 && rep.ultimoHash
         ? { nsr: rep.ultimoNsr, hashRegistro: rep.ultimoHash } : null;
 
@@ -46,11 +50,11 @@ export class MarcacaoService {
       const onlineOffline = r.onlineOffline;
 
       const g = proximaMarcacao(
-        { cpf: p.cpf, dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline }, anterior);
+        { cpf: p.cpf, dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline }, anterior, fuso);
 
       await tx.insert(pontoMarcacao).values({
         tenantId: p.tenantId, repId: rep.id, nsr: g.nsr, cpf: p.cpf,
-        dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline,
+        dtMarcacao, dtGravacao, coletor: p.coletor, onlineOffline, fuso,
         hashRegistro: g.hashRegistro, hashAnterior: g.hashAnterior,
         ipOrigem: p.ipOrigem ?? null,
         latitude: p.latitude != null ? String(p.latitude) : null,
@@ -94,10 +98,13 @@ export class MarcacaoService {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
 
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const fuso = t?.fuso ?? '-0300';
+
       const conds = [eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, e.cpf)];
       if (dataStr) {
-        conds.push(gte(pontoMarcacao.dtMarcacao, new Date(`${dataStr}T00:00:00-0300`)));
-        conds.push(lte(pontoMarcacao.dtMarcacao, new Date(`${dataStr}T23:59:59-0300`)));
+        conds.push(gte(pontoMarcacao.dtMarcacao, inicioDoDia(dataStr, fuso)));
+        conds.push(lte(pontoMarcacao.dtMarcacao, fimDoDia(dataStr, fuso)));
       }
       const linhas = await tx.select({
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao, coletor: pontoMarcacao.coletor,
@@ -112,13 +119,12 @@ export class MarcacaoService {
         const h = (await tx.select().from(pontoHorarioContratual)
           .where(eq(pontoHorarioContratual.id, e.horarioContratualId)).limit(1))[0];
         if (h) {
-          const dia = new Date(`${dataStr ?? new Date().toISOString().slice(0, 10)}T12:00:00-0300`).getDay();
+          const dia = diaDaSemanaLocal(dataStr ?? new Date().toISOString().slice(0, 10), fuso);
           if (h.diasSemana.includes(dia)) esperadas = h.pares.length * 2;
         }
       }
 
       // Local do estabelecimento: o app usa só para decidir se pede observação.
-      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
       const local = t?.latitude && t?.longitude
         ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
         : null;
@@ -221,6 +227,8 @@ export class MarcacaoService {
         empregado: { nome: emp?.nome ?? m.cpf, cpf: m.cpf },
         marcacao: { nsr: m.nsr, dtMarcacao: m.dtMarcacao, hashRegistro: m.hashRegistro },
         localPrestacao: ten?.localPrestacao ?? '',
+        // Fuso da própria batida — é a hora que o comprovante deve mostrar.
+        fuso: m.fuso ?? ten?.fuso ?? '-0300',
       });
     });
 

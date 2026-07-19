@@ -1,6 +1,6 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { usuario, tokenSenha, comoMaster, type Db } from '@ponto/db';
+import { usuario, tenant, tokenSenha, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { hashSenha, verificarSenha } from './senha';
 import { createHash, randomBytes } from 'node:crypto';
@@ -17,6 +17,20 @@ export class AuthService {
   ) {}
 
   /**
+   * Monta o payload do access token. Inclui o fuso do tenant (só para o front
+   * exibir horas na hora local). MASTER não tem tenant → sem fuso.
+   */
+  private async montarPayload(u: { id: string; tenantId: string | null; perfil: string; email?: string; deveTrocarSenha?: boolean }): Promise<PayloadAcesso> {
+    let fuso: string | undefined;
+    if (u.tenantId) {
+      const t = await comoMaster(this.db, (tx) =>
+        tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, u.tenantId!)).limit(1));
+      fuso = t[0]?.fuso ?? undefined;
+    }
+    return { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, email: u.email, deveTrocarSenha: u.deveTrocarSenha, fuso };
+  }
+
+  /**
    * Login por e-mail + senha. O lookup roda como MASTER porque o login é
    * anterior ao contexto de tenant (o e-mail é único global). A senha é o
    * que autentica; o token carrega o tenant p/ as próximas requisições.
@@ -30,13 +44,14 @@ export class AuthService {
     const ok = await verificarSenha(senha, u.senhaHash);
     if (!ok) throw new UnauthorizedException('Credenciais inválidas');
 
-    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, email: u.email, deveTrocarSenha: u.deveTrocarSenha };
+    const payload = await this.montarPayload(u);
     return {
       accessToken: this.tokens.assinarAcesso(payload),
       refreshToken: this.tokens.assinarRefresh(u.id),
       perfil: u.perfil,
       tenantId: u.tenantId,
       deveTrocarSenha: u.deveTrocarSenha,
+      fuso: payload.fuso,
     };
   }
 
@@ -51,7 +66,7 @@ export class AuthService {
       tx.select().from(usuario).where(and(eq(usuario.id, sub), eq(usuario.ativo, true))).limit(1));
     const u = rows[0];
     if (!u) throw new UnauthorizedException('Usuário inativo');
-    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, email: u.email, deveTrocarSenha: u.deveTrocarSenha };
+    const payload = await this.montarPayload(u);
     return { accessToken: this.tokens.assinarAcesso(payload) };
   }
 
@@ -69,7 +84,7 @@ export class AuthService {
     await comoMaster(this.db, (tx) =>
       tx.update(usuario).set({ senhaHash: novoHash, deveTrocarSenha: false }).where(eq(usuario.id, usuarioId)));
 
-    const payload: PayloadAcesso = { sub: u.id, tenantId: u.tenantId, perfil: u.perfil, deveTrocarSenha: false };
+    const payload = await this.montarPayload({ ...u, deveTrocarSenha: false });
     return { accessToken: this.tokens.assinarAcesso(payload), deveTrocarSenha: false };
   }
 

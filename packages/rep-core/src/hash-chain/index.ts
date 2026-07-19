@@ -10,20 +10,27 @@ export interface DadosHash {
   coletor: number;
   onlineOffline: number;
   hashAnterior: string | null;
+  /** Fuso usado na formatação das datas. Ausente = Brasília (-0300). */
+  fuso?: string;
 }
 
 /**
  * Monta a entrada do SHA-256 (registro tipo 7). PONTO CRÍTICO:
  * a representação exata de cada campo precisa ser validada contra o
  * validador oficial de AFD do MTE. Centralizado aqui de propósito.
+ *
+ * O fuso entra na formatação das datas e, portanto, DENTRO do hash. Como o
+ * hash é imutável, o fuso usado aqui tem de ser o mesmo reproduzido no AFD
+ * daquela marcação — por isso ele é gravado por linha (ver MarcacaoGravada).
  */
 export function construirEntradaHash(d: DadosHash): string {
+  const fuso = d.fuso ?? '-0300';
   return [
     String(d.nsr).padStart(9, '0'),
     '7',
-    formatarDataHoraAFD(d.dtMarcacao),
+    formatarDataHoraAFD(d.dtMarcacao, fuso),
     soDigitos(d.cpf).padStart(11, '0'),
-    formatarDataHoraAFD(d.dtGravacao),
+    formatarDataHoraAFD(d.dtGravacao, fuso),
     String(d.coletor).padStart(2, '0'),
     String(d.onlineOffline),
     d.hashAnterior ?? '',
@@ -35,10 +42,15 @@ export function calcularHash(entrada: string): string {
   return createHash('sha256').update(entrada, 'latin1').digest('hex').toUpperCase();
 }
 
-/** Função PURA: dada a marcação anterior, resolve NSR e hash da próxima. */
+/**
+ * Função PURA: dada a marcação anterior, resolve NSR e hash da próxima.
+ * O fuso é o do tenant no momento da batida; fica gravado na marcação para
+ * o AFD reproduzir a formatação exata usada no hash.
+ */
 export function proximaMarcacao(
   entrada: EntradaMarcacao,
   anterior: { nsr: number; hashRegistro: string } | null,
+  fuso = '-0300',
 ): MarcacaoGravada {
   const nsr = (anterior?.nsr ?? 0) + 1;
   const hashAnterior = anterior?.hashRegistro ?? null;
@@ -50,8 +62,9 @@ export function proximaMarcacao(
     coletor: entrada.coletor,
     onlineOffline: entrada.onlineOffline,
     hashAnterior,
+    fuso,
   }));
-  return { ...entrada, nsr, hashRegistro, hashAnterior };
+  return { ...entrada, nsr, hashRegistro, hashAnterior, fuso };
 }
 
 /** Recalcula a cadeia e retorna o primeiro NSR onde ela quebra (ou null). */
@@ -69,6 +82,7 @@ export function verificarCadeia(
       coletor: m.coletor,
       onlineOffline: m.onlineOffline,
       hashAnterior,
+      fuso: m.fuso,
     }));
     if (esperado !== m.hashRegistro || (m.hashAnterior ?? null) !== hashAnterior) {
       return { integro: false, nsrQuebrado: m.nsr };

@@ -1,11 +1,14 @@
 import PDFDocument from 'pdfkit';
 import type { RepConfig } from '@ponto/shared';
+import { offsetMin } from '../datetime.js';
 
 export interface DadosComprovante {
   rep: Pick<RepConfig, 'razaoSocial' | 'tipoIdEmpregador' | 'documentoEmpregador' | 'numeroInpi'>;
   empregado: { nome: string; cpf: string };
   marcacao: { nsr: number; dtMarcacao: Date; hashRegistro?: string };
   localPrestacao: string;
+  /** Fuso do tenant. Ausente = Brasília (-0300). */
+  fuso?: string;
 }
 
 const fmtDoc = (d: string): string => {
@@ -15,16 +18,16 @@ const fmtDoc = (d: string): string => {
   return s;
 };
 
-const fmtDataHora = (data: Date): string =>
-  new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    timeZone: 'America/Sao_Paulo',
-  }).format(data);
+const fmtDataHora = (data: Date, fuso: string): string => {
+  const l = new Date(data.getTime() + offsetMin(fuso) * 60000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(l.getUTCDate())}/${p(l.getUTCMonth() + 1)}/${l.getUTCFullYear()} ` +
+    `${p(l.getUTCHours())}:${p(l.getUTCMinutes())}:${p(l.getUTCSeconds())}`;
+};
 
 /** Gera o Comprovante de Registro de Ponto (PDF). Assinatura PAdES é etapa à parte. */
 export function gerarComprovante(dados: DadosComprovante): Promise<Buffer> {
-  const { rep, empregado, marcacao, localPrestacao } = dados;
+  const { rep, empregado, marcacao, localPrestacao, fuso = '-0300' } = dados;
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: [297, 420], margins: { top: 24, left: 24, right: 24, bottom: 24 } });
     const chunks: Buffer[] = [];
@@ -55,7 +58,7 @@ export function gerarComprovante(dados: DadosComprovante): Promise<Buffer> {
     linha(doc.y); doc.moveDown(0.5);
 
     doc.fillColor('#6b7280').font('Helvetica').fontSize(7).text('DATA E HORA DA MARCAÇÃO');
-    doc.fillColor(roxo).font('Helvetica-Bold').fontSize(14).text(fmtDataHora(marcacao.dtMarcacao));
+    doc.fillColor(roxo).font('Helvetica-Bold').fontSize(14).text(fmtDataHora(marcacao.dtMarcacao, fuso));
     doc.moveDown(0.4);
     campo('NSR (Nº SEQUENCIAL DE REGISTRO)', String(marcacao.nsr).padStart(9, '0'));
     linha(doc.y); doc.moveDown(0.5);

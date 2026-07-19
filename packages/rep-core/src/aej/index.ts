@@ -19,6 +19,8 @@ export interface MontarAEJParams {
   empregados?: EmpregadoAEJ[]; horarios?: HorarioAEJ[];
   tratamentos?: TratamentoAEJ[]; ausencias?: AusenciaAEJ[];
   dataGeracao?: Date;
+  /** Fuso do tenant para formatar as datas do arquivo. */
+  fuso?: string;
 }
 
 const soDig = (v: unknown) => String(v ?? '').replace(/\D/g, '');
@@ -26,7 +28,7 @@ const linha = (...campos: unknown[]): string =>
   campos.map((c) => (c === null || c === undefined ? '' : String(c))).join('|');
 
 export function montarAEJ(p: MontarAEJParams): { conteudo: Buffer; nomeArquivo: string; totalRegistros: number } {
-  const { rep, ptrp, empregados = [], horarios = [], tratamentos = [], ausencias = [], dataGeracao = new Date() } = p;
+  const { rep, ptrp, empregados = [], horarios = [], tratamentos = [], ausencias = [], dataGeracao = new Date(), fuso = '-0300' } = p;
   const linhas: string[] = [];
   const cont = { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0, t8: 0 };
 
@@ -39,7 +41,7 @@ export function montarAEJ(p: MontarAEJParams): { conteudo: Buffer; nomeArquivo: 
   const dataFinal = datas[datas.length - 1] ?? dataGeracao;
 
   linhas.push(linha('01', rep.tipoIdEmpregador, rep.documentoEmpregador, rep.cnoCaepf ?? '', '',
-    rep.razaoSocial, dataD(dataInicial), dataD(dataFinal), formatarDataHoraAFD(dataGeracao), '001')); cont.t1++;
+    rep.razaoSocial, dataD(dataInicial), dataD(dataFinal), formatarDataHoraAFD(dataGeracao, fuso), '001')); cont.t1++;
 
   linhas.push(linha('02', idRepAej, '3', rep.numeroInpi)); cont.t2++;
 
@@ -52,7 +54,7 @@ export function montarAEJ(p: MontarAEJParams): { conteudo: Buffer; nomeArquivo: 
     linhas.push(linha('04', h.codigo, h.durJornadaMin, ...pares)); cont.t4++;
   }
   for (const t of tratamentos) {
-    linhas.push(linha('05', vinculoPorCpf.get(soDig(t.cpf)), formatarDataHoraAFD(t.dtMarcacao), idRepAej,
+    linhas.push(linha('05', vinculoPorCpf.get(soDig(t.cpf)), formatarDataHoraAFD(t.dtMarcacao, fuso), idRepAej,
       t.tpMarc, t.seqEntSaida, t.fonteMarc ?? 'O', t.codHorContratual ?? '', t.motivo ?? '')); cont.t5++;
   }
   for (const e of empregados) {

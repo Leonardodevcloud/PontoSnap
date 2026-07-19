@@ -1,16 +1,18 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import {
-  pontoRep, pontoMarcacao, empregado, pontoHorarioContratual, pontoTratamento, pontoAusencia,
+  pontoRep, pontoMarcacao, empregado, pontoHorarioContratual, pontoTratamento, pontoAusencia, tenant,
   comTenant, type Db,
 } from '@ponto/db';
-import { montarAFD, montarAEJ, assinarCAdESDestacado } from '@ponto/rep-core';
+import { montarAFD, montarAEJ, assinarCAdESDestacado, inicioDoDia, fimDoDia } from '@ponto/rep-core';
 import type { MarcacaoGravada } from '@ponto/shared';
 import { Coletor, OnlineOffline } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { CertificadoService } from '../certificado/certificado.service';
 
-export interface Periodo { inicio?: Date; fim?: Date; }
+/** Período por datas locais "YYYY-MM-DD". Os limites em instante UTC são
+ *  construídos no service, com o fuso do tenant. */
+export interface Periodo { inicio?: string; fim?: string; }
 
 @Injectable()
 export class FiscalService {
@@ -30,10 +32,10 @@ export class FiscalService {
     };
   }
 
-  private filtroPeriodo(repId: string, p: Periodo) {
+  private filtroPeriodo(repId: string, p: Periodo, fuso: string) {
     const conds = [eq(pontoMarcacao.repId, repId)];
-    if (p.inicio) conds.push(gte(pontoMarcacao.dtMarcacao, p.inicio));
-    if (p.fim) conds.push(lte(pontoMarcacao.dtMarcacao, p.fim));
+    if (p.inicio) conds.push(gte(pontoMarcacao.dtMarcacao, inicioDoDia(p.inicio, fuso)));
+    if (p.fim) conds.push(lte(pontoMarcacao.dtMarcacao, fimDoDia(p.fim, fuso)));
     return and(...conds);
   }
 
@@ -41,12 +43,15 @@ export class FiscalService {
     return comTenant(this.db, tenantId, async (tx) => {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
+      const fusoTenant = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
       const linhas = await tx.select().from(pontoMarcacao)
-        .where(this.filtroPeriodo(rep.id, p)).orderBy(asc(pontoMarcacao.nsr));
+        .where(this.filtroPeriodo(rep.id, p, fusoTenant)).orderBy(asc(pontoMarcacao.nsr));
       const marcacoes: MarcacaoGravada[] = linhas.map((m) => ({
         nsr: Number(m.nsr), cpf: m.cpf, dtMarcacao: m.dtMarcacao, dtGravacao: m.dtGravacao,
         coletor: m.coletor as Coletor, onlineOffline: m.onlineOffline as OnlineOffline,
         hashRegistro: m.hashRegistro, hashAnterior: m.hashAnterior,
+        // Cada marcação reproduz o fuso com que foi hasheada (imutável).
+        fuso: m.fuso ?? '-0300',
       }));
       return montarAFD({
         rep: {
@@ -55,6 +60,7 @@ export class FiscalService {
           tipoIdDesenvolvedor: rep.tipoIdDesenvolvedor, documentoDesenvolvedor: rep.documentoDesenvolvedor,
         },
         marcacoes,
+        fuso: fusoTenant,
       });
     });
   }
@@ -63,6 +69,7 @@ export class FiscalService {
     return comTenant(this.db, tenantId, async (tx) => {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
+      const fusoTenant = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
       const emps = await tx.select().from(empregado).where(eq(empregado.tenantId, tenantId));
       const cpfPorId = new Map(emps.map((e) => [e.id, e.cpf] as const));
       const horarios = await tx.select().from(pontoHorarioContratual).where(eq(pontoHorarioContratual.tenantId, tenantId));
@@ -86,6 +93,7 @@ export class FiscalService {
           cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(a.data),
           qtMinutos: a.qtMinutos, tipoMovBH: a.tipoMovBh,
         })),
+        fuso: fusoTenant,
       });
     });
   }

@@ -25,4 +25,11 @@ export interface MarcacaoGravada extends EntradaMarcacao {
   nsr: number;
   hashRegistro: string;
   hashAnterior: string | null;
+  /**
+   * Fuso (offset "-0300") usado para formatar a data/hora ao calcular o hash
+   * desta marcação. Fica gravado na linha porque o hash é imutável: o AFD tem
+   * de reproduzir EXATAMENTE o mesmo fuso usado no hash, para sempre. Ausente
+   * = marcação antiga, anterior ao fuso por linha → assume Brasília (-0300).
+   */
+  fuso?: string;
 }

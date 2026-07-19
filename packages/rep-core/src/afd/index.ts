@@ -23,7 +23,7 @@ const num = (v: unknown, tam: number): string => soDigitos(v).slice(-tam).padSta
 const comCRC = (conteudo: string): string => conteudo + crc16Kermit(conteudo);
 
 /** Registro tipo "1" — Cabeçalho (302 chars). */
-export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, dataGeracao: Date): string {
+export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, dataGeracao: Date, fuso = '-0300'): string {
   const conteudo =
     num('0', 9) +                                       // 1  "000000000"
     '1' +                                               // 2  tipo
@@ -34,7 +34,7 @@ export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, da
     alfa(rep.numeroInpi, 17) +                          // 7  nº INPI (VALIDAR)
     dataD(dataInicial) +                                // 8  data inicial
     dataD(dataFinal) +                                  // 9  data final
-    formatarDataHoraAFD(dataGeracao) +                  // 10 geração
+    formatarDataHoraAFD(dataGeracao, fuso) +            // 10 geração
     '003' +                                             // 11 versão
     String(rep.tipoIdDesenvolvedor) +                   // 12
     num(rep.documentoDesenvolvedor, 14) +               // 13 doc desenvolvedor
@@ -44,10 +44,12 @@ export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, da
 
 /** Registro tipo "7" — Marcação REP-P (137 chars, sem CRC). */
 export function registro7(m: MarcacaoGravada): string {
+  // Fuso da PRÓPRIA marcação: tem de bater com o usado no hash imutável.
+  const fuso = m.fuso ?? '-0300';
   return num(m.nsr, 9) + '7' +
-    formatarDataHoraAFD(m.dtMarcacao) +
+    formatarDataHoraAFD(m.dtMarcacao, fuso) +
     alfa(soDigitos(m.cpf), 12) +
-    formatarDataHoraAFD(m.dtGravacao) +
+    formatarDataHoraAFD(m.dtGravacao, fuso) +
     num(m.coletor, 2) +
     String(m.onlineOffline) +
     alfa(m.hashRegistro, 64);
@@ -71,6 +73,9 @@ export interface MontarAFDParams {
   rep: RepConfig;
   marcacoes: MarcacaoGravada[];
   dataGeracao?: Date;
+  /** Fuso atual do tenant — só para o cabeçalho (data de geração). Cada
+   *  marcação carrega o seu próprio fuso no registro 7. */
+  fuso?: string;
 }
 
 export interface ArquivoGerado {
@@ -79,12 +84,12 @@ export interface ArquivoGerado {
   totalRegistros: number;
 }
 
-export function montarAFD({ rep, marcacoes, dataGeracao = new Date() }: MontarAFDParams): ArquivoGerado {
+export function montarAFD({ rep, marcacoes, dataGeracao = new Date(), fuso = '-0300' }: MontarAFDParams): ArquivoGerado {
   const datas = marcacoes.map((m) => m.dtMarcacao).sort((a, b) => a.getTime() - b.getTime());
   const dataInicial = datas[0] ?? dataGeracao;
   const dataFinal = datas[datas.length - 1] ?? dataGeracao;
 
-  const linhas: string[] = [registro1(rep, dataInicial, dataFinal, dataGeracao)];
+  const linhas: string[] = [registro1(rep, dataInicial, dataFinal, dataGeracao, fuso)];
   for (const m of marcacoes) linhas.push(registro7(m));
   linhas.push(registro9({ t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: marcacoes.length }));
   linhas.push(registroAssinatura());

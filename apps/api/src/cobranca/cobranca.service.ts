@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import {
-  plano, assinatura, cobranca, empregado, comoMaster, comTenant, type Db,
+  plano, assinatura, cobranca, empregado, tenant, comoMaster, comTenant, type Db,
 } from '@ponto/db';
 import {
   calcularMensalidade, vencimentoDaCompetencia, resolverBase,
@@ -149,6 +149,7 @@ export class CobrancaService {
 
   async minhaAssinatura(tenantId: string) {
     return comTenant(this.db, tenantId, async (tx) => {
+      const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
       const ass = (await tx.select().from(assinatura)
         .where(eq(assinatura.tenantId, tenantId)).limit(1))[0];
       const cobrancas = await tx.select().from(cobranca)
@@ -157,8 +158,8 @@ export class CobrancaService {
       const comStatus = cobrancas.map((c) => ({
         ...c,
         valor: Number(c.valor),
-        atrasada: estaAtrasada(c.vencimento, c.status),
-        diasAtraso: c.status === 'PAGA' ? 0 : diasDeAtraso(c.vencimento),
+        atrasada: estaAtrasada(c.vencimento, c.status, new Date(), fuso),
+        diasAtraso: c.status === 'PAGA' ? 0 : diasDeAtraso(c.vencimento, new Date(), fuso),
       }));
       const emAberto = comStatus.find((c) => c.status !== 'PAGA' && c.status !== 'CANCELADA');
       return { assinatura: ass ?? null, cobrancas: comStatus, emAberto: emAberto ?? null };

@@ -120,6 +120,13 @@
       "when": 1784411690540,
       "tag": "0016_normal_drax",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784430524391,
+      "tag": "0017_fuso_por_tenant_e_marcacao",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@
 .erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 14px; }
 
 .table{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); overflow:visible; }
-.row{ display:grid; grid-template-columns:1.7fr 1.2fr 1.2fr .8fr .9fr 40px; align-items:center; gap:14px; padding:14px 20px; border-top:1px solid rgba(16,64,63,.1); }
+.row{ display:grid; grid-template-columns:1.6fr 1.1fr 1fr 1.1fr .8fr .9fr 40px; align-items:center; gap:14px; padding:14px 20px; border-top:1px solid rgba(16,64,63,.1); }
 .row:first-child{ border-top:none; }
 .thead{ background:#fbf4e8; }
 .thead span{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ash); }
@@ -34,3 +34,10 @@
 .eLbl{ font-family:var(--ff-mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--coral-dark); }
 .eEmail{ font-family:var(--ff-mono); font-size:16px; font-weight:500; color:var(--ink); margin:8px 0; }
 .eNota{ font-size:13px; color:var(--ash); margin:0; }
+
+/* Fuso horário (dropdown no cadastro e edição) */
+.selWrap{ display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+.selLb{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
+.select{ padding:11px 12px; border:1px solid rgba(16,64,63,.18); border-radius:12px; font:inherit; background:var(--white); color:var(--ink); }
+.fusoNota{ font-size:12px; color:var(--ash); margin:-8px 0 16px; }
+.fusoCol{ font-family:var(--ff-mono); font-size:12px; color:var(--ash); }

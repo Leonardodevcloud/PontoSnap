@@ -8,14 +8,23 @@ import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarPeriodo, diaSemana, REGRAS_CLT_PADRAO, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
-import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, type DiaRelatorio } from '@ponto/rep-core';
+import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, type DiaRelatorio } from '@ponto/rep-core';
 import ExcelJS from 'exceljs';
 
 interface Par { entrada: string; saida: string; }
 
+/** Transação Drizzle (o tx que comTenant entrega ao callback). */
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
 @Injectable()
 export class TratamentoService {
   constructor(@Inject(DB) private readonly db: Db) {}
+
+  /** Fuso vigente do tenant (offset "-0300"). Rege limites de dia e apuração. */
+  private async carregarFuso(tx: Tx, tenantId: string): Promise<string> {
+    const t = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+    return t?.fuso ?? '-0300';
+  }
 
   // ---- Horário contratual ----
   criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string }) {
@@ -74,8 +83,9 @@ export class TratamentoService {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
 
-      const inicio = new Date(`${dataStr}T00:00:00-0300`);
-      const fim = new Date(`${dataStr}T23:59:59-0300`);
+      const fuso = await this.carregarFuso(tx, tenantId);
+      const inicio = inicioDoDia(dataStr, fuso);
+      const fim = fimDoDia(dataStr, fuso);
 
       const marcs = await tx.select().from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
@@ -125,8 +135,12 @@ export class TratamentoService {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
 
-      const inicio = new Date(`${dataStr}T00:00:00-0300`);
-      const fim = new Date(`${dataStr}T23:59:59-0300`);
+      // Local do estabelecimento (p/ o RH ver de onde cada batida saiu) e fuso.
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const fuso = t?.fuso ?? '-0300';
+
+      const inicio = inicioDoDia(dataStr, fuso);
+      const fim = fimDoDia(dataStr, fuso);
       const marcs = await tx.select({
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao,
         dtGravacao: pontoMarcacao.dtGravacao,
@@ -144,8 +158,6 @@ export class TratamentoService {
             .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]?.durJornadaMin ?? 0
         : 0;
 
-      // Local do estabelecimento para o RH ver de onde cada batida saiu.
-      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
       const local = t?.latitude && t?.longitude
         ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
         : null;
@@ -197,13 +209,14 @@ export class TratamentoService {
   /** Gera a escala 12x36 (trabalha em dias alternados a partir de dataInicio). */
   async gerarEscala12x36(tenantId: string, empregadoId: string, inicioStr: string, fimStr: string, dataInicioStr: string) {
     return comTenant(this.db, tenantId, async (tx) => {
-      const inicio = new Date(`${inicioStr}T12:00:00-0300`);
-      const fim = new Date(`${fimStr}T12:00:00-0300`);
-      const base = new Date(`${dataInicioStr}T12:00:00-0300`);
+      const fuso = await this.carregarFuso(tx, tenantId);
+      const inicio = new Date(`${inicioStr}T12:00:00${fuso}`);
+      const fim = new Date(`${fimStr}T12:00:00${fuso}`);
+      const base = new Date(`${dataInicioStr}T12:00:00${fuso}`);
       const dias: string[] = [];
       // ciclo de 48h: trabalha um dia, folga o seguinte
       for (const cur = new Date(base); cur.getTime() <= fim.getTime(); cur.setUTCDate(cur.getUTCDate() + 2)) {
-        if (cur.getTime() >= inicio.getTime()) dias.push(this.diaLocalISO(cur));
+        if (cur.getTime() >= inicio.getTime()) dias.push(this.diaLocalISO(cur, fuso));
       }
       await tx.delete(pontoEscala).where(and(
         eq(pontoEscala.tenantId, tenantId), eq(pontoEscala.empregadoId, empregadoId),
@@ -228,9 +241,9 @@ export class TratamentoService {
     return d.toISOString().slice(0, 10);
   }
 
-  /** Data no calendário de Brasília (-0300) a partir de um instante UTC. */
-  private diaLocalISO(d: Date): string {
-    return new Date(d.getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+  /** Data no calendário local (fuso do tenant) a partir de um instante UTC. */
+  private diaLocalISO(d: Date, fuso: string): string {
+    return dataLocalDe(d, fuso);
   }
 
   /**
@@ -253,8 +266,9 @@ export class TratamentoService {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
 
-      const inicio = new Date(`${inicioStr}T00:00:00-0300`);
-      const fim = new Date(`${fimStr}T23:59:59-0300`);
+      const fuso = await this.carregarFuso(tx, tenantId);
+      const inicio = inicioDoDia(inicioStr, fuso);
+      const fim = fimDoDia(fimStr, fuso);
 
       const marcs = await tx.select({ dtMarcacao: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
@@ -314,7 +328,7 @@ export class TratamentoService {
       // agrupa as batidas por dia local
       const porDia = new Map<string, Date[]>();
       for (const m of marcs) {
-        const dataLocal = this.diaLocalISO(m.dtMarcacao);
+        const dataLocal = this.diaLocalISO(m.dtMarcacao, fuso);
         const arr = porDia.get(dataLocal) ?? [];
         arr.push(m.dtMarcacao);
         porDia.set(dataLocal, arr);
@@ -354,10 +368,10 @@ export class TratamentoService {
         }
       } else {
         // varre TODOS os dias do período — assim faltas de dia inteiro aparecem
-        const cursor = new Date(`${inicioStr}T12:00:00-0300`);
-        const ultimo = new Date(`${fimStr}T12:00:00-0300`);
+        const cursor = new Date(`${inicioStr}T12:00:00${fuso}`);
+        const ultimo = new Date(`${fimStr}T12:00:00${fuso}`);
         while (cursor.getTime() <= ultimo.getTime()) {
-          const data = this.diaLocalISO(cursor);
+          const data = this.diaLocalISO(cursor, fuso);
           const dow = diaSemana(data);
           const ehFeriado = feriadoSet.has(data);
           const ehDomingo = dow === 0;
@@ -524,9 +538,10 @@ export class TratamentoService {
     return comTenant(this.db, tenantId, async (tx) => {
       const emps = await tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)));
-      const hojeISO = this.diaLocalISO(new Date());
-      const inicio = new Date(`${hojeISO}T00:00:00-0300`);
-      const fim = new Date(`${hojeISO}T23:59:59-0300`);
+      const fuso = await this.carregarFuso(tx, tenantId);
+      const hojeISO = this.diaLocalISO(new Date(), fuso);
+      const inicio = inicioDoDia(hojeISO, fuso);
+      const fim = fimDoDia(hojeISO, fuso);
 
       const marcsHoje = await tx.select({ cpf: pontoMarcacao.cpf, dt: pontoMarcacao.dtMarcacao, coletor: pontoMarcacao.coletor })
         .from(pontoMarcacao).where(and(

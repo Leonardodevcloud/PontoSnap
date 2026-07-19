@@ -1,17 +1,34 @@
-const TZ = 'America/Sao_Paulo';
+/**
+ * Fuso ativo da sessão (offset "-0300"). Definido após o login a partir do
+ * tenant. Default Brasília — idêntico ao antigo America/Sao_Paulo, que não tem
+ * horário de verão desde 2019.
+ */
+let fusoAtivo = '-0300';
+export function definirFusoAtivo(f?: string | null): void { fusoAtivo = f || '-0300'; }
+export function fusoDaSessao(): string { return fusoAtivo; }
 
-export const fmtHora = (iso: string) =>
-  new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const offsetMin = (f: string) => (f[0] === '-' ? -1 : 1) * (parseInt(f.slice(1, 3), 10) * 60 + parseInt(f.slice(3, 5), 10));
+/** Instante deslocado para o relógio de parede do fuso ativo (formatar em UTC). */
+const emLocal = (d: Date): Date => new Date(d.getTime() + offsetMin(fusoAtivo) * 60000);
+const p2 = (n: number) => String(n).padStart(2, '0');
+
+export const fmtHora = (iso: string) => {
+  const l = emLocal(new Date(iso));
+  return `${p2(l.getUTCHours())}:${p2(l.getUTCMinutes())}`;
+};
 
 /** Aceita Date ou 'YYYY-MM-DD'. A string é lida ao meio-dia para não escorregar de fuso. */
 export const fmtDataCurta = (d: Date | string = new Date()) =>
-  (typeof d === 'string' ? new Date(`${d}T12:00:00-0300`) : d)
-    .toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: TZ })
+  emLocal(typeof d === 'string' ? new Date(`${d}T12:00:00${fusoAtivo}`) : d)
+    .toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
     .replace('.', '');
 
-export function hojeSP(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+/** Data de hoje "YYYY-MM-DD" no fuso ativo. */
+export function hojeLocal(): string {
+  return emLocal(new Date()).toISOString().slice(0, 10);
 }
+/** @deprecated use hojeLocal — mantido para compatibilidade. */
+export const hojeSP = hojeLocal;
 
 export function minutosParaHhMm(min: number): string {
   const s = min < 0 ? '-' : '';

@@ -63,15 +63,15 @@ export function resolverBase(
 }
 
 /** Uma cobrança está atrasada se passou do vencimento e não foi paga. */
-export function estaAtrasada(vencimento: string, status: string, hoje: Date = new Date()): boolean {
+export function estaAtrasada(vencimento: string, status: string, hoje: Date = new Date(), fuso = '-0300'): boolean {
   if (status === 'PAGA' || status === 'CANCELADA') return false;
-  const venc = new Date(`${vencimento}T23:59:59-0300`);
+  const venc = new Date(`${vencimento}T23:59:59${fuso}`);
   return hoje > venc;
 }
 
 /** Dias de atraso (0 se em dia). Para o aviso "atrasada há X dias". */
-export function diasDeAtraso(vencimento: string, hoje: Date = new Date()): number {
-  const venc = new Date(`${vencimento}T23:59:59-0300`);
+export function diasDeAtraso(vencimento: string, hoje: Date = new Date(), fuso = '-0300'): number {
+  const venc = new Date(`${vencimento}T23:59:59${fuso}`);
   if (hoje <= venc) return 0;
   return Math.floor((hoje.getTime() - venc.getTime()) / 86_400_000);
 }

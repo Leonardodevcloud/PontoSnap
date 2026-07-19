@@ -17,13 +17,9 @@ export class FiscalController {
     return u.tenantId;
   }
   private periodo(inicio?: string, fim?: string): Periodo {
-    // YYYY-MM-DD é interpretado no fuso de Brasília, cobrindo o dia inteiro.
-    // Sem isso, new Date('2026-07-16') vira meia-noite UTC = 21h do dia anterior
-    // em -0300, e batidas do fim do dia ficam de fora do arquivo fiscal.
-    return {
-      inicio: inicio ? new Date(`${inicio}T00:00:00-0300`) : undefined,
-      fim: fim ? new Date(`${fim}T23:59:59-0300`) : undefined,
-    };
+    // As datas "YYYY-MM-DD" viram limites de dia no service, usando o fuso do
+    // tenant — sem isso, um cliente fora de Brasília perde batidas na virada.
+    return { inicio, fim };
   }
   private arquivo(conteudo: Buffer, nome: string, tipo = 'text/plain') {
     return new StreamableFile(conteudo, { type: tipo, disposition: `attachment; filename="${nome}"` });

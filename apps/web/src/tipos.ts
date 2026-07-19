@@ -6,6 +6,7 @@ export interface RespLogin {
   perfil: Perfil;
   tenantId: string | null;
   deveTrocarSenha?: boolean;
+  fuso?: string;
 }
 
 export interface Tenant {
@@ -13,6 +14,7 @@ export interface Tenant {
   cnpj: string;
   razaoSocial: string;
   localPrestacao: string | null;
+  fuso?: string;
   ativo: boolean;
   criadoEm?: string;
 }

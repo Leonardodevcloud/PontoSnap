@@ -6,7 +6,7 @@ import { DB } from '../database/database.module';
 import { hashSenha } from '../auth/senha';
 
 export interface CriarTenantParams {
-  cnpj: string; razaoSocial: string; localPrestacao?: string;
+  cnpj: string; razaoSocial: string; localPrestacao?: string; fuso?: string;
   adminEmail: string; adminSenha: string;
 }
 
@@ -39,6 +39,7 @@ export class TenantService {
 
       const t = (await tx.insert(tenant).values({
         cnpj: p.cnpj, razaoSocial: p.razaoSocial, localPrestacao: p.localPrestacao ?? null,
+        fuso: p.fuso ?? '-0300',
       }).returning())[0]!;
 
       const rep = (await tx.insert(pontoRep).values({
@@ -68,6 +69,16 @@ export class TenantService {
 
   async definirAtivo(id: string, ativo: boolean) {
     await comoMaster(this.db, (tx) => tx.update(tenant).set({ ativo }).where(eq(tenant.id, id)));
+    return this.obter(id);
+  }
+
+  /**
+   * Ajusta o fuso do tenant. Só afeta batidas FUTURAS: cada marcação grava o
+   * fuso vigente no INSERT (ponto_marcacao.fuso), então o histórico e o hash
+   * permanecem íntegros. Idealmente definido antes das primeiras batidas.
+   */
+  async definirFuso(id: string, fuso: string) {
+    await comoMaster(this.db, (tx) => tx.update(tenant).set({ fuso }).where(eq(tenant.id, id)));
     return this.obter(id);
   }
 }

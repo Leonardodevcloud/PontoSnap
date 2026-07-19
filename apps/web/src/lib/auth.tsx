@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, definirAcesso, definirRefresh, obterRefresh, BASE } from './api';
+import { definirFusoAtivo } from './formato';
 import type { Perfil, RespLogin } from '../tipos';
 
 interface Sessao { perfil: Perfil; tenantId: string | null; deveTrocarSenha: boolean; }
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await api.post<RespLogin>('/auth/login', { email, senha });
     definirAcesso(data.accessToken);
     definirRefresh(data.refreshToken);
+    definirFusoAtivo(data.fuso);
     setSessao({ perfil: data.perfil, tenantId: data.tenantId, deveTrocarSenha: !!data.deveTrocarSenha });
   }
 
@@ -69,6 +71,7 @@ export function useAuth(): AuthCtx {
 function lerSessao(token: string): Sessao {
   try {
     const payload = JSON.parse(atob(token.split('.')[1] ?? ''));
+    definirFusoAtivo(payload.fuso);
     return { perfil: payload.perfil, tenantId: payload.tenantId ?? null, deveTrocarSenha: !!payload.deveTrocarSenha };
   } catch { return { perfil: 'COLABORADOR', tenantId: null, deveTrocarSenha: false }; }
 }

@@ -6,6 +6,7 @@ export interface PayloadAcesso {
   perfil: string;
   email?: string;           // para a trilha de auditoria
   deveTrocarSenha?: boolean;
+  fuso?: string;            // fuso do tenant — só para exibição no front
 }
 
 export interface ConfigToken {
