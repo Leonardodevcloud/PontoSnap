@@ -118,3 +118,10 @@
 .detItem{ display:flex; justify-content:space-between; gap:16px; }
 .detNome{ font-size:13.5px; }
 .detV{ font-family:var(--ff-mono); font-size:13px; }
+
+/* ---- Folga compensatória ---- */
+.folga{ background:var(--cream); border:1px solid rgba(16,64,63,.1); border-radius:14px; padding:14px 16px; margin-top:12px; }
+.folgaTit{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); margin-bottom:10px; }
+.folgaLinha{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; }
+.folgaH{ flex:1; min-width:150px; background:var(--white); border:1.5px solid rgba(16,64,63,.1); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); outline:none; }
+.folgaH:focus{ border-color:var(--coral); }

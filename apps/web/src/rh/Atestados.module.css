@@ -65,3 +65,40 @@
   font-size:13px; color:var(--ash); line-height:1.6;
 }
 .lgpd strong{ color:var(--ink); }
+
+/* ---- Lançar atestado (RH) ---- */
+.lancar{
+  width:100%; background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill);
+  padding:12px; font:inherit; font-weight:800; font-size:14px; cursor:pointer; margin-bottom:16px;
+}
+.lancar:hover{ filter:brightness(1.08); }
+
+.folha{
+  position:fixed; inset:0; background:rgba(16,64,63,.5); backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; z-index:60; padding:16px;
+}
+.folhaIn{
+  width:100%; max-width:440px; background:var(--white); border-radius:var(--r-lg);
+  padding:24px 22px; max-height:92dvh; overflow-y:auto;
+}
+.folhaH{ font-family:var(--ff-display); font-size:21px; font-weight:600; }
+.folhaSub{ color:var(--ash); font-size:13px; margin:2px 0 16px; }
+.lb{
+  display:block; font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--coral-dark); margin-bottom:5px;
+}
+.chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:13px; }
+.chip{
+  border:1.5px solid rgba(16,64,63,.15); background:var(--white); color:var(--ink);
+  border-radius:var(--r-pill); padding:8px 14px; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
+}
+.chipOn{ background:var(--ink); border-color:var(--ink); color:var(--cream); }
+.upload{
+  width:100%; border:1.5px dashed rgba(16,64,63,.28); border-radius:12px; padding:14px;
+  text-align:center; cursor:pointer; margin-bottom:13px; background:var(--white); font:inherit; color:var(--ink);
+}
+.upload b{ display:block; font-size:14px; margin-bottom:3px; }
+.upload span{ font-size:11.5px; color:var(--ash); }
+.preview{ width:100%; max-height:230px; object-fit:contain; border-radius:12px; margin-bottom:13px; background:var(--cream); border:1px solid rgba(16,64,63,.1); }
+.abonarLinha{ display:flex; gap:9px; align-items:flex-start; font-size:13px; color:var(--ink); margin:2px 0 16px; cursor:pointer; }
+.abonarLinha input{ margin-top:2px; }

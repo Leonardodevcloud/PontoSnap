@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
-import { pontoBancoMov, tenant, empregado, comTenant, type Db } from '@ponto/db';
+import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, tenant, empregado, comTenant, type Db } from '@ponto/db';
 import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
@@ -211,6 +211,51 @@ export class BancoService {
             porFuncionario,
           };
         });
+    });
+  }
+
+  /**
+   * Registra uma folga compensatória: o funcionário usa o saldo do banco para
+   * um dia de descanso. Faz duas coisas de uma vez:
+   *  - marca o dia como folga compensatória (ausência tipo 4), pra apuração NÃO
+   *    contar como falta;
+   *  - lança um débito no banco no valor da jornada daquele dia.
+   * Sem os dois, ou o dia viraria falta, ou o saldo nunca baixaria.
+   */
+  async registrarFolga(tenantId: string, empregadoId: string, data: string, minutosManual?: number | null) {
+    const cfg = await this.obterConfig(tenantId);
+    if (!cfg.ativo) throw new BadRequestException('Esta empresa não tem acordo de banco de horas');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new BadRequestException('Data inválida (use AAAA-MM-DD)');
+
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emp = (await tx.select({ horarioId: empregado.horarioContratualId }).from(empregado)
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!emp) throw new NotFoundException('Empregado não encontrado');
+
+      let minutos = minutosManual ?? null;
+      if (minutos == null) {
+        const h = emp.horarioId
+          ? (await tx.select({ dur: pontoHorarioContratual.durJornadaMin }).from(pontoHorarioContratual)
+              .where(eq(pontoHorarioContratual.id, emp.horarioId)).limit(1))[0]
+          : undefined;
+        minutos = h?.dur ?? 0;
+      }
+      if (minutos <= 0) {
+        throw new BadRequestException('Informe as horas da folga — este funcionário não tem jornada configurada.');
+      }
+
+      // Não duplica: se já há folga nesse dia, não cria de novo.
+      const jaTem = (await tx.select({ id: pontoAusencia.id }).from(pontoAusencia).where(and(
+        eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, empregadoId),
+        eq(pontoAusencia.data, data), eq(pontoAusencia.tipo, 4))).limit(1))[0];
+      if (jaTem) throw new BadRequestException('Já existe uma folga compensatória registrada nesse dia.');
+
+      await tx.insert(pontoAusencia).values({ tenantId, empregadoId, tipo: 4, data, qtMinutos: minutos });
+      const [mov] = await tx.insert(pontoBancoMov).values({
+        tenantId, empregadoId, data, minutos: -minutos, tipo: 'DEBITO',
+        descricao: 'Folga compensatória',
+      }).returning();
+      return { data, minutos, movimento: mov };
     });
   }
 }

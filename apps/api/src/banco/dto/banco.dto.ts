@@ -21,3 +21,10 @@ export class LancarCompetenciaDto {
 export class LancarLoteDto {
   @Matches(/^\d{4}-\d{2}$/, { message: 'Competência deve ser YYYY-MM' }) competencia!: string;
 }
+
+export class FolgaDto {
+  @IsUUID() empregadoId!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data deve ser YYYY-MM-DD' }) data!: string;
+  /** Opcional: horas em minutos. Ausente = usa a jornada do dia do funcionário. */
+  @IsOptional() @IsInt() @Min(1) @Max(24 * 60) minutos?: number | null;
+}

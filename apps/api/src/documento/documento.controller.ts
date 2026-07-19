@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { DocumentoService, type StatusDocumento } from './documento.service';
-import { EnviarDocumentoDto, DecidirDto } from './dto/documento.dto';
+import { EnviarDocumentoDto, DecidirDto, RegistrarPeloRhDto } from './dto/documento.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -39,6 +39,13 @@ export class DocumentoController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   listar(@UsuarioAtual() u: PayloadAcesso, @Query('status') status?: StatusDocumento) {
     return this.docs.listar(this.tenant(u), status);
+  }
+
+  /** O RH registra um atestado no lugar do funcionário (papel, sem app…). */
+  @Post('rh')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  registrarRh(@UsuarioAtual() u: PayloadAcesso, @Body() dto: RegistrarPeloRhDto) {
+    return this.docs.registrarPeloRh(this.tenant(u), u.sub, dto);
   }
 
   /** Baixa o arquivo. RH vê os do cliente; funcionário só o próprio. */

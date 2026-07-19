@@ -99,6 +99,43 @@ export class DocumentoService {
     }
   }
 
+  /**
+   * O RH registra um atestado no lugar do funcionário (recebeu no papel, o
+   * funcionário não tem o app, etc.). Pode já entrar abonado (o RH decidiu ao
+   * lançar) ou ficar em análise, como os enviados pelo funcionário.
+   */
+  async registrarPeloRh(tenantId: string, analistaId: string, p: {
+    empregadoId: string; tipo: TipoDocumento; dataInicio: string; dataFim: string; minutos?: number | null;
+    arquivoBase64: string; arquivoNome: string; arquivoMime: string; abonar: boolean;
+  }) {
+    if (!MIMES.includes(p.arquivoMime)) {
+      throw new BadRequestException('Envie uma foto (JPG, PNG, WebP) ou um PDF');
+    }
+    if (p.dataFim < p.dataInicio) throw new BadRequestException('A data final não pode ser antes da inicial');
+    const bruto = Buffer.from(p.arquivoBase64, 'base64');
+    if (bruto.length === 0) throw new BadRequestException('Arquivo vazio');
+    if (bruto.length > LIMITE_BYTES) throw new BadRequestException('Arquivo maior que 5 MB.');
+    if (p.minutos != null && (p.minutos < 1 || p.minutos > 24 * 60)) {
+      throw new BadRequestException('Minutos abonados fora do intervalo de um dia');
+    }
+
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emp = (await tx.select({ id: empregado.id }).from(empregado)
+        .where(and(eq(empregado.id, p.empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!emp) throw new NotFoundException('Empregado não encontrado');
+      const [doc] = await tx.insert(pontoDocumento).values({
+        tenantId, empregadoId: p.empregadoId, tipo: p.tipo,
+        dataInicio: p.dataInicio, dataFim: p.dataFim, minutos: p.minutos ?? null,
+        arquivo: this.cripto.cifrarBytes(bruto),
+        arquivoNome: p.arquivoNome.slice(0, 120), arquivoMime: p.arquivoMime, arquivoBytes: bruto.length,
+        status: p.abonar ? 'ABONADO' : 'EM_ANALISE',
+        analisadoPor: p.abonar ? analistaId : null,
+        analisadoEm: p.abonar ? new Date() : null,
+      }).returning(CAMPOS);
+      return doc;
+    });
+  }
+
   /** Do próprio funcionário. */
   async meus(tenantId: string, empregadoId: string) {
     return comTenant(this.db, tenantId, (tx) =>

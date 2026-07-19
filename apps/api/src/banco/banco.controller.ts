@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { BancoService } from './banco.service';
-import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto, LancarLoteDto } from './dto/banco.dto';
+import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto, LancarLoteDto, FolgaDto } from './dto/banco.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -66,5 +66,12 @@ export class BancoController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   competencias(@UsuarioAtual() u: PayloadAcesso) {
     return this.banco.historicoCompetencias(this.tenant(u));
+  }
+
+  /** Registra uma folga compensatória: debita o banco e não conta como falta. */
+  @Post('folga')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  folga(@UsuarioAtual() u: PayloadAcesso, @Body() dto: FolgaDto) {
+    return this.banco.registrarFolga(this.tenant(u), dto.empregadoId, dto.data, dto.minutos ?? null);
   }
 }

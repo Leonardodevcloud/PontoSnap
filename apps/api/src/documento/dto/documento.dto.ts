@@ -1,4 +1,4 @@
-import { IsBase64, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
+import { IsBase64, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
 
 export class EnviarDocumentoDto {
   @IsIn(['ATESTADO', 'COMPARECIMENTO']) tipo!: 'ATESTADO' | 'COMPARECIMENTO';
@@ -9,6 +9,13 @@ export class EnviarDocumentoDto {
   @IsBase64() arquivoBase64!: string;
   @IsString() @MaxLength(120) arquivoNome!: string;
   @IsString() @MaxLength(60) arquivoMime!: string;
+}
+
+/** Igual ao envio do funcionário, mas com o empregado e a decisão do RH. */
+export class RegistrarPeloRhDto extends EnviarDocumentoDto {
+  @IsUUID() empregadoId!: string;
+  /** true = já entra abonado; false = fica em análise. */
+  @IsBoolean() abonar!: boolean;
 }
 
 export class DecidirDto {

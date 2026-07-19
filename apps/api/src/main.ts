@@ -1,10 +1,18 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // A foto do atestado vai como base64 no corpo JSON, e o padrão do Express é
+  // só 100 KB — estourava com "request entity too large". 10 MB cobre os 5 MB
+  // do arquivo + o inchaço do base64; o service ainda barra acima de 5 MB reais.
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
+
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // Em produção, restrinja aos domínios do front (ex.: https://app.pontosnap.online).

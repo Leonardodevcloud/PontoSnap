@@ -40,7 +40,13 @@ export function BancoHoras() {
   const [sel, setSel] = useState('');
   const [banco, setBanco] = useState<BancoResp | null>(null);
 
+  // Folga compensatória
+  const [folgaData, setFolgaData] = useState(hojeSP());
+  const [folgaHoras, setFolgaHoras] = useState('');
+  const [regFolga, setRegFolga] = useState(false);
+
   const [erro, setErro] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [lancando, setLancando] = useState(false);
 
@@ -107,6 +113,22 @@ export function BancoHoras() {
     finally { setLancando(false); }
   }
 
+  async function registrarFolga() {
+    if (!sel) return;
+    setErro(null); setMsg(null); setRegFolga(true);
+    try {
+      const min = folgaHoras.trim() ? Math.round(Number(folgaHoras.replace(',', '.')) * 60) : undefined;
+      const r = await api.post<{ minutos: number; data: string }>('/banco/folga', {
+        empregadoId: sel, data: folgaData, minutos: min,
+      });
+      setMsg(`Folga de ${fmtData(r.data)} registrada — ${minutosParaHhMm(r.minutos)} debitados do banco.`);
+      setFolgaHoras('');
+      await carregarBanco(sel);
+      setTimeout(() => setMsg(null), 4000);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setRegFolga(false); }
+  }
+
   async function pagarVencido() {
     if (!banco?.saldo || banco.saldo.vencidoMin <= 0) return;
     setErro(null);
@@ -130,6 +152,7 @@ export function BancoHoras() {
       </p>
 
       {erro && <p className={css.erro}>{erro}</p>}
+      {msg && <p className={css.ok}>{msg}</p>}
 
       {/* ---------- ACORDO ---------- */}
       {!editandoAcordo && cfg && (
@@ -283,6 +306,26 @@ export function BancoHoras() {
                 {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </select>
             </div>
+
+            {sel && (
+              <div className={css.folga}>
+                <div className={css.folgaTit}>Registrar folga compensatória</div>
+                <div className={css.folgaLinha}>
+                  <input className={css.mes} type="date" value={folgaData} max={hojeSP()}
+                    onChange={(e) => e.target.value && setFolgaData(e.target.value)} />
+                  <input className={css.folgaH} inputMode="decimal" value={folgaHoras}
+                    placeholder="horas (ou jornada do dia)"
+                    onChange={(e) => setFolgaHoras(e.target.value)} />
+                  <Botao variante="ghost" onClick={registrarFolga} disabled={regFolga}>
+                    {regFolga ? 'Registrando…' : 'Registrar folga'}
+                  </Botao>
+                </div>
+                <p className={css.dica}>
+                  A folga <strong>debita o banco</strong> e faz o dia <strong>não contar como falta</strong>.
+                  Deixe as horas em branco pra usar a jornada do dia do funcionário.
+                </p>
+              </div>
+            )}
 
             {s && (
               <>
