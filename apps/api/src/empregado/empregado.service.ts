@@ -101,7 +101,7 @@ export class EmpregadoService {
 
     // Manda a senha provisória por e-mail. Best-effort: se o envio falhar, o
     // acesso já foi criado e a senha volta na resposta da API do mesmo jeito.
-    const urlApp = process.env.APP_WEB_URL ?? 'https://ponto-snap-web.vercel.app';
+    const urlApp = process.env.APP_WEB_URL ?? 'https://app.pontosnap.online';
     const { assunto, html } = emailAcessoFuncionario(emp.nome, resultado.email, senha, urlApp);
     await this.email.enviar({ para: resultado.email, assunto, html });
 

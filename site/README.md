@@ -13,13 +13,13 @@ HTML puro, sem build. Projeto **separado** no Vercel (o app fica em `apps/web`).
 
 ## Domínios
 
-- Landing → `pontosnap.com.br` (ou o domínio da Vercel)
-- App → `app.pontosnap.com.br` (projeto `apps/web`)
+- Landing → `pontosnap.online` (ou o domínio da Vercel)
+- App → `app.pontosnap.online` (projeto `apps/web`)
 
 Ao apontar o domínio próprio, troque nos dois lugares do `index.html`:
-`https://ponto-snap-web.vercel.app/login` → `https://app.pontosnap.com.br/login`
+`https://app.pontosnap.online/login` → `https://app.pontosnap.online/login`
 
 ## Antes de divulgar
 
-- [ ] Trocar `contato@pontosnap.com.br` pelo e-mail/WhatsApp real
+- [ ] Trocar `contato@pontosnap.online` pelo e-mail/WhatsApp real
 - [ ] Registro no INPI: a página fala do registro sem citar número. Confirme o registro antes de divulgar.
