@@ -23,10 +23,22 @@ export function PainelRH() {
       <div className={css.head}><h2>Painel</h2><p>Visão do dia · {p ? fmtDataExtenso(p.data) : '—'}</p></div>
       {erro && <p className={css.erro}>{erro}</p>}
 
-      {p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0) && (
+      {p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0 || p.pendencias.naoBateramTotal > 0) && (
         <div className={css.pend}>
+          {p.pendencias.naoBateramTotal > 0 && (
+            <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendAlerta}`}>
+              <span className={css.pendN}>{p.pendencias.naoBateramTotal}</span>
+              <span className={css.pendT}>
+                {p.pendencias.naoBateramTotal === 1 ? 'ainda não bateu hoje' : 'ainda não bateram hoje'}
+                <em>
+                  {p.pendencias.naoBateram.slice(0, 3).map((r) => `${r.nome.split(' ')[0]} (desde ${r.desde})`).join(' · ')}
+                  {p.pendencias.naoBateramTotal > 3 ? '…' : ''} →
+                </em>
+              </span>
+            </Link>
+          )}
           {p.pendencias.atestados > 0 && (
-            <Link to="/rh/atestados" className={`${css.pendCard} ${css.pendAlerta}`}>
+            <Link to="/rh/atestados" className={`${css.pendCard} ${css.pendAviso}`}>
               <span className={css.pendN}>{p.pendencias.atestados}</span>
               <span className={css.pendT}>
                 {p.pendencias.atestados === 1 ? 'atestado aguardando decisão' : 'atestados aguardando decisão'}
@@ -35,7 +47,7 @@ export function PainelRH() {
             </Link>
           )}
           {p.pendencias.revisarTotal > 0 && (
-            <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendAviso}`}>
+            <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendInfo}`}>
               <span className={css.pendN}>{p.pendencias.revisarTotal}</span>
               <span className={css.pendT}>
                 {p.pendencias.revisarTotal === 1 ? 'dia com batida faltando' : 'dias com batida faltando'}

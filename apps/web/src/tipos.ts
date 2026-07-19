@@ -193,6 +193,8 @@ export interface PainelResp {
     atestados: number;
     revisar: { nome: string; data: string }[];
     revisarTotal: number;
+    naoBateram: { nome: string; desde: string }[];
+    naoBateramTotal: number;
   };
 }
 

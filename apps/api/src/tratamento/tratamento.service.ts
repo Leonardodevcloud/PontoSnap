@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, tenant,
   comTenant, comoMaster, type Db,
@@ -8,7 +8,7 @@ import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarPeriodo, diaSemana, REGRAS_CLT_PADRAO, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
-import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, type DiaRelatorio } from '@ponto/rep-core';
+import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio } from '@ponto/rep-core';
 import ExcelJS from 'exceljs';
 
 interface Par { entrada: string; saida: string; }
@@ -575,6 +575,43 @@ export class TratamentoService {
         .map(([k]) => { const [cpf, data] = k.split('|') as [string, string]; return { nome: nomePorCpf.get(cpf)?.nome ?? cpf, data }; })
         .sort((a, b) => (a.data < b.data ? 1 : -1));
 
+      // 3) Quem já devia ter batido hoje e não bateu. Cruza com o horário: só
+      //    cobra em dia de trabalho, depois da entrada (+30min de tolerância), e
+      //    nunca de quem está de folga (ausência 1/4) ou afastado hoje.
+      const dowHoje = diaDaSemanaLocal(hojeISO, fuso);
+      const agoraLocal = new Date(Date.now() + offsetMin(fuso) * 60_000);
+      const minsAgora = agoraLocal.getUTCHours() * 60 + agoraLocal.getUTCMinutes();
+      const GRACA_MIN = 30;
+
+      const horIds = [...new Set(emps.map((e) => e.horarioContratualId).filter((x): x is string => !!x))];
+      const horarios = horIds.length
+        ? await tx.select().from(pontoHorarioContratual).where(inArray(pontoHorarioContratual.id, horIds))
+        : [];
+      const horPorId = new Map(horarios.map((h) => [h.id, h]));
+
+      const folgasHoje = await tx.select({ e: pontoAusencia.empregadoId }).from(pontoAusencia).where(and(
+        eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.data, hojeISO), inArray(pontoAusencia.tipo, [1, 4])));
+      const afastHoje = await tx.select({ e: pontoAfastamento.empregadoId }).from(pontoAfastamento).where(and(
+        eq(pontoAfastamento.tenantId, tenantId), lte(pontoAfastamento.dataInicio, hojeISO), gte(pontoAfastamento.dataFim, hojeISO)));
+      const dispensados = new Set<string>([...folgasHoje.map((f) => f.e), ...afastHoje.map((a) => a.e)]);
+
+      const naoBateram = emps
+        .filter((e) => {
+          if (presentes.has(e.cpf)) return false;         // já bateu
+          if (dispensados.has(e.id)) return false;         // folga/afastamento hoje
+          const h = e.horarioContratualId ? horPorId.get(e.horarioContratualId) : undefined;
+          if (!h || h.regime === 'r12x36') return false;   // sem horário fixo → não dá pra cobrar
+          if (!h.diasSemana.includes(dowHoje)) return false; // não trabalha hoje
+          const ent = h.pares[0]?.entrada;
+          if (!ent) return false;
+          const entradaMin = Number(ent.slice(0, 2)) * 60 + Number(ent.slice(2));
+          return minsAgora >= entradaMin + GRACA_MIN;
+        })
+        .map((e) => {
+          const ent = horPorId.get(e.horarioContratualId!)!.pares[0]!.entrada;
+          return { nome: e.nome, desde: `${ent.slice(0, 2)}:${ent.slice(2)}` };
+        });
+
       return {
         data: hojeISO,
         ativos: emps.length,
@@ -587,6 +624,8 @@ export class TratamentoService {
           atestados: pendDocs.length,
           revisar: revisar.slice(0, 12),
           revisarTotal: revisar.length,
+          naoBateram: naoBateram.slice(0, 12),
+          naoBateramTotal: naoBateram.length,
         },
       };
     });

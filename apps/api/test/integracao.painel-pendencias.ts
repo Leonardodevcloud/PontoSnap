@@ -2,7 +2,7 @@ import 'reflect-metadata';
 process.env.APP_CRYPTO_KEY = Buffer.alloc(32, 3).toString('base64');
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { schema, comoMaster, tenant, empregado, pontoRep, pontoMarcacao, pontoDocumento } from '@ponto/db';
+import { schema, comoMaster, tenant, empregado, pontoRep, pontoMarcacao, pontoDocumento, pontoHorarioContratual, pontoAusencia } from '@ponto/db';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
 
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
@@ -41,12 +41,32 @@ async function main() {
     { tenantId: t.id, empregadoId: joao.id, tipo: 'ATESTADO', dataInicio: '2026-07-09', dataFim: '2026-07-09', arquivo: Buffer.from('y'), arquivoNome: 'b', arquivoMime: 'image/png', arquivoBytes: 1, status: 'ABONADO' },
   ]).returning());
 
+  // Cenário do "não bateu hoje": horário todo dia, entrada meia-noite (garante que
+  // já passou da entrada + tolerância independentemente do dia/hora do teste).
+  const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
+    tenantId: t.id, codigo: 'TODODIA', durJornadaMin: 480,
+    pares: [{ entrada: '0000', saida: '0800' }], diasSemana: [0, 1, 2, 3, 4, 5, 6], regime: 'normal',
+  }).returning()))[0]!;
+  const ana = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '10000000003', nome: 'Ana Reis', horarioContratualId: hor.id }).returning()))[0]!;
+  const bruno = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '10000000004', nome: 'Bruno Dias', horarioContratualId: hor.id }).returning()))[0]!;
+  const carla = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '10000000005', nome: 'Carla Nunes', horarioContratualId: hor.id }).returning()))[0]!;
+
+  const hoje = new Date(Date.now() - 180 * 60_000).toISOString().slice(0, 10); // -0300
+  // Bruno bateu hoje → não deve ser cobrado
+  await bater(bruno.cpf, new Date().toISOString());
+  // Carla está de folga hoje (ausência tipo 4) → não deve ser cobrada
+  await comoMaster(db, (tx) => tx.insert(pontoAusencia).values({ tenantId: t.id, empregadoId: carla.id, tipo: 4, data: hoje, qtMinutos: 480 }).returning());
+  // Ana não bateu e não tem folga → deve ser a única cobrada
+
   const p = await trat.painel(t.id);
   ok(p.pendencias.atestados === 1, `conta só os atestados em análise (${p.pendencias.atestados})`);
   ok(p.pendencias.revisarTotal === 1, `só o dia ímpar entra em revisar (${p.pendencias.revisarTotal})`);
   ok(p.pendencias.revisar[0]?.nome === 'Maria Souza', `aponta quem esqueceu (${p.pendencias.revisar[0]?.nome})`);
   ok(p.pendencias.revisar[0]?.data === '2026-07-16', `aponta o dia certo (${p.pendencias.revisar[0]?.data})`);
-  ok(p.ativos === 2, `conta os ativos (${p.ativos})`);
+  ok(p.ativos === 5, `conta os ativos (${p.ativos})`);
+  ok(p.pendencias.naoBateramTotal === 1, `só a Ana é cobrada por não bater (${p.pendencias.naoBateramTotal}: ${p.pendencias.naoBateram.map((x) => x.nome).join(', ')})`);
+  ok(p.pendencias.naoBateram[0]?.nome === 'Ana Reis', `aponta quem não bateu (${p.pendencias.naoBateram[0]?.nome})`);
+  ok(p.pendencias.naoBateram[0]?.desde === '00:00', `mostra desde que horário (${p.pendencias.naoBateram[0]?.desde})`);
 
   console.log(falhas === 0 ? '\n>>> PAINEL PENDÊNCIAS OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();
