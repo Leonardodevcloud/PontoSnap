@@ -132,12 +132,19 @@ export function MeusAtestados() {
             <button className={css.upload} onClick={() => inputRef.current?.click()}>
               {arquivo
                 ? <><b>{arquivo.nome}</b><span>{kb(arquivo.bytes)} · toque pra trocar</span></>
-                : <><b>Tirar foto ou anexar PDF</b><span>a foto é reduzida no seu aparelho</span></>}
+                : <><b>Tirar foto, escolher da galeria ou anexar PDF</b><span>a foto é reduzida no seu aparelho</span></>}
             </button>
             <input
               ref={inputRef} type="file" accept="image/*,application/pdf"
-              capture="environment" hidden onChange={escolher}
+              hidden onChange={escolher}
             />
+
+            {arquivo && arquivo.mime.startsWith('image/') && (
+              <img className={css.preview} src={`data:${arquivo.mime};base64,${arquivo.base64}`} alt="Prévia do documento" />
+            )}
+            {arquivo && arquivo.mime === 'application/pdf' && (
+              <div className={css.previewPdf}>📄 PDF anexado — {arquivo.nome}</div>
+            )}
 
             <div className={css.lgpd}>
               🔒 Seu atestado é dado de saúde. Fica guardado <b>cifrado</b> e só o RH da sua

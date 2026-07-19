@@ -56,6 +56,30 @@ export function emailRecuperacao(nome: string, url: string): { assunto: string; 
   };
 }
 
+/** Aviso ao RH: chegou um atestado para analisar. */
+export function emailAtestadoRecebido(nomeFunc: string, tipoRotulo: string, periodo: string, urlRh: string): { assunto: string; html: string } {
+  return {
+    assunto: `Novo ${tipoRotulo.toLowerCase()} de ${nomeFunc}`,
+    html: moldura(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">Documento para analisar</h1>
+      <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#5C4F49;">
+        <strong style="color:#10403F;">${nomeFunc}</strong> enviou um documento para o seu RH avaliar:
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0;width:100%;background:#FFF8EE;border-radius:12px;">
+        <tr><td style="padding:16px 20px;">
+          <p style="margin:0 0 6px;font-size:13px;color:#5C4F49;">Tipo</p>
+          <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#10403F;">${tipoRotulo}</p>
+          <p style="margin:0 0 6px;font-size:13px;color:#5C4F49;">Período</p>
+          <p style="margin:0;font-size:15px;font-weight:700;color:#10403F;">${periodo}</p>
+        </td></tr>
+      </table>
+      ${botao('Abrir e analisar', urlRh)}
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#5C4F49;">
+        Abra o documento no PontoSnap, confira e decida entre abonar ou recusar.
+      </p>`),
+  };
+}
+
 /** Boas-vindas do funcionário: primeiro acesso com senha provisória. */
 export function emailAcessoFuncionario(nome: string, email: string, senha: string, urlApp: string): { assunto: string; html: string } {
   return {

@@ -76,13 +76,16 @@ export function LayoutColaborador() {
 
       <nav className={css.abas}>
         <button className={pathname === '/' ? css.on : ''} onClick={() => navegar('/')}>
-          Bater ponto
+          Bater
         </button>
         <button className={pathname.startsWith('/espelho') ? css.on : ''} onClick={() => navegar('/espelho')}>
-          Meu espelho
+          Espelho
         </button>
         <button className={pathname === '/escala' ? css.on : ''} onClick={() => navegar('/escala')}>
           Escala
+        </button>
+        <button className={pathname === '/atestados' ? css.on : ''} onClick={() => navegar('/atestados')}>
+          Atestados
         </button>
         {temBanco && (
           <button className={pathname === '/banco' ? css.on : ''} onClick={() => navegar('/banco')}>

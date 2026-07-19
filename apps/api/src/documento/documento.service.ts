@@ -1,8 +1,13 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { pontoDocumento, empregado, usuario, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { CriptoService } from '../common/cripto.service';
+import { EmailService } from '../email/email.service';
+import { emailAtestadoRecebido } from '../email/templates';
+
+const fmtDataBR = (d: string) => { const [a, m, dia] = d.split('-'); return `${dia}/${m}/${a}`; };
+const ROTULO_DOC: Record<string, string> = { ATESTADO: 'Atestado médico', COMPARECIMENTO: 'Comparecimento' };
 
 /** 5 MB depois de comprimido no aparelho já é foto de atestado com folga. */
 const LIMITE_BYTES = 5 * 1024 * 1024;
@@ -26,6 +31,7 @@ export class DocumentoService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly cripto: CriptoService,
+    private readonly email: EmailService,
   ) {}
 
   async empregadoDoUsuario(usuarioId: string, tenantId: string): Promise<string> {
@@ -55,7 +61,7 @@ export class DocumentoService {
       throw new BadRequestException('Minutos abonados fora do intervalo de um dia');
     }
 
-    return comTenant(this.db, tenantId, async (tx) => {
+    const dados = await comTenant(this.db, tenantId, async (tx) => {
       const [doc] = await tx.insert(pontoDocumento).values({
         tenantId, empregadoId, tipo: p.tipo,
         dataInicio: p.dataInicio, dataFim: p.dataFim,
@@ -65,8 +71,32 @@ export class DocumentoService {
         arquivoMime: p.arquivoMime,
         arquivoBytes: bruto.length,
       }).returning(CAMPOS);
-      return doc;
+
+      // Quem avisar: nome de quem enviou + e-mails dos admins/RH ativos.
+      const emp = (await tx.select({ nome: empregado.nome }).from(empregado)
+        .where(eq(empregado.id, empregadoId)).limit(1))[0];
+      const admins = await tx.select({ email: usuario.email }).from(usuario).where(and(
+        eq(usuario.tenantId, tenantId),
+        inArray(usuario.perfil, ['ADMIN_CLIENTE', 'RH']),
+        eq(usuario.ativo, true),
+      ));
+      return { doc, nomeFunc: emp?.nome ?? 'Um funcionário', emails: admins.map((a) => a.email) };
     });
+
+    // Notifica o RH fora da transação — falha de e-mail nunca derruba o envio.
+    void this.notificarRh(dados.nomeFunc, p, dados.emails);
+    return dados.doc;
+  }
+
+  /** Avisa por e-mail cada admin/RH que chegou um documento novo. */
+  private async notificarRh(nomeFunc: string, p: { tipo: TipoDocumento; dataInicio: string; dataFim: string }, emails: string[]) {
+    if (emails.length === 0) return;
+    const periodo = p.dataInicio === p.dataFim ? fmtDataBR(p.dataInicio) : `${fmtDataBR(p.dataInicio)} a ${fmtDataBR(p.dataFim)}`;
+    const urlRh = `${process.env.APP_WEB_URL ?? 'https://app.pontosnap.online'}/rh/atestados`;
+    const { assunto, html } = emailAtestadoRecebido(nomeFunc, ROTULO_DOC[p.tipo] ?? 'Documento', periodo, urlRh);
+    for (const email of emails) {
+      await this.email.enviar({ para: email, assunto, html });
+    }
   }
 
   /** Do próprio funcionário. */
