@@ -35,11 +35,18 @@
 .menu button:hover{ background:var(--cream); }
 .menu .sair{ color:var(--coral-dark); border-top:1px solid rgba(16,64,63,.08); border-radius:0 0 10px 10px; margin-top:4px; }
 
-/* Abas: o funcionário só tem dois lugares pra ir. */
+/* Conteúdo rola; a barra fica fixa embaixo. O padding evita que a última
+   coisa da tela fique escondida atrás da barra. */
+.conteudo{ flex:1 0 auto; width:100%; padding-bottom:78px; }
+
+/* Barra de abas fixa no rodapé — não rola junto com a página. */
 .abas{
-  position:sticky; bottom:0; display:flex; gap:6px; justify-content:center;
-  padding:8px 20px max(8px, env(safe-area-inset-bottom));
-  background:linear-gradient(transparent, var(--cream) 34%);
+  position:fixed; left:0; right:0; bottom:0; z-index:20;
+  max-width:440px; margin:0 auto;
+  display:flex; gap:6px; justify-content:center;
+  padding:8px 20px max(10px, env(safe-area-inset-bottom));
+  background:var(--cream);
+  border-top:1px solid rgba(16,64,63,.07);
 }
 .abas button{
   flex:1; max-width:200px; background:transparent; border:1.5px solid transparent; cursor:pointer;

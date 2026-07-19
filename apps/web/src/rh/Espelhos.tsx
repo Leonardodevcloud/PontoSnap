@@ -4,9 +4,6 @@ import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato
 import type { Empregado, EspelhoResp } from '../tipos';
 import css from './Espelhos.module.css';
 
-const fmtDistancia = (m?: number | null) =>
-  m == null ? '' : m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
-
 export function Espelhos() {
   const [emps, setEmps] = useState<Empregado[]>([]);
   const [empregadoId, setEmpregadoId] = useState('');
@@ -71,7 +68,7 @@ export function Espelhos() {
                     <span className={css.geoLinha}>
                       <span className={m.fora ? css.geoFora : css.geoSem}>
                         {m.fora
-                          ? `Fora · ${fmtDistancia(m.distancia)}`
+                          ? 'Fora'
                           : m.latitude == null ? 'Sem localização' : 'No escritório'}
                       </span>
                       {m.observacao && <span className={css.geoObs}>“{m.observacao}”</span>}

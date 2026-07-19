@@ -65,7 +65,9 @@ export function LayoutColaborador() {
         </div>
       </header>
 
-      <Outlet />
+      <main className={css.conteudo}>
+        <Outlet />
+      </main>
 
       <nav className={css.abas}>
         <button className={pathname === '/' ? css.on : ''} onClick={() => navegar('/')}>

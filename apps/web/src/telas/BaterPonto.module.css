@@ -15,6 +15,19 @@
 /* touch-action:none — sem isso o navegador rola a tela em vez de deixar segurar */
 .snapbtn{ touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 
+/* Anel de "convite" pulsante — mesma animação da landing page. */
+.snapbtn::after{
+  content:''; position:absolute; inset:-3px; border-radius:50%;
+  border:2px solid var(--coral); opacity:0; pointer-events:none;
+  animation:convite 3.4s ease-out infinite;
+}
+@keyframes convite{
+  0%{ transform:scale(1); opacity:.5; }
+  70%{ transform:scale(1.24); opacity:0; }
+  100%{ opacity:0; }
+}
+.snapbtn:active::after, .snapbtn:disabled::after{ animation:none; opacity:0; }
+
 /* Anel de progresso do "segurar pra registrar". */
 .anel{ position:absolute; inset:-8px; transform:rotate(-90deg); pointer-events:none; }
 .anel circle{

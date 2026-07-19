@@ -89,6 +89,11 @@ export function Local() {
     finally { setEnviando(false); }
   }
 
+  function abrirEdicao() {
+    if (!raio.trim()) setRaio('1000'); // padrão recomendado
+    setModo('editar');
+  }
+
   function cancelar() {
     if (salvo) preencher(salvo);
     setErro(null);
@@ -130,7 +135,7 @@ export function Local() {
                   : <>Sem raio definido, o app não pede observação por distância. <b>Nunca bloqueia a batida.</b></>}
               </p>
               <div className={css.acoesLivres}>
-                <Botao variante="ghost" onClick={() => setModo('editar')}>Editar local</Botao>
+                <Botao variante="ghost" onClick={abrirEdicao}>Editar local</Botao>
                 <button className={css.remover} onClick={remover} disabled={enviando}>Remover localização</button>
               </div>
             </div>
@@ -152,7 +157,7 @@ export function Local() {
             <Flash className={css.emptyFlash} />
             <h3>Nenhum local definido</h3>
             <p>Sem local, o app não pede observação e não mostra distância — tudo bem para empresa remota.</p>
-            <Botao variante="coral" onClick={() => setModo('editar')}>Definir local</Botao>
+            <Botao variante="coral" onClick={abrirEdicao}>Definir local</Botao>
           </div>
         </div>
       )}
@@ -180,10 +185,10 @@ export function Local() {
           </p>
 
           <Campo rotulo="Raio em metros" inputMode="numeric" value={raio}
-            onChange={(e) => setRaio(e.target.value)} placeholder="200" />
+            onChange={(e) => setRaio(e.target.value)} placeholder="1000" />
           <p className={css.dica}>
             Fora desse raio, o app pede uma observação (home office, visita a cliente…).
-            Entre 20 e 50000 metros. <strong>Deixe em branco se a empresa é remota</strong> — aí ninguém nunca vê o campo.
+            Recomendamos <strong>1000 m</strong>. Entre 20 e 50000 metros. <strong>Deixe em branco se a empresa é remota</strong> — aí ninguém nunca vê o campo.
           </p>
 
           <div className={css.acoes}>

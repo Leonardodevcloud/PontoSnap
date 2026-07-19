@@ -19,9 +19,6 @@ const VOLTA = 2 * Math.PI * RAIO;
 /** Atalhos para quem bate fora do raio — 1 toque em vez de digitar. */
 const MOTIVOS = ['Home office', 'Visita a cliente', 'Trabalho externo', 'Outro'];
 
-const formatarDistancia = (m: number) =>
-  m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`;
-
 export function BaterPonto() {
   const navegar = useNavigate();
   const [dados, setDados] = useState<MinhasMarcacoes | null>(null);
@@ -82,7 +79,7 @@ export function BaterPonto() {
   const excedente = esperadas > 0 && marcs.length >= esperadas;
 
   const posicao = geo?.estado === 'ok' ? geo.posicao : null;
-  const { fora, distancia } = foraDoRaio(dados?.local ?? null, posicao);
+  const { fora } = foraDoRaio(dados?.local ?? null, posicao);
   const semLocalizacao = geo != null && geo.estado !== 'ok';
   // Só pedimos contexto quando ele ajuda o RH. Empresa sem endereço nunca vê isso.
   const pedirObs = (fora || (semLocalizacao && !!dados?.local)) && !!dados?.local;
@@ -197,7 +194,7 @@ export function BaterPonto() {
           <span className={css.geoPt} />
           {geo.estado === 'ok'
             ? fora
-              ? `Fora do escritório · ${distancia != null ? formatarDistancia(distancia) : ''}`
+              ? 'Fora do escritório'
               : 'No escritório'
             : geo.estado === 'negada' ? 'Sem localização' : 'Localização indisponível'}
         </div>

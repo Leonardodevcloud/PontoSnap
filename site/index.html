@@ -22,6 +22,10 @@
   --linha:rgba(16,64,63,.10);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* Botões e elementos interativos não devem "selecionar texto" ao clicar. */
+button, a, [role="button"], .snapbtn, .tecla, label{
+  -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none;
+}
 html{scroll-behavior:smooth}
 body{background:var(--cream); color:var(--ink); font-family:var(--ff-body); font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--ff-display); font-weight:600; line-height:1.06; letter-spacing:-.015em}
