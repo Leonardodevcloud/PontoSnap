@@ -30,3 +30,5 @@
 .cod{ font-weight:700; font-size:14.5px; }
 .mono{ font-family:var(--ff-mono); font-size:13px; }
 .diasTxt{ color:var(--ash); font-size:13px; }
+
+.hint{ font-size:12.5px; color:var(--ash); margin:2px 0 10px; max-width:46ch; }

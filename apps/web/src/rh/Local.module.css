@@ -37,3 +37,42 @@
   font-size:13px; color:var(--ash); line-height:1.6;
 }
 .lgpd strong{ color:var(--ink); }
+
+/* ---------- estado salvo (view) ---------- */
+.tela{ max-width:640px; }
+.saved{ display:flex; gap:24px; align-items:flex-start; }
+.info{ flex:1; min-width:0; }
+.pillOk{
+  display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:800;
+  padding:5px 13px; border-radius:var(--r-pill); text-transform:uppercase; letter-spacing:.02em;
+  background:var(--verde-bg); color:var(--verde);
+}
+.dot{ width:7px; height:7px; border-radius:50%; background:currentColor; }
+.endereco{ font-family:var(--ff-display); font-weight:600; font-size:23px; margin:14px 0 2px; }
+.facts{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:14px 0 14px; }
+.fl{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }
+.fv{ font-family:var(--ff-mono); font-size:15px; color:var(--ink); margin-top:2px; }
+.hint{ font-size:13.5px; color:var(--ash); max-width:52ch; line-height:1.55; }
+.hint b{ color:var(--ink); font-weight:700; }
+.acoesLivres{ display:flex; gap:10px; align-items:center; margin-top:18px; flex-wrap:wrap; }
+.remover{
+  background:transparent; border:none; color:var(--coral-dark); font:inherit;
+  font-weight:800; font-size:13.5px; cursor:pointer; padding:11px 8px;
+}
+.remover:disabled{ opacity:.5; cursor:wait; }
+.cobertura{
+  width:132px; height:132px; flex-shrink:0; border-radius:var(--r-md);
+  background:radial-gradient(circle at 50% 46%, rgba(255,107,74,.12), rgba(255,107,74,0) 62%), var(--cream);
+  border:1px solid rgba(16,64,63,.08); display:flex; align-items:center; justify-content:center;
+}
+
+/* ---------- empty state ---------- */
+.empty{ text-align:center; padding:34px 20px; }
+.emptyFlash{ margin-bottom:12px; }
+.empty h3{ font-family:var(--ff-display); font-weight:600; font-size:19px; }
+.empty p{ color:var(--ash); font-size:13.5px; margin:6px auto 18px; max-width:40ch; line-height:1.5; }
+
+@media(max-width:640px){
+  .saved{ flex-direction:column-reverse; }
+  .cobertura{ width:100%; height:120px; }
+}

@@ -18,7 +18,7 @@
 .cardV{ font-family:var(--ff-display); font-weight:600; font-size:24px; line-height:1.15; margin-top:4px; }
 
 .tabela{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); overflow:hidden; }
-.linha{ display:grid; grid-template-columns:1fr .8fr .8fr 1.4fr .9fr .8fr 1.1fr; align-items:center; gap:10px; padding:10px 16px; border-top:1px solid rgba(16,64,63,.08); font-size:13.5px; }
+.linha{ display:grid; grid-template-columns:1fr .75fr .75fr 1.15fr .8fr .75fr 1.6fr; align-items:center; gap:10px; padding:10px 16px; border-top:1px solid rgba(16,64,63,.08); font-size:13.5px; }
 .linha:first-child{ border-top:none; }
 .thead{ background:#fbf4e8; }
 .thead span{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); }
@@ -28,8 +28,8 @@
 .faltaTxt{ color:var(--coral-dark); font-weight:600; }
 .diaVazio{ opacity:.5; }
 .viol{ background:#fff7f0; }
-.sinais{ display:flex; gap:5px; flex-wrap:wrap; }
-.tag{ font-family:var(--ff-mono); font-size:10px; background:var(--ink); color:var(--cream); padding:2px 6px; border-radius:6px; }
+.sinais{ display:flex; gap:5px; flex-wrap:wrap; align-content:center; }
+.tag{ font-family:var(--ff-mono); font-size:9.5px; background:var(--ink); color:var(--cream); padding:2px 6px; border-radius:6px; white-space:nowrap; }
 .viol .tag{ background:var(--coral-dark); }
 .tagAtraso{ background:var(--coral-dark); }
 

@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { capturarPosicao } from '../lib/geolocalizacao';
 import { Campo } from '../components/Campo';
 import { Botao } from '../components/Botao';
+import { Flash } from '../components/Flash';
 import css from './Local.module.css';
 
 interface Local {
@@ -12,36 +13,48 @@ interface Local {
   raioMetros: number | null;
 }
 
+type Modo = 'ver' | 'editar' | 'vazio';
+
 export function Local() {
+  const [modo, setModo] = useState<Modo>('vazio');
+  const [salvo, setSalvo] = useState<Local | null>(null);
+
   const [endereco, setEndereco] = useState('');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
   const [raio, setRaio] = useState('');
   const [erro, setErro] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [buscando, setBuscando] = useState(false);
+
+  const preencher = (l: Local) => {
+    setEndereco(l.localPrestacao ?? '');
+    setLat(l.latitude != null ? String(l.latitude) : '');
+    setLon(l.longitude != null ? String(l.longitude) : '');
+    setRaio(l.raioMetros != null ? String(l.raioMetros) : '');
+  };
+
+  const temLocal = (l: Local) =>
+    !!(l.localPrestacao || (l.latitude != null && l.longitude != null) || l.raioMetros != null);
 
   const carregar = useCallback(async () => {
     try {
       const l = await api.get<Local>('/marcacao/local');
-      setEndereco(l.localPrestacao ?? '');
-      setLat(l.latitude != null ? String(l.latitude) : '');
-      setLon(l.longitude != null ? String(l.longitude) : '');
-      setRaio(l.raioMetros != null ? String(l.raioMetros) : '');
+      setSalvo(l);
+      preencher(l);
+      setModo(temLocal(l) ? 'ver' : 'vazio');
     } catch (e) { setErro((e as Error).message); }
   }, []);
 
   useEffect(() => { void carregar(); }, [carregar]);
 
   async function usarAqui() {
-    setBuscando(true);
-    setErro(null);
+    setBuscando(true); setErro(null);
     const r = await capturarPosicao();
     setBuscando(false);
     if (r.estado !== 'ok') {
       setErro(r.estado === 'negada'
-        ? 'Você precisa permitir a localização no navegador para usar este atalho.'
+        ? 'Permita a localização no navegador para usar este atalho.'
         : 'Não consegui obter a localização deste aparelho.');
       return;
     }
@@ -50,7 +63,7 @@ export function Local() {
   }
 
   async function salvar() {
-    setErro(null); setOk(false); setEnviando(true);
+    setErro(null); setEnviando(true);
     try {
       const temGeo = lat.trim() !== '' && lon.trim() !== '';
       await api.post('/marcacao/local', {
@@ -59,13 +72,28 @@ export function Local() {
         longitude: temGeo ? Number(lon.replace(',', '.')) : null,
         raioMetros: raio.trim() ? Number(raio) : null,
       });
-      setOk(true);
-      setTimeout(() => setOk(false), 3000);
+      await carregar();
     } catch (e) { setErro((e as Error).message); }
     finally { setEnviando(false); }
   }
 
-  function limpar() { setLat(''); setLon(''); setRaio(''); }
+  async function remover() {
+    setErro(null); setEnviando(true);
+    try {
+      await api.post('/marcacao/local', {
+        localPrestacao: undefined, latitude: null, longitude: null, raioMetros: null,
+      });
+      setEndereco(''); setLat(''); setLon(''); setRaio('');
+      await carregar();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setEnviando(false); }
+  }
+
+  function cancelar() {
+    if (salvo) preencher(salvo);
+    setErro(null);
+    setModo(salvo && temLocal(salvo) ? 'ver' : 'vazio');
+  }
 
   return (
     <div className={css.tela}>
@@ -75,47 +103,97 @@ export function Local() {
         <strong> A batida nunca é bloqueada</strong> — a lei não permite restringir marcação.
       </p>
 
-      <div className={css.bloco}>
-        <Campo
-          rotulo="Endereço" value={endereco}
-          onChange={(e) => setEndereco(e.target.value)}
-          placeholder="Av. Tancredo Neves, 1283 — Salvador/BA"
-        />
+      {erro && <p className={css.erro}>{erro}</p>}
 
-        <div className={css.coords}>
-          <Campo rotulo="Latitude" inputMode="decimal" value={lat}
-            onChange={(e) => setLat(e.target.value)} placeholder="-12.9777000" />
-          <Campo rotulo="Longitude" inputMode="decimal" value={lon}
-            onChange={(e) => setLon(e.target.value)} placeholder="-38.5016000" />
+      {/* ---------- ESTADO SALVO ---------- */}
+      {modo === 'ver' && salvo && (
+        <div className={css.bloco}>
+          <div className={css.saved}>
+            <div className={css.info}>
+              <span className={css.pillOk}><span className={css.dot} />Localização ativa</span>
+              {salvo.localPrestacao && <div className={css.endereco}>{salvo.localPrestacao}</div>}
+              <div className={css.facts}>
+                {salvo.latitude != null && salvo.longitude != null && (
+                  <div className={css.fact}>
+                    <div className={css.fl}>Coordenadas</div>
+                    <div className={css.fv}>{salvo.latitude}, {salvo.longitude}</div>
+                  </div>
+                )}
+                <div className={css.fact}>
+                  <div className={css.fl}>Raio</div>
+                  <div className={css.fv}>{salvo.raioMetros != null ? `${salvo.raioMetros} m` : 'sem raio'}</div>
+                </div>
+              </div>
+              <p className={css.hint}>
+                {salvo.raioMetros != null
+                  ? <>Fora de <b>{salvo.raioMetros} m</b>, o app pede uma observação ao funcionário. Dentro do raio, bate direto. <b>Nunca bloqueia.</b></>
+                  : <>Sem raio definido, o app não pede observação por distância. <b>Nunca bloqueia a batida.</b></>}
+              </p>
+              <div className={css.acoesLivres}>
+                <Botao variante="ghost" onClick={() => setModo('editar')}>Editar local</Botao>
+                <button className={css.remover} onClick={remover} disabled={enviando}>Remover localização</button>
+              </div>
+            </div>
+            <div className={css.cobertura} aria-hidden="true">
+              <svg width="96" height="96" viewBox="0 0 96 96">
+                <circle cx="48" cy="52" r="30" fill="rgba(255,107,74,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
+                <path d="M48 24 C40 24 34 30 34 38 C34 48 48 60 48 60 C48 60 62 48 62 38 C62 30 56 24 48 24 Z" fill="var(--coral)" />
+                <circle cx="48" cy="38" r="5" fill="var(--cream)" />
+              </svg>
+            </div>
+          </div>
         </div>
+      )}
 
-        <button className={css.aqui} onClick={usarAqui} disabled={buscando}>
-          {buscando ? 'Buscando…' : 'Usar a localização deste aparelho'}
-        </button>
-        <p className={css.dica}>
-          Abra esta tela no escritório e toque no botão acima — é o jeito mais fácil.
-          Ou copie as coordenadas do Google Maps (clique com o botão direito no ponto → a primeira linha).
-        </p>
-
-        <Campo
-          rotulo="Raio em metros" inputMode="numeric" value={raio}
-          onChange={(e) => setRaio(e.target.value)} placeholder="200"
-        />
-        <p className={css.dica}>
-          Fora desse raio, o app pede uma observação (home office, visita a cliente…).
-          Entre 20 e 50000 metros. <strong>Deixe em branco se a empresa é remota</strong> — aí ninguém nunca vê o campo.
-        </p>
-
-        {erro && <p className={css.erro}>{erro}</p>}
-        {ok && <p className={css.ok}>Local salvo.</p>}
-
-        <div className={css.acoes}>
-          <Botao variante="coral" onClick={salvar} disabled={enviando}>
-            {enviando ? 'Salvando…' : 'Salvar'}
-          </Botao>
-          <Botao variante="ghost" onClick={limpar}>Não usar localização</Botao>
+      {/* ---------- EMPTY STATE ---------- */}
+      {modo === 'vazio' && (
+        <div className={css.bloco}>
+          <div className={css.empty}>
+            <Flash className={css.emptyFlash} />
+            <h3>Nenhum local definido</h3>
+            <p>Sem local, o app não pede observação e não mostra distância — tudo bem para empresa remota.</p>
+            <Botao variante="coral" onClick={() => setModo('editar')}>Definir local</Botao>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ---------- FORMULÁRIO (EDIÇÃO) ---------- */}
+      {modo === 'editar' && (
+        <div className={css.bloco}>
+          <Campo rotulo="Endereço" value={endereco}
+            onChange={(e) => setEndereco(e.target.value)}
+            placeholder="Av. Tancredo Neves, 1283 — Salvador/BA" />
+
+          <div className={css.coords}>
+            <Campo rotulo="Latitude" inputMode="decimal" value={lat}
+              onChange={(e) => setLat(e.target.value)} placeholder="-12.9777000" />
+            <Campo rotulo="Longitude" inputMode="decimal" value={lon}
+              onChange={(e) => setLon(e.target.value)} placeholder="-38.5016000" />
+          </div>
+
+          <button className={css.aqui} onClick={usarAqui} disabled={buscando}>
+            {buscando ? 'Buscando…' : 'Usar a localização deste aparelho'}
+          </button>
+          <p className={css.dica}>
+            Abra esta tela no escritório e toque no botão acima — é o jeito mais fácil.
+            Ou copie as coordenadas do Google Maps (clique com o botão direito no ponto → a primeira linha).
+          </p>
+
+          <Campo rotulo="Raio em metros" inputMode="numeric" value={raio}
+            onChange={(e) => setRaio(e.target.value)} placeholder="200" />
+          <p className={css.dica}>
+            Fora desse raio, o app pede uma observação (home office, visita a cliente…).
+            Entre 20 e 50000 metros. <strong>Deixe em branco se a empresa é remota</strong> — aí ninguém nunca vê o campo.
+          </p>
+
+          <div className={css.acoes}>
+            <Botao variante="coral" onClick={salvar} disabled={enviando}>
+              {enviando ? 'Salvando…' : 'Salvar local'}
+            </Botao>
+            <Botao variante="ghost" onClick={cancelar}>Cancelar</Botao>
+          </div>
+        </div>
+      )}
 
       <div className={css.lgpd}>
         <strong>Sobre privacidade:</strong> a localização é capturada só no instante da batida —

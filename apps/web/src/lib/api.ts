@@ -10,6 +10,18 @@ export function definirRefresh(token: string | null) {
 }
 export function obterRefresh(): string | null { return localStorage.getItem(CHAVE_REFRESH); }
 
+// --- Sinal de "tem requisição em voo" para a barra de progresso global ---
+let emVoo = 0;
+const ouvintes = new Set<(ativo: boolean) => void>();
+function notificar() { const ativo = emVoo > 0; for (const f of ouvintes) f(ativo); }
+/** Inscreve-se no estado de carregamento. Devolve a função de cancelamento. */
+export function aoCarregar(f: (ativo: boolean) => void): () => void { ouvintes.add(f); return () => { ouvintes.delete(f); }; }
+async function rastrear<T>(p: Promise<T>): Promise<T> {
+  emVoo++; if (emVoo === 1) notificar();
+  try { return await p; }
+  finally { emVoo = Math.max(0, emVoo - 1); if (emVoo === 0) notificar(); }
+}
+
 async function tentarRefresh(): Promise<boolean> {
   const rt = obterRefresh();
   if (!rt) return false;
@@ -49,14 +61,15 @@ async function req<T>(path: string, opts: Opts = {}, retry = true): Promise<T> {
 }
 
 export const api = {
-  get: <T>(p: string) => req<T>(p),
-  post: <T>(p: string, body?: unknown) => req<T>(p, { method: 'POST', body }),
-  patch: <T>(p: string, body?: unknown) => req<T>(p, { method: 'PATCH', body }),
-  del: <T>(p: string) => req<T>(p, { method: 'DELETE' }),
+  get: <T>(p: string) => rastrear(req<T>(p)),
+  post: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'POST', body })),
+  patch: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PATCH', body })),
+  del: <T>(p: string) => rastrear(req<T>(p, { method: 'DELETE' })),
   /** Baixa binário (ex.: comprovante PDF) já com o token. */
-  async baixar(path: string): Promise<Blob> {
+  baixar(path: string): Promise<Blob> { return rastrear(this._baixar(path)); },
+  async _baixar(path: string): Promise<Blob> {
     const res = await fetch(`${BASE}${path}`, { headers: acesso ? { Authorization: `Bearer ${acesso}` } : {} });
-    if (res.status === 401 && (await tentarRefresh())) return this.baixar(path);
+    if (res.status === 401 && (await tentarRefresh())) return this._baixar(path);
     if (!res.ok) {
       const msg = await res.json().then((j) => j.message).catch(() => null);
       throw new Error(msg ?? 'Não consegui baixar o arquivo.');
@@ -64,7 +77,8 @@ export const api = {
     return res.blob();
   },
   /** Envia um arquivo (multipart). Não seta Content-Type: o browser põe o boundary. */
-  async enviarArquivo<T>(path: string, arquivo: File, campo = 'arquivo'): Promise<T> {
+  enviarArquivo<T>(path: string, arquivo: File, campo = 'arquivo'): Promise<T> { return rastrear(this._enviarArquivo<T>(path, arquivo, campo)); },
+  async _enviarArquivo<T>(path: string, arquivo: File, campo = 'arquivo'): Promise<T> {
     const fd = new FormData();
     fd.append(campo, arquivo);
     const res = await fetch(`${BASE}${path}`, {
@@ -72,7 +86,7 @@ export const api = {
       headers: acesso ? { Authorization: `Bearer ${acesso}` } : {},
       body: fd,
     });
-    if (res.status === 401 && (await tentarRefresh())) return this.enviarArquivo<T>(path, arquivo, campo);
+    if (res.status === 401 && (await tentarRefresh())) return this._enviarArquivo<T>(path, arquivo, campo);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: res.statusText }));
       throw new Error(err.message ?? 'Falha no envio.');

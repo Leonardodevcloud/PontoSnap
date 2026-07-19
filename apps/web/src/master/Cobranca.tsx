@@ -3,7 +3,7 @@ import { api } from '../lib/api';
 import type { Tenant, PainelCobranca, Plano, Cobranca, Assinatura } from '../tipos';
 import css from './Cobranca.module.css';
 
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const brl = (v: number | string) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const compAtual = () => new Date().toISOString().slice(0, 7);
 
 export function Cobranca() {

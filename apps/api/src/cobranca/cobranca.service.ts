@@ -133,14 +133,15 @@ export class CobrancaService {
 
   async painelMaster() {
     return comoMaster(this.db, async (tx) => {
-      const assinaturas = await tx.select().from(assinatura);
-      const cobrancas = await tx.select().from(cobranca).orderBy(desc(cobranca.competencia));
+      const assinaturasRaw = await tx.select().from(assinatura);
+      const cobrancasRaw = await tx.select().from(cobranca).orderBy(desc(cobranca.competencia));
       const planos = await tx.select().from(plano);
-      const porTenant = new Map<string, typeof cobrancas>();
-      for (const c of cobrancas) {
-        const arr = porTenant.get(c.tenantId) ?? [];
-        arr.push(c); porTenant.set(c.tenantId, arr);
-      }
+      // valor vem como string (numeric do Postgres) — coage p/ número aqui,
+      // senão o front soma string ("0" + "350.00" = "0350.00") e o BRL quebra.
+      const assinaturas = assinaturasRaw.map((a) => ({
+        ...a, valorOverride: a.valorOverride != null ? Number(a.valorOverride) : null,
+      }));
+      const cobrancas = cobrancasRaw.map((c) => ({ ...c, valor: Number(c.valor) }));
       return { assinaturas, cobrancas, planos: planos.map((p) => ({ ...p, valor: Number(p.valor) })) };
     });
   }

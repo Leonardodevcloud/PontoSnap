@@ -35,6 +35,7 @@ import { Cobranca } from './master/Cobranca';
 import { Assinatura } from './rh/Assinatura';
 import { Quiosque } from './quiosque/Quiosque';
 import { Flash } from './components/Flash';
+import { BarraProgresso } from './components/BarraProgresso';
 
 const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
 
@@ -69,6 +70,8 @@ const PERFIS_RH: Perfil[] = ['RH', 'ADMIN_CLIENTE'];
 export function App() {
   const { sessao, carregando } = useAuth();
   return (
+    <>
+    <BarraProgresso />
     <Routes>
       <Route path="/login" element={carregando ? <Splash /> : sessao ? <Navigate to={rotaInicial(sessao.perfil)} replace /> : <Login />} />
       <Route path="/trocar-senha" element={<SoLogado><TrocarSenha /></SoLogado>} />
@@ -116,5 +119,6 @@ export function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }

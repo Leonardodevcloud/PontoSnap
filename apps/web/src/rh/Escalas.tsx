@@ -78,7 +78,8 @@ export function Escalas() {
         </div>
 
         <div className={css.bloco}>
-          <span className={css.lb}>Pares entrada/saída</span>
+          <span className={css.lb}>Horários de trabalho</span>
+          <p className={css.hint}>Cada linha é um período de trabalho. Use duas para separar manhã e tarde com o almoço no meio — ex.: 08:00→12:00 e 13:00→17:00.</p>
           {pares.map((p, i) => (
             <div key={i} className={css.par}>
               <input type="time" value={p.entrada} onChange={(e) => setPar(i, 'entrada', e.target.value)} />
@@ -87,7 +88,7 @@ export function Escalas() {
               {pares.length > 1 && <button className={css.rm} onClick={() => setPares((ps) => ps.filter((_, idx) => idx !== i))}>×</button>}
             </div>
           ))}
-          <button className={css.addPar} onClick={() => setPares((ps) => [...ps, { entrada: '', saida: '' }])}>+ par</button>
+          <button className={css.addPar} onClick={() => setPares((ps) => [...ps, { entrada: '', saida: '' }])}>+ período</button>
         </div>
 
         {erro && <p className={css.erro}>{erro}</p>}
