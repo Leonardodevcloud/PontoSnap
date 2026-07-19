@@ -10,8 +10,15 @@ function moldura(conteudo: string): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFF8EE;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(16,64,63,.08);">
-        <tr><td style="background:#10403F;padding:22px 32px;">
-          <span style="color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:-.01em;">Ponto<span style="color:#FF6B4A;">Snap</span></span>
+        <tr><td style="background:#10403F;padding:20px 32px;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="vertical-align:middle;padding-right:10px;">
+              <img src="https://app.pontosnap.online/icon-192.png" width="30" height="30" alt="" style="display:block;border-radius:8px;" />
+            </td>
+            <td style="vertical-align:middle;">
+              <span style="color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:-.01em;">Ponto<span style="color:#FF6B4A;">Snap</span></span>
+            </td>
+          </tr></table>
         </td></tr>
         <tr><td style="padding:32px;color:#10403F;">${conteudo}</td></tr>
         <tr><td style="padding:0 32px 28px;">

@@ -72,7 +72,10 @@ export function PromptInstalar() {
       <div className={css.txt}>
         {iosDica
           ? <>Instale o PontoSnap: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.</>
-          : <>Instale o PontoSnap no seu celular — bater ponto fica a um toque.</>}
+          : <>
+              Instale o PontoSnap no seu celular — bater ponto fica a um toque.
+              <span className={css.nota}>Se o Android mostrar um aviso, é normal: toque em <b>Instalar mesmo assim</b>.</span>
+            </>}
       </div>
       {!iosDica && <button className={css.instalar} onClick={instalar}>Instalar</button>}
       <button className={css.fechar} onClick={dispensar} aria-label="Dispensar">×</button>

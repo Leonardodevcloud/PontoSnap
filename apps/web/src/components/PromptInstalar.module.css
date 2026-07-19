@@ -16,3 +16,6 @@
   flex-shrink:0; background:transparent; border:none; cursor:pointer;
   color:var(--ash); font-size:20px; line-height:1; padding:2px 4px;
 }
+
+.nota{ display:block; margin-top:4px; font-size:11.5px; color:var(--ash); line-height:1.35; }
+.nota b{ color:var(--ink); font-weight:700; }
