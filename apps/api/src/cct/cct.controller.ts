@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { CctService } from './cct.service';
-import { CctDto } from './dto/cct.dto';
+import { CctDto, ExtrairCctDto } from './dto/cct.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -28,6 +28,13 @@ export class CctController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   criar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CctDto) {
     return this.cct.criar(this.tenant(u), dto);
+  }
+
+  /** Lê o PDF da CCT com a IA e devolve um rascunho pro RH conferir. */
+  @Post('extrair')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  extrair(@Body() dto: ExtrairCctDto) {
+    return this.cct.extrairDoPdf(dto.arquivoBase64);
   }
 
   @Patch(':id')

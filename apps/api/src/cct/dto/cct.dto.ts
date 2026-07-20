@@ -27,3 +27,7 @@ export class CctDto {
 export class VincularCctDto {
   @IsOptional() @IsString() cctId?: string | null;
 }
+
+export class ExtrairCctDto {
+  @IsString() arquivoBase64!: string;
+}

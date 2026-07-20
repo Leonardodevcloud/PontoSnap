@@ -20,6 +20,27 @@ export default function Convencoes() {
   const [erro, setErro] = useState<string | null>(null);
   const [editando, setEditando] = useState<(typeof VAZIA & { id?: string }) | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [lendoPdf, setLendoPdf] = useState(false);
+  const [citacoes, setCitacoes] = useState<{ campo: string; texto: string }[]>([]);
+  const [preenchidoIA, setPreenchidoIA] = useState(false);
+
+  async function lerPdf(file: File) {
+    if (file.type !== 'application/pdf') { setErro('Envie um PDF'); return; }
+    setErro(null); setLendoPdf(true); setCitacoes([]);
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(',')[1] ?? '');
+        r.onerror = () => rej(new Error('Falha ao ler o arquivo'));
+        r.readAsDataURL(file);
+      });
+      const out = await api.post<{ valores: Partial<typeof VAZIA>; citacoes: { campo: string; texto: string }[] }>('/cct/extrair', { arquivoBase64: base64 });
+      setEditando((cur) => cur ? { ...cur, ...out.valores } : cur);
+      setCitacoes(out.citacoes);
+      setPreenchidoIA(true);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setLendoPdf(false); }
+  }
 
   const carregar = useCallback(async () => {
     setErro(null);
@@ -28,8 +49,8 @@ export default function Convencoes() {
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
 
-  function novo() { setEditando({ ...VAZIA }); }
-  function editar(c: Cct) { const { funcionarios, id, ...resto } = c; void funcionarios; setEditando({ ...resto, id }); }
+  function novo() { setCitacoes([]); setPreenchidoIA(false); setEditando({ ...VAZIA }); }
+  function editar(c: Cct) { setCitacoes([]); setPreenchidoIA(false); const { funcionarios, id, ...resto } = c; void funcionarios; setEditando({ ...resto, id }); }
 
   async function salvar() {
     if (!editando) return;
@@ -100,7 +121,27 @@ export default function Convencoes() {
       {e && (
         <div className={css.card}>
           <h2 className={css.h2}>{e.id ? 'Editar convenção' : 'Nova convenção'}</h2>
-          <p className={css.sub}>Leia a CCT e traduza os números. O que não mexer, segue a CLT.</p>
+          <p className={css.sub}>Envie o PDF da CCT e a IA preenche pra você — depois confira e salve. Ou preencha à mão.</p>
+
+          <div className={css.upload}>
+            <label className={css.uploadBtn}>
+              {lendoPdf ? 'Lendo o PDF…' : '📄 Enviar PDF da CCT'}
+              <input type="file" accept="application/pdf" hidden disabled={lendoPdf}
+                onChange={(x) => { const f = x.target.files?.[0]; if (f) void lerPdf(f); x.target.value = ''; }} />
+            </label>
+            <span className={css.uploadDica}>A IA lê e preenche os campos. Você confere antes de salvar.</span>
+          </div>
+
+          {preenchidoIA && (
+            <div className={css.iaBox}>
+              <strong>A IA preencheu os campos abaixo.</strong> Confira cada número antes de salvar.
+              {citacoes.length > 0 && (
+                <ul className={css.cit}>
+                  {citacoes.map((c, i) => <li key={i}><b>{c.campo}:</b> {c.texto}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className={css.row}>
             <div><span className={css.lb}>Nome</span><input className={css.inp} value={e.nome} onChange={(x) => set({ nome: x.target.value })} placeholder="Ex.: Motoristas Carga RS 2025" /></div>
