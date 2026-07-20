@@ -1,14 +1,15 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, tenant,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoCct, tenant,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
-import { apurarPeriodo, valorizarPeriodo, diaSemana, REGRAS_CLT_PADRAO, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
+import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio } from '@ponto/rep-core';
+import { regrasDeCct } from './regras-cct';
 import ExcelJS from 'exceljs';
 
 interface Par { entrada: string; saida: string; }
@@ -282,6 +283,12 @@ export class TratamentoService {
       const durJornada = horario?.durJornadaMin ?? 0;
       const diasUteis = horario?.diasSemana ?? [1, 2, 3, 4, 5]; // seg–sex por padrão
 
+      // Convenção do funcionário → regras de apuração (sem CCT = CLT pura).
+      const cct = emp.cctId
+        ? (await tx.select().from(pontoCct).where(eq(pontoCct.id, emp.cctId)).limit(1))[0]
+        : undefined;
+      const regras = regrasDeCct(cct);
+
       // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
       //  1 (DSR) e 4 (folga compensatória) marcam o dia como descanso;
       //  2 é falta não justificada — o oposto de abono;
@@ -392,7 +399,7 @@ export class TratamentoService {
         }
       }
 
-      const resultado = apurarPeriodo(dias, REGRAS_CLT_PADRAO);
+      const resultado = apurarPeriodo(dias, regras);
 
       // O motor é puro e não conhece "férias". O motivo vem junto do resultado
       // para a tela poder escrever Férias em vez de deixar o dia em branco.
@@ -403,7 +410,7 @@ export class TratamentoService {
       let valores: ResultadoValores | null = null;
       if (emp.salarioMensal != null) {
         const salarioMensalCentavos = Math.round(Number(emp.salarioMensal) * 100);
-        valores = valorizarPeriodo(resultado, { salarioMensalCentavos, horasMensaisFolha: 220 }, REGRAS_CLT_PADRAO);
+        valores = valorizarPeriodo(resultado, { salarioMensalCentavos, horasMensaisFolha: 220 }, regras);
       }
 
       return {

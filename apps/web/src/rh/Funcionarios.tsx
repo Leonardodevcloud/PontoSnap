@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
-import type {Empregado, Horario } from '../tipos';
+import type { Empregado, Horario, Cct } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Modal } from '../components/Modal';
@@ -17,6 +17,7 @@ export function Funcionarios() {
   const [menu, setMenu] = useState<string | null>(null);
   const [pinPara, setPinPara] = useState<Empregado | null>(null);
   const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
+  const [convencaoPara, setConvencaoPara] = useState<Empregado | null>(null);
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
   const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
@@ -66,6 +67,7 @@ export function Funcionarios() {
                   <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
                   <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
                   <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
+                  <button onClick={() => { setConvencaoPara(e); setMenu(null); }}>Definir convenção</button>
                   <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
                   <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
                   <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
@@ -80,6 +82,7 @@ export function Funcionarios() {
       {importarAberto && <ModalImportar onFechar={() => setImportarAberto(false)} onImportado={() => void carregar()} />}
       {pinPara && <ModalPin empregado={pinPara} onFechar={() => setPinPara(null)} onSalvo={() => { setPinPara(null); void carregar(); }} />}
       {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
+      {convencaoPara && <ModalConvencao empregado={convencaoPara} onFechar={() => setConvencaoPara(null)} onSalvo={() => { setConvencaoPara(null); void carregar(); }} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
@@ -301,6 +304,42 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
       {horarios.length > 0 && (
         <Botao variante="coral" onClick={salvar} disabled={enviando || !sel}>{enviando ? 'Salvando…' : 'Vincular escala'}</Botao>
       )}
+    </Modal>
+  );
+}
+
+function ModalConvencao({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
+  const [ccts, setCcts] = useState<Cct[]>([]);
+  const [sel, setSel] = useState(empregado.cctId ?? '');
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    api.get<Cct[]>('/cct')
+      .then(setCcts)
+      .catch((e) => setErro((e as Error).message));
+  }, []);
+
+  async function salvar() {
+    setErro(null); setEnviando(true);
+    try {
+      await api.patch(`/empregados/${empregado.id}/cct`, { cctId: sel || null });
+      onSalvo();
+    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  }
+
+  return (
+    <Modal titulo={`Convenção de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
+      <label className={css.selWrap}>
+        <span className={css.selLb}>Convenção aplicada</span>
+        <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
+          <option value="">CLT (padrão — sem convenção)</option>
+          {ccts.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.uf ? ` · ${c.uf}` : ''}</option>)}
+        </select>
+      </label>
+      {ccts.length === 0 && <p className={css.aviso}>Nenhuma convenção cadastrada. Crie em <strong>Convenções</strong> primeiro.</p>}
+      {erro && <p className={css.erroModal}>{erro}</p>}
+      <Botao variante="coral" onClick={salvar} disabled={enviando}>{enviando ? 'Salvando…' : 'Vincular convenção'}</Botao>
     </Modal>
   );
 }

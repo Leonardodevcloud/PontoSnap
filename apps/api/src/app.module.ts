@@ -8,6 +8,7 @@ import { CertificadoModule } from './certificado/certificado.module';
 import { MarcacaoModule } from './marcacao/marcacao.module';
 import { TratamentoModule } from './tratamento/tratamento.module';
 import { BancoModule } from './banco/banco.module';
+import { CctModule } from './cct/cct.module';
 import { DocumentoModule } from './documento/documento.module';
 import { AfastamentoModule } from './afastamento/afastamento.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
@@ -20,7 +21,7 @@ import { JobsModule } from './jobs/jobs.module';
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule,
+    BancoModule, CctModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule,
   ],
 })
 export class AppModule {}

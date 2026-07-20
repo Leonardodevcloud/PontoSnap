@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
-import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, tenant, empregado, comTenant, type Db } from '@ponto/db';
+import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, pontoCct, tenant, empregado, comTenant, type Db } from '@ponto/db';
 import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
@@ -69,14 +69,29 @@ export class BancoService {
     if (!cfg.ativo || cfg.prazoMeses == null) {
       return { ativo: false as const, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, saldo: null, extrato: [] };
     }
+    // Prazo do banco: se a convenção do funcionário definir, ela manda; senão,
+    // vale o acordo da empresa. (Motorista 12m e administrativo 6m convivem.)
+    const prazo = (await this.prazoBancoDoFuncionario(tenantId, empregadoId)) ?? cfg.prazoMeses;
     const movs = await this.extrato(tenantId, empregadoId);
     return {
       ativo: true as const,
       tipoAcordo: cfg.tipoAcordo,
-      prazoMeses: cfg.prazoMeses,
-      saldo: calcularBanco(movs, cfg.prazoMeses, hoje),
+      prazoMeses: prazo,
+      saldo: calcularBanco(movs, prazo, hoje),
       extrato: [...movs].reverse(), // o mais recente primeiro, como extrato de banco
     };
+  }
+
+  /** Prazo do banco vindo da convenção do funcionário (nulo = usa o da empresa). */
+  private async prazoBancoDoFuncionario(tenantId: string, empregadoId: string): Promise<number | null> {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const e = (await tx.select({ cctId: empregado.cctId }).from(empregado)
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!e?.cctId) return null;
+      const c = (await tx.select({ p: pontoCct.bancoPrazoMeses }).from(pontoCct)
+        .where(eq(pontoCct.id, e.cctId)).limit(1))[0];
+      return c?.p ?? null;
+    });
   }
 
   /** Movimento avulso do RH: pagamento de saldo vencido, ajuste justificado. */

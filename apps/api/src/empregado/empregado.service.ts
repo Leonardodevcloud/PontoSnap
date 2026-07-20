@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import ExcelJS from 'exceljs';
 import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
 import { and, eq } from 'drizzle-orm';
-import { empregado, pontoHorarioContratual, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
+import { empregado, pontoHorarioContratual, pontoCct, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { EmailService } from '../email/email.service';
 import { emailAcessoFuncionario } from '../email/templates';
@@ -155,6 +155,21 @@ export class EmpregadoService {
         .where(and(eq(pontoHorarioContratual.id, horarioContratualId), eq(pontoHorarioContratual.tenantId, tenantId))).limit(1);
       if (!hor[0]) throw new NotFoundException('Horário não encontrado');
       const rows = await tx.update(empregado).set({ horarioContratualId })
+        .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
+      if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
+      return this.semSegredos(rows[0]);
+    });
+  }
+
+  /** Vincula o funcionário a uma convenção (ou desvincula com null = CLT). */
+  async definirCct(tenantId: string, id: string, cctId: string | null) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      if (cctId) {
+        const c = await tx.select({ id: pontoCct.id }).from(pontoCct)
+          .where(and(eq(pontoCct.id, cctId), eq(pontoCct.tenantId, tenantId))).limit(1);
+        if (!c[0]) throw new NotFoundException('Convenção não encontrada');
+      }
+      const rows = await tx.update(empregado).set({ cctId })
         .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
       return this.semSegredos(rows[0]);

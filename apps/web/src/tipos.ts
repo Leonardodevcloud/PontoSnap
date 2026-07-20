@@ -61,6 +61,7 @@ export interface Empregado {
   temPin: boolean;
   matriculaEsocial?: string | null;
   horarioContratualId?: string | null;
+  cctId?: string | null;
 }
 
 export interface InfoCertificado {
@@ -407,4 +408,25 @@ export interface MinhaAssinatura {
   assinatura: Assinatura | null;
   cobrancas: Cobranca[];
   emAberto: Cobranca | null;
+}
+
+export interface Cct {
+  id: string;
+  nome: string;
+  uf: string | null;
+  vigencia: string | null;
+  extraDiaUtilPct: number;
+  extraDomingoFeriadoPct: number;
+  extraLimiteDiarioMin: number;
+  toleranciaDiariaMin: number;
+  toleranciaPorMarcacaoMin: number;
+  noturnoAdicionalPct: number;
+  noturnoReduzida: boolean;
+  noturnoInicioMin: number;
+  noturnoFimMin: number;
+  jornadaSemanalMin: number;
+  interjornadaMinimaMin: number;
+  intervaloMaior6hMin: number;
+  bancoPrazoMeses: number | null;
+  funcionarios?: number;
 }

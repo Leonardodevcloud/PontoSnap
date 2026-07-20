@@ -2,6 +2,7 @@ export * from './tenant';
 export * from './usuario';
 export * from './rep';
 export * from './empregado';
+export * from './cct';
 export * from './marcacao';
 export * from './tratamento';
 export * from './banco';

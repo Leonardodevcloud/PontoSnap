@@ -10,6 +10,7 @@ export const empregado = pgTable('empregado', {
   matricula: varchar('matricula', { length: 30 }),        // identificador do quiosque
   pinHash: varchar('pin_hash', { length: 120 }),          // PIN do quiosque (hash)
   horarioContratualId: uuid('horario_contratual_id'),
+  cctId: uuid('cct_id'),
   matriculaEsocial: varchar('matricula_esocial', { length: 30 }),
   ativo: boolean('ativo').notNull().default(true),
   salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }),
