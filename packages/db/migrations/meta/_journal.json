@@ -127,6 +127,13 @@
       "when": 1784430524391,
       "tag": "0017_fuso_por_tenant_e_marcacao",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784600000000,
+      "tag": "0018_convencoes_cct",
+      "breakpoints": true
     }
   ]
 }
