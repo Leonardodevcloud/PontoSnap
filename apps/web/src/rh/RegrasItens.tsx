@@ -10,6 +10,14 @@ const ROTULO: Record<Tipo, string> = {
   EXTRA: 'Hora extra', TOLERANCIA: 'Tolerância', NOTURNO: 'Adicional noturno',
   JORNADA: 'Jornada', BANCO: 'Banco de horas', DESTINACAO: 'Destinação',
 };
+const EXPLICACAO: Record<Tipo, string> = {
+  EXTRA: 'Percentual pago sobre as horas que passam da jornada do dia. Padrão CLT: 50% em dia útil, 100% em domingo e feriado.',
+  TOLERANCIA: 'Minutos de atraso ou saída antecipada que não contam como devedor. Padrão CLT: até 10min no dia, 5min por marcação.',
+  NOTURNO: 'Adicional sobre as horas trabalhadas à noite. Padrão CLT: 20%, das 22h às 5h, com hora reduzida (52min30).',
+  JORNADA: 'Carga semanal e descansos mínimos. Padrão CLT: 44h por semana, 11h entre jornadas, 1h de intervalo acima de 6h.',
+  BANCO: 'Define se as horas acumulam num banco pra compensar depois, o tipo de acordo e o prazo. Se você não escolher, o funcionário herda a configuração de banco da empresa.',
+  DESTINACAO: 'O que fazer com falta e atraso: descontar na folha, abater do banco, ou abonar/tolerar. Padrão CLT: falta desconta, atraso vai pro banco (se houver).',
+};
 const DEFAULTS: Record<Tipo, Record<string, unknown>> = {
   EXTRA: { extraDiaUtilPct: 50, extraDomingoFeriadoPct: 100, extraLimiteDiarioMin: 120 },
   TOLERANCIA: { toleranciaDiariaMin: 10, toleranciaPorMarcacaoMin: 5 },
@@ -87,12 +95,14 @@ export default function RegrasItens() {
         ))}
       </div>
 
+      <p className={css.itemExpl}>{EXPLICACAO[tipo]}</p>
+
       {erro && <p className={css.erro}>{erro}</p>}
 
       {!editando && (
         <div className={css.card}>
           <div className={css.top}><h2 className={css.h2}>Opções de {ROTULO[tipo]}</h2><button className={css.novo} onClick={novo}>+ Nova opção</button></div>
-          {lista.length === 0 ? <p className={css.vazio}>Nenhuma opção de {ROTULO[tipo].toLowerCase()}. Quem não escolher usa o padrão CLT.</p> : (
+          {lista.length === 0 ? <p className={css.vazio}>Nenhuma opção de {ROTULO[tipo].toLowerCase()}. {tipo === 'BANCO' ? 'Quem não escolher herda a configuração de banco da empresa.' : 'Quem não escolher usa o padrão CLT.'}</p> : (
             <table className={css.tab}>
               <thead><tr><th>Nome</th><th>Resumo</th><th></th></tr></thead>
               <tbody>
@@ -115,6 +125,7 @@ export default function RegrasItens() {
       {editando && (
         <div className={css.card}>
           <h2 className={css.h2}>{editando.id ? 'Editar' : 'Nova'} opção de {ROTULO[tipo]}</h2>
+          <p className={css.itemExpl}>{EXPLICACAO[tipo]}</p>
           <div className={css.row}>
             <div><span className={css.lb}>Nome da opção</span><input className={css.inp} value={editando.nome} onChange={(x) => setEditando((e) => e ? { ...e, nome: x.target.value } : e)} placeholder={`Ex.: Rodoviários`} /></div>
           </div>

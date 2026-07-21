@@ -52,3 +52,5 @@
 .itensNav{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:16px; }
 .itemPill{ font:inherit; font-size:13px; font-weight:700; padding:8px 14px; border-radius:999px; background:var(--white); color:var(--ash); border:1.5px solid rgba(16,64,63,.12); cursor:pointer; }
 .itemPillOn{ background:var(--ink); color:var(--cream); border-color:var(--ink); }
+
+.itemExpl{ background:var(--peach); border-radius:12px; padding:11px 14px; font-size:13px; color:var(--ash); margin:0 0 16px; line-height:1.45; }
