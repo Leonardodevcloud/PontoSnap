@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { and, asc, eq, count } from 'drizzle-orm';
+import { and, asc, eq, count, ne } from 'drizzle-orm';
 import { pontoCct, empregado, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { mapearGeminiParaCct, type ExtracaoCct } from './extrair-cct';
@@ -13,6 +13,8 @@ const CAMPOS = {
   noturnoInicioMin: pontoCct.noturnoInicioMin, noturnoFimMin: pontoCct.noturnoFimMin,
   jornadaSemanalMin: pontoCct.jornadaSemanalMin, interjornadaMinimaMin: pontoCct.interjornadaMinimaMin,
   intervaloMaior6hMin: pontoCct.intervaloMaior6hMin, bancoPrazoMeses: pontoCct.bancoPrazoMeses,
+  bancoModo: pontoCct.bancoModo, bancoTipoAcordo: pontoCct.bancoTipoAcordo,
+  ativa: pontoCct.ativa, padrao: pontoCct.padrao,
 };
 
 type Dados = Omit<typeof pontoCct.$inferInsert, 'id' | 'tenantId' | 'criadoEm'>;
@@ -37,6 +39,7 @@ export class CctService {
   async criar(tenantId: string, dados: Dados) {
     if (!dados.nome?.trim()) throw new BadRequestException('Dê um nome à convenção');
     return comTenant(this.db, tenantId, async (tx) => {
+      if (dados.padrao) await this.limparPadrao(tx, tenantId);
       const [c] = await tx.insert(pontoCct).values({ ...dados, tenantId }).returning(CAMPOS);
       return c;
     });
@@ -44,11 +47,20 @@ export class CctService {
 
   async atualizar(tenantId: string, id: string, dados: Dados) {
     return comTenant(this.db, tenantId, async (tx) => {
+      if (dados.padrao) await this.limparPadrao(tx, tenantId, id);
       const [c] = await tx.update(pontoCct).set(dados)
         .where(and(eq(pontoCct.id, id), eq(pontoCct.tenantId, tenantId))).returning(CAMPOS);
       if (!c) throw new NotFoundException('Convenção não encontrada');
       return c;
     });
+  }
+
+  /** Garante uma única regra padrão por empresa (desmarca as outras). */
+  private async limparPadrao(tx: Parameters<Parameters<typeof comTenant>[2]>[0], tenantId: string, exceto?: string) {
+    const cond = exceto
+      ? and(eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true), ne(pontoCct.id, exceto))
+      : and(eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true));
+    await tx.update(pontoCct).set({ padrao: false }).where(cond);
   }
 
   /** Só remove se nenhum funcionário estiver vinculado. */

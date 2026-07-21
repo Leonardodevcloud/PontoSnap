@@ -428,5 +428,9 @@ export interface Cct {
   interjornadaMinimaMin: number;
   intervaloMaior6hMin: number;
   bancoPrazoMeses: number | null;
+  bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO';
+  bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null;
+  ativa: boolean;
+  padrao: boolean;
   funcionarios?: number;
 }

@@ -134,6 +134,13 @@
       "when": 1784600000000,
       "tag": "0018_convencoes_cct",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784600100000,
+      "tag": "0019_regra_banco_por_funcionario",
+      "breakpoints": true
     }
   ]
 }

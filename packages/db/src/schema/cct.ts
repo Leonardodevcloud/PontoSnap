@@ -26,5 +26,10 @@ export const pontoCct = pgTable('ponto_cct', {
   intervaloMaior6hMin: integer('intervalo_maior6h_min').notNull().default(60),
   // Banco de horas (prazo do acordo em meses; nulo = usa a config da empresa)
   bancoPrazoMeses: integer('banco_prazo_meses'),
+  // HERDA (usa a empresa) | ATIVO (banco ligado) | INATIVO (banco desligado)
+  bancoModo: varchar('banco_modo', { length: 8 }).notNull().default('HERDA'),
+  bancoTipoAcordo: varchar('banco_tipo_acordo', { length: 12 }),
+  ativa: boolean('ativa').notNull().default(true),
+  padrao: boolean('padrao').notNull().default(false),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });

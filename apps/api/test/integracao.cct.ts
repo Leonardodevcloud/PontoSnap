@@ -38,7 +38,7 @@ async function main() {
   // Convenção dos motoristas: extra a 60%, banco de 12 meses.
   const cct = await cctSvc.criar(t.id, {
     nome: 'Motoristas Carga RS', uf: 'RS', vigencia: '2025/2026',
-    extraDiaUtilPct: 60, bancoPrazoMeses: 12, ...base,
+    extraDiaUtilPct: 60, bancoModo: 'ATIVO', bancoTipoAcordo: 'COLETIVO', bancoPrazoMeses: 12, ...base,
   } as never);
   if (!cct) { console.log('FALHA — criar não retornou convenção'); await client.end(); process.exit(1); }
   ok(cct.extraDiaUtilPct === 60, 'convenção criada com extra 60%');

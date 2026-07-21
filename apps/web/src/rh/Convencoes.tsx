@@ -10,6 +10,7 @@ const VAZIA: Omit<Cct, 'id' | 'funcionarios'> = {
   noturnoAdicionalPct: 20, noturnoReduzida: true, noturnoInicioMin: 1320, noturnoFimMin: 300,
   jornadaSemanalMin: 2640, interjornadaMinimaMin: 660, intervaloMaior6hMin: 60,
   bancoPrazoMeses: null,
+  bancoModo: 'HERDA', bancoTipoAcordo: null, ativa: true, padrao: false,
 };
 
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
@@ -98,13 +99,21 @@ export default function Convencoes() {
               <thead><tr><th>Convenção</th><th>UF</th><th>Extra útil</th><th>Dom/fer</th><th>Noturno</th><th>Banco</th><th>Func.</th><th></th></tr></thead>
               <tbody>
                 {lista.map((c) => (
-                  <tr key={c.id}>
-                    <td><strong>{c.nome}</strong>{c.vigencia && <div className={css.esc}>{c.vigencia}</div>}</td>
+                  <tr key={c.id} style={{ opacity: c.ativa ? 1 : 0.5 }}>
+                    <td>
+                      <strong>{c.nome}</strong>
+                      {c.padrao && <span className={css.badge}>padrão</span>}
+                      {!c.ativa && <span className={css.badgeArq}>arquivada</span>}
+                      {c.vigencia && <div className={css.esc}>{c.vigencia}</div>}
+                    </td>
                     <td className={css.mono}>{c.uf ?? '—'}</td>
                     <td className={css.mono}>{c.extraDiaUtilPct}%</td>
                     <td className={css.mono}>{c.extraDomingoFeriadoPct}%</td>
                     <td className={css.mono}>{c.noturnoAdicionalPct}%</td>
-                    <td className={css.mono}>{c.bancoPrazoMeses ? `${c.bancoPrazoMeses}m` : '—'}</td>
+                    <td className={css.mono}>
+                      {c.bancoModo === 'ATIVO' ? `${c.bancoPrazoMeses ?? (c.bancoTipoAcordo === 'COLETIVO' ? 12 : 6)}m`
+                        : c.bancoModo === 'INATIVO' ? 'não' : 'empresa'}
+                    </td>
                     <td><span className={css.pill}>{c.funcionarios ?? 0}</span></td>
                     <td className={css.acoesCell}>
                       <button className={css.link} onClick={() => editar(c)}>editar</button>
@@ -178,14 +187,39 @@ export default function Convencoes() {
             <label className={css.chk}><input type="checkbox" checked={e.noturnoReduzida} onChange={(x) => set({ noturnoReduzida: x.target.checked })} /> Hora reduzida (52min30)</label>
           </div>
 
-          <span className={css.grupoLb}>Jornada e banco</span>
-          <div className={css.row3}>
+          <span className={css.grupoLb}>Jornada</span>
+          <div className={css.row}>
             <div><span className={css.lb}>Semanal (h)</span><input className={css.inp} inputMode="decimal" value={Math.round(e.jornadaSemanalMin / 60 * 10) / 10} onChange={(x) => set({ jornadaSemanalMin: Math.round(numero(x.target.value) * 60) })} /></div>
             <div><span className={css.lb}>Interjornada (h)</span><input className={css.inp} inputMode="decimal" value={Math.round(e.interjornadaMinimaMin / 60 * 10) / 10} onChange={(x) => set({ interjornadaMinimaMin: Math.round(numero(x.target.value) * 60) })} /></div>
-            <div><span className={css.lb}>Banco (meses) — vazio = empresa</span><input className={css.inp} inputMode="numeric" value={e.bancoPrazoMeses ?? ''} onChange={(x) => set({ bancoPrazoMeses: x.target.value.trim() === '' ? null : numero(x.target.value) })} placeholder="6 ou 12" /></div>
           </div>
 
-          <div className={css.nota}>O intervalo (&gt;6h) segue {e.intervaloMaior6hMin}min. O banco de horas continua ativado na aba Banco de horas — aqui você só define o prazo por convenção.</div>
+          <span className={css.grupoLb}>Banco de horas desta regra</span>
+          <div className={css.row3}>
+            <div><span className={css.lb}>Banco</span>
+              <select className={css.inp} value={e.bancoModo} onChange={(x) => set({ bancoModo: x.target.value as typeof e.bancoModo })}>
+                <option value="HERDA">Herda da empresa</option>
+                <option value="ATIVO">Ativado nesta regra</option>
+                <option value="INATIVO">Desativado nesta regra</option>
+              </select>
+            </div>
+            {e.bancoModo === 'ATIVO' && (
+              <>
+                <div><span className={css.lb}>Tipo de acordo</span>
+                  <select className={css.inp} value={e.bancoTipoAcordo ?? 'INDIVIDUAL'} onChange={(x) => set({ bancoTipoAcordo: x.target.value as 'INDIVIDUAL' | 'COLETIVO' })}>
+                    <option value="INDIVIDUAL">Individual</option>
+                    <option value="COLETIVO">Coletivo</option>
+                  </select>
+                </div>
+                <div><span className={css.lb}>Prazo (meses)</span><input className={css.inp} inputMode="numeric" value={e.bancoPrazoMeses ?? ''} placeholder={e.bancoTipoAcordo === 'COLETIVO' ? '12' : '6'} onChange={(x) => set({ bancoPrazoMeses: x.target.value.trim() === '' ? null : numero(x.target.value) })} /></div>
+              </>
+            )}
+          </div>
+
+          <span className={css.grupoLb}>Esta regra</span>
+          <label className={css.chkLinha}><input type="checkbox" checked={e.padrao} onChange={(x) => set({ padrao: x.target.checked })} /> <span>É a <strong>regra padrão</strong> da empresa (vale pra quem não tem convenção escolhida)</span></label>
+          <label className={css.chkLinha}><input type="checkbox" checked={e.ativa} onChange={(x) => set({ ativa: x.target.checked })} /> <span>Ativa (desmarque para arquivar)</span></label>
+
+          <div className={css.nota}>Se o banco <strong>herda</strong>, vale a config da empresa (aba Banco de horas). <strong>Ativado/Desativado</strong> mandam por esta regra — assim motorista pode ter banco e administrativo não, na mesma empresa. O intervalo (&gt;6h) segue {e.intervaloMaior6hMin}min.</div>
 
           <div className={css.acoes}>
             <button className={css.salvar} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar convenção'}</button>

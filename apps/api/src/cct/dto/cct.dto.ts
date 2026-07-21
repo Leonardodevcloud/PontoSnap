@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
 
 export class CctDto {
   @IsString() @MaxLength(120) nome!: string;
@@ -22,6 +22,12 @@ export class CctDto {
   @IsInt() @Min(0) @Max(24 * 60) intervaloMaior6hMin!: number;
 
   @IsOptional() @IsInt() @Min(1) @Max(12) bancoPrazoMeses?: number | null;
+
+  // Banco de horas por regra: HERDA (usa empresa) | ATIVO | INATIVO
+  @IsIn(['HERDA', 'ATIVO', 'INATIVO']) bancoModo!: 'HERDA' | 'ATIVO' | 'INATIVO';
+  @IsOptional() @IsIn(['INDIVIDUAL', 'COLETIVO']) bancoTipoAcordo?: 'INDIVIDUAL' | 'COLETIVO' | null;
+  @IsBoolean() ativa!: boolean;
+  @IsBoolean() padrao!: boolean;
 }
 
 export class VincularCctDto {

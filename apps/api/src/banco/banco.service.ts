@@ -65,33 +65,48 @@ export class BancoService {
 
   /** Saldo fechado + extrato, do jeito que a tela precisa. */
   async saldo(tenantId: string, empregadoId: string, hoje: string) {
-    const cfg = await this.obterConfig(tenantId);
+    const cfg = await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo || cfg.prazoMeses == null) {
       return { ativo: false as const, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, saldo: null, extrato: [] };
     }
-    // Prazo do banco: se a convenção do funcionário definir, ela manda; senão,
-    // vale o acordo da empresa. (Motorista 12m e administrativo 6m convivem.)
-    const prazo = (await this.prazoBancoDoFuncionario(tenantId, empregadoId)) ?? cfg.prazoMeses;
     const movs = await this.extrato(tenantId, empregadoId);
     return {
       ativo: true as const,
       tipoAcordo: cfg.tipoAcordo,
-      prazoMeses: prazo,
-      saldo: calcularBanco(movs, prazo, hoje),
+      prazoMeses: cfg.prazoMeses,
+      saldo: calcularBanco(movs, cfg.prazoMeses, hoje),
       extrato: [...movs].reverse(), // o mais recente primeiro, como extrato de banco
     };
   }
 
-  /** Prazo do banco vindo da convenção do funcionário (nulo = usa o da empresa). */
-  private async prazoBancoDoFuncionario(tenantId: string, empregadoId: string): Promise<number | null> {
-    return comTenant(this.db, tenantId, async (tx) => {
-      const e = (await tx.select({ cctId: empregado.cctId }).from(empregado)
-        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
-      if (!e?.cctId) return null;
-      const c = (await tx.select({ p: pontoCct.bancoPrazoMeses }).from(pontoCct)
-        .where(eq(pontoCct.id, e.cctId)).limit(1))[0];
-      return c?.p ?? null;
-    });
+  /** A Regra que vale pro funcionário: a dele (cctId) ou a padrão da empresa. */
+  private async regraEfetiva(tx: Parameters<Parameters<typeof comTenant>[2]>[0], tenantId: string, empregadoId: string) {
+    const emp = (await tx.select({ cctId: empregado.cctId }).from(empregado)
+      .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+    if (emp?.cctId) {
+      return (await tx.select().from(pontoCct).where(eq(pontoCct.id, emp.cctId)).limit(1))[0];
+    }
+    return (await tx.select().from(pontoCct).where(and(
+      eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true), eq(pontoCct.ativa, true))).limit(1))[0];
+  }
+
+  /**
+   * Config de banco QUE VALE pro funcionário. Se a Regra dele definir o banco
+   * (modo ATIVO/INATIVO), ela manda; se herda (ou não tem Regra), usa a empresa.
+   */
+  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null }> {
+    const empresa = await this.obterConfig(tenantId);
+    const regra = await comTenant(this.db, tenantId, (tx) => this.regraEfetiva(tx, tenantId, empregadoId));
+    if (regra && regra.bancoModo !== 'HERDA') {
+      const ativo = regra.bancoModo === 'ATIVO';
+      const tipo = (regra.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
+      return {
+        ativo,
+        tipoAcordo: ativo ? tipo : 'NENHUM',
+        prazoMeses: ativo ? (regra.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
+      };
+    }
+    return empresa; // HERDA
   }
 
   /** Movimento avulso do RH: pagamento de saldo vencido, ajuste justificado. */
@@ -99,8 +114,8 @@ export class BancoService {
     empregadoId: string; data: string; minutos: number;
     tipo: TipoMovBanco; descricao?: string;
   }) {
-    const cfg = await this.obterConfig(tenantId);
-    if (!cfg.ativo) throw new BadRequestException('Esta empresa não tem acordo de banco de horas');
+    const cfg = await this.configBanco(tenantId, p.empregadoId);
+    if (!cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
     if (p.minutos === 0) throw new BadRequestException('Movimento de zero minuto não faz sentido');
     if (p.tipo === 'AJUSTE' && !p.descricao?.trim()) {
       throw new BadRequestException('Ajuste manual precisa de justificativa');
@@ -125,8 +140,8 @@ export class BancoService {
    * tocados, porque não pertencem à competência.
    */
   async lancarCompetencia(tenantId: string, empregadoId: string, competencia: string) {
-    const cfg = await this.obterConfig(tenantId);
-    if (!cfg.ativo) throw new BadRequestException('Esta empresa não tem acordo de banco de horas');
+    const cfg = await this.configBanco(tenantId, empregadoId);
+    if (!cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
     if (!/^\d{4}-\d{2}$/.test(competencia)) throw new BadRequestException('Competência deve ser YYYY-MM');
 
     const [a, m] = competencia.split('-').map(Number);
@@ -165,8 +180,6 @@ export class BancoService {
    * substitui só o que veio da apuração — pagamentos e ajustes ficam intactos.
    */
   async lancarCompetenciaLote(tenantId: string, competencia: string) {
-    const cfg = await this.obterConfig(tenantId);
-    if (!cfg.ativo) throw new BadRequestException('Esta empresa não tem acordo de banco de horas');
     if (!/^\d{4}-\d{2}$/.test(competencia)) throw new BadRequestException('Competência deve ser YYYY-MM');
 
     const ativos = await comTenant(this.db, tenantId, (tx) =>
@@ -175,12 +188,18 @@ export class BancoService {
         .orderBy(asc(empregado.nome)));
 
     const porFuncionario: { empregadoId: string; nome: string; minutos: number }[] = [];
+    let comBanco = 0;
     for (const e of ativos) {
+      // Cada funcionário pela SUA regra: só lança pra quem tem banco ativo.
+      const cfg = await this.configBanco(tenantId, e.id);
+      if (!cfg.ativo) continue;
+      comBanco++;
       const r = await this.lancarCompetencia(tenantId, e.id, competencia);
       porFuncionario.push({ empregadoId: e.id, nome: e.nome, minutos: r.totalMin });
     }
+    if (comBanco === 0) throw new BadRequestException('Nenhum funcionário tem banco de horas ativo nesta empresa');
     const totalMin = porFuncionario.reduce((s, f) => s + f.minutos, 0);
-    return { competencia, funcionarios: ativos.length, totalMin, porFuncionario };
+    return { competencia, funcionarios: comBanco, totalMin, porFuncionario };
   }
 
   /**
@@ -238,8 +257,8 @@ export class BancoService {
    * Sem os dois, ou o dia viraria falta, ou o saldo nunca baixaria.
    */
   async registrarFolga(tenantId: string, empregadoId: string, data: string, minutosManual?: number | null) {
-    const cfg = await this.obterConfig(tenantId);
-    if (!cfg.ativo) throw new BadRequestException('Esta empresa não tem acordo de banco de horas');
+    const cfg = await this.configBanco(tenantId, empregadoId);
+    if (!cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new BadRequestException('Data inválida (use AAAA-MM-DD)');
 
     return comTenant(this.db, tenantId, async (tx) => {

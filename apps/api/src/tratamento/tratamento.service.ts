@@ -283,10 +283,12 @@ export class TratamentoService {
       const durJornada = horario?.durJornadaMin ?? 0;
       const diasUteis = horario?.diasSemana ?? [1, 2, 3, 4, 5]; // seg–sex por padrão
 
-      // Convenção do funcionário → regras de apuração (sem CCT = CLT pura).
+      // Convenção do funcionário → regras de apuração. Sem a dele, usa a Regra
+      // padrão da empresa; sem padrão, CLT pura.
       const cct = emp.cctId
         ? (await tx.select().from(pontoCct).where(eq(pontoCct.id, emp.cctId)).limit(1))[0]
-        : undefined;
+        : (await tx.select().from(pontoCct).where(and(
+            eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true), eq(pontoCct.ativa, true))).limit(1))[0];
       const regras = regrasDeCct(cct);
 
       // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
