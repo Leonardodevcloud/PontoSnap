@@ -50,3 +50,13 @@
 /* Coluna Extra: cada faixa numa linha, adicional em coral */
 .extraItem{ display:block; line-height:1.35; }
 .extraItem em{ font-style:normal; color:var(--coral-dark); font-size:11px; }
+
+/* Destinação de faltas e atrasos */
+.destinacao{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:14px; padding:16px 18px; margin:6px 0 18px; }
+.destinacao h3{ font-family:var(--ff-display); font-weight:600; font-size:15px; margin:0 0 10px; }
+.destLinha{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(16,64,63,.06); font-size:14px; }
+.destLinha:last-of-type{ border-bottom:none; }
+.destBadge{ font-family:var(--ff-mono); font-size:11px; padding:2px 9px; border-radius:6px; margin-left:8px; }
+.destDesc{ background:#FFE9E3; color:var(--coral-dark); }
+.destBanco{ background:var(--lime); color:var(--ink); }
+.destNota{ font-size:12px; color:var(--ash); margin:10px 0 0; }

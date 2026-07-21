@@ -28,6 +28,9 @@ export class CctDto {
   @IsOptional() @IsIn(['INDIVIDUAL', 'COLETIVO']) bancoTipoAcordo?: 'INDIVIDUAL' | 'COLETIVO' | null;
   @IsBoolean() ativa!: boolean;
   @IsBoolean() padrao!: boolean;
+
+  @IsIn(['DESCONTA', 'BANCO', 'ABONA']) destinacaoFaltas!: 'DESCONTA' | 'BANCO' | 'ABONA';
+  @IsIn(['DESCONTA', 'BANCO', 'TOLERA']) destinacaoAtrasos!: 'DESCONTA' | 'BANCO' | 'TOLERA';
 }
 
 export class VincularCctDto {

@@ -19,6 +19,12 @@ const fmtDia = (iso: string) => {
 const diaSemanaCurto = (iso: string) =>
   ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(`${iso}T12:00:00-0300`).getUTCDay()];
 
+const ROTULO_DESTINO: Record<string, string> = {
+  DESCONTA: 'desconto sinalizado', BANCO: 'abatido do banco', ABONA: 'abonado',
+  TOLERA: 'tolerado', PAGA: 'pago como extra',
+};
+const ehBanco = (d: string) => d === 'BANCO';
+
 export function ApuracaoCLT() {
   const [emps, setEmps] = useState<Empregado[]>([]);
   const [empregadoId, setEmpregadoId] = useState('');
@@ -98,6 +104,25 @@ export function ApuracaoCLT() {
             {r.reflexoDsrMin > 0 && <Card k="Reflexo do DSR" v={minutosParaHhMm(r.reflexoDsrMin)} nota="estimativa" dica="Reflexo do descanso semanal remunerado sobre as horas extras da semana. É uma estimativa — a folha de pagamento faz o cálculo exato." />}
             {r.dsrPerdidoSemanas > 0 && <Card k="DSR perdido" v={`${r.dsrPerdidoSemanas} sem`} alerta dica="Semanas em que o funcionário perdeu o descanso semanal remunerado por falta ou atraso." />}
           </div>
+
+          {ap!.destinacao && (ap!.destinacao.falta.min > 0 || ap!.destinacao.atraso.min > 0) && (
+            <div className={css.destinacao}>
+              <h3>Destinação — o que foi feito com falta e atraso</h3>
+              {ap!.destinacao.falta.min > 0 && (
+                <div className={css.destLinha}>
+                  <span>Faltas injustificadas</span>
+                  <span><span className={css.mono}>{minutosParaHhMm(ap!.destinacao.falta.min)}</span> <span className={`${css.destBadge} ${ehBanco(ap!.destinacao.falta.destino) ? css.destBanco : css.destDesc}`}>{ROTULO_DESTINO[ap!.destinacao.falta.destino]}</span></span>
+                </div>
+              )}
+              {ap!.destinacao.atraso.min > 0 && (
+                <div className={css.destLinha}>
+                  <span>Atrasos e saídas antecipadas</span>
+                  <span><span className={css.mono}>{minutosParaHhMm(ap!.destinacao.atraso.min)}</span> <span className={`${css.destBadge} ${ehBanco(ap!.destinacao.atraso.destino) ? css.destBanco : css.destDesc}`}>{ROTULO_DESTINO[ap!.destinacao.atraso.destino]}</span></span>
+                </div>
+              )}
+              <p className={css.destNota}>O sistema calcula e sinaliza — o desconto real é aplicado pela folha.</p>
+            </div>
+          )}
 
           <div className={css.tabela}>
             <div className={`${css.linha} ${css.thead}`}>

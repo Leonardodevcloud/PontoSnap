@@ -31,5 +31,8 @@ export const pontoCct = pgTable('ponto_cct', {
   bancoTipoAcordo: varchar('banco_tipo_acordo', { length: 12 }),
   ativa: boolean('ativa').notNull().default(true),
   padrao: boolean('padrao').notNull().default(false),
+  // Destinação: DESCONTA | BANCO | ABONA (faltas) / DESCONTA | BANCO | TOLERA (atrasos)
+  destinacaoFaltas: varchar('destinacao_faltas', { length: 10 }).notNull().default('DESCONTA'),
+  destinacaoAtrasos: varchar('destinacao_atrasos', { length: 10 }).notNull().default('BANCO'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });

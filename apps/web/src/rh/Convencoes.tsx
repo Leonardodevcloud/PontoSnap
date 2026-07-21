@@ -11,6 +11,7 @@ const VAZIA: Omit<Cct, 'id' | 'funcionarios'> = {
   jornadaSemanalMin: 2640, interjornadaMinimaMin: 660, intervaloMaior6hMin: 60,
   bancoPrazoMeses: null,
   bancoModo: 'HERDA', bancoTipoAcordo: null, ativa: true, padrao: false,
+  destinacaoFaltas: 'DESCONTA', destinacaoAtrasos: 'BANCO',
 };
 
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
@@ -220,6 +221,27 @@ export default function Convencoes() {
           <label className={css.chkLinha}><input type="checkbox" checked={e.ativa} onChange={(x) => set({ ativa: x.target.checked })} /> <span>Ativa (desmarque para arquivar)</span></label>
 
           <div className={css.nota}>Se o banco <strong>herda</strong>, vale a config da empresa (aba Banco de horas). <strong>Ativado/Desativado</strong> mandam por esta regra — assim motorista pode ter banco e administrativo não, na mesma empresa. O intervalo (&gt;6h) segue {e.intervaloMaior6hMin}min.</div>
+
+          <span className={css.grupoLb}>Destinação de faltas e atrasos</span>
+          <div className={css.row}>
+            <div>
+              <span className={css.lb}>Falta injustificada (dia inteiro)</span>
+              <select className={css.inp} value={e.destinacaoFaltas} onChange={(x) => set({ destinacaoFaltas: x.target.value as typeof e.destinacaoFaltas })}>
+                <option value="DESCONTA">Descontar na folha</option>
+                {e.bancoModo !== 'INATIVO' && <option value="BANCO">Abater do banco de horas</option>}
+                <option value="ABONA">Abonar (não descontar)</option>
+              </select>
+            </div>
+            <div>
+              <span className={css.lb}>Atraso e saída antecipada</span>
+              <select className={css.inp} value={e.destinacaoAtrasos} onChange={(x) => set({ destinacaoAtrasos: x.target.value as typeof e.destinacaoAtrasos })}>
+                <option value="DESCONTA">Descontar na folha</option>
+                {e.bancoModo !== 'INATIVO' && <option value="BANCO">Abater do banco de horas</option>}
+                <option value="TOLERA">Tolerar (não descontar)</option>
+              </select>
+            </div>
+          </div>
+          <div className={css.nota}>O sistema <strong>calcula e sinaliza</strong> — o desconto real (e o reflexo do DSR) é aplicado pela sua folha. Se o banco estiver desligado, "abater do banco" vira desconto sinalizado.</div>
 
           <div className={css.acoes}>
             <button className={css.salvar} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar convenção'}</button>

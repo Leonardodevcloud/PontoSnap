@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, pontoCct, tenant, empregado, comTenant, type Db } from '@ponto/db';
 import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
+import { movimentosBancoDoDia, type DestinoFalta, type DestinoAtraso } from '../tratamento/destinacao';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
 
@@ -94,9 +95,11 @@ export class BancoService {
    * Config de banco QUE VALE pro funcionário. Se a Regra dele definir o banco
    * (modo ATIVO/INATIVO), ela manda; se herda (ou não tem Regra), usa a empresa.
    */
-  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null }> {
+  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso }> {
     const empresa = await this.obterConfig(tenantId);
     const regra = await comTenant(this.db, tenantId, (tx) => this.regraEfetiva(tx, tenantId, empregadoId));
+    const destinacaoFaltas = (regra?.destinacaoFaltas as DestinoFalta) ?? 'DESCONTA';
+    const destinacaoAtrasos = (regra?.destinacaoAtrasos as DestinoAtraso) ?? 'BANCO';
     if (regra && regra.bancoModo !== 'HERDA') {
       const ativo = regra.bancoModo === 'ATIVO';
       const tipo = (regra.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
@@ -104,9 +107,10 @@ export class BancoService {
         ativo,
         tipoAcordo: ativo ? tipo : 'NENHUM',
         prazoMeses: ativo ? (regra.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
+        destinacaoFaltas, destinacaoAtrasos,
       };
     }
-    return empresa; // HERDA
+    return { ...empresa, destinacaoFaltas, destinacaoAtrasos }; // HERDA
   }
 
   /** Movimento avulso do RH: pagamento de saldo vencido, ajuste justificado. */
@@ -153,14 +157,12 @@ export class BancoService {
     const ap = await this.tratamento.apurarPeriodoCLT(
       tenantId, empregadoId, inicio, fim, feriados.map((f) => f.data));
 
-    const novos = ap.resultado.dias
-      .filter((d) => d.saldoMin !== 0 && !d.paresIncompletos)
-      .map((d) => ({
-        tenantId, empregadoId, data: d.data, minutos: d.saldoMin,
-        tipo: d.saldoMin > 0 ? 'CREDITO' : 'DEBITO',
-        descricao: d.saldoMin > 0 ? 'Hora extra' : 'Saída antecipada ou atraso',
-        competencia,
-      }));
+    const opc = { destinacaoFaltas: cfg.destinacaoFaltas, destinacaoAtrasos: cfg.destinacaoAtrasos, bancoAtivo: true };
+    const novos = ap.resultado.dias.flatMap((d) =>
+      movimentosBancoDoDia(d, opc).map((mv) => ({
+        tenantId, empregadoId, data: d.data, minutos: mv.minutos,
+        tipo: mv.tipo as 'CREDITO' | 'DEBITO', descricao: mv.descricao, competencia,
+      })));
 
     return comTenant(this.db, tenantId, async (tx) => {
       await tx.delete(pontoBancoMov).where(and(

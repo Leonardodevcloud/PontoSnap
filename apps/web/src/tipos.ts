@@ -237,6 +237,14 @@ export interface ApuracaoResp {
   resultado: ResultadoPeriodoCLT;
   /** Férias/licenças do período — a tela escreve o motivo no dia. */
   afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
+  /** Pra onde vão faltas/atrasos/extras, segundo a regra do funcionário. */
+  destinacao?: Destinacao;
+}
+
+export interface Destinacao {
+  falta: { min: number; destino: 'DESCONTA' | 'BANCO' | 'ABONA' };
+  atraso: { min: number; destino: 'DESCONTA' | 'BANCO' | 'TOLERA' };
+  extra: { min: number; destino: 'BANCO' | 'PAGA' };
 }
 
 export interface ParEntradaSaida { entrada: string; saida: string; }
@@ -432,5 +440,7 @@ export interface Cct {
   bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null;
   ativa: boolean;
   padrao: boolean;
+  destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA';
+  destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA';
   funcionarios?: number;
 }

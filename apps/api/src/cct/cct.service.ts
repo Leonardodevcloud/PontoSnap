@@ -15,6 +15,7 @@ const CAMPOS = {
   intervaloMaior6hMin: pontoCct.intervaloMaior6hMin, bancoPrazoMeses: pontoCct.bancoPrazoMeses,
   bancoModo: pontoCct.bancoModo, bancoTipoAcordo: pontoCct.bancoTipoAcordo,
   ativa: pontoCct.ativa, padrao: pontoCct.padrao,
+  destinacaoFaltas: pontoCct.destinacaoFaltas, destinacaoAtrasos: pontoCct.destinacaoAtrasos,
 };
 
 type Dados = Omit<typeof pontoCct.$inferInsert, 'id' | 'tenantId' | 'criadoEm'>;

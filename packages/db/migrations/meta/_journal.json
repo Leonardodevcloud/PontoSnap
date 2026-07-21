@@ -141,6 +141,13 @@
       "when": 1784600100000,
       "tag": "0019_regra_banco_por_funcionario",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784600200000,
+      "tag": "0020_destinacao_faltas_atrasos",
+      "breakpoints": true
     }
   ]
 }

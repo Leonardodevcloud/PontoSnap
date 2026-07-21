@@ -10,6 +10,7 @@ import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio } from '@ponto/rep-core';
 import { regrasDeCct } from './regras-cct';
+import { resumirDestinacao, type DestinoFalta, type DestinoAtraso } from './destinacao';
 import ExcelJS from 'exceljs';
 
 interface Par { entrada: string; saida: string; }
@@ -291,6 +292,13 @@ export class TratamentoService {
             eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true), eq(pontoCct.ativa, true))).limit(1))[0];
       const regras = regrasDeCct(cct);
 
+      // Banco efetivamente ativo pro funcionário (regra manda; senão, empresa) —
+      // usado só pra dizer, no resumo, se "abater do banco" vale ou vira desconto.
+      const bancoEmpresa = (await tx.select({ tipo: tenant.bancoTipoAcordo }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.tipo;
+      const bancoAtivo = cct?.bancoModo === 'ATIVO' ? true
+        : cct?.bancoModo === 'INATIVO' ? false
+        : !!bancoEmpresa && bancoEmpresa !== 'NENHUM';
+
       // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
       //  1 (DSR) e 4 (folga compensatória) marcam o dia como descanso;
       //  2 é falta não justificada — o oposto de abono;
@@ -415,10 +423,16 @@ export class TratamentoService {
         valores = valorizarPeriodo(resultado, { salarioMensalCentavos, horasMensaisFolha: 220 }, regras);
       }
 
+      const destinacao = resumirDestinacao(resultado, {
+        destinacaoFaltas: (cct?.destinacaoFaltas as DestinoFalta) ?? 'DESCONTA',
+        destinacaoAtrasos: (cct?.destinacaoAtrasos as DestinoAtraso) ?? 'BANCO',
+        bancoAtivo,
+      });
+
       return {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
-        afastamentos,
+        afastamentos, destinacao,
       };
     });
   }
