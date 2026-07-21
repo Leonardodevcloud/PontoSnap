@@ -34,5 +34,7 @@ export const pontoCct = pgTable('ponto_cct', {
   // Destinação: DESCONTA | BANCO | ABONA (faltas) / DESCONTA | BANCO | TOLERA (atrasos)
   destinacaoFaltas: varchar('destinacao_faltas', { length: 10 }).notNull().default('DESCONTA'),
   destinacaoAtrasos: varchar('destinacao_atrasos', { length: 10 }).notNull().default('BANCO'),
+  // BANCO_HORAS (acumula entre meses) | INTRA_MES (compensa no mês)
+  formaCalculo: varchar('forma_calculo', { length: 12 }).notNull().default('BANCO_HORAS'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });

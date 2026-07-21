@@ -10,6 +10,7 @@ import { TratamentoService } from '../tratamento/tratamento.service';
 const PRAZO_PADRAO: Record<string, number> = { INDIVIDUAL: 6, COLETIVO: 12 };
 
 export type TipoAcordo = 'NENHUM' | 'INDIVIDUAL' | 'COLETIVO';
+export type FormaCalculo = 'BANCO_HORAS' | 'INTRA_MES';
 
 @Injectable()
 export class BancoService {
@@ -68,13 +69,19 @@ export class BancoService {
   async saldo(tenantId: string, empregadoId: string, hoje: string) {
     const cfg = await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo || cfg.prazoMeses == null) {
-      return { ativo: false as const, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, saldo: null, extrato: [] };
+      return { ativo: false as const, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, saldo: null, extrato: [], formaCalculo: cfg.formaCalculo };
     }
-    const movs = await this.extrato(tenantId, empregadoId);
+    let movs = await this.extrato(tenantId, empregadoId);
+    // Intra-mês: compensa só dentro do mês corrente — não carrega saldo entre meses.
+    if (cfg.formaCalculo === 'INTRA_MES') {
+      const mes = hoje.slice(0, 7);
+      movs = movs.filter((m) => m.data.slice(0, 7) === mes);
+    }
     return {
       ativo: true as const,
       tipoAcordo: cfg.tipoAcordo,
-      prazoMeses: cfg.prazoMeses,
+      prazoMeses: cfg.formaCalculo === 'INTRA_MES' ? 1 : cfg.prazoMeses,
+      formaCalculo: cfg.formaCalculo,
       saldo: calcularBanco(movs, cfg.prazoMeses, hoje),
       extrato: [...movs].reverse(), // o mais recente primeiro, como extrato de banco
     };
@@ -95,11 +102,12 @@ export class BancoService {
    * Config de banco QUE VALE pro funcionário. Se a Regra dele definir o banco
    * (modo ATIVO/INATIVO), ela manda; se herda (ou não tem Regra), usa a empresa.
    */
-  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso }> {
+  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; formaCalculo: FormaCalculo }> {
     const empresa = await this.obterConfig(tenantId);
     const regra = await comTenant(this.db, tenantId, (tx) => this.regraEfetiva(tx, tenantId, empregadoId));
     const destinacaoFaltas = (regra?.destinacaoFaltas as DestinoFalta) ?? 'DESCONTA';
     const destinacaoAtrasos = (regra?.destinacaoAtrasos as DestinoAtraso) ?? 'BANCO';
+    const formaCalculo = (regra?.formaCalculo as FormaCalculo) ?? 'BANCO_HORAS';
     if (regra && regra.bancoModo !== 'HERDA') {
       const ativo = regra.bancoModo === 'ATIVO';
       const tipo = (regra.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
@@ -107,10 +115,10 @@ export class BancoService {
         ativo,
         tipoAcordo: ativo ? tipo : 'NENHUM',
         prazoMeses: ativo ? (regra.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
-        destinacaoFaltas, destinacaoAtrasos,
+        destinacaoFaltas, destinacaoAtrasos, formaCalculo,
       };
     }
-    return { ...empresa, destinacaoFaltas, destinacaoAtrasos }; // HERDA
+    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo }; // HERDA
   }
 
   /** Movimento avulso do RH: pagamento de saldo vencido, ajuste justificado. */

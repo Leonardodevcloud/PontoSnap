@@ -442,5 +442,6 @@ export interface Cct {
   padrao: boolean;
   destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA';
   destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA';
+  formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
   funcionarios?: number;
 }

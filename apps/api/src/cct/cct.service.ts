@@ -16,6 +16,7 @@ const CAMPOS = {
   bancoModo: pontoCct.bancoModo, bancoTipoAcordo: pontoCct.bancoTipoAcordo,
   ativa: pontoCct.ativa, padrao: pontoCct.padrao,
   destinacaoFaltas: pontoCct.destinacaoFaltas, destinacaoAtrasos: pontoCct.destinacaoAtrasos,
+  formaCalculo: pontoCct.formaCalculo,
 };
 
 type Dados = Omit<typeof pontoCct.$inferInsert, 'id' | 'tenantId' | 'criadoEm'>;

@@ -31,6 +31,7 @@ export class CctDto {
 
   @IsIn(['DESCONTA', 'BANCO', 'ABONA']) destinacaoFaltas!: 'DESCONTA' | 'BANCO' | 'ABONA';
   @IsIn(['DESCONTA', 'BANCO', 'TOLERA']) destinacaoAtrasos!: 'DESCONTA' | 'BANCO' | 'TOLERA';
+  @IsIn(['BANCO_HORAS', 'INTRA_MES']) formaCalculo!: 'BANCO_HORAS' | 'INTRA_MES';
 }
 
 export class VincularCctDto {

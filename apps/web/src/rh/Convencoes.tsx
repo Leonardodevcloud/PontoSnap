@@ -12,6 +12,7 @@ const VAZIA: Omit<Cct, 'id' | 'funcionarios'> = {
   bancoPrazoMeses: null,
   bancoModo: 'HERDA', bancoTipoAcordo: null, ativa: true, padrao: false,
   destinacaoFaltas: 'DESCONTA', destinacaoAtrasos: 'BANCO',
+  formaCalculo: 'BANCO_HORAS',
 };
 
 const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
@@ -215,6 +216,17 @@ export default function Convencoes() {
               </>
             )}
           </div>
+
+          {e.bancoModo !== 'INATIVO' && (
+            <div className={css.row}>
+              <div><span className={css.lb}>Compensação</span>
+                <select className={css.inp} value={e.formaCalculo} onChange={(x) => set({ formaCalculo: x.target.value as typeof e.formaCalculo })}>
+                  <option value="BANCO_HORAS">Acumula no banco (entre meses)</option>
+                  <option value="INTRA_MES">Compensa dentro do mês (não acumula)</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           <span className={css.grupoLb}>Esta regra</span>
           <label className={css.chkLinha}><input type="checkbox" checked={e.padrao} onChange={(x) => set({ padrao: x.target.checked })} /> <span>É a <strong>regra padrão</strong> da empresa (vale pra quem não tem convenção escolhida)</span></label>
