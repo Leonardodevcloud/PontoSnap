@@ -1,8 +1,10 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
-import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, pontoCct, tenant, empregado, comTenant, type Db } from '@ponto/db';
+import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, tenant, empregado, comTenant, type Db } from '@ponto/db';
 import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
 import { movimentosBancoDoDia, type DestinoFalta, type DestinoAtraso } from '../tratamento/destinacao';
+import { resolverItens } from '../tratamento/resolver-itens';
+import type { ItensResolvidos } from '../tratamento/montar-regras';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
 
@@ -87,34 +89,30 @@ export class BancoService {
     };
   }
 
-  /** A Regra que vale pro funcionário: a dele (cctId) ou a padrão da empresa. */
-  private async regraEfetiva(tx: Parameters<Parameters<typeof comTenant>[2]>[0], tenantId: string, empregadoId: string) {
-    const emp = (await tx.select({ cctId: empregado.cctId }).from(empregado)
-      .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
-    if (emp?.cctId) {
-      return (await tx.select().from(pontoCct).where(eq(pontoCct.id, emp.cctId)).limit(1))[0];
-    }
-    return (await tx.select().from(pontoCct).where(and(
-      eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true), eq(pontoCct.ativa, true))).limit(1))[0];
-  }
-
   /**
-   * Config de banco QUE VALE pro funcionário. Se a Regra dele definir o banco
-   * (modo ATIVO/INATIVO), ela manda; se herda (ou não tem Regra), usa a empresa.
+   * Config de banco QUE VALE pro funcionário, montada a partir dos itens (BANCO
+   * e DESTINACAO). Se o item de banco herda (ou não há), usa a empresa.
    */
   async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; formaCalculo: FormaCalculo }> {
     const empresa = await this.obterConfig(tenantId);
-    const regra = await comTenant(this.db, tenantId, (tx) => this.regraEfetiva(tx, tenantId, empregadoId));
-    const destinacaoFaltas = (regra?.destinacaoFaltas as DestinoFalta) ?? 'DESCONTA';
-    const destinacaoAtrasos = (regra?.destinacaoAtrasos as DestinoAtraso) ?? 'BANCO';
-    const formaCalculo = (regra?.formaCalculo as FormaCalculo) ?? 'BANCO_HORAS';
-    if (regra && regra.bancoModo !== 'HERDA') {
-      const ativo = regra.bancoModo === 'ATIVO';
-      const tipo = (regra.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
+    const itens = await comTenant(this.db, tenantId, async (tx) => {
+      const emp = (await tx.select({
+        regraExtraId: empregado.regraExtraId, regraToleranciaId: empregado.regraToleranciaId, regraNoturnoId: empregado.regraNoturnoId,
+        regraJornadaId: empregado.regraJornadaId, regraBancoId: empregado.regraBancoId, regraDestinacaoId: empregado.regraDestinacaoId,
+      }).from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      return emp ? resolverItens(tx as never, tenantId, emp) : ({} as ItensResolvidos);
+    });
+    const banco = itens.banco;
+    const destinacaoFaltas = itens.destinacao?.destinacaoFaltas ?? 'DESCONTA';
+    const destinacaoAtrasos = itens.destinacao?.destinacaoAtrasos ?? 'BANCO';
+    const formaCalculo = banco?.formaCalculo ?? 'BANCO_HORAS';
+    if (banco && banco.bancoModo !== 'HERDA') {
+      const ativo = banco.bancoModo === 'ATIVO';
+      const tipo = (banco.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
       return {
         ativo,
         tipoAcordo: ativo ? tipo : 'NENHUM',
-        prazoMeses: ativo ? (regra.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
+        prazoMeses: ativo ? (banco.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
         destinacaoFaltas, destinacaoAtrasos, formaCalculo,
       };
     }

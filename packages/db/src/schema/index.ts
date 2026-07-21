@@ -4,6 +4,7 @@ export * from './rep';
 export * from './empregado';
 export * from './cct';
 export * from './convencao';
+export * from './regra-item';
 export * from './marcacao';
 export * from './tratamento';
 export * from './banco';

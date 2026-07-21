@@ -63,6 +63,12 @@ export interface Empregado {
   horarioContratualId?: string | null;
   cctId?: string | null;
   convencaoId?: string | null;
+  regraExtraId?: string | null;
+  regraToleranciaId?: string | null;
+  regraNoturnoId?: string | null;
+  regraJornadaId?: string | null;
+  regraBancoId?: string | null;
+  regraDestinacaoId?: string | null;
 }
 
 export interface InfoCertificado {

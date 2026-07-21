@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, count, eq } from 'drizzle-orm';
-import { pontoConvencao, empregado, comTenant, type Db } from '@ponto/db';
+import { pontoConvencao, pontoRegraItem, empregado, comTenant, type Db, type TipoRegraItem } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { CctService } from '../cct/cct.service';
 import type { ExtracaoCct } from '../cct/extrair-cct';
@@ -61,12 +61,39 @@ export class ConvencaoService {
     });
   }
 
-  /** Lê o PDF guardado nesta convenção e devolve um rascunho de Regra (IA). */
-  async gerarRegra(tenantId: string, id: string): Promise<ExtracaoCct> {
-    const pdf = await comTenant(this.db, tenantId, async (tx) =>
-      (await tx.select({ pdf: pontoConvencao.pdfBase64 }).from(pontoConvencao)
-        .where(and(eq(pontoConvencao.id, id), eq(pontoConvencao.tenantId, tenantId))).limit(1))[0]?.pdf);
-    if (!pdf) throw new BadRequestException('Esta convenção não tem PDF anexado.');
-    return this.cct.extrairDoPdf(pdf);
+  /** Lê o PDF e cria/atualiza os 6 itens de regra desta convenção (IA). */
+  async gerarRegra(tenantId: string, id: string): Promise<{ itens: number; citacoes: ExtracaoCct['citacoes'] }> {
+    const conv = await comTenant(this.db, tenantId, async (tx) =>
+      (await tx.select({ nome: pontoConvencao.nome, pdf: pontoConvencao.pdfBase64 }).from(pontoConvencao)
+        .where(and(eq(pontoConvencao.id, id), eq(pontoConvencao.tenantId, tenantId))).limit(1))[0]);
+    if (!conv?.pdf) throw new BadRequestException('Esta convenção não tem PDF anexado.');
+
+    const ex = await this.cct.extrairDoPdf(conv.pdf);
+    const v = ex.valores;
+    const nome = (sufixo: string) => `${conv.nome} · ${sufixo}`;
+    const pecas: { tipo: TipoRegraItem; nome: string; config: Record<string, unknown> }[] = [
+      { tipo: 'EXTRA', nome: nome('extra'), config: { extraDiaUtilPct: v.extraDiaUtilPct ?? 50, extraDomingoFeriadoPct: v.extraDomingoFeriadoPct ?? 100, extraLimiteDiarioMin: 120 } },
+      { tipo: 'TOLERANCIA', nome: nome('tolerância'), config: { toleranciaDiariaMin: v.toleranciaDiariaMin ?? 10, toleranciaPorMarcacaoMin: v.toleranciaPorMarcacaoMin ?? 5 } },
+      { tipo: 'NOTURNO', nome: nome('noturno'), config: { noturnoAdicionalPct: v.noturnoAdicionalPct ?? 20, noturnoReduzida: true, noturnoInicioMin: 1320, noturnoFimMin: 300 } },
+      { tipo: 'JORNADA', nome: nome('jornada'), config: { jornadaSemanalMin: v.jornadaSemanalMin ?? 2640, interjornadaMinimaMin: v.interjornadaMinimaMin ?? 660, intervaloMaior6hMin: v.intervaloMaior6hMin ?? 60 } },
+      { tipo: 'BANCO', nome: nome('banco'), config: { bancoModo: v.bancoPrazoMeses ? 'ATIVO' : 'HERDA', bancoTipoAcordo: v.bancoPrazoMeses && v.bancoPrazoMeses >= 12 ? 'COLETIVO' : v.bancoPrazoMeses ? 'INDIVIDUAL' : null, bancoPrazoMeses: v.bancoPrazoMeses ?? null, formaCalculo: 'BANCO_HORAS' } },
+      { tipo: 'DESTINACAO', nome: nome('destinação'), config: { destinacaoFaltas: 'DESCONTA', destinacaoAtrasos: 'BANCO' } },
+    ];
+
+    await comTenant(this.db, tenantId, async (tx) => {
+      const existentes = await tx.select({ id: pontoRegraItem.id, tipo: pontoRegraItem.tipo }).from(pontoRegraItem)
+        .where(and(eq(pontoRegraItem.tenantId, tenantId), eq(pontoRegraItem.convencaoId, id)));
+      const porTipo = new Map(existentes.map((e) => [e.tipo, e.id]));
+      for (const p of pecas) {
+        const existe = porTipo.get(p.tipo);
+        if (existe) {
+          await tx.update(pontoRegraItem).set({ nome: p.nome, config: p.config })
+            .where(and(eq(pontoRegraItem.id, existe), eq(pontoRegraItem.tenantId, tenantId)));
+        } else {
+          await tx.insert(pontoRegraItem).values({ tenantId, tipo: p.tipo, nome: p.nome, config: p.config, convencaoId: id });
+        }
+      }
+    });
+    return { itens: pecas.length, citacoes: ex.citacoes };
   }
 }

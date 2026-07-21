@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
-import type { Empregado, Horario, Cct, Convencao } from '../tipos';
+import type { Empregado, Horario, Convencao } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Modal } from '../components/Modal';
@@ -19,7 +19,6 @@ export function Funcionarios() {
   const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
   const [convencaoPara, setConvencaoPara] = useState<Empregado | null>(null);
   const [convDocPara, setConvDocPara] = useState<Empregado | null>(null);
-  const [regraMap, setRegraMap] = useState<Record<string, string>>({});
   const [convMap, setConvMap] = useState<Record<string, string>>({});
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
@@ -31,7 +30,6 @@ export function Funcionarios() {
   }
   useEffect(() => { void carregar(); }, []);
   useEffect(() => {
-    api.get<{ id: string; nome: string }[]>('/cct').then((rs) => setRegraMap(Object.fromEntries(rs.map((r) => [r.id, r.nome])))).catch(() => {});
     api.get<{ id: string; nome: string }[]>('/convencoes').then((cs) => setConvMap(Object.fromEntries(cs.map((c) => [c.id, c.nome])))).catch(() => {});
   }, [convencaoPara, convDocPara]);
 
@@ -63,7 +61,7 @@ export function Funcionarios() {
           <div key={e.id} className={css.row}>
             <span className={css.nome}>{e.nome}
               <small className={css.regraConv}>
-                {e.cctId ? (regraMap[e.cctId] ?? 'Regra') : 'CLT padrão'}
+                {[e.regraExtraId, e.regraToleranciaId, e.regraNoturnoId, e.regraJornadaId, e.regraBancoId, e.regraDestinacaoId].some(Boolean) ? 'regras montadas' : 'CLT padrão'}
                 {e.convencaoId ? ` · 📄 ${convMap[e.convencaoId] ?? 'Convenção'}` : ''}
               </small>
             </span>
@@ -323,37 +321,76 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
 }
 
 function ModalConvencao({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
-  const [ccts, setCcts] = useState<Cct[]>([]);
-  const [sel, setSel] = useState(empregado.cctId ?? '');
+  type Tipo = 'EXTRA' | 'TOLERANCIA' | 'NOTURNO' | 'JORNADA' | 'BANCO' | 'DESTINACAO';
+  const TIPOS: { tipo: Tipo; campo: keyof Empregado; rotulo: string }[] = [
+    { tipo: 'EXTRA', campo: 'regraExtraId', rotulo: 'Hora extra' },
+    { tipo: 'TOLERANCIA', campo: 'regraToleranciaId', rotulo: 'Tolerância' },
+    { tipo: 'NOTURNO', campo: 'regraNoturnoId', rotulo: 'Adicional noturno' },
+    { tipo: 'JORNADA', campo: 'regraJornadaId', rotulo: 'Jornada' },
+    { tipo: 'BANCO', campo: 'regraBancoId', rotulo: 'Banco de horas' },
+    { tipo: 'DESTINACAO', campo: 'regraDestinacaoId', rotulo: 'Destinação' },
+  ];
+  const [opcoes, setOpcoes] = useState<Record<string, { id: string; nome: string }[]>>({});
+  const [sel, setSel] = useState<Record<string, string>>(() => {
+    const s: Record<string, string> = {};
+    for (const t of TIPOS) s[t.tipo] = (empregado[t.campo] as string) ?? '';
+    return s;
+  });
+  const [convs, setConvs] = useState<{ id: string; nome: string }[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
-    api.get<Cct[]>('/cct')
-      .then(setCcts)
-      .catch((e) => setErro((e as Error).message));
+    api.get<{ id: string; tipo: Tipo; nome: string }[]>('/regra-itens').then((itens) => {
+      const por: Record<string, { id: string; nome: string }[]> = {};
+      for (const i of itens) (por[i.tipo] ??= []).push({ id: i.id, nome: i.nome });
+      setOpcoes(por);
+    }).catch((e) => setErro((e as Error).message));
+    api.get<{ id: string; nome: string }[]>('/convencoes').then(setConvs).catch(() => {});
   }, []);
 
   async function salvar() {
     setErro(null); setEnviando(true);
     try {
-      await api.patch(`/empregados/${empregado.id}/cct`, { cctId: sel || null });
+      await api.patch(`/empregados/${empregado.id}/regras`, {
+        regraExtraId: sel.EXTRA || null, regraToleranciaId: sel.TOLERANCIA || null, regraNoturnoId: sel.NOTURNO || null,
+        regraJornadaId: sel.JORNADA || null, regraBancoId: sel.BANCO || null, regraDestinacaoId: sel.DESTINACAO || null,
+      });
+      onSalvo();
+    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  }
+
+  async function aplicarConvencao(convId: string) {
+    if (!convId) return;
+    setErro(null); setEnviando(true);
+    try {
+      await api.post(`/empregados/${empregado.id}/aplicar-convencao`, { convencaoId: convId });
       onSalvo();
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
   }
 
   return (
-    <Modal titulo={`Regra de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
-      <label className={css.selWrap}>
-        <span className={css.selLb}>Regra de jornada (define o cálculo)</span>
-        <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
-          <option value="">CLT padrão da empresa</option>
-          {ccts.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.uf ? ` · ${c.uf}` : ''}</option>)}
-        </select>
-      </label>
-      {ccts.length === 0 && <p className={css.aviso}>Nenhuma regra cadastrada. Crie em <strong>Regras de jornada</strong> primeiro.</p>}
+    <Modal titulo={`Regras de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
+      {convs.length > 0 && (
+        <label className={css.selWrap}>
+          <span className={css.selLb}>Atalho: aplicar as peças de uma convenção</span>
+          <select className={css.select} defaultValue="" onChange={(e) => aplicarConvencao(e.target.value)}>
+            <option value="">— escolher convenção —</option>
+            {convs.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </label>
+      )}
+      {TIPOS.map((t) => (
+        <label key={t.tipo} className={css.selWrap}>
+          <span className={css.selLb}>{t.rotulo}</span>
+          <select className={css.select} value={sel[t.tipo]} onChange={(e) => setSel((s) => ({ ...s, [t.tipo]: e.target.value }))}>
+            <option value="">Padrão CLT</option>
+            {(opcoes[t.tipo] ?? []).map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          </select>
+        </label>
+      ))}
       {erro && <p className={css.erroModal}>{erro}</p>}
-      <Botao variante="coral" onClick={salvar} disabled={enviando}>{enviando ? 'Salvando…' : 'Vincular regra'}</Botao>
+      <Botao variante="coral" onClick={salvar} disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar regras'}</Botao>
     </Modal>
   );
 }

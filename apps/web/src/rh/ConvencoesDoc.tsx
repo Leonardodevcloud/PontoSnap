@@ -64,21 +64,9 @@ export default function ConvencoesDoc() {
   async function gerarRegra(c: Convencao) {
     setErro(null); setMsg(null); setRascunho(null); setGerando(c.id);
     try {
-      const out = await api.post<{ valores: Record<string, unknown>; citacoes: { campo: string; texto: string }[] }>(`/convencoes/${c.id}/gerar-regra`, {});
-      // Cria a Regra rascunho a partir do que a IA extraiu (o RH edita depois na aba Regras).
-      const corpo = {
-        nome: `${c.nome} (IA)`, uf: c.uf, vigencia: c.vigencia,
-        extraDiaUtilPct: 50, extraDomingoFeriadoPct: 100, extraLimiteDiarioMin: 120,
-        toleranciaDiariaMin: 10, toleranciaPorMarcacaoMin: 5,
-        noturnoAdicionalPct: 20, noturnoReduzida: true, noturnoInicioMin: 1320, noturnoFimMin: 300,
-        jornadaSemanalMin: 2640, interjornadaMinimaMin: 660, intervaloMaior6hMin: 60,
-        bancoPrazoMeses: null, bancoModo: 'HERDA', bancoTipoAcordo: null, ativa: true, padrao: false,
-        destinacaoFaltas: 'DESCONTA', destinacaoAtrasos: 'BANCO', formaCalculo: 'BANCO_HORAS',
-        ...out.valores,
-      };
-      await api.post('/cct', corpo);
+      const out = await api.post<{ itens: number; citacoes: { campo: string; texto: string }[] }>(`/convencoes/${c.id}/gerar-regra`, {});
       setRascunho(out.citacoes);
-      setMsg(`Regra "${c.nome} (IA)" criada na aba Regras. Revise os números lá antes de usar.`);
+      setMsg(`${out.itens} itens de regra criados a partir de "${c.nome}". Revise em Regras por item; no funcionário, use o atalho "aplicar convenção".`);
     } catch (e) { setErro((e as Error).message); }
     finally { setGerando(null); }
   }

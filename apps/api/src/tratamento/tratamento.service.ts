@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoCct, tenant,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, tenant,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -9,8 +9,9 @@ import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio } from '@ponto/rep-core';
-import { regrasDeCct } from './regras-cct';
-import { resumirDestinacao, type DestinoFalta, type DestinoAtraso } from './destinacao';
+import { montarRegrasApuracao } from './montar-regras';
+import { resolverItens } from './resolver-itens';
+import { resumirDestinacao } from './destinacao';
 import ExcelJS from 'exceljs';
 
 interface Par { entrada: string; saida: string; }
@@ -284,20 +285,12 @@ export class TratamentoService {
       const durJornada = horario?.durJornadaMin ?? 0;
       const diasUteis = horario?.diasSemana ?? [1, 2, 3, 4, 5]; // seg–sex por padrão
 
-      // Convenção do funcionário → regras de apuração. Sem a dele, usa a Regra
-      // padrão da empresa; sem padrão, CLT pura.
-      const cct = emp.cctId
-        ? (await tx.select().from(pontoCct).where(eq(pontoCct.id, emp.cctId)).limit(1))[0]
-        : (await tx.select().from(pontoCct).where(and(
-            eq(pontoCct.tenantId, tenantId), eq(pontoCct.padrao, true), eq(pontoCct.ativa, true))).limit(1))[0];
-      const regras = regrasDeCct(cct);
-
-      // Banco efetivamente ativo pro funcionário (regra manda; senão, empresa) —
-      // usado só pra dizer, no resumo, se "abater do banco" vale ou vira desconto.
-      const bancoEmpresa = (await tx.select({ tipo: tenant.bancoTipoAcordo }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.tipo;
-      const bancoAtivo = cct?.bancoModo === 'ATIVO' ? true
-        : cct?.bancoModo === 'INATIVO' ? false
-        : !!bancoEmpresa && bancoEmpresa !== 'NENHUM';
+      // Regras por item: escolha do funcionário → padrão do tipo → CLT.
+      const itens = await resolverItens(tx as never, tenantId, emp);
+      const regras = montarRegrasApuracao(itens);
+      const bancoAtivo = itens.banco?.bancoModo === 'ATIVO' ? true
+        : itens.banco?.bancoModo === 'INATIVO' ? false
+        : ((await tx.select({ tipo: tenant.bancoTipoAcordo }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.tipo ?? 'NENHUM') !== 'NENHUM';
 
       // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
       //  1 (DSR) e 4 (folga compensatória) marcam o dia como descanso;
@@ -424,8 +417,8 @@ export class TratamentoService {
       }
 
       const destinacao = resumirDestinacao(resultado, {
-        destinacaoFaltas: (cct?.destinacaoFaltas as DestinoFalta) ?? 'DESCONTA',
-        destinacaoAtrasos: (cct?.destinacaoAtrasos as DestinoAtraso) ?? 'BANCO',
+        destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
+        destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
         bancoAtivo,
       });
 

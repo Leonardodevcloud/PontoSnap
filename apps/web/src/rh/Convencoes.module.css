@@ -47,3 +47,8 @@
 
 .ok{ background:#EAF7EE; color:#0FA968; border-radius:var(--r-md); padding:10px 14px; font-size:14px; margin-bottom:14px; }
 .pdfSim{ font-family:var(--ff-mono); font-size:11px; color:var(--coral-dark); }
+
+/* Nav de itens (pills) */
+.itensNav{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:16px; }
+.itemPill{ font:inherit; font-size:13px; font-weight:700; padding:8px 14px; border-radius:999px; background:var(--white); color:var(--ash); border:1.5px solid rgba(16,64,63,.12); cursor:pointer; }
+.itemPillOn{ background:var(--ink); color:var(--cream); border-color:var(--ink); }

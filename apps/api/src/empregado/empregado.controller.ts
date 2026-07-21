@@ -10,8 +10,9 @@ import { BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { EmpregadoService } from './empregado.service';
 import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, AcessoDto } from './dto/empregado.dto';
-import { VincularCctDto } from '../cct/dto/cct.dto';
+
 import { VincularConvencaoDto } from '../convencao/dto/convencao.dto';
+import { MontarRegrasDto } from '../regra-item/dto/regra-item.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -72,8 +73,12 @@ export class EmpregadoController {
     return this.empregados.definirHorario(this.tenant(u), id, dto.horarioContratualId);
   }
 
-  @Patch(':id/cct') cct(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: VincularCctDto) {
-    return this.empregados.definirCct(this.tenant(u), id, dto.cctId ?? null);
+  @Patch(':id/regras') regras(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: MontarRegrasDto) {
+    return this.empregados.definirRegras(this.tenant(u), id, dto);
+  }
+
+  @Post(':id/aplicar-convencao') aplicarConvencao(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: VincularConvencaoDto) {
+    return this.empregados.aplicarConvencao(this.tenant(u), id, dto.convencaoId!);
   }
 
   @Patch(':id/convencao') convencao(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: VincularConvencaoDto) {
