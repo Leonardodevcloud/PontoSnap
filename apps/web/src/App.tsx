@@ -28,6 +28,7 @@ import { BancoHoras } from './rh/BancoHoras';
 import { Atestados } from './rh/Atestados';
 import { Afastamentos } from './rh/Afastamentos';
 import Convencoes from './rh/Convencoes';
+import ConvencoesDoc from './rh/ConvencoesDoc';
 import { Auditoria } from './rh/Auditoria';
 import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
@@ -107,7 +108,8 @@ export function App() {
         <Route path="banco" element={<BancoHoras />} />
         <Route path="atestados" element={<Atestados />} />
         <Route path="afastamentos" element={<Afastamentos />} />
-        <Route path="convencoes" element={<Convencoes />} />
+        <Route path="convencoes" element={<ConvencoesDoc />} />
+        <Route path="regras" element={<Convencoes />} />
         <Route path="auditoria" element={<Auditoria />} />
         <Route path="dispositivos" element={<Dispositivos />} />
         <Route path="assinatura" element={<Assinatura />} />

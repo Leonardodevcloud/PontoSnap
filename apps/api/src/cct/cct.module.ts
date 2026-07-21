@@ -7,5 +7,6 @@ import { CctService } from './cct.service';
   imports: [AuthModule],
   controllers: [CctController],
   providers: [CctService],
+  exports: [CctService],
 })
 export class CctModule {}

@@ -23,27 +23,6 @@ export default function Convencoes() {
   const [erro, setErro] = useState<string | null>(null);
   const [editando, setEditando] = useState<(typeof VAZIA & { id?: string }) | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [lendoPdf, setLendoPdf] = useState(false);
-  const [citacoes, setCitacoes] = useState<{ campo: string; texto: string }[]>([]);
-  const [preenchidoIA, setPreenchidoIA] = useState(false);
-
-  async function lerPdf(file: File) {
-    if (file.type !== 'application/pdf') { setErro('Envie um PDF'); return; }
-    setErro(null); setLendoPdf(true); setCitacoes([]);
-    try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result).split(',')[1] ?? '');
-        r.onerror = () => rej(new Error('Falha ao ler o arquivo'));
-        r.readAsDataURL(file);
-      });
-      const out = await api.post<{ valores: Partial<typeof VAZIA>; citacoes: { campo: string; texto: string }[] }>('/cct/extrair', { arquivoBase64: base64 });
-      setEditando((cur) => cur ? { ...cur, ...out.valores } : cur);
-      setCitacoes(out.citacoes);
-      setPreenchidoIA(true);
-    } catch (e) { setErro((e as Error).message); }
-    finally { setLendoPdf(false); }
-  }
 
   const carregar = useCallback(async () => {
     setErro(null);
@@ -52,12 +31,12 @@ export default function Convencoes() {
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
 
-  function novo() { setCitacoes([]); setPreenchidoIA(false); setEditando({ ...VAZIA }); }
-  function editar(c: Cct) { setCitacoes([]); setPreenchidoIA(false); const { funcionarios, id, ...resto } = c; void funcionarios; setEditando({ ...resto, id }); }
+  function novo() { setEditando({ ...VAZIA }); }
+  function editar(c: Cct) { const { funcionarios, id, ...resto } = c; void funcionarios; setEditando({ ...resto, id }); }
 
   async function salvar() {
     if (!editando) return;
-    if (!editando.nome.trim()) { setErro('Dê um nome à convenção'); return; }
+    if (!editando.nome.trim()) { setErro('Dê um nome à regra'); return; }
     setErro(null); setSalvando(true);
     const { id, ...corpo } = editando;
     try {
@@ -70,7 +49,7 @@ export default function Convencoes() {
   }
 
   async function remover(c: Cct) {
-    if (!confirm(`Remover a convenção "${c.nome}"?`)) return;
+    if (!confirm(`Remover a regra "${c.nome}"?`)) return;
     setErro(null);
     try { await api.del(`/cct/${c.id}`); await carregar(); }
     catch (e) { setErro((e as Error).message); }
@@ -84,10 +63,10 @@ export default function Convencoes() {
     <div className={css.tela}>
       <div className={css.top}>
         <div>
-          <h1 className={css.h}>Convenções (CCT/ACT)</h1>
-          <p className={css.sub}>Cadastre as convenções da empresa; cada funcionário aponta pra sua no cadastro dele.</p>
+          <h1 className={css.h}>Regras de jornada</h1>
+          <p className={css.sub}>Cada regra define o cálculo (extra, tolerância, noturno, banco, destinação). Você atribui a regra ao funcionário no cadastro dele.</p>
         </div>
-        {!e && <button className={css.novo} onClick={novo}>+ Nova convenção</button>}
+        {!e && <button className={css.novo} onClick={novo}>+ Nova regra</button>}
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -95,7 +74,7 @@ export default function Convencoes() {
       {!e && (
         <div className={css.card}>
           {lista.length === 0 ? (
-            <p className={css.vazio}>Nenhuma convenção ainda. Quem não tiver convenção é apurado pela CLT.</p>
+            <p className={css.vazio}>Nenhuma regra ainda. Quem não tiver regra é apurado pela CLT padrão.</p>
           ) : (
             <table className={css.tab}>
               <thead><tr><th>Convenção</th><th>UF</th><th>Extra útil</th><th>Dom/fer</th><th>Noturno</th><th>Banco</th><th>Func.</th><th></th></tr></thead>
@@ -131,28 +110,8 @@ export default function Convencoes() {
 
       {e && (
         <div className={css.card}>
-          <h2 className={css.h2}>{e.id ? 'Editar convenção' : 'Nova convenção'}</h2>
-          <p className={css.sub}>Envie o PDF da CCT e a IA preenche pra você — depois confira e salve. Ou preencha à mão.</p>
-
-          <div className={css.upload}>
-            <label className={css.uploadBtn}>
-              {lendoPdf ? 'Lendo o PDF…' : '📄 Enviar PDF da CCT'}
-              <input type="file" accept="application/pdf" hidden disabled={lendoPdf}
-                onChange={(x) => { const f = x.target.files?.[0]; if (f) void lerPdf(f); x.target.value = ''; }} />
-            </label>
-            <span className={css.uploadDica}>A IA lê e preenche os campos. Você confere antes de salvar.</span>
-          </div>
-
-          {preenchidoIA && (
-            <div className={css.iaBox}>
-              <strong>A IA preencheu os campos abaixo.</strong> Confira cada número antes de salvar.
-              {citacoes.length > 0 && (
-                <ul className={css.cit}>
-                  {citacoes.map((c, i) => <li key={i}><b>{c.campo}:</b> {c.texto}</li>)}
-                </ul>
-              )}
-            </div>
-          )}
+          <h2 className={css.h2}>{e.id ? 'Editar regra' : 'Nova regra'}</h2>
+          <p className={css.sub}>Defina o cálculo. Dica: dá pra gerar uma regra automaticamente a partir do PDF na aba <strong>Convenções</strong>.</p>
 
           <div className={css.row}>
             <div><span className={css.lb}>Nome</span><input className={css.inp} value={e.nome} onChange={(x) => set({ nome: x.target.value })} placeholder="Ex.: Motoristas Carga RS 2025" /></div>
@@ -229,7 +188,7 @@ export default function Convencoes() {
           )}
 
           <span className={css.grupoLb}>Esta regra</span>
-          <label className={css.chkLinha}><input type="checkbox" checked={e.padrao} onChange={(x) => set({ padrao: x.target.checked })} /> <span>É a <strong>regra padrão</strong> da empresa (vale pra quem não tem convenção escolhida)</span></label>
+          <label className={css.chkLinha}><input type="checkbox" checked={e.padrao} onChange={(x) => set({ padrao: x.target.checked })} /> <span>É a <strong>regra padrão</strong> da empresa (vale pra quem não tem regra escolhida)</span></label>
           <label className={css.chkLinha}><input type="checkbox" checked={e.ativa} onChange={(x) => set({ ativa: x.target.checked })} /> <span>Ativa (desmarque para arquivar)</span></label>
 
           <div className={css.nota}>Se o banco <strong>herda</strong>, vale a config da empresa (aba Banco de horas). <strong>Ativado/Desativado</strong> mandam por esta regra — assim motorista pode ter banco e administrativo não, na mesma empresa. O intervalo (&gt;6h) segue {e.intervaloMaior6hMin}min.</div>
@@ -256,7 +215,7 @@ export default function Convencoes() {
           <div className={css.nota}>O sistema <strong>calcula e sinaliza</strong> — o desconto real (e o reflexo do DSR) é aplicado pela sua folha. Se o banco estiver desligado, "abater do banco" vira desconto sinalizado.</div>
 
           <div className={css.acoes}>
-            <button className={css.salvar} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar convenção'}</button>
+            <button className={css.salvar} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar regra'}</button>
             <button className={css.cancelar} onClick={() => { setEditando(null); setErro(null); }}>Cancelar</button>
           </div>
         </div>

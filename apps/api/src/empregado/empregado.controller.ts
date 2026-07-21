@@ -11,6 +11,7 @@ import { Perfil } from '@ponto/shared';
 import { EmpregadoService } from './empregado.service';
 import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, AcessoDto } from './dto/empregado.dto';
 import { VincularCctDto } from '../cct/dto/cct.dto';
+import { VincularConvencaoDto } from '../convencao/dto/convencao.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -73,6 +74,10 @@ export class EmpregadoController {
 
   @Patch(':id/cct') cct(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: VincularCctDto) {
     return this.empregados.definirCct(this.tenant(u), id, dto.cctId ?? null);
+  }
+
+  @Patch(':id/convencao') convencao(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: VincularConvencaoDto) {
+    return this.empregados.definirConvencao(this.tenant(u), id, dto.convencaoId ?? null);
   }
   /** Cria ou reseta o login do colaborador. A senha provisória aparece uma vez só. */
   @Post(':id/acesso') acesso(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: AcessoDto) {
