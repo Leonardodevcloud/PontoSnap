@@ -181,17 +181,22 @@ export class TratamentoService {
       const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, dataStr, dataStr);
       const efetivas = aplicarAjustes(marcs, aj);
 
-      const dur = emp.horarioContratualId
+      const hor = emp.horarioContratualId
         ? (await tx.select().from(pontoHorarioContratual)
-            .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]?.durJornadaMin ?? 0
-        : 0;
+            .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]
+        : undefined;
+      const dur = hor?.durJornadaMin ?? 0;
+      // Quantas batidas o dia prevê (2 por par). O rótulo (entrada / saída
+      // descanso / retorno / saída) sai daqui — sem isso, uma batida extra
+      // faz o rótulo da saída escorregar.
+      const esperadas = (hor?.pares?.length ?? 0) * 2;
 
       const local = t?.latitude && t?.longitude
         ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
         : null;
 
       return {
-        nome: emp.nome, matricula: emp.matricula,
+        nome: emp.nome, matricula: emp.matricula, esperadas,
         marcacoes: marcs.map((m) => {
           const pos = m.latitude != null && m.longitude != null
             ? { latitude: Number(m.latitude), longitude: Number(m.longitude) } : null;

@@ -106,7 +106,11 @@ export interface MarcacaoEspelho {
 export interface EspelhoResp {
   nome: string;
   matricula: string | null;
+  /** Batidas previstas pelo horário contratual (2 por par). 0 = sem horário. */
+  esperadas?: number;
   marcacoes: MarcacaoEspelho[];
+  /** Batidas que entraram por ajuste aprovado (não têm NSR). */
+  incluidas?: { dtMarcacao: string; tpMarc: string | null; motivo: string }[];
   resumo: ResumoJornada;
 }
 

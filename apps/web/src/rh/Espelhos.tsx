@@ -58,7 +58,7 @@ export function Espelhos() {
               <div key={m.nsr} className={css.row}>
                 <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
                 <span>
-                  <span className={css.k}>{rotuloMarcacao(i, esp.marcacoes.length)}</span>
+                  <span className={css.k}>{rotuloMarcacao(i, esp.esperadas || esp.marcacoes.length)}</span>
                   {m.offline && (
                     <span className={css.offSelo} title={m.defasagemSeg ? `Relógio do aparelho ${m.defasagemSeg > 0 ? 'atrasado' : 'adiantado'} ${Math.abs(Math.round(m.defasagemSeg / 60))} min` : undefined}>
                       Offline{m.defasagemSeg && Math.abs(m.defasagemSeg) > 120 ? ` · ${m.defasagemSeg > 0 ? '−' : '+'}${Math.abs(Math.round(m.defasagemSeg / 60))}min` : ''}

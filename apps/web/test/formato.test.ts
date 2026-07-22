@@ -18,7 +18,13 @@ describe('rótulo das marcações', () => {
     ]);
   });
 
-  it('dia ímpar: a última é retorno em aberto, NÃO "Saída"', () => {
+  it('jornada de 4 batidas com uma extra à noite: a saída fica no lugar certo', () => {
+    // 5 batidas num dia que prevê 4 (08:00, 11:00, 12:00, 18:00 + 23:28 extra)
+    const rots = Array.from({ length: 5 }, (_, i) => rotuloMarcacao(i, 4));
+    expect(rots).toEqual(['Entrada', 'Saída descanso', 'Retorno descanso', 'Saída', 'Entrada']);
+  });
+
+  it('dia ímpar SEM horário contratual: a última é retorno em aberto', () => {
     // 5 batidas (ex.: uma inclusão por ajuste) — a 5ª ainda está em aberto
     expect(doDia(5)).toEqual([
       'Entrada', 'Saída descanso 1', 'Retorno descanso 1', 'Saída descanso 2', 'Retorno descanso 2',

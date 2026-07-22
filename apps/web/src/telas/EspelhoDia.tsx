@@ -125,7 +125,7 @@ export function EspelhoDia() {
           title={m.nsr != null ? 'Baixar comprovante' : 'Batida incluída por ajuste aprovado'}
         >
           <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
-          <span className={css.kk}>{rotuloMarcacao(i, marcs.length)}</span>
+          <span className={css.kk}>{rotuloMarcacao(i, dados?.esperadas || marcs.length)}</span>
           <span className={css.tt}>{fmtHora(m.dtMarcacao)}</span>
           {m.nsr != null ? <span className={css.pdf}>PDF</span> : <span className={css.tagInc}>ajuste</span>}
         </button>
