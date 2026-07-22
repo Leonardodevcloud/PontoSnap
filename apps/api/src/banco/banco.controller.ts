@@ -24,6 +24,13 @@ export class BancoController {
     return this.banco.obterConfig(this.tenant(u));
   }
 
+  /** Quem segue o padrão da empresa e quem tem regra própria de banco. */
+  @Get('cobertura')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  cobertura(@UsuarioAtual() u: PayloadAcesso) {
+    return this.banco.cobertura(this.tenant(u));
+  }
+
   /** Só o admin do cliente define o acordo — é decisão contratual, não operacional. */
   @Post('config')
   @Perfis(Perfil.ADMIN_CLIENTE)

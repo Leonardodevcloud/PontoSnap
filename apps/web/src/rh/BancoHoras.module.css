@@ -125,3 +125,8 @@
 .folgaLinha{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; }
 .folgaH{ flex:1; min-width:150px; background:var(--white); border:1.5px solid rgba(16,64,63,.1); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); outline:none; }
 .folgaH:focus{ border-color:var(--coral); }
+
+/* Cobertura: quem segue o padrão e quem tem regra própria */
+.cobertura{ display:flex; flex-direction:column; gap:5px; background:var(--cream); border-radius:12px; padding:11px 14px; margin-top:12px; }
+.cobLinha{ font-size:13px; color:var(--ash); }
+.cobLink{ font-size:12.5px; font-weight:800; color:var(--coral-dark); text-decoration:underline; margin-top:3px; }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { hojeSP, minutosParaHhMm } from '../lib/formato';
 import { Botao } from '../components/Botao';
@@ -21,6 +22,8 @@ const ACORDOS: { v: TipoAcordoBanco; t: string; d: string }[] = [
   { v: 'COLETIVO', t: 'Acordo coletivo', d: 'Via sindicato. Compensar em até 12 meses.' },
 ];
 const rotuloAcordo = (t: TipoAcordoBanco) => ACORDOS.find((a) => a.v === t)?.t ?? '—';
+
+interface Cobertura { total: number; comRegraPropria: number; seguindoEmpresa: number; comBanco: number; semBanco: number; opcoesBanco: number }
 
 export function BancoHoras() {
   const [cfg, setCfg] = useState<ConfigBanco | null>(null);
@@ -46,6 +49,8 @@ export function BancoHoras() {
   const [regFolga, setRegFolga] = useState(false);
 
   const [erro, setErro] = useState<string | null>(null);
+
+  const [cob, setCob] = useState<Cobertura | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [lancando, setLancando] = useState(false);
@@ -53,6 +58,7 @@ export function BancoHoras() {
   const carregarCfg = useCallback(async () => {
     try {
       const c = await api.get<ConfigBanco>('/banco/config');
+      api.get<Cobertura>('/banco/cobertura').then(setCob).catch(() => {});
       setCfg(c); setTipo(c.tipoAcordo);
       setPrazo(c.prazoMeses != null ? String(c.prazoMeses) : '');
       setEditandoAcordo(false);
@@ -149,6 +155,7 @@ export function BancoHoras() {
       <h2 className={css.h}>Banco de horas</h2>
       <p className={css.sub}>
         Só existe com acordo. Sem ele, a hora extra é paga na folha — e é isso que a lei manda.
+        O acordo abaixo é o <strong>padrão da empresa</strong>: vale pra quem não tem uma regra de banco própria.
       </p>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -157,7 +164,7 @@ export function BancoHoras() {
       {/* ---------- ACORDO ---------- */}
       {!editandoAcordo && cfg && (
         <div className={css.bloco}>
-          <div className={css.blocoH}>Acordo da empresa</div>
+          <div className={css.blocoH}>Acordo padrão da empresa</div>
           <div className={css.acordoSaved}>
             {cfg.ativo
               ? <>
@@ -175,6 +182,21 @@ export function BancoHoras() {
               {cfg.ativo ? 'Editar acordo' : 'Configurar acordo'}
             </button>
           </div>
+
+          {cob && cob.total > 0 && (
+            <div className={css.cobertura}>
+              <span className={css.cobLinha}>
+                <b className={css.mono}>{cob.seguindoEmpresa}</b> de <b className={css.mono}>{cob.total}</b> funcionários seguem este padrão
+                {cob.comRegraPropria > 0 && <> · <b className={css.mono}>{cob.comRegraPropria}</b> têm regra de banco própria</>}
+              </span>
+              <span className={css.cobLinha}>
+                Na prática: <b className={css.mono}>{cob.comBanco}</b> com banco, <b className={css.mono}>{cob.semBanco}</b> sem.
+              </span>
+              <Link to="/rh/regras" className={css.cobLink}>
+                {cob.opcoesBanco > 0 ? 'ver as regras de banco →' : 'criar uma regra de banco por funcionário →'}
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

@@ -58,6 +58,13 @@ async function main() {
   ok(apP.destinacao?.falta.destino === 'BANCO' || true, 'resumo de destinação presente');
   void extra50pad;
 
+  // ---- cobertura do banco: quem segue a empresa, quem tem regra própria ----
+  const cob = await banco.cobertura(t.id);
+  ok(cob.total === 2, `cobertura conta os 2 ativos (${cob.total})`);
+  ok(cob.comRegraPropria === 1, `só o Pedro tem regra própria de banco (${cob.comRegraPropria})`);
+  ok(cob.seguindoEmpresa === 1, `João segue o padrão da empresa (${cob.seguindoEmpresa})`);
+  ok(cob.comBanco === 1 && cob.semBanco === 1, `na prática: ${cob.comBanco} com banco, ${cob.semBanco} sem`);
+
   console.log(falhas === 0 ? '\n>>> REGRA-ITEM OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();
   process.exit(falhas === 0 ? 0 : 1);
