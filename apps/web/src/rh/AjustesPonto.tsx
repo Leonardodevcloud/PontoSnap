@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
+import { rotuloMarcacao } from '../lib/formato';
 import css from './AjustesPonto.module.css';
 
 interface Pedido {
@@ -16,7 +17,8 @@ interface Pedido {
   empregadoId: string;
   nome: string;
 }
-interface Batida { id: string; dtMarcacao: string; nsr: number }
+interface Batida { id: string; dtMarcacao: string; nsr: number | null }
+interface DiaCtx { batidas: Batida[]; pares: { entrada: string; saida: string }[]; esperadas: number }
 
 const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const dia = (d: string) => { const [a, m, x] = d.split('-'); return `${x}/${m}/${a}`; };
@@ -58,7 +60,8 @@ export default function AjustesPonto() {
       setLista(pend);
       const mapa: Record<string, Batida[]> = {};
       await Promise.all(pend.map(async (p) => {
-        mapa[p.id] = await api.get<Batida[]>(`/ajustes/batidas?empregadoId=${p.empregadoId}&data=${p.data}`).catch(() => []);
+        mapa[p.id] = await api.get<DiaCtx>(`/ajustes/batidas?empregadoId=${p.empregadoId}&data=${p.data}`)
+          .then((d) => d.batidas).catch(() => []);
       }));
       setBatidas(mapa);
     } catch (e) { setErro((e as Error).message); }
@@ -226,7 +229,8 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
   const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR'>('INCLUSAO');
   const [hora, setHora] = useState('');
   const [tpMarc, setTpMarc] = useState<'E' | 'S'>('E');
-  const [batidas, setBatidas] = useState<BatidaLite[]>([]);
+  const [dia, setDia] = useState<{ batidas: BatidaLite[]; pares: { entrada: string; saida: string }[]; esperadas: number }>({ batidas: [], pares: [], esperadas: 0 });
+  const batidas = dia.batidas;
   const [alvo, setAlvo] = useState<string>('');
   const [obs, setObs] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -237,13 +241,33 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
   }, []);
 
   useEffect(() => {
-    if (!empregadoId || !data) { setBatidas([]); return; }
-    api.get<BatidaLite[]>(`/ajustes/batidas?empregadoId=${empregadoId}&data=${data}`)
-      .then((b) => { setBatidas(b); setAlvo(''); })
-      .catch(() => setBatidas([]));
+    if (!empregadoId || !data) { setDia({ batidas: [], pares: [], esperadas: 0 }); return; }
+    api.get<{ batidas: BatidaLite[]; pares: { entrada: string; saida: string }[]; esperadas: number }>(
+      `/ajustes/batidas?empregadoId=${empregadoId}&data=${data}`)
+      .then((d) => { setDia(d); setAlvo(''); })
+      .catch(() => setDia({ batidas: [], pares: [], esperadas: 0 }));
   }, [empregadoId, data]);
 
   const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const hor = (p: string) => `${p.slice(0, 2)}:${p.slice(2)}`;
+
+  // Cruza o horário previsto com o que foi batido: cada posição vira um slot
+  // (batido, incluído por ajuste, ou faltando). Batidas além do previsto entram
+  // no fim como "extra".
+  const previstos = dia.pares.flatMap((p) => [
+    { hora: hor(p.entrada), tp: 'E' as const },
+    { hora: hor(p.saida), tp: 'S' as const },
+  ]);
+  const total = Math.max(previstos.length, batidas.length);
+  const slots = Array.from({ length: total }, (_, i) => {
+    const prev = previstos[i];
+    return {
+      rotulo: prev ? rotuloMarcacao(i, previstos.length) : 'extra',
+      sugestao: prev?.hora ?? null,
+      tp: prev?.tp ?? ('E' as const),
+      batida: batidas[i] ?? null,
+    };
+  });
 
   async function enviar() {
     if (!empregadoId) { setErro('Escolha o funcionário.'); return; }
@@ -280,6 +304,33 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
         <span className={css.lb}>Dia</span>
         <input className={css.inp} type="date" value={data} max={new Date().toISOString().slice(0, 10)}
           onChange={(e) => setData(e.target.value)} />
+
+        {empregadoId && data && (
+          <div className={css.diaCtx}>
+            <span className={css.diaCtxLb}>
+              Como está o dia
+              {dia.pares.length > 0 && <em> · previsto {dia.pares.map((p) => `${hor(p.entrada)}–${hor(p.saida)}`).join(' / ')}</em>}
+            </span>
+            {dia.esperadas === 0 && batidas.length === 0 && (
+              <p className={css.semBat}>Sem horário contratual e sem batidas neste dia.</p>
+            )}
+            <div className={css.slots}>
+              {slots.map((s2, i) => (
+                <button
+                  key={i}
+                  className={`${css.slot} ${s2.batida ? css.slotOk : css.slotFalta} ${!s2.batida && tipo === 'INCLUSAO' ? css.slotClicavel : ''}`}
+                  disabled={!!s2.batida || tipo !== 'INCLUSAO'}
+                  onClick={() => { if (s2.sugestao) { setHora(s2.sugestao); setTpMarc(s2.tp); } }}
+                  title={!s2.batida && tipo === 'INCLUSAO' ? 'Clique pra preencher esta batida' : ''}
+                >
+                  <span className={css.slotLb}>{s2.rotulo}</span>
+                  <span className={css.slotV}>{s2.batida ? hhmm(s2.batida.dtMarcacao) : (s2.sugestao ?? '—')}</span>
+                  <span className={css.slotTag}>{s2.batida ? (s2.batida.nsr == null ? 'ajuste' : 'batido') : 'faltando'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <span className={css.lb}>O que fazer</span>
         <div className={css.opts}>

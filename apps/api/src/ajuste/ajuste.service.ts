@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
-import { pontoAjuste, empregado, pontoMarcacao, pontoRep, usuario, tenant, comTenant, type Db } from '@ponto/db';
+import { pontoAjuste, empregado, pontoMarcacao, pontoRep, pontoHorarioContratual, usuario, tenant, comTenant, type Db } from '@ponto/db';
 import { inicioDoDia, fimDoDia } from '@ponto/rep-core';
 import { ajustesAprovados } from '../tratamento/ajustes';
 import { DB } from '../database/database.module';
@@ -139,14 +139,23 @@ export class AjusteService {
     });
   }
 
-  /** Batidas do dia (só daquele dia, no fuso do tenant), em ordem. */
+  /**
+   * O dia do funcionário: o que o horário previa, o que já foi batido e o que
+   * falta. É o que o RH precisa ver antes de lançar qualquer ajuste.
+   */
   async batidasDoDia(tenantId: string, empregadoId: string, data: string) {
     return comTenant(this.db, tenantId, async (tx) => {
-      const emp = (await tx.select({ cpf: empregado.cpf }).from(empregado)
+      const emp = (await tx.select({ cpf: empregado.cpf, horarioContratualId: empregado.horarioContratualId })
+        .from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!emp) throw new NotFoundException('Empregado não encontrado');
+      const horario = emp.horarioContratualId
+        ? (await tx.select().from(pontoHorarioContratual)
+            .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]
+        : undefined;
+      const pares = horario?.pares ?? [];
       const rep = (await tx.select({ id: pontoRep.id }).from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
-      if (!rep) return [];
+      if (!rep) return { batidas: [], pares, esperadas: pares.length * 2 };
       const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
       const originais = await tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao, nsr: pontoMarcacao.nsr })
         .from(pontoMarcacao)
@@ -158,10 +167,11 @@ export class AjusteService {
       // as inclusões aprovadas. Assim, ao decidir vários pedidos do mesmo dia,
       // cada um enxerga o resultado das decisões anteriores.
       const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, data, data);
-      return [
+      const batidas = [
         ...originais.filter((m) => !aj.desconsideradas.has(m.id)),
         ...aj.inclusoes.map((i) => ({ id: i.id, dtMarcacao: i.dtMarcacao, nsr: null as number | null })),
       ].sort((a, b) => a.dtMarcacao.getTime() - b.dtMarcacao.getTime());
+      return { batidas, pares, esperadas: pares.length * 2 };
     });
   }
 }

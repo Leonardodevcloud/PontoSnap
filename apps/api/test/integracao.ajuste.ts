@@ -103,8 +103,9 @@ async function main() {
   ok(decidiu, 'decidir grava e-mail longo sem estourar a coluna');
 
   // batidas do dia vêm só do dia pedido
-  const bat = await ajuste.batidasDoDia(t.id, emp.id, DATA);
-  ok(bat.length === 4, `dia efetivo do RH: 5 originais - 1 desconsiderada = ${bat.length}`);
+  const diaRh = await ajuste.batidasDoDia(t.id, emp.id, DATA);
+  ok(diaRh.batidas.length === 4, `dia efetivo do RH: 5 originais - 1 desconsiderada = ${diaRh.batidas.length}`);
+  ok(diaRh.esperadas === 4 && diaRh.pares.length === 2, `RH vê o horário previsto (${diaRh.esperadas} batidas em ${diaRh.pares.length} pares)`);
 
   // ---- cenário do dia todo esquecido: 4 pedidos, aprovados um a um ----
   const emp3 = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '22200000003', nome: 'Esqueceu Tudo', horarioContratualId: hor.id }).returning()))[0]!;
@@ -114,11 +115,11 @@ async function main() {
     const p = await ajuste.solicitar(t.id, { empregadoId: emp3.id, tipo: 'INCLUSAO', data: DATA, hora: h, tpMarc: 'E', observacao: `Esqueci de bater ${h}.` });
     ids.push(p!.id);
   }
-  ok((await ajuste.batidasDoDia(t.id, emp3.id, DATA)).length === 0, 'dia começa sem nenhuma batida');
+  ok((await ajuste.batidasDoDia(t.id, emp3.id, DATA)).batidas.length === 0, 'dia começa sem nenhuma batida');
 
   for (let i = 0; i < ids.length; i++) {
     await ajuste.decidir(t.id, ids[i]!, true, null, 'rh@empresa.com.br');
-    const agora = await ajuste.batidasDoDia(t.id, emp3.id, DATA);
+    const agora = (await ajuste.batidasDoDia(t.id, emp3.id, DATA)).batidas;
     ok(agora.length === i + 1, `após aprovar ${i + 1}º pedido, o dia mostra ${agora.length} batida(s)`);
   }
 
