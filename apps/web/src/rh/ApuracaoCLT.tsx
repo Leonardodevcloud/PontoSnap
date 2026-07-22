@@ -186,6 +186,7 @@ export function ApuracaoCLT() {
               esperadas={ap!.esperadas ?? 0}
               pares={ap!.horarioPares ?? []}
               nome={ap!.nome}
+              empregadoId={empregadoId}
               onFechar={() => setDiaAberto(null)}
             />
           )}
@@ -220,13 +221,14 @@ function VLinha({ k, v, forte, desc }: { k: string; v: string; forte?: boolean; 
 }
 
 /** Gaveta lateral com o detalhe de um dia: batidas, números e sinais. */
-function GavetaDia({ data, dia, batidas, esperadas, pares, nome, onFechar }: {
+function GavetaDia({ data, dia, batidas, esperadas, pares, nome, empregadoId, onFechar }: {
   data: string;
   dia?: ResultadoDiaCLT;
   batidas: BatidaDia[];
   esperadas: number;
   pares: { entrada: string; saida: string }[];
   nome: string;
+  empregadoId: string;
   onFechar: () => void;
 }) {
   useEffect(() => {
@@ -325,7 +327,7 @@ function GavetaDia({ data, dia, batidas, esperadas, pares, nome, onFechar }: {
         )}
 
         <div className={css.gAcoes}>
-          <Link to={`/rh/ajustes?empregado=${encodeURIComponent(nome)}&data=${data}`} className={css.gBtn}>Lançar ajuste neste dia</Link>
+          <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}`} className={css.gBtn}>Lançar ajuste neste dia</Link>
           <Link to={`/rh/espelhos?data=${data}`} className={css.gBtn2}>Abrir espelho</Link>
         </div>
       </aside>

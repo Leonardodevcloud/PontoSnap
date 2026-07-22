@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import css from './AjustesPonto.module.css';
 
@@ -47,6 +48,8 @@ export default function AjustesPonto() {
   const [recusando, setRecusando] = useState<string | null>(null);
   const [motivo, setMotivo] = useState('');
   const [enviando, setEnviando] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [lancando, setLancando] = useState(false);
 
   const carregar = useCallback(async () => {
     setErro(null);
@@ -61,6 +64,10 @@ export default function AjustesPonto() {
     } catch (e) { setErro((e as Error).message); }
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
+  // Veio da gaveta da Apuração (com funcionário e dia): já abre o lançamento.
+  useEffect(() => {
+    if (params.get('empregadoId') && params.get('data')) setLancando(true);
+  }, [params]);
 
   async function decidir(p: Pedido, aprovar: boolean) {
     if (!aprovar && !motivo.trim()) { setErro('Escreva o motivo da recusa.'); return; }
@@ -89,6 +96,7 @@ export default function AjustesPonto() {
           <h1 className={css.h}>Ajustes de ponto</h1>
           <p className={css.sub}>Pedidos dos funcionários. Nada muda na apuração até você decidir — e a batida original nunca é apagada.</p>
         </div>
+        <button className={css.novoBtn} onClick={() => setLancando(true)}>+ Lançar ajuste</button>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -185,6 +193,140 @@ export default function AjustesPonto() {
         })}
         </div>
       ))}
+
+      {lancando && (
+        <ModalLancar
+          empregadoIdInicial={params.get('empregadoId') ?? ''}
+          dataInicial={params.get('data') ?? ''}
+          onFechar={() => { setLancando(false); setParams({}); }}
+          onPronto={() => {
+            setLancando(false); setParams({});
+            setMsg('Ajuste lançado — já vale na apuração.');
+            void carregar();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+interface EmpLite { id: string; nome: string; ativo: boolean }
+interface BatidaLite { id: string; dtMarcacao: string; nsr: number | null }
+
+/**
+ * Lançamento direto do RH: nasce aprovado (não passa por decisão). É o caminho
+ * pra tirar uma batida a mais ou incluir uma que faltou sem esperar o pedido.
+ */
+function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
+  empregadoIdInicial: string; dataInicial: string; onFechar: () => void; onPronto: () => void;
+}) {
+  const [emps, setEmps] = useState<EmpLite[]>([]);
+  const [empregadoId, setEmpregadoId] = useState(empregadoIdInicial);
+  const [data, setData] = useState(dataInicial || new Date().toISOString().slice(0, 10));
+  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR'>('INCLUSAO');
+  const [hora, setHora] = useState('');
+  const [tpMarc, setTpMarc] = useState<'E' | 'S'>('E');
+  const [batidas, setBatidas] = useState<BatidaLite[]>([]);
+  const [alvo, setAlvo] = useState<string>('');
+  const [obs, setObs] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    api.get<EmpLite[]>('/empregados').then((l) => setEmps(l.filter((e) => e.ativo))).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!empregadoId || !data) { setBatidas([]); return; }
+    api.get<BatidaLite[]>(`/ajustes/batidas?empregadoId=${empregadoId}&data=${data}`)
+      .then((b) => { setBatidas(b); setAlvo(''); })
+      .catch(() => setBatidas([]));
+  }, [empregadoId, data]);
+
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  async function enviar() {
+    if (!empregadoId) { setErro('Escolha o funcionário.'); return; }
+    if (obs.trim().length < 5) { setErro('Escreva o motivo — fica registrado na auditoria.'); return; }
+    if (tipo === 'INCLUSAO' && !/^\d{2}:\d{2}$/.test(hora)) { setErro('Informe a hora (HH:MM).'); return; }
+    if (tipo === 'DESCONSIDERAR' && !alvo) { setErro('Escolha qual batida sai da conta.'); return; }
+    setErro(null); setEnviando(true);
+    try {
+      await api.post('/ajustes/lancar', {
+        empregadoId, tipo, data,
+        ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : { marcacaoId: alvo }),
+        observacao: obs.trim(),
+      });
+      onPronto();
+    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  }
+
+  return (
+    <>
+      <div className={css.fundoModal} onClick={onFechar} />
+      <div className={css.modal} role="dialog" aria-label="Lançar ajuste">
+        <div className={css.modalTop}>
+          <h2 className={css.modalH}>Lançar ajuste</h2>
+          <button className={css.gX} onClick={onFechar} aria-label="Fechar">✕</button>
+        </div>
+        <p className={css.modalSub}>Este lançamento já nasce valendo — não passa por aprovação. O motivo fica na auditoria.</p>
+
+        <span className={css.lb}>Funcionário</span>
+        <select className={css.inp} value={empregadoId} onChange={(e) => setEmpregadoId(e.target.value)}>
+          <option value="">— escolher —</option>
+          {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+        </select>
+
+        <span className={css.lb}>Dia</span>
+        <input className={css.inp} type="date" value={data} max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => setData(e.target.value)} />
+
+        <span className={css.lb}>O que fazer</span>
+        <div className={css.opts}>
+          <button className={`${css.optB} ${tipo === 'INCLUSAO' ? css.optOn : ''}`} onClick={() => setTipo('INCLUSAO')}>Incluir batida que faltou</button>
+          <button className={`${css.optB} ${tipo === 'DESCONSIDERAR' ? css.optOn : ''}`} onClick={() => setTipo('DESCONSIDERAR')}>Tirar batida a mais</button>
+        </div>
+
+        {tipo === 'INCLUSAO' ? (
+          <>
+            <span className={css.lb}>Horário</span>
+            <div className={css.dupla}>
+              <input className={css.inp} type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+              <select className={css.inp} value={tpMarc} onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
+                <option value="E">entrada</option>
+                <option value="S">saída</option>
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <span className={css.lb}>Qual batida sai da conta</span>
+            {batidas.length === 0 ? (
+              <p className={css.semBat}>Nenhuma batida neste dia.</p>
+            ) : (
+              <div className={css.batidas}>
+                {batidas.map((b) => (
+                  <button key={b.id} className={`${css.batB} ${alvo === b.id ? css.batOn : ''}`}
+                    onClick={() => setAlvo(b.id)} disabled={b.nsr == null}
+                    title={b.nsr == null ? 'Batida incluída por ajuste — remova pelo pedido de origem' : ''}>
+                    {hhmm(b.dtMarcacao)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        <span className={css.lb}>Motivo</span>
+        <textarea className={css.inp} rows={2} value={obs} onChange={(e) => setObs(e.target.value)}
+          placeholder="Ex.: batida duplicada confirmada com o funcionário." />
+
+        {erro && <p className={css.erroModal}>{erro}</p>}
+        <div className={css.acoes}>
+          <button className={css.ok2} onClick={enviar} disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar'}</button>
+          <button className={css.cancelar} onClick={onFechar}>Cancelar</button>
+        </div>
+      </div>
+    </>
   );
 }

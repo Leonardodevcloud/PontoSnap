@@ -48,3 +48,23 @@
 .grupoTop{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-bottom:11px; border-bottom:1px solid rgba(16,64,63,.08); margin-bottom:12px; }
 .contador{ font-family:var(--ff-mono); font-size:10px; background:var(--peach); color:var(--coral-dark); padding:2px 8px; border-radius:6px; }
 .grupo .ped{ border:1px solid rgba(16,64,63,.08); background:var(--cream); }
+
+/* Lançamento direto do RH */
+.novoBtn{ background:var(--coral); color:#fff; border:none; border-radius:var(--r-pill); padding:11px 19px; font:inherit; font-weight:800; font-size:14px; cursor:pointer; white-space:nowrap; }
+.fundoModal{ position:fixed; inset:0; background:rgba(16,64,63,.25); z-index:60; }
+.modal{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:min(460px,92vw); max-height:88vh; overflow-y:auto; background:var(--white); border-radius:20px; padding:22px 24px; z-index:70; box-shadow:0 20px 50px rgba(16,64,63,.2); }
+.modalTop{ display:flex; justify-content:space-between; align-items:flex-start; }
+.modalH{ font-family:var(--ff-display); font-weight:600; font-size:20px; margin:0; }
+.modalSub{ color:var(--ash); font-size:12.5px; margin:4px 0 16px; }
+.gX{ background:none; border:none; font-size:19px; color:var(--ash); cursor:pointer; line-height:1; padding:2px 6px; }
+.lb{ display:block; font-size:12px; font-weight:800; color:var(--ash); margin:12px 0 5px; }
+.opts{ display:flex; gap:8px; }
+.optB{ flex:1; font:inherit; font-size:12.5px; font-weight:800; padding:9px; border-radius:10px; border:1.5px solid rgba(16,64,63,.12); background:var(--cream); color:var(--ash); cursor:pointer; }
+.optOn{ background:var(--peach); border-color:var(--coral); color:var(--coral-dark); }
+.dupla{ display:flex; gap:8px; }
+.batidas{ display:flex; gap:7px; flex-wrap:wrap; }
+.batB{ font-family:var(--ff-mono); font-size:13px; padding:7px 12px; border-radius:9px; border:1.5px solid rgba(16,64,63,.12); background:var(--cream); color:var(--ink); cursor:pointer; }
+.batB:disabled{ opacity:.45; cursor:not-allowed; }
+.batOn{ background:#FFE9E3; border-color:var(--coral); color:var(--coral-dark); font-weight:800; }
+.semBat{ font-size:13px; color:var(--ash); margin:0; }
+.erroModal{ background:#FFE9E3; color:var(--coral-dark); border-radius:10px; padding:9px 12px; font-size:13px; margin:12px 0 0; }

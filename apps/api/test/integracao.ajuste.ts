@@ -28,6 +28,10 @@ async function main() {
   const emp = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '22200000001', nome: 'Zé Ajuste', horarioContratualId: hor.id }).returning()))[0]!;
 
   let nsr = 1;
+  const bate2 = async (cpf: string, d: Date) => (await comoMaster(db, (tx) => tx.insert(pontoMarcacao).values({
+    tenantId: t.id, repId: rep.id, nsr: nsr++, cpf, dtMarcacao: d, coletor: 1,
+    hashRegistro: nsr.toString(16).padStart(64, '0'),
+  }).returning()))[0]!;
   const bate = async (d: Date) => (await comoMaster(db, (tx) => tx.insert(pontoMarcacao).values({
     tenantId: t.id, repId: rep.id, nsr: nsr++, cpf: emp.cpf, dtMarcacao: d, coletor: 1,
     hashRegistro: nsr.toString(16).padStart(64, '0'),
@@ -132,6 +136,28 @@ async function main() {
   const bat2 = (apDet2 as never as { batidas: Record<string, { origem: string }[]> }).batidas[DATA] ?? [];
   ok(bat2.some((b) => b.origem === 'INCLUIDA'), 'a incluída por ajuste vem marcada');
   ok((apDet as never as { esperadas: number }).esperadas === 4, 'gaveta sabe quantas batidas o dia previa');
+
+  // ---- RH lança direto (sem pedido do funcionário) ----
+  const emp4 = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '22200000004', nome: 'RH Resolve', horarioContratualId: hor.id }).returning()))[0]!;
+  const m1 = await bate2(emp4.cpf, emUTC(11));
+  await bate2(emp4.cpf, emUTC(15));
+  const dupRh = await bate2(emp4.cpf, emUTC(15, 2));
+  await bate2(emp4.cpf, emUTC(16));
+  await bate2(emp4.cpf, emUTC(20));
+  void m1;
+
+  const antesRh = await trat.apurarPeriodoCLT(t.id, emp4.id, DATA, DATA, []);
+  ok(antesRh.resultado.dias.find((d) => d.data === DATA)?.paresIncompletos === true, 'RH: dia começa ímpar (5 batidas)');
+
+  const lanc = await ajuste.solicitar(t.id, {
+    empregadoId: emp4.id, tipo: 'DESCONSIDERAR', data: DATA, marcacaoId: dupRh.id,
+    observacao: 'Batida duplicada confirmada com o funcionário.',
+  }, 'RH');
+  ok(lanc!.status === 'APROVADO', `lançamento do RH já nasce valendo (${lanc!.status})`);
+  ok((await ajuste.pendentes(t.id)).every((p) => p.empregadoId !== emp4.id), 'lançamento do RH não entra na fila de decisão');
+
+  const depoisRh = await trat.apurarPeriodoCLT(t.id, emp4.id, DATA, DATA, []);
+  ok(depoisRh.resultado.dias.find((d) => d.data === DATA)?.paresIncompletos === false, 'RH: batida a mais saiu da conta na hora');
 
   console.log(falhas === 0 ? '\n>>> AJUSTE OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();
