@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { minutosParaHhMm, reaisDeCentavos } from '../lib/formato';
+import { Link } from 'react-router-dom';
+import { minutosParaHhMm, reaisDeCentavos, rotuloMarcacao } from '../lib/formato';
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
-import type { ApuracaoResp, Empregado } from '../tipos';
+import type { ApuracaoResp, Empregado, ResultadoDiaCLT, BatidaDia } from '../tipos';
 import css from './ApuracaoCLT.module.css';
 
 const mesAtual = () => new Date().toISOString().slice(0, 7);
@@ -26,6 +27,7 @@ const ROTULO_DESTINO: Record<string, string> = {
 const ehBanco = (d: string) => d === 'BANCO';
 
 export function ApuracaoCLT() {
+  const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [emps, setEmps] = useState<Empregado[]>([]);
   const [empregadoId, setEmpregadoId] = useState('');
   const [mes, setMes] = useState(mesAtual());
@@ -131,7 +133,12 @@ export function ApuracaoCLT() {
             {r.dias.map((d) => {
               const vazio = d.minutosTrabalhados === 0 && d.minutosContratados === 0 && d.faltaMin === 0;
               return (
-                <div key={d.data} className={`${css.linha} ${violSet.has(d.data) ? css.viol : ''} ${vazio ? css.diaVazio : ''}`}>
+                <div
+                  key={d.data} role="button" tabIndex={0}
+                  className={`${css.linha} ${css.clicavel} ${violSet.has(d.data) ? css.viol : ''} ${vazio ? css.diaVazio : ''} ${diaAberto === d.data ? css.linhaSel : ''}`}
+                  onClick={() => setDiaAberto(d.data)}
+                  onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setDiaAberto(d.data); } }}
+                >
                   <span className={css.data}>{fmtDia(d.data)} <em>{diaSemanaCurto(d.data)}</em></span>
                   <span className={css.mono}>{d.minutosTrabalhados ? minutosParaHhMm(d.minutosTrabalhados) : '—'}</span>
                   <span className={css.mono}>{d.minutosContratados ? minutosParaHhMm(d.minutosContratados) : '—'}</span>
@@ -171,6 +178,18 @@ export function ApuracaoCLT() {
             </div>
           )}
 
+          {diaAberto && (
+            <GavetaDia
+              data={diaAberto}
+              dia={r.dias.find((x) => x.data === diaAberto)}
+              batidas={ap!.batidas?.[diaAberto] ?? []}
+              esperadas={ap!.esperadas ?? 0}
+              pares={ap!.horarioPares ?? []}
+              nome={ap!.nome}
+              onFechar={() => setDiaAberto(null)}
+            />
+          )}
+
           <p className={css.disclaimer}>
             Regras aplicadas: <strong>{ap!.regras}</strong>. Escala considerada seg–sex quando não há configuração específica;
             feriados vêm do calendário do cliente. O <strong>reflexo de DSR é estimativa</strong> e os percentuais seguem a base
@@ -196,6 +215,129 @@ function VLinha({ k, v, forte, desc }: { k: string; v: string; forte?: boolean; 
     <div className={`${css.vLinha} ${forte ? css.vForte : ''}`}>
       <span className={desc ? css.vDesc : ''}>{k}</span>
       <strong className={desc ? css.vDesc : ''}>{v}</strong>
+    </div>
+  );
+}
+
+/** Gaveta lateral com o detalhe de um dia: batidas, números e sinais. */
+function GavetaDia({ data, dia, batidas, esperadas, pares, nome, onFechar }: {
+  data: string;
+  dia?: ResultadoDiaCLT;
+  batidas: BatidaDia[];
+  esperadas: number;
+  pares: { entrada: string; saida: string }[];
+  nome: string;
+  onFechar: () => void;
+}) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar(); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onFechar]);
+
+  const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const hor = (p: string) => `${p.slice(0, 2)}:${p.slice(2)}`;
+  // As desconsideradas não entram na contagem de rótulos: elas não valem na jornada.
+  const valendo = batidas.filter((b) => b.origem !== 'DESCONSIDERADA');
+  const diaSem = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][new Date(`${data}T12:00:00-0300`).getUTCDay()];
+
+  return (
+    <>
+      <div className={css.fundoGaveta} onClick={onFechar} />
+      <aside className={css.gaveta} role="dialog" aria-label={`Detalhe de ${data}`}>
+        <div className={css.gTop}>
+          <div>
+            <p className={css.gData}>{diaSem}, {fmtDia(data)}</p>
+            <p className={css.gSub}>
+              {nome}
+              {pares.length > 0 && ` · horário ${pares.map((p) => `${hor(p.entrada)}–${hor(p.saida)}`).join(' / ')}`}
+            </p>
+          </div>
+          <button className={css.gX} onClick={onFechar} aria-label="Fechar">✕</button>
+        </div>
+
+        <span className={css.gSecLb}>Batidas do dia</span>
+        {batidas.length === 0 ? (
+          <p className={css.gVazio}>
+            Nenhuma batida neste dia.
+            {dia?.faltaMin ? ' O dia está contando como falta.' : ''}
+          </p>
+        ) : (
+          <>
+            {(() => {
+              let iValendo = -1;
+              return batidas.map((b, i) => {
+                const desc = b.origem === 'DESCONSIDERADA';
+                if (!desc) iValendo++;
+                const rot = desc ? 'desconsiderada' : rotuloMarcacao(iValendo, esperadas || valendo.length);
+                return (
+                  <div key={`${b.dtMarcacao}-${i}`} className={css.gBat}>
+                    <span className={`${css.gDot} ${desc ? css.gDotOff : iValendo % 2 === 0 ? css.gDotE : css.gDotS}`} />
+                    <span className={`${css.gBatNome} ${desc ? css.gRiscado : ''}`}>{rot}</span>
+                    <span className={`${css.gBatHora} ${desc ? css.gRiscado : ''}`}>{hhmm(b.dtMarcacao)}</span>
+                    {b.origem === 'INCLUIDA' && <span className={css.gTagAj} title={b.motivo ?? ''}>ajuste</span>}
+                    {desc && <span className={css.gTagDesc} title={b.motivo ?? ''}>fora da conta</span>}
+                  </div>
+                );
+              });
+            })()}
+            {batidas.some((b) => b.origem !== 'ORIGINAL') && (
+              <p className={css.gObs}>
+                A batida marcada como <strong>ajuste</strong> entrou por pedido aprovado. A que está <strong>fora da conta</strong>
+                {' '}continua no arquivo fiscal, mas não conta na jornada.
+              </p>
+            )}
+          </>
+        )}
+
+        {dia && (
+          <>
+            <div className={css.gSep} />
+            <span className={css.gSecLb}>Números do dia</span>
+            <div className={css.gGrade}>
+              <Caixa k="trabalhado" v={dia.minutosTrabalhados ? minutosParaHhMm(dia.minutosTrabalhados) : '—'} />
+              <Caixa k="contratado" v={dia.minutosContratados ? minutosParaHhMm(dia.minutosContratados) : '—'} />
+              {dia.extras.map((e, i) => <Caixa key={i} k={`extra +${e.adicionalPct}%`} v={minutosParaHhMm(e.min)} bom />)}
+              {dia.minutosNoturnosLegais > 0 && <Caixa k="noturno" v={minutosParaHhMm(dia.minutosNoturnosLegais)} />}
+              {dia.atrasoMin > 0 && <Caixa k="atraso" v={minutosParaHhMm(dia.atrasoMin)} ruim />}
+              {dia.faltaMin > 0 && <Caixa k="falta" v={minutosParaHhMm(dia.faltaMin)} ruim />}
+              {dia.intervaloGozadoMin > 0 && <Caixa k="intervalo" v={minutosParaHhMm(dia.intervaloGozadoMin)} ruim={dia.penalidadeIntervaloMin > 0} />}
+              <Caixa k="saldo do dia" v={`${dia.saldoMin > 0 ? '+' : ''}${minutosParaHhMm(Math.abs(dia.saldoMin))}`} bom={dia.saldoMin > 0} ruim={dia.saldoMin < 0} />
+            </div>
+
+            {(dia.atrasoMin > 0 || dia.paresIncompletos || dia.penalidadeIntervaloMin > 0 || dia.violacaoInterjornada || dia.observacoes.length > 0) && (
+              <>
+                <div className={css.gSep} />
+                <span className={css.gSecLb}>Sinais</span>
+                <div className={css.gSinais}>
+                  {dia.atrasoMin > 0 && <span className={`${css.tag} ${css.tagAtraso}`}>atraso {minutosParaHhMm(dia.atrasoMin)}</span>}
+                  {dia.paresIncompletos && <span className={css.tag}>faltou bater</span>}
+                  {dia.penalidadeIntervaloMin > 0 && <span className={css.tag}>intervalo curto</span>}
+                  {dia.violacaoInterjornada && <span className={css.tag}>descanso &lt; 11h</span>}
+                </div>
+                {dia.penalidadeIntervaloMin > 0 && (
+                  <p className={css.gObs}>Intervalo abaixo do mínimo legal: a CLT manda pagar o período todo como extra (Art. 71 §4º). Já está no cálculo.</p>
+                )}
+                {dia.observacoes.map((o, i) => <p key={i} className={css.gObs}>{o}</p>)}
+              </>
+            )}
+          </>
+        )}
+
+        <div className={css.gAcoes}>
+          <Link to={`/rh/ajustes?empregado=${encodeURIComponent(nome)}&data=${data}`} className={css.gBtn}>Lançar ajuste neste dia</Link>
+          <Link to={`/rh/espelhos?data=${data}`} className={css.gBtn2}>Abrir espelho</Link>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function Caixa({ k, v, bom, ruim }: { k: string; v: string; bom?: boolean; ruim?: boolean }) {
+  return (
+    <div className={css.gBox}>
+      <span className={css.gBoxL}>{k}</span>
+      <span className={`${css.gBoxV} ${bom ? css.gBom : ''} ${ruim ? css.gRuim : ''}`}>{v}</span>
     </div>
   );
 }

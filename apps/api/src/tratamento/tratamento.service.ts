@@ -463,10 +463,35 @@ export class TratamentoService {
         bancoAtivo,
       });
 
+      // Batidas de cada dia com a origem: o RH precisa ver o dia inteiro,
+      // inclusive a que foi desconsiderada (que continua no AFD) e a que
+      // entrou por ajuste aprovado.
+      const batidas: Record<string, { dtMarcacao: Date; origem: 'ORIGINAL' | 'INCLUIDA' | 'DESCONSIDERADA'; motivo: string | null }[]> = {};
+      const põe = (d: string, item: { dtMarcacao: Date; origem: 'ORIGINAL' | 'INCLUIDA' | 'DESCONSIDERADA'; motivo: string | null }) => {
+        (batidas[d] ??= []).push(item);
+      };
+      for (const m of marcs) {
+        const desconsiderada = aj.desconsideradas.has(m.id);
+        põe(this.diaLocalISO(m.dtMarcacao, fuso), {
+          dtMarcacao: m.dtMarcacao,
+          origem: desconsiderada ? 'DESCONSIDERADA' : 'ORIGINAL',
+          motivo: desconsiderada ? (aj.desconsideradas.get(m.id) ?? null) : null,
+        });
+      }
+      for (const i of aj.inclusoes) {
+        põe(this.diaLocalISO(i.dtMarcacao, fuso), { dtMarcacao: i.dtMarcacao, origem: 'INCLUIDA', motivo: i.motivo });
+      }
+      for (const d of Object.keys(batidas)) {
+        batidas[d]!.sort((a, b) => a.dtMarcacao.getTime() - b.dtMarcacao.getTime());
+      }
+
       return {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
-        afastamentos, destinacao,
+        afastamentos, destinacao, batidas,
+        /** Batidas previstas pelo horário contratual (2 por par). */
+        esperadas: (horario?.pares?.length ?? 0) * 2,
+        horarioPares: horario?.pares ?? [],
       };
     });
   }

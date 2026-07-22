@@ -123,6 +123,16 @@ async function main() {
   ok(dEsq?.paresIncompletos === false && (dEsq?.minutosTrabalhados ?? 0) === 480,
     `dia todo reconstruído por ajuste: ${dEsq?.minutosTrabalhados}min, par completo`);
 
+  // ---- detalhe do dia pra gaveta da Apuração ----
+  const apDet = await trat.apurarPeriodoCLT(t.id, emp.id, DATA, DATA, []);
+  const detDia = (apDet as never as { batidas: Record<string, { origem: string }[]> }).batidas[DATA] ?? [];
+  ok(detDia.length === 5, `gaveta recebe as 5 batidas do dia, inclusive a fora da conta (${detDia.length})`);
+  ok(detDia.filter((b) => b.origem === 'DESCONSIDERADA').length === 1, 'a desconsiderada vem marcada');
+  const apDet2 = await trat.apurarPeriodoCLT(t.id, emp2.id, DATA, DATA, []);
+  const bat2 = (apDet2 as never as { batidas: Record<string, { origem: string }[]> }).batidas[DATA] ?? [];
+  ok(bat2.some((b) => b.origem === 'INCLUIDA'), 'a incluída por ajuste vem marcada');
+  ok((apDet as never as { esperadas: number }).esperadas === 4, 'gaveta sabe quantas batidas o dia previa');
+
   console.log(falhas === 0 ? '\n>>> AJUSTE OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();
   process.exit(falhas === 0 ? 0 : 1);

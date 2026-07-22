@@ -253,6 +253,17 @@ export interface ApuracaoResp {
   afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
   /** Pra onde vão faltas/atrasos/extras, segundo a regra do funcionário. */
   destinacao?: Destinacao;
+  /** Batidas de cada dia (chave = YYYY-MM-DD) com a origem de cada uma. */
+  batidas?: Record<string, BatidaDia[]>;
+  /** Batidas previstas pelo horário contratual (2 por par). */
+  esperadas?: number;
+  horarioPares?: { entrada: string; saida: string }[];
+}
+
+export interface BatidaDia {
+  dtMarcacao: string;
+  origem: 'ORIGINAL' | 'INCLUIDA' | 'DESCONSIDERADA';
+  motivo: string | null;
 }
 
 export interface Destinacao {
