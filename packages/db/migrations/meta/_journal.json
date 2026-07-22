@@ -176,6 +176,13 @@
       "when": 1784600600000,
       "tag": "0024_ajuste_ponto",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784600700000,
+      "tag": "0025_ajuste_decidido_por",
+      "breakpoints": true
     }
   ]
 }

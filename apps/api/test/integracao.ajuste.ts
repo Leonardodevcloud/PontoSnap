@@ -56,7 +56,7 @@ async function main() {
   const meio = await trat.apurarPeriodoCLT(t.id, emp.id, DATA, DATA, []);
   ok(meio.resultado.dias.find((d) => d.data === DATA)?.paresIncompletos === true, 'em análise não muda a apuração');
 
-  await ajuste.decidir(t.id, pedido!.id, true, null, 'rh@empresa');
+  await ajuste.decidir(t.id, pedido!.id, true, null, 'leonardo.santos@pontosnap.online');
   const depois = await trat.apurarPeriodoCLT(t.id, emp.id, DATA, DATA, []);
   const diaDepois = depois.resultado.dias.find((d) => d.data === DATA);
   ok(diaDepois?.paresIncompletos === false, `aprovado: batida a mais sai da conta (par completo=${!diaDepois?.paresIncompletos})`);
@@ -74,7 +74,7 @@ async function main() {
   const recusaSemMotivo = await ajuste.decidir(t.id, p2!.id, false, null, 'rh').catch(() => 'recusou');
   ok(recusaSemMotivo === 'recusou', 'recusa sem motivo é bloqueada');
 
-  await ajuste.decidir(t.id, p2!.id, true, null, 'rh@empresa');
+  await ajuste.decidir(t.id, p2!.id, true, null, 'leonardo.santos@pontosnap.online');
   const ap2 = await trat.apurarPeriodoCLT(t.id, emp2.id, DATA, DATA, []);
   const d2 = ap2.resultado.dias.find((d) => d.data === DATA);
   ok(d2?.paresIncompletos === false, `inclusão fecha o par (incompleto=${d2?.paresIncompletos})`);
@@ -92,6 +92,15 @@ async function main() {
   await trat.apurarDia(t.id, emp2.id, DATA);
   const aej2 = (await fiscal.gerarAej(t.id)).conteudo.toString('latin1');
   ok(aej2.split('\r\n').some((l) => l.startsWith('05|') && l.split('|')[6] === 'I'), 'AEJ marca a batida esquecida como I (incluída)');
+
+  // e-mail longo de verdade na trilha (regressão do 500 em decidido_por)
+  const pend2 = await ajuste.solicitar(t.id, { empregadoId: emp2.id, tipo: 'INCLUSAO', data: DATA, hora: '18:00', tpMarc: 'S', observacao: 'Outro teste de decisão.' });
+  const decidiu = await ajuste.decidir(t.id, pend2!.id, true, null, 'administrador.geral@empresa-com-nome-longo.com.br').then(() => true).catch(() => false);
+  ok(decidiu, 'decidir grava e-mail longo sem estourar a coluna');
+
+  // batidas do dia vêm só do dia pedido
+  const bat = await ajuste.batidasDoDia(t.id, emp.id, DATA);
+  ok(bat.length === 5, `batidasDoDia traz só as 5 do dia (${bat.length})`);
 
   console.log(falhas === 0 ? '\n>>> AJUSTE OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();

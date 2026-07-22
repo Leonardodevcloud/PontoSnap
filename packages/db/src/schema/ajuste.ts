@@ -26,7 +26,7 @@ export const pontoAjuste = pgTable('ponto_ajuste', {
   status: varchar('status', { length: 12 }).notNull().default('EM_ANALISE').$type<StatusAjuste>(),
   origem: varchar('origem', { length: 12 }).notNull().default('FUNCIONARIO'),
   motivoDecisao: varchar('motivo_decisao', { length: 200 }),
-  decididoPor: varchar('decidido_por', { length: 14 }),
+  decididoPor: varchar('decidido_por', { length: 160 }),
   decididoEm: timestamp('decidido_em', { withTimezone: true }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });

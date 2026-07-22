@@ -23,3 +23,22 @@
 .cancelar{ background:transparent; color:var(--ash); border:none; font:inherit; font-size:13px; font-weight:700; cursor:pointer; text-decoration:underline; }
 .recusa{ margin-top:11px; }
 .inp{ width:100%; background:var(--cream); border:1.5px solid rgba(16,64,63,.12); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); }
+
+/* Comparação antes/depois do dia */
+.comparaWrap{ display:flex; align-items:flex-start; gap:14px; background:var(--cream); border-radius:12px; padding:13px 15px; margin:4px 0 10px; flex-wrap:wrap; }
+.coluna{ flex:1; min-width:210px; }
+.colLb{ display:block; font-family:var(--ff-mono); font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ash); margin-bottom:8px; }
+.linhaBat{ display:flex; gap:7px; flex-wrap:wrap; }
+.bat{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; background:var(--white); border:1.5px solid rgba(16,64,63,.12); border-radius:10px; padding:5px 10px; min-width:62px; }
+.batPapel{ font-family:var(--ff-mono); font-size:8.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--ash); }
+.batHora{ font-family:var(--ff-mono); font-size:13.5px; font-weight:700; color:var(--ink); }
+.batSai{ background:#FFE9E3; border-color:rgba(255,107,74,.35); }
+.batSai .batHora{ color:var(--coral-dark); text-decoration:line-through; }
+.batEntra{ background:var(--lime); border-color:rgba(16,64,63,.25); }
+.batEntra .batHora{ color:var(--ink); }
+.seta{ align-self:center; color:var(--ash); font-size:18px; }
+.semBat{ font-size:13px; color:var(--ash); }
+.avisoImpar{ display:inline-block; margin-top:7px; font-size:11.5px; color:var(--coral-dark); font-weight:700; }
+.avisoOk{ display:inline-block; margin-top:7px; font-size:11.5px; color:#0FA968; font-weight:700; }
+.detalhe{ font-size:12.5px; color:var(--ash); margin:0 0 10px; line-height:1.5; }
+.divergiu{ color:var(--coral-dark); font-weight:700; }

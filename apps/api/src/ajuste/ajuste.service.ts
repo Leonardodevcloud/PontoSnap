@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
-import { pontoAjuste, empregado, pontoMarcacao, pontoRep, usuario, comTenant, type Db } from '@ponto/db';
+import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
+import { pontoAjuste, empregado, pontoMarcacao, pontoRep, usuario, tenant, comTenant, type Db } from '@ponto/db';
+import { inicioDoDia, fimDoDia } from '@ponto/rep-core';
 import { DB } from '../database/database.module';
 
 export interface NovoAjuste {
@@ -131,24 +132,26 @@ export class AjusteService {
       const [a] = await tx.update(pontoAjuste).set({
         status: aprovar ? 'APROVADO' : 'RECUSADO',
         motivoDecisao: motivo?.trim() ?? null,
-        decididoPor: quem, decididoEm: new Date(),
+        decididoPor: quem.slice(0, 160), decididoEm: new Date(),
       }).where(and(eq(pontoAjuste.id, id), eq(pontoAjuste.tenantId, tenantId))).returning();
       return a;
     });
   }
 
-  /** Batidas do dia, pra o funcionário escolher qual desconsiderar. */
-  async batidasDoDia(tenantId: string, empregadoId: string, data: string, fuso = '-0300') {
+  /** Batidas do dia (só daquele dia, no fuso do tenant), em ordem. */
+  async batidasDoDia(tenantId: string, empregadoId: string, data: string) {
     return comTenant(this.db, tenantId, async (tx) => {
       const emp = (await tx.select({ cpf: empregado.cpf }).from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!emp) throw new NotFoundException('Empregado não encontrado');
       const rep = (await tx.select({ id: pontoRep.id }).from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) return [];
-      void fuso;
+      const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
       return tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao, nsr: pontoMarcacao.nsr })
         .from(pontoMarcacao)
-        .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf)));
+        .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
+          gte(pontoMarcacao.dtMarcacao, inicioDoDia(data, fuso)), lte(pontoMarcacao.dtMarcacao, fimDoDia(data, fuso))))
+        .orderBy(asc(pontoMarcacao.dtMarcacao));
     });
   }
 }
