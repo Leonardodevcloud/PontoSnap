@@ -12,9 +12,16 @@ describe('rótulo das marcações', () => {
     expect(doDia(2)).toEqual(['Entrada', 'Saída']);
   });
 
-  it('três pares (6 marcações)', () => {
+  it('três pares (6 marcações): numera os intervalos pra não repetir rótulo', () => {
     expect(doDia(6)).toEqual([
-      'Entrada', 'Saída descanso', 'Retorno descanso', 'Saída descanso', 'Retorno descanso', 'Saída',
+      'Entrada', 'Saída descanso 1', 'Retorno descanso 1', 'Saída descanso 2', 'Retorno descanso 2', 'Saída',
+    ]);
+  });
+
+  it('dia ímpar: a última é retorno em aberto, NÃO "Saída"', () => {
+    // 5 batidas (ex.: uma inclusão por ajuste) — a 5ª ainda está em aberto
+    expect(doDia(5)).toEqual([
+      'Entrada', 'Saída descanso 1', 'Retorno descanso 1', 'Saída descanso 2', 'Retorno descanso 2',
     ]);
   });
 
@@ -26,7 +33,7 @@ describe('rótulo das marcações', () => {
 
   it('sem horário contratual, rotula pelo que já foi batido', () => {
     expect(doDia(1)).toEqual(['Entrada']);
-    expect(doDia(3)).toEqual(['Entrada', 'Saída descanso', 'Saída']);
+    expect(doDia(3)).toEqual(['Entrada', 'Saída descanso', 'Retorno descanso']);
   });
 
   it('próxima marcação: o botão diz o que vai gravar', () => {

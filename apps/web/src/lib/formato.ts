@@ -45,10 +45,19 @@ export function minutosParaHhMm(min: number): string {
  */
 export function rotuloMarcacao(i: number, total: number): string {
   if (i === 0) return 'Entrada';
-  const ultimo = total - 1;
-  if (i > ultimo) return i % 2 === 1 ? 'Saída' : 'Entrada'; // excedente: o RH trata
-  if (i === ultimo) return 'Saída';
-  return i % 2 === 1 ? 'Saída descanso' : 'Retorno descanso';
+  // Batida além do previsto (ex.: voltou pra hora extra): alterna simples.
+  if (i > total - 1) return i % 2 === 1 ? 'Saída' : 'Entrada';
+  // A ordem manda: índice ímpar é saída, par é entrada/retorno. Só chamamos de
+  // "Saída" (fim do expediente) a última batida de um dia fechado — num dia
+  // ímpar a última é um retorno ainda em aberto.
+  const ehSaida = i % 2 === 1;
+  const ehUltima = i === total - 1;
+  if (ehSaida && ehUltima && total % 2 === 0) return 'Saída';
+  // Dia com mais de um intervalo: numera pra não repetir o mesmo rótulo.
+  const intervalos = total % 2 === 0 ? (total - 2) / 2 : (total - 1) / 2;
+  const nesimo = Math.ceil(i / 2);
+  const sufixo = intervalos > 1 ? ` ${nesimo}` : '';
+  return ehSaida ? `Saída descanso${sufixo}` : `Retorno descanso${sufixo}`;
 }
 
 /** Rótulo da PRÓXIMA marcação. `jaBatidas` = quantas já existem hoje. */
