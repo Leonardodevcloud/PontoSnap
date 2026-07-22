@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import {
-  pontoRep, pontoMarcacao, empregado, pontoHorarioContratual, pontoTratamento, pontoAusencia, tenant,
+  pontoRep, pontoMarcacao, empregado, pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoBancoMov, tenant,
   comTenant, type Db,
 } from '@ponto/db';
 import { montarAFD, montarAEJ, assinarCAdESDestacado, inicioDoDia, fimDoDia } from '@ponto/rep-core';
@@ -9,6 +9,14 @@ import type { MarcacaoGravada } from '@ponto/shared';
 import { Coletor, OnlineOffline } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { CertificadoService } from '../certificado/certificado.service';
+
+// Registro 07 do AEJ — movimento de banco de horas.
+// tipoMovBH: 1 = crédito ao banco, 2 = débito do banco.
+// ⚠️ O código de "tipo" do registro de banco deve ser conferido contra o leiaute
+// oficial do AEJ (item A3 do checklist) antes de gerar em produção.
+const TIPO_AEJ_MOV_BANCO = 5;
+const MOV_BH_CREDITO = 1;
+const MOV_BH_DEBITO = 2;
 
 /** Período por datas locais "YYYY-MM-DD". Os limites em instante UTC são
  *  construídos no service, com o fuso do tenant. */
@@ -76,6 +84,15 @@ export class FiscalService {
       const tratamentos = await tx.select().from(pontoTratamento)
         .where(eq(pontoTratamento.tenantId, tenantId)).orderBy(asc(pontoTratamento.dtMarcacao));
       const ausencias = await tx.select().from(pontoAusencia).where(eq(pontoAusencia.tenantId, tenantId));
+      // Ponte: os movimentos de banco calculados pelas regras (pontoBancoMov)
+      // entram no AEJ como registro 07 de banco de horas (tipoMovBH 1=crédito,
+      // 2=débito). É a fonte única do banco no arquivo — pontoAusencia fica só
+      // pras ausências/folgas (por isso o tipoMovBH delas não é emitido).
+      const bancoMovs = await tx.select().from(pontoBancoMov).where(eq(pontoBancoMov.tenantId, tenantId));
+      const ausenciasBanco = bancoMovs.map((m) => ({
+        empregadoId: m.empregadoId, tipo: TIPO_AEJ_MOV_BANCO, data: m.data,
+        qtMinutos: Math.abs(m.minutos), tipoMovBh: m.tipo === 'CREDITO' ? MOV_BH_CREDITO : MOV_BH_DEBITO,
+      }));
       return montarAEJ({
         rep: {
           tipoIdEmpregador: rep.tipoIdEmpregador, documentoEmpregador: rep.documentoEmpregador,
@@ -89,10 +106,16 @@ export class FiscalService {
           cpf: cpfPorId.get(t.empregadoId) ?? '', dtMarcacao: t.dtMarcacao, tpMarc: t.tpMarc,
           seqEntSaida: t.seqEntSaida, fonteMarc: t.fonteMarc, codHorContratual: t.codHorContratual, motivo: t.motivo,
         })),
-        ausencias: ausencias.map((a) => ({
-          cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(a.data),
-          qtMinutos: a.qtMinutos, tipoMovBH: a.tipoMovBh,
-        })),
+        ausencias: [
+          ...ausencias.map((a) => ({
+            cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(a.data),
+            qtMinutos: a.qtMinutos, tipoMovBH: null,
+          })),
+          ...ausenciasBanco.map((a) => ({
+            cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(a.data),
+            qtMinutos: a.qtMinutos, tipoMovBH: a.tipoMovBh,
+          })),
+        ],
         fuso: fusoTenant,
       });
     });
