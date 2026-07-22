@@ -9,6 +9,44 @@ import css from './Funcionarios.module.css';
 
 const fmtCpf = (c: string) => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
+type TipoItem = 'EXTRA' | 'TOLERANCIA' | 'NOTURNO' | 'JORNADA' | 'BANCO' | 'DESTINACAO';
+interface ItemRegra { id: string; tipo: TipoItem; nome: string; config: Record<string, unknown>; padrao: boolean; }
+
+const PECAS: { tipo: TipoItem; campo: keyof Empregado; lb: string }[] = [
+  { tipo: 'EXTRA', campo: 'regraExtraId', lb: 'extra' },
+  { tipo: 'TOLERANCIA', campo: 'regraToleranciaId', lb: 'tolerância' },
+  { tipo: 'NOTURNO', campo: 'regraNoturnoId', lb: 'noturno' },
+  { tipo: 'JORNADA', campo: 'regraJornadaId', lb: 'jornada' },
+  { tipo: 'BANCO', campo: 'regraBancoId', lb: 'banco' },
+  { tipo: 'DESTINACAO', campo: 'regraDestinacaoId', lb: 'destinação' },
+];
+
+/** Valor curto da peça, pra caber no chip. */
+function valorPeca(tipo: TipoItem, c: Record<string, unknown>): string {
+  const n = (k: string) => Number(c[k]);
+  switch (tipo) {
+    case 'EXTRA': return `${n('extraDiaUtilPct')}% útil`;
+    case 'TOLERANCIA': return `${n('toleranciaDiariaMin')}/${n('toleranciaPorMarcacaoMin')} min`;
+    case 'NOTURNO': return `${n('noturnoAdicionalPct')}%`;
+    case 'JORNADA': return `${Math.round(n('jornadaSemanalMin') / 60)}h semana`;
+    case 'BANCO': return c.bancoModo === 'ATIVO' ? `${c.bancoTipoAcordo === 'COLETIVO' ? 'Coletivo' : 'Individual'} ${n('bancoPrazoMeses')}m`
+      : c.bancoModo === 'INATIVO' ? 'sem banco' : 'herda empresa';
+    case 'DESTINACAO': return `falta ${String(c.destinacaoFaltas ?? '').toLowerCase()}`;
+  }
+}
+
+/** O que está VALENDO na peça: escolha do funcionário → padrão do item → CLT. */
+function pecaEfetiva(e: Empregado, p: { tipo: TipoItem; campo: keyof Empregado }, itens: ItemRegra[]): { texto: string; propria: boolean } {
+  const id = e[p.campo] as string | null | undefined;
+  const escolhido = id ? itens.find((i) => i.id === id) : undefined;
+  if (escolhido) return { texto: valorPeca(p.tipo, escolhido.config), propria: true };
+  const padrao = itens.find((i) => i.tipo === p.tipo && i.padrao);
+  if (padrao) return { texto: valorPeca(p.tipo, padrao.config), propria: false };
+  return { texto: p.tipo === 'BANCO' ? 'herda empresa' : 'CLT padrão', propria: false };
+}
+
+const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
+
 export function Funcionarios() {
   const [lista, setLista] = useState<Empregado[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -20,6 +58,9 @@ export function Funcionarios() {
   const [convencaoPara, setConvencaoPara] = useState<Empregado | null>(null);
   const [convDocPara, setConvDocPara] = useState<Empregado | null>(null);
   const [convMap, setConvMap] = useState<Record<string, string>>({});
+  const [itens, setItens] = useState<ItemRegra[]>([]);
+  const [busca, setBusca] = useState('');
+  const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS'>('TODOS');
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
   const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
@@ -31,6 +72,7 @@ export function Funcionarios() {
   useEffect(() => { void carregar(); }, []);
   useEffect(() => {
     api.get<{ id: string; nome: string }[]>('/convencoes').then((cs) => setConvMap(Object.fromEntries(cs.map((c) => [c.id, c.nome])))).catch(() => {});
+    api.get<ItemRegra[]>('/regra-itens').then(setItens).catch(() => {});
   }, [convencaoPara, convDocPara]);
 
   async function alternarAtivo(e: Empregado) {
@@ -39,6 +81,19 @@ export function Funcionarios() {
   }
 
   const ativos = lista?.filter((e) => e.ativo).length ?? 0;
+
+  const temAlgumaPeca = (e: Empregado) =>
+    PECAS.some((p) => !!e[p.campo]) || !!e.convencaoId;
+
+  const visiveis = lista?.filter((e) => {
+    const q = busca.trim().toLowerCase();
+    if (q && !`${e.nome} ${e.cpf} ${e.matricula ?? ''}`.toLowerCase().includes(q)) return false;
+    if (filtro === 'INATIVOS') return !e.ativo;
+    if (!e.ativo) return false;
+    if (filtro === 'MONTADAS') return temAlgumaPeca(e);
+    if (filtro === 'PADRAO') return !temAlgumaPeca(e);
+    return true;
+  });
 
   return (
     <div onClick={() => setMenu(null)}>
@@ -52,39 +107,56 @@ export function Funcionarios() {
 
       {erro && <p className={css.erro}>{erro}</p>}
 
-      <div className={css.table}>
-        <div className={`${css.row} ${css.thead}`}>
-          <span>Nome</span><span>Matrícula</span><span>CPF</span><span>Horário</span><span>Status</span><span>PIN</span><span></span>
-        </div>
-        {lista?.length === 0 && <div className={css.vazio}>Ninguém cadastrado ainda. Adiciona o primeiro funcionário.</div>}
-        {lista?.map((e) => (
-          <div key={e.id} className={css.row}>
-            <span className={css.nome}>{e.nome}
-              <small className={css.regraConv}>
-                {[e.regraExtraId, e.regraToleranciaId, e.regraNoturnoId, e.regraJornadaId, e.regraBancoId, e.regraDestinacaoId].some(Boolean) ? 'regras montadas' : 'CLT padrão'}
-                {e.convencaoId ? ` · 📄 ${convMap[e.convencaoId] ?? 'Convenção'}` : ''}
-              </small>
-            </span>
-            <span className={css.mono}>{e.matricula ?? '—'}</span>
-            <span className={css.mono}>{fmtCpf(e.cpf)}</span>
-            <span className={css.muted}>{e.horarioContratualId ? 'vinculado' : '—'}</span>
-            <span className={`${css.status} ${e.ativo ? css.ativo : css.inativo}`}><span className={css.sdot} />{e.ativo ? 'Ativo' : 'Inativo'}</span>
-            <span className={`${css.pin} ${e.temPin ? css.sim : css.nao}`}>{e.temPin ? '✓' : '—'}</span>
-            <span className={css.kebabWrap} onClick={(ev) => { ev.stopPropagation(); setMenu(menu === e.id ? null : e.id); }}>
-              <button className={css.kebab} aria-label="Ações">⋯</button>
-              {menu === e.id && (
-                <div className={css.menu} onClick={(ev) => ev.stopPropagation()}>
-                  <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
-                  <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
-                  <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
-                  <button onClick={() => { setConvencaoPara(e); setMenu(null); }}>Definir regra</button>
-                  <button onClick={() => { setConvDocPara(e); setMenu(null); }}>Definir convenção</button>
-                  <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
-                  <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
-                  <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
-                </div>
-              )}
-            </span>
+      <div className={css.filtros}>
+        <input className={css.busca} placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
+        {([['TODOS', 'Todos'], ['MONTADAS', 'Regras montadas'], ['PADRAO', 'Só CLT padrão'], ['INATIVOS', 'Inativos']] as const).map(([k, rot]) => (
+          <button key={k} className={`${css.chipF} ${filtro === k ? css.chipFOn : ''}`} onClick={() => setFiltro(k)}>{rot}</button>
+        ))}
+      </div>
+
+      <div className={css.cards}>
+        {visiveis?.length === 0 && <div className={css.vazio}>{lista?.length === 0 ? 'Ninguém cadastrado ainda. Adiciona o primeiro funcionário.' : 'Nenhum funcionário com esse filtro.'}</div>}
+        {visiveis?.map((e) => (
+          <div key={e.id} className={css.card}>
+            <div className={css.linha1}>
+              <span className={css.avatar}>{iniciais(e.nome)}</span>
+              <span className={css.quem}>
+                <span className={css.nomeC}>{e.nome}</span>
+                <span className={css.metaC}>mat. {e.matricula ?? '—'} · {fmtCpf(e.cpf)} · {e.horarioContratualId ? 'horário vinculado' : 'sem horário'}</span>
+              </span>
+              <span className={`${css.status} ${e.ativo ? css.ativo : css.inativo}`}><span className={css.sdot} />{e.ativo ? 'Ativo' : 'Inativo'}</span>
+              <span className={css.pinC}>{e.temPin ? 'PIN ✓' : 'sem PIN'}</span>
+              <span className={css.kebabWrap} onClick={(ev) => { ev.stopPropagation(); setMenu(menu === e.id ? null : e.id); }}>
+                <button className={css.kebab} aria-label="Ações">⋯</button>
+                {menu === e.id && (
+                  <div className={css.menu} onClick={(ev) => ev.stopPropagation()}>
+                    <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
+                    <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
+                    <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
+                    <button onClick={() => { setConvencaoPara(e); setMenu(null); }}>Definir regra</button>
+                    <button onClick={() => { setConvDocPara(e); setMenu(null); }}>Definir convenção</button>
+                    <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
+                    <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
+                    <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
+                  </div>
+                )}
+              </span>
+            </div>
+
+            <div className={css.pecas}>
+              {e.convencaoId
+                ? <span className={css.conv}>📄 {convMap[e.convencaoId] ?? 'Convenção'}</span>
+                : <span className={`${css.conv} ${css.semConv}`}>sem convenção</span>}
+              {PECAS.map((p) => {
+                const v = pecaEfetiva(e, p, itens);
+                return (
+                  <span key={p.tipo} className={`${css.peca} ${v.propria ? '' : css.pecaCLT}`}>
+                    <span className={css.pLb}>{p.lb}</span><span className={css.pVal}>{v.texto}</span>
+                  </span>
+                );
+              })}
+              <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setConvencaoPara(e); }}>editar regras</button>
+            </div>
           </div>
         ))}
       </div>
