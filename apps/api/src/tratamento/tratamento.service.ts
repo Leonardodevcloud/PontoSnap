@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, tenant,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -11,6 +11,7 @@ import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type Resul
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio } from '@ponto/rep-core';
 import { montarRegrasApuracao } from './montar-regras';
 import { resolverItens } from './resolver-itens';
+import { ajustesAprovados, aplicarAjustes } from './ajustes';
 import { resumirDestinacao } from './destinacao';
 import ExcelJS from 'exceljs';
 
@@ -108,19 +109,37 @@ export class TratamentoService {
       const durJornada = horario?.durJornadaMin ?? 0;
 
       let criados = 0;
-      for (let i = 0; i < marcs.length; i++) {
-        const m = marcs[i]!;
+      // Ajustes aprovados do dia. As desconsideradas continuam indo pro AEJ,
+      // mas marcadas como 'D'; as incluídas entram com fonte 'I'. A sequência
+      // E/S é contada só sobre as batidas que valem.
+      const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, dataStr, dataStr);
+      const efetivas = aplicarAjustes(marcs, aj);
+
+      for (let i = 0; i < efetivas.length; i++) {
+        const e = efetivas[i]!;
         const tpMarc = i % 2 === 0 ? 'E' : 'S';
         const seq = Math.floor(i / 2) + 1;
+        const inc = e.origem === 'INCLUIDA';
         await tx.insert(pontoTratamento).values({
-          tenantId, empregadoId, marcacaoId: m.id, dtMarcacao: m.dtMarcacao,
-          tpMarc, seqEntSaida: seq, fonteMarc: 'O',
+          tenantId, empregadoId, marcacaoId: e.marcacaoId ?? null, dtMarcacao: e.dtMarcacao,
+          tpMarc, seqEntSaida: seq, fonteMarc: inc ? 'I' : 'O',
+          motivo: inc ? (e.motivo ?? 'Batida incluída por ajuste aprovado') : null,
           codHorContratual: tpMarc === 'E' && seq === 1 ? codHor : null,
         });
         criados++;
       }
+      // As desconsideradas entram como 'D' (o AEJ registra que existiram).
+      for (const m of marcs) {
+        if (!aj.desconsideradas.has(m.id)) continue;
+        await tx.insert(pontoTratamento).values({
+          tenantId, empregadoId, marcacaoId: m.id, dtMarcacao: m.dtMarcacao,
+          tpMarc: 'D', seqEntSaida: 0, fonteMarc: 'O',
+          motivo: aj.desconsideradas.get(m.id) ?? 'Marcação desconsiderada por ajuste aprovado',
+        });
+        criados++;
+      }
 
-      const resumo = apurarJornada(marcs.map((m) => m.dtMarcacao), durJornada);
+      const resumo = apurarJornada(efetivas.map((e) => e.dtMarcacao), durJornada);
       return {
         empregadoId, data: dataStr, marcacoes: marcs.length, tratamentosCriados: criados,
         avisoImpar: resumo.paresIncompletos ? 'Número ímpar de batidas — falta uma saída/entrada' : null,
@@ -145,6 +164,7 @@ export class TratamentoService {
       const inicio = inicioDoDia(dataStr, fuso);
       const fim = fimDoDia(dataStr, fuso);
       const marcs = await tx.select({
+        id: pontoMarcacao.id,
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao,
         dtGravacao: pontoMarcacao.dtGravacao,
         latitude: pontoMarcacao.latitude, longitude: pontoMarcacao.longitude,
@@ -155,6 +175,11 @@ export class TratamentoService {
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
           gte(pontoMarcacao.dtMarcacao, inicio), lte(pontoMarcacao.dtMarcacao, fim)))
         .orderBy(asc(pontoMarcacao.dtMarcacao));
+
+      // Ajustes aprovados do dia: marcam o que foi desconsiderado e trazem as
+      // batidas incluídas (que não existem em ponto_marcacao).
+      const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, dataStr, dataStr);
+      const efetivas = aplicarAjustes(marcs, aj);
 
       const dur = emp.horarioContratualId
         ? (await tx.select().from(pontoHorarioContratual)
@@ -179,9 +204,15 @@ export class TratamentoService {
             // veio do relógio do aparelho, não do servidor.
             offline: m.onlineOffline === 1,
             defasagemSeg: m.defasagemSeg ?? null,
+            marcacaoId: m.id,
+            // Desconsiderada por ajuste aprovado: continua no AFD, mas não conta.
+            desconsiderada: aj.desconsideradas.has(m.id),
+            motivoAjuste: aj.desconsideradas.get(m.id) ?? null,
           };
         }),
-        resumo: apurarJornada(marcs.map((m) => m.dtMarcacao), dur),
+        // Batidas incluídas por ajuste aprovado (não existem no AFD original).
+        incluidas: aj.inclusoes.map((i) => ({ dtMarcacao: i.dtMarcacao, tpMarc: i.tpMarc, motivo: i.motivo })),
+        resumo: apurarJornada(efetivas.map((m) => m.dtMarcacao), dur),
       };
     });
   }
@@ -273,10 +304,15 @@ export class TratamentoService {
       const inicio = inicioDoDia(inicioStr, fuso);
       const fim = fimDoDia(fimStr, fuso);
 
-      const marcs = await tx.select({ dtMarcacao: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
+      const marcs = await tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
           gte(pontoMarcacao.dtMarcacao, inicio), lte(pontoMarcacao.dtMarcacao, fim)))
         .orderBy(asc(pontoMarcacao.dtMarcacao));
+
+      // Ajustes aprovados: tira as batidas desconsideradas, soma as incluídas.
+      // O AFD segue intocado — isto vale só pro cálculo e pro espelho.
+      const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, inicioStr, fimStr);
+      const efetivas = aplicarAjustes(marcs, aj);
 
       const horario = emp.horarioContratualId
         ? (await tx.select().from(pontoHorarioContratual)
@@ -335,9 +371,9 @@ export class TratamentoService {
         eq(pontoFeriado.tenantId, tenantId), gte(pontoFeriado.data, inicioStr), lte(pontoFeriado.data, fimStr)));
       const feriadoSet = new Set<string>([...feriados, ...feriadosBanco.map((f) => f.data)]);
 
-      // agrupa as batidas por dia local
+      // agrupa as batidas EFETIVAS (com ajustes aprovados) por dia local
       const porDia = new Map<string, Date[]>();
-      for (const m of marcs) {
+      for (const m of efetivas) {
         const dataLocal = this.diaLocalISO(m.dtMarcacao, fuso);
         const arr = porDia.get(dataLocal) ?? [];
         arr.push(m.dtMarcacao);
@@ -611,6 +647,13 @@ export class TratamentoService {
         eq(pontoAfastamento.tenantId, tenantId), lte(pontoAfastamento.dataInicio, hojeISO), gte(pontoAfastamento.dataFim, hojeISO)));
       const dispensados = new Set<string>([...folgasHoje.map((f) => f.e), ...afastHoje.map((a) => a.e)]);
 
+      // Pedidos de ajuste de ponto aguardando decisão do RH.
+
+      const ajustesPend = await tx.select({ id: pontoAjuste.id }).from(pontoAjuste).where(and(
+
+        eq(pontoAjuste.tenantId, tenantId), eq(pontoAjuste.status, 'EM_ANALISE')));
+
+
       const naoBateram = emps
         .filter((e) => {
           if (presentes.has(e.cpf)) return false;         // já bateu
@@ -638,6 +681,7 @@ export class TratamentoService {
         ultimas,
         pendencias: {
           atestados: pendDocs.length,
+          ajustes: ajustesPend.length,
           revisar: revisar.slice(0, 12),
           revisarTotal: revisar.length,
           naoBateram: naoBateram.slice(0, 12),

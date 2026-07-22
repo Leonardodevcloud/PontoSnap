@@ -23,7 +23,7 @@ export function PainelRH() {
       <div className={css.head}><h2>Painel</h2><p>Visão do dia · {p ? fmtDataExtenso(p.data) : '—'}</p></div>
       {erro && <p className={css.erro}>{erro}</p>}
 
-      {p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0 || p.pendencias.naoBateramTotal > 0) && (
+      {p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0 || p.pendencias.naoBateramTotal > 0 || (p.pendencias.ajustes ?? 0) > 0) && (
         <div className={css.pend}>
           {p.pendencias.naoBateramTotal > 0 && (
             <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendAlerta}`}>
@@ -43,6 +43,15 @@ export function PainelRH() {
               <span className={css.pendT}>
                 {p.pendencias.atestados === 1 ? 'atestado aguardando decisão' : 'atestados aguardando decisão'}
                 <em>abra pra abonar ou recusar →</em>
+              </span>
+            </Link>
+          )}
+          {(p.pendencias.ajustes ?? 0) > 0 && (
+            <Link to="/rh/ajustes" className={`${css.pendCard} ${css.pendAviso}`}>
+              <span className={css.pendN}>{p.pendencias.ajustes}</span>
+              <span className={css.pendT}>
+                {p.pendencias.ajustes === 1 ? 'ajuste de ponto aguardando' : 'ajustes de ponto aguardando'}
+                <em>o funcionário pediu correção →</em>
               </span>
             </Link>
           )}

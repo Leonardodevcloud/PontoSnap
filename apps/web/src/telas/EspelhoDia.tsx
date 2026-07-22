@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato';
-import type { MinhasMarcacoes } from '../tipos';
+import type { MinhasMarcacoes, AjusteMeu } from '../tipos';
 import { Botao } from '../components/Botao';
 import css from './EspelhoDia.module.css';
 
@@ -20,11 +20,23 @@ export function EspelhoDia() {
   const [dados, setDados] = useState<MinhasMarcacoes | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [pedindo, setPedindo] = useState(false);
+  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR'>('INCLUSAO');
+  const [hora, setHora] = useState('');
+  const [tpMarc, setTpMarc] = useState<'E' | 'S'>('S');
+  const [nsrAlvo, setNsrAlvo] = useState<number | null>(null);
+  const [obs, setObs] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [meus, setMeus] = useState<AjusteMeu[]>([]);
 
   const carregar = useCallback(async (d: string) => {
     setCarregando(true);
     setErro(null);
-    try { setDados(await api.get<MinhasMarcacoes>(`/marcacao/minhas?data=${d}`)); }
+    try {
+      setDados(await api.get<MinhasMarcacoes>(`/marcacao/minhas?data=${d}`));
+      setMeus(await api.get<AjusteMeu[]>('/ajustes/meus').catch(() => []));
+    }
     catch (e) { setErro((e as Error).message); }
     finally { setCarregando(false); }
   }, []);
@@ -42,6 +54,25 @@ export function EspelhoDia() {
   }
   const impar = marcs.length % 2 !== 0;
   const ultimoNsr = marcs.length ? marcs[marcs.length - 1].nsr : null;
+  const pedidosDoDia = meus.filter((a) => a.data === data);
+
+  async function enviarPedido() {
+    if (obs.trim().length < 5) { setErro('Escreva o que aconteceu (pelo menos algumas palavras).'); return; }
+    if (tipo === 'INCLUSAO' && !/^\d{2}:\d{2}$/.test(hora)) { setErro('Informe a hora que faltou (HH:MM).'); return; }
+    if (tipo === 'DESCONSIDERAR' && nsrAlvo == null) { setErro('Escolha qual batida deve ser desconsiderada.'); return; }
+    setErro(null); setEnviando(true);
+    try {
+      await api.post('/ajustes/meus', {
+        tipo, data,
+        ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : { nsr: nsrAlvo }),
+        observacao: obs.trim(),
+      });
+      setOkMsg('Pedido enviado! O RH vai analisar.');
+      setPedindo(false); setObs(''); setHora(''); setNsrAlvo(null);
+      await carregar(data);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setEnviando(false); }
+  }
 
   async function baixarComprovante(nsr: number) {
     try {
@@ -105,6 +136,63 @@ export function EspelhoDia() {
             ? <div className={css.aviso}>Já tem uma batida em aberto — falta bater a saída.</div>
             : <div className={css.afd}>NSR #{String(ultimoNsr).padStart(5, '0')} · <span className={css.ok}>●</span> registro íntegro</div>}
         </>
+      )}
+
+
+      {/* Pedido de ajuste — o funcionário explica e o RH decide. */}
+      {okMsg && <div className={css.okBox}>{okMsg}</div>}
+      {pedidosDoDia.length > 0 && pedidosDoDia.map((a) => (
+        <div key={a.id} className={`${css.pedBox} ${a.status === 'RECUSADO' ? css.pedNo : a.status === 'APROVADO' ? css.pedOk : ''}`}>
+          {a.status === 'EM_ANALISE' && <>⏳ <strong>Em análise</strong> — você pediu {a.tipo === 'INCLUSAO' ? 'para incluir uma batida' : 'para desconsiderar uma batida'}.</>}
+          {a.status === 'APROVADO' && <>✓ <strong>Aprovado</strong> — {a.tipo === 'INCLUSAO' ? 'a batida foi incluída' : 'a batida foi desconsiderada'}.</>}
+          {a.status === 'RECUSADO' && <>✕ <strong>Recusado</strong>{a.motivoDecisao ? ` — ${a.motivoDecisao}` : ''}.</>}
+        </div>
+      ))}
+
+      {!pedindo ? (
+        <button className={css.pedirBtn} onClick={() => { setPedindo(true); setOkMsg(null); }}>
+          Pedir ajuste deste dia
+        </button>
+      ) : (
+        <div className={css.form}>
+          <div className={css.opts}>
+            <button className={`${css.optB} ${tipo === 'INCLUSAO' ? css.optOn : ''}`} onClick={() => setTipo('INCLUSAO')}>Esqueci de bater</button>
+            <button className={`${css.optB} ${tipo === 'DESCONSIDERAR' ? css.optOn : ''}`} onClick={() => setTipo('DESCONSIDERAR')}>Tem batida a mais</button>
+          </div>
+
+          {tipo === 'INCLUSAO' ? (
+            <>
+              <span className={css.lbF}>Horário que faltou</span>
+              <div className={css.dupla}>
+                <input className={css.inpF} type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+                <select className={css.inpF} value={tpMarc} onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
+                  <option value="E">entrada</option>
+                  <option value="S">saída</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className={css.lbF}>Qual batida está sobrando?</span>
+              <div className={css.batidas}>
+                {marcs.map((m) => (
+                  <button key={m.nsr} className={`${css.batB} ${nsrAlvo === m.nsr ? css.batOn : ''}`} onClick={() => setNsrAlvo(m.nsr)}>
+                    {fmtHora(m.dtMarcacao)}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <span className={css.lbF}>O que aconteceu?</span>
+          <textarea className={css.inpF} rows={2} value={obs} onChange={(e) => setObs(e.target.value)}
+            placeholder="Ex.: saí às 17:05 e o celular estava sem bateria." />
+
+          <div className={css.formAcoes}>
+            <Botao variante="coral" onClick={enviarPedido} disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar pro RH'}</Botao>
+            <button className={css.cancelarF} onClick={() => { setPedindo(false); setErro(null); }}>Cancelar</button>
+          </div>
+        </div>
       )}
 
       <div className={css.espaco} />

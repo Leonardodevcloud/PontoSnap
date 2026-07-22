@@ -47,3 +47,22 @@
   border:none; background:none;
 }
 .dataTxt{ font-family:var(--ff-mono); font-size:13.5px; color:var(--ink); font-weight:500; }
+
+/* Pedido de ajuste de ponto */
+.pedirBtn{ width:100%; margin-top:14px; background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill); padding:12px; font:inherit; font-weight:800; font-size:14px; cursor:pointer; }
+.form{ background:var(--white); border:1.5px solid var(--coral); border-radius:16px; padding:14px; margin-top:14px; }
+.opts{ display:flex; gap:8px; margin-bottom:12px; }
+.optB{ flex:1; font:inherit; font-size:12.5px; font-weight:800; padding:9px; border-radius:10px; border:1.5px solid rgba(16,64,63,.12); background:var(--cream); color:var(--ash); cursor:pointer; }
+.optOn{ background:var(--peach); border-color:var(--coral); color:var(--coral-dark); }
+.lbF{ display:block; font-size:12px; font-weight:800; color:var(--ash); margin:0 0 5px; }
+.inpF{ width:100%; background:var(--cream); border:1.5px solid rgba(16,64,63,.12); border-radius:10px; padding:9px 11px; font:inherit; font-size:14px; color:var(--ink); margin-bottom:11px; }
+.dupla{ display:flex; gap:8px; }
+.batidas{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:11px; }
+.batB{ font-family:var(--ff-mono); font-size:13px; padding:7px 12px; border-radius:9px; border:1.5px solid rgba(16,64,63,.12); background:var(--cream); color:var(--ink); cursor:pointer; }
+.batOn{ background:#FFE9E3; border-color:var(--coral); color:var(--coral-dark); font-weight:800; }
+.formAcoes{ display:flex; gap:10px; align-items:center; }
+.cancelarF{ background:none; border:none; font:inherit; font-size:13px; font-weight:700; color:var(--ash); text-decoration:underline; cursor:pointer; }
+.okBox{ background:#EAF7EE; color:#0FA968; border-radius:12px; padding:11px 13px; font-size:13.5px; margin-top:14px; }
+.pedBox{ background:#FFF6E8; border:1px solid rgba(255,107,74,.25); border-radius:12px; padding:11px 13px; font-size:13px; color:var(--ash); margin-top:12px; }
+.pedOk{ background:#EAF7EE; border-color:rgba(15,169,104,.3); }
+.pedNo{ background:#FFE9E3; border-color:rgba(255,107,74,.3); }

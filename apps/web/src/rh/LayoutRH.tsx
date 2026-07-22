@@ -11,6 +11,7 @@ const GRUPOS: { titulo: string; itens: { to: string; rotulo: string; fim?: boole
       { to: '/rh/espelhos', rotulo: 'Espelhos' },
       { to: '/rh/apuracao', rotulo: 'Apuração CLT' },
       { to: '/rh/atestados', rotulo: 'Atestados' },
+      { to: '/rh/ajustes', rotulo: 'Ajustes de ponto' },
       { to: '/rh/banco', rotulo: 'Banco de horas' },
       { to: '/rh/afastamentos', rotulo: 'Férias e afastamentos' },
     ],

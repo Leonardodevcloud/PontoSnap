@@ -169,6 +169,13 @@
       "when": 1784600500000,
       "tag": "0023_regras_por_item",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784600600000,
+      "tag": "0024_ajuste_ponto",
+      "breakpoints": true
     }
   ]
 }

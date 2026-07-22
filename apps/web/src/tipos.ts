@@ -199,6 +199,7 @@ export interface PainelResp {
   ultimas: { nome: string; dt: string; coletor: number }[];
   pendencias: {
     atestados: number;
+    ajustes?: number;
     revisar: { nome: string; data: string }[];
     revisarTotal: number;
     naoBateram: { nome: string; desde: string }[];
@@ -465,4 +466,13 @@ export interface Convencao {
   pdfNome: string | null;
   temPdf?: boolean;
   funcionarios?: number;
+}
+
+export interface AjusteMeu {
+  id: string;
+  tipo: 'INCLUSAO' | 'DESCONSIDERAR';
+  data: string;
+  status: 'EM_ANALISE' | 'APROVADO' | 'RECUSADO';
+  observacao: string;
+  motivoDecisao: string | null;
 }
