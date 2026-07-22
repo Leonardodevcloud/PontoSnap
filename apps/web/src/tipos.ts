@@ -23,9 +23,11 @@ export interface Marcacao {
   latitude?: number | null;
   longitude?: number | null;
   observacao?: string | null;
-  nsr: number;
+  /** null quando a batida entrou por ajuste aprovado (não tem NSR no AFD). */
+  nsr: number | null;
   dtMarcacao: string;
   coletor: number;
+  incluida?: boolean;
 }
 
 export interface LocalEstabelecimento {
@@ -475,4 +477,6 @@ export interface AjusteMeu {
   status: 'EM_ANALISE' | 'APROVADO' | 'RECUSADO';
   observacao: string;
   motivoDecisao: string | null;
+  dtMarcacao: string | null;
+  tpMarc: string | null;
 }

@@ -74,6 +74,14 @@ export default function AjustesPonto() {
     finally { setEnviando(null); }
   }
 
+  // Vários pedidos do mesmo funcionário no mesmo dia ficam juntos.
+  const mapa = new Map<string, Pedido[]>();
+  for (const p of lista) {
+    const k = `${p.empregadoId}|${p.data}`;
+    mapa.set(k, [...(mapa.get(k) ?? []), p]);
+  }
+  const grupos = [...mapa.entries()];
+
   return (
     <div className={css.tela}>
       <div className={css.top}>
@@ -88,7 +96,14 @@ export default function AjustesPonto() {
 
       {lista.length === 0 ? (
         <div className={css.card}><p className={css.vazio}>Nenhum pedido aguardando decisão.</p></div>
-      ) : lista.map((p) => {
+      ) : grupos.map(([chave, doGrupo]) => (
+        <div key={chave} className={css.grupo}>
+          <div className={css.grupoTop}>
+            <span className={css.quem}>{doGrupo[0]!.nome}</span>
+            <span className={css.quando}>{dia(doGrupo[0]!.data)}</span>
+            {doGrupo.length > 1 && <span className={css.contador}>{doGrupo.length} pedidos neste dia</span>}
+          </div>
+          {doGrupo.map((p) => {
         const bs = batidas[p.id] ?? [];
         const { antes, depois } = montar(p, bs);
         const declarado = p.tpMarc === 'S' ? 'saída' : 'entrada';
@@ -99,13 +114,10 @@ export default function AjustesPonto() {
         return (
           <div key={p.id} className={css.ped}>
             <div className={css.pedTop}>
-              <span>
-                <span className={css.quem}>{p.nome}</span>
-                <span className={`${css.badge} ${p.tipo === 'INCLUSAO' ? css.bInc : css.bDesc}`}>
-                  {p.tipo === 'INCLUSAO' ? 'inclusão' : 'desconsiderar'}
-                </span>
+              <span className={`${css.badge} ${p.tipo === 'INCLUSAO' ? css.bInc : css.bDesc}`}>
+                {p.tipo === 'INCLUSAO' ? 'inclusão' : 'desconsiderar'}
               </span>
-              <span className={css.quando}>{dia(p.data)}</span>
+              <span className={css.quando}>pedido às {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
 
             <p className={css.obs}>“{p.observacao}”</p>
@@ -168,9 +180,11 @@ export default function AjustesPonto() {
                 <button className={css.no} onClick={() => { setRecusando(p.id); setMotivo(''); }}>Recusar</button>
               </div>
             )}
-          </div>
-        );
-      })}
+            </div>
+          );
+        })}
+        </div>
+      ))}
     </div>
   );
 }

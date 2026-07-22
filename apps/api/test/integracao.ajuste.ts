@@ -100,7 +100,28 @@ async function main() {
 
   // batidas do dia vêm só do dia pedido
   const bat = await ajuste.batidasDoDia(t.id, emp.id, DATA);
-  ok(bat.length === 5, `batidasDoDia traz só as 5 do dia (${bat.length})`);
+  ok(bat.length === 4, `dia efetivo do RH: 5 originais - 1 desconsiderada = ${bat.length}`);
+
+  // ---- cenário do dia todo esquecido: 4 pedidos, aprovados um a um ----
+  const emp3 = (await comoMaster(db, (tx) => tx.insert(empregado).values({ tenantId: t.id, cpf: '22200000003', nome: 'Esqueceu Tudo', horarioContratualId: hor.id }).returning()))[0]!;
+  const horas = ['08:00', '12:00', '13:00', '17:00'];
+  const ids: string[] = [];
+  for (const h of horas) {
+    const p = await ajuste.solicitar(t.id, { empregadoId: emp3.id, tipo: 'INCLUSAO', data: DATA, hora: h, tpMarc: 'E', observacao: `Esqueci de bater ${h}.` });
+    ids.push(p!.id);
+  }
+  ok((await ajuste.batidasDoDia(t.id, emp3.id, DATA)).length === 0, 'dia começa sem nenhuma batida');
+
+  for (let i = 0; i < ids.length; i++) {
+    await ajuste.decidir(t.id, ids[i]!, true, null, 'rh@empresa.com.br');
+    const agora = await ajuste.batidasDoDia(t.id, emp3.id, DATA);
+    ok(agora.length === i + 1, `após aprovar ${i + 1}º pedido, o dia mostra ${agora.length} batida(s)`);
+  }
+
+  const apEsq = await trat.apurarPeriodoCLT(t.id, emp3.id, DATA, DATA, []);
+  const dEsq = apEsq.resultado.dias.find((d) => d.data === DATA);
+  ok(dEsq?.paresIncompletos === false && (dEsq?.minutosTrabalhados ?? 0) === 480,
+    `dia todo reconstruído por ajuste: ${dEsq?.minutosTrabalhados}min, par completo`);
 
   console.log(falhas === 0 ? '\n>>> AJUSTE OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();

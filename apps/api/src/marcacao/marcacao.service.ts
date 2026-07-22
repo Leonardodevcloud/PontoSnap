@@ -7,6 +7,7 @@ import { proximaMarcacao, gerarComprovante, assinarPdfPAdES, resolverBatida, ini
 import { Coletor, OnlineOffline, TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { CertificadoService } from '../certificado/certificado.service';
+import { ajustesAprovados } from '../tratamento/ajustes';
 
 export interface BaterParams {
   tenantId: string; cpf: string; coletor: Coletor;
@@ -107,10 +108,25 @@ export class MarcacaoService {
         conds.push(lte(pontoMarcacao.dtMarcacao, fimDoDia(dataStr, fuso)));
       }
       const linhas = await tx.select({
+        id: pontoMarcacao.id,
         nsr: pontoMarcacao.nsr, dtMarcacao: pontoMarcacao.dtMarcacao, coletor: pontoMarcacao.coletor,
         latitude: pontoMarcacao.latitude, longitude: pontoMarcacao.longitude,
         observacao: pontoMarcacao.observacao,
       }).from(pontoMarcacao).where(and(...conds)).orderBy(asc(pontoMarcacao.dtMarcacao));
+
+      // Ajustes aprovados: a batida incluída precisa aparecer pro funcionário
+      // (senão o dia continua ímpar na tela), e a desconsiderada some da conta.
+      // O AFD segue com tudo — isto é só o que vale na jornada.
+      const aj = dataStr
+        ? await ajustesAprovados(tx as never, tenantId, e.id, dataStr, dataStr)
+        : { desconsideradas: new Map<string, string | null>(), inclusoes: [] };
+      const efetivas = [
+        ...linhas.filter((l) => !aj.desconsideradas.has(l.id)),
+        ...aj.inclusoes.map((i) => ({
+          id: i.id, nsr: null as number | null, dtMarcacao: i.dtMarcacao, coletor: 0,
+          latitude: null, longitude: null, observacao: i.motivo, incluida: true,
+        })),
+      ].sort((a, b) => a.dtMarcacao.getTime() - b.dtMarcacao.getTime());
 
       // Quantas marcações o dia prevê (2 por par do horário contratual).
       // 0 = desconhecido: o app rotula pelo que já foi batido, sem inventar descanso.
@@ -133,11 +149,14 @@ export class MarcacaoService {
         nome: e.nome,
         esperadas,
         local,
-        marcacoes: linhas.map((m) => ({
-          nsr: Number(m.nsr), dtMarcacao: m.dtMarcacao, coletor: m.coletor,
+        marcacoes: efetivas.map((m) => ({
+          nsr: m.nsr != null ? Number(m.nsr) : null,
+          dtMarcacao: m.dtMarcacao, coletor: m.coletor,
           latitude: m.latitude != null ? Number(m.latitude) : null,
           longitude: m.longitude != null ? Number(m.longitude) : null,
           observacao: m.observacao,
+          // Batida que entrou por ajuste aprovado: não tem NSR nem comprovante.
+          incluida: 'incluida' in m,
         })),
       };
     });

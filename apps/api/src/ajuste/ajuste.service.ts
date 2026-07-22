@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { pontoAjuste, empregado, pontoMarcacao, pontoRep, usuario, tenant, comTenant, type Db } from '@ponto/db';
 import { inicioDoDia, fimDoDia } from '@ponto/rep-core';
+import { ajustesAprovados } from '../tratamento/ajustes';
 import { DB } from '../database/database.module';
 
 export interface NovoAjuste {
@@ -147,11 +148,20 @@ export class AjusteService {
       const rep = (await tx.select({ id: pontoRep.id }).from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) return [];
       const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
-      return tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao, nsr: pontoMarcacao.nsr })
+      const originais = await tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao, nsr: pontoMarcacao.nsr })
         .from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.cpf, emp.cpf),
           gte(pontoMarcacao.dtMarcacao, inicioDoDia(data, fuso)), lte(pontoMarcacao.dtMarcacao, fimDoDia(data, fuso))))
         .orderBy(asc(pontoMarcacao.dtMarcacao));
+
+      // O dia como ele está VALENDO agora: já sem as desconsideradas e já com
+      // as inclusões aprovadas. Assim, ao decidir vários pedidos do mesmo dia,
+      // cada um enxerga o resultado das decisões anteriores.
+      const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, data, data);
+      return [
+        ...originais.filter((m) => !aj.desconsideradas.has(m.id)),
+        ...aj.inclusoes.map((i) => ({ id: i.id, dtMarcacao: i.dtMarcacao, nsr: null as number | null })),
+      ].sort((a, b) => a.dtMarcacao.getTime() - b.dtMarcacao.getTime());
     });
   }
 }

@@ -53,7 +53,8 @@ export function EspelhoDia() {
     trabalhado += Math.round((+new Date(marcs[i + 1].dtMarcacao) - +new Date(marcs[i].dtMarcacao)) / 60000);
   }
   const impar = marcs.length % 2 !== 0;
-  const ultimoNsr = marcs.length ? marcs[marcs.length - 1].nsr : null;
+  const comNsr = marcs.filter((m) => m.nsr != null);
+  const ultimoNsr = comNsr.length ? comNsr[comNsr.length - 1].nsr : null;
   const pedidosDoDia = meus.filter((a) => a.data === data);
 
   async function enviarPedido() {
@@ -118,11 +119,15 @@ export function EspelhoDia() {
       )}
 
       {marcs.map((m, i) => (
-        <button key={m.nsr} className={css.row} onClick={() => baixarComprovante(m.nsr)} title="Baixar comprovante">
+        <button
+          key={m.nsr ?? `inc-${m.dtMarcacao}`} className={css.row}
+          onClick={() => m.nsr != null && baixarComprovante(m.nsr)}
+          title={m.nsr != null ? 'Baixar comprovante' : 'Batida incluída por ajuste aprovado'}
+        >
           <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
           <span className={css.kk}>{rotuloMarcacao(i, marcs.length)}</span>
           <span className={css.tt}>{fmtHora(m.dtMarcacao)}</span>
-          <span className={css.pdf}>PDF</span>
+          {m.nsr != null ? <span className={css.pdf}>PDF</span> : <span className={css.tagInc}>ajuste</span>}
         </button>
       ))}
 
@@ -134,20 +139,33 @@ export function EspelhoDia() {
           </div>
           {impar
             ? <div className={css.aviso}>Já tem uma batida em aberto — falta bater a saída.</div>
-            : <div className={css.afd}>NSR #{String(ultimoNsr).padStart(5, '0')} · <span className={css.ok}>●</span> registro íntegro</div>}
+            : ultimoNsr != null
+              ? <div className={css.afd}>NSR #{String(ultimoNsr).padStart(5, '0')} · <span className={css.ok}>●</span> registro íntegro</div>
+              : null}
         </>
       )}
 
 
       {/* Pedido de ajuste — o funcionário explica e o RH decide. */}
       {okMsg && <div className={css.okBox}>{okMsg}</div>}
-      {pedidosDoDia.length > 0 && pedidosDoDia.map((a) => (
-        <div key={a.id} className={`${css.pedBox} ${a.status === 'RECUSADO' ? css.pedNo : a.status === 'APROVADO' ? css.pedOk : ''}`}>
-          {a.status === 'EM_ANALISE' && <>⏳ <strong>Em análise</strong> — você pediu {a.tipo === 'INCLUSAO' ? 'para incluir uma batida' : 'para desconsiderar uma batida'}.</>}
-          {a.status === 'APROVADO' && <>✓ <strong>Aprovado</strong> — {a.tipo === 'INCLUSAO' ? 'a batida foi incluída' : 'a batida foi desconsiderada'}.</>}
-          {a.status === 'RECUSADO' && <>✕ <strong>Recusado</strong>{a.motivoDecisao ? ` — ${a.motivoDecisao}` : ''}.</>}
-        </div>
-      ))}
+      {pedidosDoDia.map((a) => {
+        const alvo = a.dtMarcacao ? fmtHora(a.dtMarcacao) : null;
+        const qual = a.tipo === 'INCLUSAO'
+          ? `incluir ${alvo ?? 'uma batida'}${a.tpMarc === 'S' ? ' (saída)' : a.tpMarc === 'E' ? ' (entrada)' : ''}`
+          : 'desconsiderar uma batida';
+        return (
+          <div key={a.id} className={`${css.pedBox} ${a.status === 'RECUSADO' ? css.pedNo : a.status === 'APROVADO' ? css.pedOk : ''}`}>
+            <strong>
+              {a.status === 'EM_ANALISE' && '⏳ Em análise'}
+              {a.status === 'APROVADO' && '✓ Aprovado'}
+              {a.status === 'RECUSADO' && '✕ Recusado'}
+            </strong>
+            {' — '}{qual}
+            {a.status === 'RECUSADO' && a.motivoDecisao ? `. Motivo: ${a.motivoDecisao}` : '.'}
+            <em className={css.pedObs}>“{a.observacao}”</em>
+          </div>
+        );
+      })}
 
       {!pedindo ? (
         <button className={css.pedirBtn} onClick={() => { setPedindo(true); setOkMsg(null); }}>

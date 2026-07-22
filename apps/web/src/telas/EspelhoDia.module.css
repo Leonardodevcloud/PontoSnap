@@ -66,3 +66,5 @@
 .pedBox{ background:#FFF6E8; border:1px solid rgba(255,107,74,.25); border-radius:12px; padding:11px 13px; font-size:13px; color:var(--ash); margin-top:12px; }
 .pedOk{ background:#EAF7EE; border-color:rgba(15,169,104,.3); }
 .pedNo{ background:#FFE9E3; border-color:rgba(255,107,74,.3); }
+.tagInc{ font-family:var(--ff-mono); font-size:10px; color:var(--ink); background:var(--lime); padding:2px 7px; border-radius:6px; }
+.pedObs{ display:block; font-size:12px; color:var(--ash); margin-top:4px; font-style:italic; }
