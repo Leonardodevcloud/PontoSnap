@@ -74,9 +74,11 @@ function SeletorEmpresa() {
 
   return (
     <div className={css.selWrap}>
-      <button className={css.selBtn} onClick={() => setAberto((a) => !a)}>
-        <span className={css.selNome}>{atual?.razaoSocial ?? 'Empresa'}</span>
-        <span className={css.selCnpj}>{atual ? fmtCnpj(atual.cnpj) : ''}</span>
+      <button className={css.selBtn} onClick={() => setAberto((a) => !a)} title={atual?.razaoSocial}>
+        <span className={css.selTexto}>
+          <span className={css.selNome}>{atual?.razaoSocial ?? 'Empresa'}</span>
+          <span className={css.selCnpj}>{atual ? fmtCnpj(atual.cnpj) : ''}</span>
+        </span>
         <span className={css.selSeta}>{aberto ? '▲' : '▼'}</span>
       </button>
       {aberto && (

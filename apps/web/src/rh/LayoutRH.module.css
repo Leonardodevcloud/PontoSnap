@@ -31,20 +31,22 @@
 
 /* ===== Seletor de empresa (multi-CNPJ) ===== */
 .selWrap{ position:relative; margin:0 14px 16px; }
-.selBtn{ width:100%; text-align:left; background:rgba(255,248,238,.08); border:1.5px solid rgba(255,248,238,.18); border-radius:12px; padding:9px 12px; cursor:pointer; color:var(--cream); font:inherit; display:grid; grid-template-columns:1fr auto; gap:2px 8px; align-items:center; }
-.selNome{ font-size:13px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.selCnpj{ font-family:var(--ff-mono); font-size:10px; opacity:.6; grid-column:1; }
-.selSeta{ grid-row:1 / span 2; font-size:9px; opacity:.6; }
+.selBtn{ width:100%; text-align:left; background:rgba(255,248,238,.08); border:1.5px solid rgba(255,248,238,.18); border-radius:12px; padding:10px 12px; cursor:pointer; color:var(--cream); font:inherit; display:flex; align-items:center; gap:8px; }
+.selTexto{ flex:1 1 auto; min-width:0; }
+.selNome{ display:block; font-size:12.5px; font-weight:800; line-height:1.3; overflow-wrap:anywhere; }
+.selCnpj{ display:block; font-family:var(--ff-mono); font-size:10px; opacity:.65; white-space:nowrap; margin-top:3px; }
+.selSeta{ flex:0 0 auto; font-size:9px; opacity:.6; }
 .selFundo{ position:fixed; inset:0; z-index:40; }
-.selDd{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--white); border:1px solid rgba(16,64,63,.12); border-radius:14px; box-shadow:0 12px 30px rgba(16,64,63,.18); padding:6px; z-index:41; }
+/* Mais largo que a sidebar (236px) de propósito: nome e CNPJ inteiros, sem corte. */
+.selDd{ position:absolute; top:calc(100% + 6px); left:0; right:auto; width:max-content; min-width:100%; max-width:330px; background:var(--white); border:1px solid rgba(16,64,63,.12); border-radius:14px; box-shadow:0 12px 30px rgba(16,64,63,.18); padding:6px; z-index:41; }
 .selDdLb{ font-family:var(--ff-mono); font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); padding:6px 10px 4px; }
-.selItem{ width:100%; display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:10px; border:none; background:none; cursor:pointer; font:inherit; text-align:left; }
+.selItem{ width:100%; display:flex; align-items:flex-start; gap:9px; padding:9px 10px; border-radius:10px; border:none; background:none; cursor:pointer; font:inherit; text-align:left; }
 .selItem:hover:not(:disabled){ background:var(--cream); }
 .selItem:disabled{ opacity:.6; cursor:default; }
 .selOn{ background:var(--peach); }
 .selIni{ width:28px; height:28px; border-radius:8px; background:var(--cream); color:var(--ink); display:grid; place-items:center; font-family:var(--ff-display); font-weight:600; font-size:11px; flex-shrink:0; }
 .selOn .selIni{ background:var(--coral); color:#fff; }
 .selTxt{ flex:1; min-width:0; }
-.selItemNome{ display:block; font-size:12.5px; font-weight:800; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.selItemMeta{ display:block; font-family:var(--ff-mono); font-size:10px; color:var(--ash); margin-top:1px; }
+.selItemNome{ display:block; font-size:12.5px; font-weight:800; color:var(--ink); line-height:1.3; overflow-wrap:anywhere; }
+.selItemMeta{ display:block; font-family:var(--ff-mono); font-size:10px; color:var(--ash); margin-top:2px; white-space:nowrap; }
 .selCheck{ color:var(--coral-dark); font-weight:800; font-size:13px; }
