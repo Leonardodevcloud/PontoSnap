@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import {
-  pontoRep, pontoMarcacao, empregado, pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoBancoMov, tenant,
+  pontoRep, pontoMarcacao, pontoEventoRep, empregado, pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoBancoMov, tenant,
   comTenant, type Db,
 } from '@ponto/db';
 import { montarAFD, montarAEJ, assinarCAdESDestacado, inicioDoDia, fimDoDia } from '@ponto/rep-core';
@@ -61,6 +61,29 @@ export class FiscalService {
         // Cada marcação reproduz o fuso com que foi hasheada (imutável).
         fuso: m.fuso ?? '-0300',
       }));
+      // Registros 2, 5 e 6: mesma sequência de NSR das marcações, então saem
+      // intercalados por NSR dentro do arquivo (regra 4 do leiaute).
+      const evs = await tx.select().from(pontoEventoRep)
+        .where(eq(pontoEventoRep.repId, rep.id)).orderBy(asc(pontoEventoRep.nsr));
+      const eventos = {
+        empresa: evs.filter((e) => e.tipo === 2).map((e) => ({
+          nsr: e.nsr, dtGravacao: e.dtGravacao, fuso: e.fuso,
+          docResponsavel: e.docResponsavel, tipoIdEmpregador: Number(e.tpIdtEmpregador ?? 1),
+          documentoEmpregador: e.docEmpregador ?? rep.documentoEmpregador,
+          cnoCaepf: e.cnoCaepf, razaoSocial: e.razaoSocial ?? rep.razaoSocial,
+          localPrestacao: e.localPrestacao,
+        })),
+        empregado: evs.filter((e) => e.tipo === 5).map((e) => ({
+          nsr: e.nsr, dtGravacao: e.dtGravacao, fuso: e.fuso,
+          operacao: (e.operacao ?? 'I') as 'I' | 'A' | 'E',
+          cpf: e.cpfEmpregado ?? '', nome: e.nomeEmpregado ?? '',
+          docResponsavel: e.docResponsavel,
+        })),
+        sensivel: evs.filter((e) => e.tipo === 6).map((e) => ({
+          nsr: e.nsr, dtGravacao: e.dtGravacao, fuso: e.fuso, tipoEvento: Number(e.tipoEvento ?? 0),
+        })),
+      };
+
       return montarAFD({
         rep: {
           tipoIdEmpregador: rep.tipoIdEmpregador, documentoEmpregador: rep.documentoEmpregador,
@@ -68,6 +91,7 @@ export class FiscalService {
           tipoIdDesenvolvedor: rep.tipoIdDesenvolvedor, documentoDesenvolvedor: rep.documentoDesenvolvedor,
         },
         marcacoes,
+        eventos,
         fuso: fusoTenant,
       });
     });

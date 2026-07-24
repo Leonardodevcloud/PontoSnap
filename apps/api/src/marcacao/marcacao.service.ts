@@ -38,8 +38,11 @@ export class MarcacaoService {
       const t = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, p.tenantId)).limit(1))[0];
       const fuso = t?.fuso ?? '-0300';
 
-      const anterior = rep.ultimoNsr > 0 && rep.ultimoHash
-        ? { nsr: rep.ultimoNsr, hashRegistro: rep.ultimoHash } : null;
+      // O NSR vem do contador do REP, que é compartilhado com os registros
+      // 2, 5 e 6 do AFD. O hash anterior vem da última MARCAÇÃO e pode ser
+      // nulo mesmo com NSR já avançado (ex.: empresa e funcionários gravados
+      // antes da primeira batida).
+      const anterior = { nsr: Number(rep.ultimoNsr ?? 0), hashRegistro: rep.ultimoHash ?? null };
 
       // Resolve hora e flag: offline usa a hora do aparelho e marca a divergência;
       // online confia no servidor. Nunca recusa — só sinaliza.

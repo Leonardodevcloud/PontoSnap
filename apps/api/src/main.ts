@@ -4,6 +4,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
+import { DisponibilidadeService } from './fiscal/disponibilidade.service';
+
 async function bootstrap() {
   // Atestado é dado de saúde (LGPD sensível) e depende de APP_CRYPTO_KEY para
   // ser cifrado de verdade. Sem a chave, o CriptoService cai numa chave pública
@@ -30,5 +32,22 @@ async function bootstrap() {
   const porta = Number(process.env.PORT ?? 3000);
   await app.listen(porta, '0.0.0.0');
   console.log(`PontoSnap API ouvindo na porta ${porta}`);
+
+  // Registro 6 do AFD: disponibilidade do serviço. O leiaute prevê "07" e "08"
+  // justamente para o REP-P documentar quando esteve no ar.
+  const disp = app.get(DisponibilidadeService);
+  await disp.aoSubir().catch(() => 0);
+
+  let parando = false;
+  const parar = async (sinal: string) => {
+    if (parando) return;
+    parando = true;
+    console.log(`Recebi ${sinal}: registrando indisponibilidade e encerrando.`);
+    await disp.aoParar().catch(() => 0);
+    await app.close().catch(() => undefined);
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => void parar('SIGTERM'));
+  process.on('SIGINT', () => void parar('SIGINT'));
 }
 void bootstrap();

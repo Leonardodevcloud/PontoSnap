@@ -55,6 +55,70 @@ export function registro7(m: MarcacaoGravada): string {
     alfa(m.hashRegistro, 64);
 }
 
+/**
+ * Registro tipo "2" — Inclusão ou alteração da identificação da empresa no
+ * REP (331 chars, com CRC).
+ */
+export interface EventoEmpresaAFD {
+  nsr: number; dtGravacao: Date; fuso?: string;
+  docResponsavel?: string | null;
+  tipoIdEmpregador: number; documentoEmpregador: string;
+  cnoCaepf?: string | null; razaoSocial: string; localPrestacao?: string | null;
+}
+export function registro2(e: EventoEmpresaAFD): string {
+  const fuso = e.fuso ?? '-0300';
+  const conteudo =
+    num(e.nsr, 9) +                                        // 1  NSR
+    '2' +                                                   // 2  tipo
+    formatarDataHoraAFD(e.dtGravacao, fuso) +               // 3  gravação
+    num(e.docResponsavel ?? '', 14) +                       // 4  CPF do responsável
+    String(e.tipoIdEmpregador) +                            // 5  1=CNPJ 2=CPF
+    num(e.documentoEmpregador, 14) +                        // 6  doc do empregador
+    (e.cnoCaepf ? num(e.cnoCaepf, 14) : alfa('', 14)) +     // 7  CNO/CAEPF
+    alfa(e.razaoSocial, 150) +                              // 8  razão social
+    alfa(e.localPrestacao ?? '', 100);                      // 9  local de prestação
+  return comCRC(conteudo);                                  // 10 CRC-16
+}
+
+/**
+ * Registro tipo "5" — Inclusão, alteração ou exclusão de empregado no REP
+ * (118 chars, com CRC).
+ */
+export interface EventoEmpregadoAFD {
+  nsr: number; dtGravacao: Date; fuso?: string;
+  operacao: 'I' | 'A' | 'E';
+  cpf: string; nome: string;
+  dadosIdentificacao?: string | null;
+  docResponsavel?: string | null;
+}
+export function registro5(e: EventoEmpregadoAFD): string {
+  const fuso = e.fuso ?? '-0300';
+  const conteudo =
+    num(e.nsr, 9) +                                        // 1  NSR
+    '5' +                                                   // 2  tipo
+    formatarDataHoraAFD(e.dtGravacao, fuso) +               // 3  gravação
+    e.operacao +                                            // 4  I / A / E
+    num(e.cpf, 12) +                                        // 5  CPF do empregado
+    alfa(e.nome, 52) +                                      // 6  nome
+    alfa(e.dadosIdentificacao ?? '', 4) +                   // 7  demais dados
+    num(e.docResponsavel ?? '', 11);                        // 8  CPF do responsável
+  return comCRC(conteudo);                                  // 9  CRC-16
+}
+
+/**
+ * Registro tipo "6" — Eventos sensíveis (36 chars, SEM CRC: a regra 8 do
+ * leiaute manda gravar CRC só nos tipos "1" a "5").
+ * No REP-P valem "07" (disponibilidade) e "08" (indisponibilidade de serviço).
+ */
+export const EVENTO_DISPONIVEL = 7;
+export const EVENTO_INDISPONIVEL = 8;
+export interface EventoSensivelAFD { nsr: number; dtGravacao: Date; tipoEvento: number; fuso?: string; }
+export function registro6(e: EventoSensivelAFD): string {
+  return num(e.nsr, 9) + '6' +
+    formatarDataHoraAFD(e.dtGravacao, e.fuso ?? '-0300') +
+    num(e.tipoEvento, 2);
+}
+
 export interface ContadoresAFD { t2: number; t3: number; t4: number; t5: number; t6: number; t7: number; }
 
 /** Registro tipo "9" — Trailer (64 chars, sem CRC). */
@@ -69,9 +133,17 @@ export function registroAssinatura(): string {
   return alfa('ASSINATURA_DIGITAL_EM_ARQUIVO_P7S', 100);
 }
 
+export interface EventosAFD {
+  empresa?: EventoEmpresaAFD[];
+  empregado?: EventoEmpregadoAFD[];
+  sensivel?: EventoSensivelAFD[];
+}
+
 export interface MontarAFDParams {
   rep: RepConfig;
   marcacoes: MarcacaoGravada[];
+  /** Registros 2, 5 e 6 — compartilham a MESMA sequência de NSR das marcações. */
+  eventos?: EventosAFD;
   dataGeracao?: Date;
   /** Fuso atual do tenant — só para o cabeçalho (data de geração). Cada
    *  marcação carrega o seu próprio fuso no registro 7. */
@@ -84,14 +156,30 @@ export interface ArquivoGerado {
   totalRegistros: number;
 }
 
-export function montarAFD({ rep, marcacoes, dataGeracao = new Date(), fuso = '-0300' }: MontarAFDParams): ArquivoGerado {
+export function montarAFD({ rep, marcacoes, eventos = {}, dataGeracao = new Date(), fuso = '-0300' }: MontarAFDParams): ArquivoGerado {
   const datas = marcacoes.map((m) => m.dtMarcacao).sort((a, b) => a.getTime() - b.getTime());
   const dataInicial = datas[0] ?? dataGeracao;
   const dataFinal = datas[datas.length - 1] ?? dataGeracao;
 
+  // Regra 4 do leiaute: os registros saem ordenados pelo NSR — e o NSR é uma
+  // sequência única, então marcações e eventos se intercalam por ele.
+  const corpo: { nsr: number; linha: string }[] = [
+    ...marcacoes.map((m) => ({ nsr: Number(m.nsr), linha: registro7(m) })),
+    ...(eventos.empresa ?? []).map((e) => ({ nsr: Number(e.nsr), linha: registro2(e) })),
+    ...(eventos.empregado ?? []).map((e) => ({ nsr: Number(e.nsr), linha: registro5(e) })),
+    ...(eventos.sensivel ?? []).map((e) => ({ nsr: Number(e.nsr), linha: registro6(e) })),
+  ].sort((a, b) => a.nsr - b.nsr);
+
   const linhas: string[] = [registro1(rep, dataInicial, dataFinal, dataGeracao, fuso)];
-  for (const m of marcacoes) linhas.push(registro7(m));
-  linhas.push(registro9({ t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: marcacoes.length }));
+  for (const r of corpo) linhas.push(r.linha);
+  linhas.push(registro9({
+    t2: eventos.empresa?.length ?? 0,
+    t3: 0,
+    t4: 0,
+    t5: eventos.empregado?.length ?? 0,
+    t6: eventos.sensivel?.length ?? 0,
+    t7: marcacoes.length,
+  }));
   linhas.push(registroAssinatura());
 
   const texto = linhas.map((l) => l + '\r\n').join('');

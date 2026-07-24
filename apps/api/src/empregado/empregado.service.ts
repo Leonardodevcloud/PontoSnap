@@ -4,6 +4,7 @@ import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
 import { and, eq } from 'drizzle-orm';
 import { empregado, pontoHorarioContratual, pontoConvencao, pontoRegraItem, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
+import { registrarEventoRep } from '../fiscal/evento-rep';
 import { EmailService } from '../email/email.service';
 import { emailAcessoFuncionario } from '../email/templates';
 import { hashPin } from '../auth/pin';
@@ -51,6 +52,11 @@ export class EmpregadoService {
         matricula: p.matricula ?? null, pinHash, pis: p.pis ?? null,
         salarioMensal: p.salarioMensal != null ? String(p.salarioMensal) : null,
       }).returning();
+
+      // Registro 5 do AFD: inclusão de empregado no REP.
+      await registrarEventoRep(tx as never, tenantId, {
+        tipo: 5, operacao: 'I', cpfEmpregado: p.cpf, nomeEmpregado: p.nome,
+      });
       return this.semSegredos(rows[0]!);
     });
 
@@ -141,9 +147,19 @@ export class EmpregadoService {
   }
 
   async definirAtivo(tenantId: string, id: string, ativo: boolean) {
-    const rows = await comTenant(this.db, tenantId, (tx) =>
-      tx.update(empregado).set({ ativo })
-        .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning());
+    const rows = await comTenant(this.db, tenantId, async (tx) => {
+      const r = await tx.update(empregado).set({ ativo })
+        .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
+      if (r[0]) {
+        // Registro 5 do AFD: reativar é alteração ("A"); inativar equivale à
+        // exclusão do empregado no REP ("E") — ele deixa de bater ponto.
+        await registrarEventoRep(tx as never, tenantId, {
+          tipo: 5, operacao: ativo ? 'A' : 'E',
+          cpfEmpregado: r[0].cpf, nomeEmpregado: r[0].nome,
+        });
+      }
+      return r;
+    });
     if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
     return this.semSegredos(rows[0]);
   }

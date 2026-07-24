@@ -49,7 +49,12 @@ export function calcularHash(entrada: string): string {
  */
 export function proximaMarcacao(
   entrada: EntradaMarcacao,
-  anterior: { nsr: number; hashRegistro: string } | null,
+  /**
+   * Último registro do REP. `nsr` é o contador do ARQUIVO (compartilhado com
+   * os registros 2, 5 e 6); `hashRegistro` é o da última MARCAÇÃO — pode ser
+   * nulo mesmo com nsr > 0, quando ainda não houve batida.
+   */
+  anterior: { nsr: number; hashRegistro: string | null } | null,
   fuso = '-0300',
 ): MarcacaoGravada {
   const nsr = (anterior?.nsr ?? 0) + 1;

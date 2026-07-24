@@ -190,6 +190,13 @@
       "when": 1784600800000,
       "tag": "0026_usuario_multi_empresa",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784600900000,
+      "tag": "0027_evento_rep_afd",
+      "breakpoints": true
     }
   ]
 }

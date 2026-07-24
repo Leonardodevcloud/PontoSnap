@@ -5,6 +5,7 @@ import { TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { hashSenha } from '../auth/senha';
 import { gerarATTR } from '@ponto/rep-core';
+import { registrarEventoRep } from '../fiscal/evento-rep';
 import { randomBytes } from 'node:crypto';
 import { EmailService } from '../email/email.service';
 import { emailBoasVindasCliente } from '../email/templates';
@@ -103,6 +104,13 @@ export class TenantService {
         razaoSocial: p.razaoSocial, numeroInpi: cfg.numeroInpi,
         tipoIdDesenvolvedor: cfg.tipoIdDesenvolvedor, documentoDesenvolvedor: cfg.documentoDesenvolvedor,
       }).returning())[0]!;
+
+      // Registro 2 do AFD: a identificação da empresa no REP. Consome o NSR 1,
+      // antes de qualquer batida — é o primeiro fato do arquivo fiscal.
+      await registrarEventoRep(tx as never, t.id, {
+        tipo: 2, tpIdtEmpregador: TipoIdentificador.CNPJ, docEmpregador: p.cnpj,
+        razaoSocial: p.razaoSocial, localPrestacao: p.localPrestacao ?? null,
+      });
 
       if (!caminhoB) {
         const senhaHash = await hashSenha(senha!);
