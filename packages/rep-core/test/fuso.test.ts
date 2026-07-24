@@ -21,7 +21,7 @@ describe('helpers de fuso', () => {
     expect(formatarDataHoraAFD(dt, '-0300')).toBe('2026-07-10T09:00:00-0300');
     expect(formatarDataHoraAFD(dt, '-0400')).toBe('2026-07-10T08:00:00-0400');
     // Sem argumento = Brasília (compatibilidade).
-    expect(formatarDataHoraAFD(dt)).toBe('2026-07-10T09:00:00-0300');
+    expect(formatarDataHoraAFD(dt, '-0300')).toBe('2026-07-10T09:00:00-0300');
   });
 
   it('inicioDoDia/fimDoDia deslocam o limite conforme o fuso', () => {
@@ -64,7 +64,7 @@ function entrada(dtISO: string) {
 
 describe('fuso no hash-chain (irreversível)', () => {
   it('sem fuso == com -0300: não muda o hash das batidas de produção existentes', () => {
-    const semFuso = proximaMarcacao(entrada('2026-07-10T08:00:00-0300'), null);
+    const semFuso = proximaMarcacao(entrada('2026-07-10T08:00:00-0300'), null, '-0300');
     const comBrasilia = proximaMarcacao(entrada('2026-07-10T08:00:00-0300'), null, '-0300');
     expect(semFuso.hashRegistro).toBe(comBrasilia.hashRegistro);
     expect(semFuso.fuso).toBe('-0300');
@@ -112,7 +112,7 @@ describe('AFD reproduz o fuso de cada marcação', () => {
     // O hash impresso na linha é o mesmo que recalculamos com o fuso da linha.
     const recalculado = calcularHash(construirEntradaHash({
       nsr: m.nsr, dtMarcacao: m.dtMarcacao, cpf: m.cpf, dtGravacao: m.dtGravacao,
-      coletor: m.coletor, onlineOffline: m.onlineOffline, hashAnterior: null, fuso: m.fuso,
+      coletor: m.coletor, onlineOffline: m.onlineOffline, hashAnterior: null, fuso: m.fuso ?? '-0300',
     }));
     expect(linha).toContain(recalculado);
     // Larguras do leiaute preservadas.

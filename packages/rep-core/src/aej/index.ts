@@ -20,7 +20,7 @@ export interface MontarAEJParams {
   tratamentos?: TratamentoAEJ[]; ausencias?: AusenciaAEJ[];
   dataGeracao?: Date;
   /** Fuso do tenant para formatar as datas do arquivo. */
-  fuso?: string;
+  fuso: string;
 }
 
 const soDig = (v: unknown) => String(v ?? '').replace(/\D/g, '');
@@ -64,7 +64,7 @@ const linha = (...campos: unknown[]): string =>
 
 export function montarAEJ(p: MontarAEJParams): { conteudo: Buffer; nomeArquivo: string; totalRegistros: number } {
   validar(p);
-  const { rep, ptrp, empregados = [], horarios = [], tratamentos = [], ausencias = [], dataGeracao = new Date(), fuso = '-0300' } = p;
+  const { rep, ptrp, empregados = [], horarios = [], tratamentos = [], ausencias = [], dataGeracao = new Date(), fuso } = p;
   const linhas: string[] = [];
   const cont = { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0, t8: 0 };
 

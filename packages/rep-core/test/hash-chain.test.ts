@@ -16,7 +16,7 @@ function montarCadeia(): MarcacaoGravada[] {
     const m = proximaMarcacao({
       cpf: '43461292850', dtMarcacao: new Date(dt), dtGravacao: new Date(dt),
       coletor: Coletor.MOBILE, onlineOffline: OnlineOffline.ONLINE,
-    }, anterior);
+    }, anterior, '-0300');
     cadeia.push(m);
     anterior = { nsr: m.nsr, hashRegistro: m.hashRegistro };
   }

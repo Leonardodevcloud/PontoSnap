@@ -18,12 +18,12 @@ function marcacoes(): MarcacaoGravada[] {
     cpf: '43461292850', dtMarcacao: new Date('2026-07-10T08:00:00-0300'),
     dtGravacao: new Date('2026-07-10T08:00:00-0300'),
     coletor: Coletor.MOBILE, onlineOffline: OnlineOffline.ONLINE,
-  }, null);
+  }, null, '-0300');
   return [m];
 }
 
 describe('geração do AFD', () => {
-  const { conteudo, nomeArquivo } = montarAFD({ rep, marcacoes: marcacoes() });
+  const { conteudo, nomeArquivo } = montarAFD({ rep, marcacoes: marcacoes(), fuso: '-0300' });
   const linhas = conteudo.toString('latin1').split('\r\n').filter(Boolean);
 
   it('cada tipo de registro tem a largura exata do leiaute', () => {

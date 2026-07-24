@@ -283,6 +283,32 @@ export class TenantService {
     const nomeArquivo = `ATTR_${soDigitosSimples(t.cnpj)}.pdf`;
     return { pdf, nomeArquivo };
   }
+
+  /**
+   * Reenvia o acesso do admin do cliente (quando ele perde o e-mail ou a
+   * senha provisória). Gera uma senha nova — a antiga deixa de valer — e
+   * obriga a troca no primeiro login.
+   */
+  async reenviarAcesso(tenantId: string) {
+    const dados = await comoMaster(this.db, async (tx) => {
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      if (!t) throw new NotFoundException('Cliente não encontrado');
+      const u = (await tx.select().from(usuario)
+        .where(and(eq(usuario.tenantId, tenantId), eq(usuario.perfil, 'ADMIN_CLIENTE')))
+        .limit(1))[0];
+      if (!u) throw new NotFoundException('Este cliente não tem conta de administrador.');
+
+      const senha = senhaProvisoria();
+      await tx.update(usuario).set({ senhaHash: await hashSenha(senha), deveTrocarSenha: true })
+        .where(eq(usuario.id, u.id));
+      return { razaoSocial: t.razaoSocial, email: u.email, senha };
+    });
+
+    const url = process.env.APP_WEB_URL ?? 'https://pontosnap.online';
+    const msg = emailBoasVindasCliente('', dados.razaoSocial, dados.email, dados.senha, url);
+    const emailEnviado = await this.email.enviar({ para: dados.email, ...msg }).catch(() => false);
+    return { email: dados.email, senhaProvisoria: dados.senha, emailEnviado };
+  }
 }
 
 const soDigitosSimples = (v: string) => String(v ?? '').replace(/\D/g, '');

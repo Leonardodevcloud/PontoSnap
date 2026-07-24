@@ -132,3 +132,30 @@ export function emailBoasVindasCliente(
       ${botao('Entrar no PontoSnap', urlApp)}`),
   };
 }
+
+/** Avisa o funcionário que o RH decidiu o pedido de ajuste de ponto dele. */
+export function emailAjusteDecidido(
+  nome: string, dia: string, aprovado: boolean, motivo: string | null, urlApp: string,
+): { assunto: string; html: string } {
+  return {
+    assunto: aprovado ? `Seu ajuste de ponto de ${dia} foi aprovado` : `Seu ajuste de ponto de ${dia} foi recusado`,
+    html: moldura(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">
+        ${aprovado ? 'Ajuste aprovado' : 'Ajuste recusado'}
+      </h1>
+      <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">Olá${nome ? `, ${nome}` : ''}!</p>
+      <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#5C4F49;">
+        ${aprovado
+          ? `O RH aprovou o ajuste que você pediu para o dia <strong>${dia}</strong>. A correção já vale na sua apuração.`
+          : `O RH não aprovou o ajuste que você pediu para o dia <strong>${dia}</strong>.`}
+      </p>
+      ${!aprovado && motivo ? `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;width:100%;background:#FFF8EE;border-radius:12px;">
+        <tr><td style="padding:14px 18px;">
+          <p style="margin:0 0 6px;font-size:13px;color:#5C4F49;">Motivo</p>
+          <p style="margin:0;font-size:15px;color:#10403F;">${motivo}</p>
+        </td></tr>
+      </table>` : ''}
+      ${botao('Ver meu ponto', urlApp)}`),
+  };
+}

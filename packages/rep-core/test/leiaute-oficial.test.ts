@@ -35,10 +35,10 @@ const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 function linhasAFD() {
   const { conteudo } = montarAFD({
+    fuso: '-0300',
     rep: REP,
     marcacoes: [marcacao(1, '2026-07-13T11:00:00Z'), marcacao(2, '2026-07-13T15:00:00Z')],
-    dataGeracao: new Date('2026-07-14T10:00:00Z'),
-  });
+    dataGeracao: new Date('2026-07-14T10:00:00Z') });
   const texto = conteudo.toString('latin1');
   return { texto, linhas: texto.split('\r\n').filter((l) => l.length > 0) };
 }
@@ -113,7 +113,7 @@ describe('AFD — leiaute oficial (Anexo V)', () => {
   });
 
   it('nome do arquivo segue "AFD" + INPI + documento do empregador + REP_P', () => {
-    const { nomeArquivo } = montarAFD({ rep: REP, marcacoes: [marcacao(1, '2026-07-13T11:00:00Z')] });
+    const { nomeArquivo } = montarAFD({ rep: REP, marcacoes: [marcacao(1, '2026-07-13T11:00:00Z')], fuso: '-0300' });
     expect(nomeArquivo).toBe('AFD5120240001234' + '12345678000190' + 'REP_P.txt');
   });
 });
@@ -122,6 +122,7 @@ describe('AFD — leiaute oficial (Anexo V)', () => {
 
 function gerarAEJ() {
   const { conteudo } = montarAEJ({
+    fuso: '-0300',
     rep: REP,
     ptrp: { nome: 'PontoSnap', versao: '1.0.0', tpIdtDesenv: 1, idtDesenv: '98765432000188', razaoNome: 'TUTTS LTDA', email: 'contato@pontosnap.online' },
     empregados: [{ cpf: '12345678901', nome: 'FULANO DE TAL' }],
@@ -261,6 +262,7 @@ describe('AEJ — leiaute oficial (Anexo VI)', () => {
 
 describe('o gerador RECUSA arquivo fora do leiaute', () => {
   const base = {
+    fuso: '-0300',
     rep: REP,
     ptrp: { nome: 'PontoSnap', versao: '1.0.0', tpIdtDesenv: 1, idtDesenv: '98765432000188', razaoNome: 'TUTTS LTDA', email: 'a@b.com' },
     empregados: [{ cpf: '12345678901', nome: 'FULANO' }],

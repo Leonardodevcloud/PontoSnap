@@ -28,6 +28,11 @@ export class TenantController {
     });
   }
 
+  /** Reenvia o acesso do admin do cliente com senha nova. */
+  @Post(':id/reenviar-acesso') reenviar(@Param('id') id: string) {
+    return this.tenants.reenviarAcesso(id);
+  }
+
   // ---- Acesso multi-empresa ----
   @Get('acessos/lista') acessos() { return this.tenants.listarAcessos(); }
 

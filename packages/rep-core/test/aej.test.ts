@@ -19,6 +19,7 @@ const ptrp = {
 
 describe('geração do AEJ', () => {
   const { conteudo } = montarAEJ({
+    fuso: '-0300',
     rep, ptrp,
     empregados: [{ cpf: '43461292850', nome: 'Maria da Silva' }],
     horarios: [{ codigo: 'CH001', durJornadaMin: 480, pares: [

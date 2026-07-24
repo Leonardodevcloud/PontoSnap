@@ -46,6 +46,18 @@ export function Clientes() {
    * ATTR (art. 89). O PDF sai SEM assinatura: a Portaria exige assinatura
    * eletrônica qualificada de pessoa física — feita fora, com e-CPF.
    */
+  /** Gera senha nova e reenvia o e-mail de boas-vindas ao admin do cliente. */
+  async function reenviarAcesso(t: Tenant) {
+    if (!confirm(`Gerar uma senha nova para o admin de ${t.razaoSocial}? A senha atual deixa de valer.`)) return;
+    setErro(null); setMsgAttr(null);
+    try {
+      const r = await api.post<{ email: string; senhaProvisoria: string; emailEnviado: boolean }>(`/tenants/${t.id}/reenviar-acesso`, {});
+      setMsgAttr(r.emailEnviado
+        ? `Novo acesso enviado para ${r.email}. Senha provisória: ${r.senhaProvisoria}`
+        : `Não consegui enviar o e-mail. Passe manualmente — ${r.email} / senha: ${r.senhaProvisoria}`);
+    } catch (e) { setErro((e as Error).message); }
+  }
+
   async function baixarAttr(t: Tenant) {
     setErro(null); setMsgAttr(null);
     try {
@@ -92,6 +104,7 @@ export function Clientes() {
                 <div className={css.menu} onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => { setMenu(null); setEditarFuso(t); }}>Fuso horário</button>
                   <button onClick={() => { setMenu(null); void baixarAttr(t); }}>Baixar ATTR</button>
+                  <button onClick={() => { setMenu(null); void reenviarAcesso(t); }}>Reenviar acesso</button>
                   <button onClick={() => void alternarAtivo(t)}>{t.ativo ? 'Inativar' : 'Reativar'}</button>
                 </div>
               )}

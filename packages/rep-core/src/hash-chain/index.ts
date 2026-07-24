@@ -10,8 +10,8 @@ export interface DadosHash {
   coletor: number;
   onlineOffline: number;
   hashAnterior: string | null;
-  /** Fuso usado na formatação das datas. Ausente = Brasília (-0300). */
-  fuso?: string;
+  /** Fuso usado na formatação das datas — entra DENTRO do hash imutável. */
+  fuso: string;
 }
 
 /**
@@ -24,7 +24,7 @@ export interface DadosHash {
  * daquela marcação — por isso ele é gravado por linha (ver MarcacaoGravada).
  */
 export function construirEntradaHash(d: DadosHash): string {
-  const fuso = d.fuso ?? '-0300';
+  const fuso = d.fuso;
   return [
     String(d.nsr).padStart(9, '0'),
     '7',
@@ -55,7 +55,7 @@ export function proximaMarcacao(
    * nulo mesmo com nsr > 0, quando ainda não houve batida.
    */
   anterior: { nsr: number; hashRegistro: string | null } | null,
-  fuso = '-0300',
+  fuso: string,
 ): MarcacaoGravada {
   const nsr = (anterior?.nsr ?? 0) + 1;
   const hashAnterior = anterior?.hashRegistro ?? null;
@@ -87,7 +87,10 @@ export function verificarCadeia(
       coletor: m.coletor,
       onlineOffline: m.onlineOffline,
       hashAnterior,
-      fuso: m.fuso,
+      // Marcação sem fuso gravado é anterior ao fuso por linha: foi hasheada
+      // com Brasília, então é assim que se reproduz o hash dela. Não é default
+      // — é reconstituir o passado.
+      fuso: m.fuso ?? '-0300',
     }));
     if (esperado !== m.hashRegistro || (m.hashAnterior ?? null) !== hashAnterior) {
       return { integro: false, nsrQuebrado: m.nsr };

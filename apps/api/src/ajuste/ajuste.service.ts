@@ -4,6 +4,8 @@ import { pontoAjuste, empregado, pontoMarcacao, pontoRep, pontoHorarioContratual
 import { inicioDoDia, fimDoDia } from '@ponto/rep-core';
 import { ajustesAprovados } from '../tratamento/ajustes';
 import { DB } from '../database/database.module';
+import { EmailService } from '../email/email.service';
+import { emailAjusteDecidido } from '../email/templates';
 
 export interface NovoAjuste {
   empregadoId: string;
@@ -26,7 +28,10 @@ function limiteRetroativo(hoje = new Date()): string {
 
 @Injectable()
 export class AjusteService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly email?: EmailService,
+  ) {}
 
   /** Descobre o empregado vinculado ao usuário logado (colaborador). */
   async empregadoDoUsuario(usuarioId: string, tenantId: string): Promise<string> {

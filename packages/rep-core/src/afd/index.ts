@@ -23,7 +23,7 @@ const num = (v: unknown, tam: number): string => soDigitos(v).slice(-tam).padSta
 const comCRC = (conteudo: string): string => conteudo + crc16Kermit(conteudo);
 
 /** Registro tipo "1" — Cabeçalho (302 chars). */
-export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, dataGeracao: Date, fuso = '-0300'): string {
+export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, dataGeracao: Date, fuso: string): string {
   const conteudo =
     num('0', 9) +                                       // 1  "000000000"
     '1' +                                               // 2  tipo
@@ -145,9 +145,9 @@ export interface MontarAFDParams {
   /** Registros 2, 5 e 6 — compartilham a MESMA sequência de NSR das marcações. */
   eventos?: EventosAFD;
   dataGeracao?: Date;
-  /** Fuso atual do tenant — só para o cabeçalho (data de geração). Cada
-   *  marcação carrega o seu próprio fuso no registro 7. */
-  fuso?: string;
+  /** Fuso do tenant — cabeçalho e eventos. Cada marcação carrega o seu
+   *  próprio fuso no registro 7 (o mesmo com que foi hasheada). */
+  fuso: string;
 }
 
 export interface ArquivoGerado {
@@ -156,7 +156,7 @@ export interface ArquivoGerado {
   totalRegistros: number;
 }
 
-export function montarAFD({ rep, marcacoes, eventos = {}, dataGeracao = new Date(), fuso = '-0300' }: MontarAFDParams): ArquivoGerado {
+export function montarAFD({ rep, marcacoes, eventos = {}, dataGeracao = new Date(), fuso }: MontarAFDParams): ArquivoGerado {
   const datas = marcacoes.map((m) => m.dtMarcacao).sort((a, b) => a.getTime() - b.getTime());
   const dataInicial = datas[0] ?? dataGeracao;
   const dataFinal = datas[datas.length - 1] ?? dataGeracao;

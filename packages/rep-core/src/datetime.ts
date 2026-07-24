@@ -1,3 +1,7 @@
+// O fuso é OBRIGATÓRIO nestas funções de propósito. Elas decidem a que dia uma
+// batida pertence e como a hora vai para o arquivo fiscal — e o registro é
+// imutável. Um default silencioso (Brasília) já causou hora errada em cliente
+// de outro fuso; agora, esquecer de passar o fuso é erro de compilação.
 /** Formatadores de data/hora exigidos pelos leiautes AFD e AEJ. */
 
 export const soDigitos = (v: unknown): string => String(v ?? '').replace(/\D/g, '');
@@ -16,7 +20,7 @@ export function offsetMin(fuso: string): number {
  * DH do AFD/AEJ: "AAAA-MM-ddThh:mm:00ZZZZZ" (ex.: 2021-04-27T16:44:00-0300).
  * O fuso é parâmetro porque cada tenant (e cada marcação) tem o seu.
  */
-export function formatarDataHoraAFD(data: Date, fuso = '-0300'): string {
+export function formatarDataHoraAFD(data: Date, fuso: string): string {
   const local = new Date(data.getTime() + offsetMin(fuso) * 60000);
   const p = (n: number, l = 2) => String(n).padStart(l, '0');
   return `${local.getUTCFullYear()}-${p(local.getUTCMonth() + 1)}-${p(local.getUTCDate())}` +
@@ -34,15 +38,15 @@ export function dataD(d: Date): string {
  * Usado como limite inferior de filtros por dia — sem isso, um cliente fora de
  * Brasília perde/ganha batidas na virada do dia.
  */
-export const inicioDoDia = (dataISO: string, fuso = '-0300'): Date =>
+export const inicioDoDia = (dataISO: string, fuso: string): Date =>
   new Date(`${dataISO}T00:00:00${fuso}`);
 
 /** Instante UTC do fim do dia local (23:59:59) de "YYYY-MM-DD" num dado fuso. */
-export const fimDoDia = (dataISO: string, fuso = '-0300'): Date =>
+export const fimDoDia = (dataISO: string, fuso: string): Date =>
   new Date(`${dataISO}T23:59:59${fuso}`);
 
 /** Data-calendário local "YYYY-MM-DD" de um instante, no fuso informado. */
-export function dataLocalDe(instante: Date, fuso = '-0300'): string {
+export function dataLocalDe(instante: Date, fuso: string): string {
   return new Date(instante.getTime() + offsetMin(fuso) * 60000).toISOString().slice(0, 10);
 }
 
@@ -51,6 +55,6 @@ export function dataLocalDe(instante: Date, fuso = '-0300'): string {
  * Ancora ao meio-dia: meio-dia ±5h nunca cruza a meia-noite, então o dia
  * da semana sai correto para qualquer offset do Brasil.
  */
-export function diaDaSemanaLocal(dataISO: string, fuso = '-0300'): number {
+export function diaDaSemanaLocal(dataISO: string, fuso: string): number {
   return new Date(`${dataISO}T12:00:00${fuso}`).getUTCDay();
 }
