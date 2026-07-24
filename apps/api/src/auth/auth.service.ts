@@ -1,6 +1,6 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
-import { usuario, tenant, tokenSenha, comoMaster, type Db } from '@ponto/db';
+import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { and, asc, eq } from 'drizzle-orm';
+import { usuario, usuarioTenant, tenant, tokenSenha, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { hashSenha, verificarSenha } from './senha';
 import { createHash, randomBytes } from 'node:crypto';
@@ -15,6 +15,56 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly email: EmailService,
   ) {}
+
+  /** Empresas que o usuário administra (com o papel em cada uma). */
+  async empresasDoUsuario(usuarioId: string) {
+    return comoMaster(this.db, (tx) =>
+      tx.select({
+        tenantId: usuarioTenant.tenantId, perfil: usuarioTenant.perfil,
+        razaoSocial: tenant.razaoSocial, cnpj: tenant.cnpj,
+      }).from(usuarioTenant)
+        .innerJoin(tenant, eq(tenant.id, usuarioTenant.tenantId))
+        .where(eq(usuarioTenant.usuarioId, usuarioId))
+        .orderBy(asc(tenant.razaoSocial)));
+  }
+
+  /**
+   * TRAVA DE SEGURANÇA do multi-empresa. Decide em qual empresa a sessão vai
+   * abrir e com qual papel, SEMPRE conferindo o vínculo no banco. O tenantId
+   * que vem do navegador nunca é aceito por si só.
+   *
+   * `estrito` = pedido explícito de troca (recusa se não tiver acesso).
+   * Sem ele (refresh), cai para uma empresa válida em vez de derrubar a sessão.
+   */
+  private async resolverAcesso(
+    u: { id: string; tenantId: string | null; perfil: string },
+    desejado?: string | null,
+    estrito = false,
+  ): Promise<{ tenantId: string | null; perfil: string }> {
+    // MASTER opera a plataforma (sem tenant); colaborador pertence a uma só.
+    if (u.perfil === 'MASTER') return { tenantId: null, perfil: u.perfil };
+    if (u.perfil === 'COLABORADOR') return { tenantId: u.tenantId, perfil: u.perfil };
+
+    const vinculos = await this.empresasDoUsuario(u.id);
+    if (vinculos.length === 0) {
+      // Sem vínculo cadastrado: usa a empresa do próprio usuário (comportamento
+      // de sempre, para quem só administra uma).
+      if (!u.tenantId) throw new UnauthorizedException('Usuário sem empresa vinculada');
+      if (estrito && desejado && desejado !== u.tenantId) {
+        throw new ForbiddenException('Você não tem acesso a esta empresa');
+      }
+      return { tenantId: u.tenantId, perfil: u.perfil };
+    }
+
+    if (desejado) {
+      const v = vinculos.find((x) => x.tenantId === desejado);
+      if (v) return { tenantId: v.tenantId, perfil: v.perfil };
+      if (estrito) throw new ForbiddenException('Você não tem acesso a esta empresa');
+    }
+    // Empresa padrão, se ainda valer; senão, a primeira a que tem acesso.
+    const v = vinculos.find((x) => x.tenantId === u.tenantId) ?? vinculos[0]!;
+    return { tenantId: v.tenantId, perfil: v.perfil };
+  }
 
   /**
    * Monta o payload do access token. Inclui o fuso do tenant (só para o front
@@ -44,21 +94,28 @@ export class AuthService {
     const ok = await verificarSenha(senha, u.senhaHash);
     if (!ok) throw new UnauthorizedException('Credenciais inválidas');
 
-    const payload = await this.montarPayload(u);
+    // Em qual empresa a sessão abre (e com qual papel) — decidido no servidor.
+    const acesso = await this.resolverAcesso(u);
+    const payload = await this.montarPayload({ ...u, tenantId: acesso.tenantId, perfil: acesso.perfil });
+    const empresas = u.perfil === 'ADMIN_CLIENTE' || u.perfil === 'RH'
+      ? await this.empresasDoUsuario(u.id) : [];
     return {
       accessToken: this.tokens.assinarAcesso(payload),
-      refreshToken: this.tokens.assinarRefresh(u.id),
-      perfil: u.perfil,
-      tenantId: u.tenantId,
+      refreshToken: this.tokens.assinarRefresh(u.id, acesso.tenantId),
+      perfil: acesso.perfil,
+      tenantId: acesso.tenantId,
       deveTrocarSenha: u.deveTrocarSenha,
       fuso: payload.fuso,
+      /** Vazio ou com 1 item = usuário de empresa única (o front nem mostra o seletor). */
+      empresas,
     };
   }
 
   async refresh(refreshToken: string) {
     let sub: string;
+    let tenantAtivo: string | null | undefined;
     try {
-      ({ sub } = this.tokens.verificarRefresh(refreshToken));
+      ({ sub, tenantAtivo } = this.tokens.verificarRefresh(refreshToken));
     } catch {
       throw new UnauthorizedException('Refresh inválido ou expirado');
     }
@@ -66,8 +123,37 @@ export class AuthService {
       tx.select().from(usuario).where(and(eq(usuario.id, sub), eq(usuario.ativo, true))).limit(1));
     const u = rows[0];
     if (!u) throw new UnauthorizedException('Usuário inativo');
-    const payload = await this.montarPayload(u);
-    return { accessToken: this.tokens.assinarAcesso(payload) };
+    // Revalida o vínculo: se o acesso àquela empresa foi retirado, a renovação
+    // já não devolve mais permissão nela.
+    const acesso = await this.resolverAcesso(u, tenantAtivo ?? null);
+    const payload = await this.montarPayload({ ...u, tenantId: acesso.tenantId, perfil: acesso.perfil });
+    return {
+      accessToken: this.tokens.assinarAcesso(payload),
+      perfil: acesso.perfil,
+      tenantId: acesso.tenantId,
+    };
+  }
+
+  /**
+   * Troca a empresa que a sessão está enxergando. Emite tokens novos só depois
+   * de conferir o vínculo — é aqui que o "quero ver a empresa X" do navegador
+   * é aceito ou recusado.
+   */
+  async trocarEmpresa(usuarioId: string, tenantId: string) {
+    const rows = await comoMaster(this.db, (tx) =>
+      tx.select().from(usuario).where(and(eq(usuario.id, usuarioId), eq(usuario.ativo, true))).limit(1));
+    const u = rows[0];
+    if (!u) throw new UnauthorizedException('Usuário inativo');
+
+    const acesso = await this.resolverAcesso(u, tenantId, true);
+    const payload = await this.montarPayload({ ...u, tenantId: acesso.tenantId, perfil: acesso.perfil });
+    return {
+      accessToken: this.tokens.assinarAcesso(payload),
+      refreshToken: this.tokens.assinarRefresh(u.id, acesso.tenantId),
+      perfil: acesso.perfil,
+      tenantId: acesso.tenantId,
+      fuso: payload.fuso,
+    };
   }
 
   /** Troca a própria senha (verifica a atual) e limpa a obrigação de trocar. */

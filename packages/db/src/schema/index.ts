@@ -6,6 +6,7 @@ export * from './cct';
 export * from './convencao';
 export * from './regra-item';
 export * from './ajuste';
+export * from './usuario-tenant';
 export * from './marcacao';
 export * from './tratamento';
 export * from './banco';

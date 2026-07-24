@@ -19,3 +19,9 @@ export class AtivoDto {
 export class FusoDto {
   @IsIn(FUSOS_BR, { message: 'Fuso inválido' }) fuso!: string;
 }
+
+export class VincularEmpresaDto {
+  @IsString() usuarioId!: string;
+  @IsString() tenantId!: string;
+  @IsIn(['ADMIN_CLIENTE', 'RH']) perfil!: 'ADMIN_CLIENTE' | 'RH';
+}

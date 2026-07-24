@@ -17,6 +17,9 @@ export function LayoutMaster() {
           <NavLink to="/master/cobranca" className={({ isActive }) => `${css.link} ${isActive ? css.on : ''}`}>
             <span className={css.ic} />Cobrança
           </NavLink>
+          <NavLink to="/master/acessos" className={({ isActive }) => `${css.link} ${isActive ? css.on : ''}`}>
+            <span className={css.ic} />Acessos
+          </NavLink>
         </nav>
         <div className={css.foot}>
           <div className={css.who}>Master<small>plataforma</small></div>

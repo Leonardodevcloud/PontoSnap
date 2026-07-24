@@ -1,6 +1,6 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshDto, AlterarSenhaDto, RecuperarSenhaDto, RedefinirSenhaDto } from './dto/login.dto';
+import { LoginDto, RefreshDto, AlterarSenhaDto, RecuperarSenhaDto, RedefinirSenhaDto, TrocarEmpresaDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from './token';
@@ -17,6 +17,20 @@ export class AuthController {
   @Post('refresh')
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto.refreshToken);
+  }
+
+  /** Empresas que este acesso administra (para o seletor do topo). */
+  @Get('empresas')
+  @UseGuards(JwtAuthGuard)
+  empresas(@UsuarioAtual() u: PayloadAcesso) {
+    return this.auth.empresasDoUsuario(u.sub);
+  }
+
+  /** Troca a empresa que a sessão enxerga. O vínculo é conferido no servidor. */
+  @Post('trocar-empresa')
+  @UseGuards(JwtAuthGuard)
+  trocarEmpresa(@UsuarioAtual() u: PayloadAcesso, @Body() dto: TrocarEmpresaDto) {
+    return this.auth.trocarEmpresa(u.sub, dto.tenantId);
   }
 
   @Post('alterar-senha')

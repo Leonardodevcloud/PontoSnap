@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { BannerCobranca } from './BannerCobranca';
 import { useAuth } from '../lib/auth';
@@ -49,6 +50,59 @@ const NOME_PERFIL: Record<string, string> = {
   RH: 'RH', ADMIN_CLIENTE: 'Administrador', MASTER: 'Master',
 };
 
+/**
+ * Seletor de empresa. Só aparece para quem administra mais de um CNPJ —
+ * quem cuida de uma empresa só não vê diferença nenhuma.
+ */
+function SeletorEmpresa() {
+  const { sessao, empresas, trocarEmpresa } = useAuth();
+  const [aberto, setAberto] = useState(false);
+  const [trocando, setTrocando] = useState<string | null>(null);
+
+  if (empresas.length < 2) return null;
+  const atual = empresas.find((e) => e.tenantId === sessao?.tenantId) ?? empresas[0];
+
+  const iniciais = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((x) => x[0]?.toUpperCase() ?? '').join('');
+  const fmtCnpj = (c: string) => c.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+
+  async function trocar(tenantId: string) {
+    if (tenantId === sessao?.tenantId) { setAberto(false); return; }
+    setTrocando(tenantId);
+    try { await trocarEmpresa(tenantId); }
+    catch { setTrocando(null); setAberto(false); }
+  }
+
+  return (
+    <div className={css.selWrap}>
+      <button className={css.selBtn} onClick={() => setAberto((a) => !a)}>
+        <span className={css.selNome}>{atual?.razaoSocial ?? 'Empresa'}</span>
+        <span className={css.selCnpj}>{atual ? fmtCnpj(atual.cnpj) : ''}</span>
+        <span className={css.selSeta}>{aberto ? '▲' : '▼'}</span>
+      </button>
+      {aberto && (
+        <>
+          <div className={css.selFundo} onClick={() => setAberto(false)} />
+          <div className={css.selDd}>
+            <div className={css.selDdLb}>Trocar de empresa</div>
+            {empresas.map((e) => (
+              <button key={e.tenantId} className={`${css.selItem} ${e.tenantId === sessao?.tenantId ? css.selOn : ''}`}
+                disabled={trocando != null} onClick={() => trocar(e.tenantId)}>
+                <span className={css.selIni}>{iniciais(e.razaoSocial)}</span>
+                <span className={css.selTxt}>
+                  <span className={css.selItemNome}>{e.razaoSocial}</span>
+                  <span className={css.selItemMeta}>{fmtCnpj(e.cnpj)} · {e.perfil === 'ADMIN_CLIENTE' ? 'Admin' : 'RH'}</span>
+                </span>
+                {trocando === e.tenantId ? <span className={css.selCheck}>…</span>
+                  : e.tenantId === sessao?.tenantId ? <span className={css.selCheck}>✓</span> : null}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function LayoutRH() {
   const { sessao, sair } = useAuth();
   const navegar = useNavigate();
@@ -57,6 +111,7 @@ export function LayoutRH() {
     <div className={css.app}>
       <aside className={css.side}>
         <div className={css.wm}>Ponto<span className={css.snap}>Snap</span></div>
+        <SeletorEmpresa />
         <nav className={css.nav}>
           {GRUPOS.map((g) => {
             const itens = g.itens.filter((i) => !i.soAdmin || sessao?.perfil === 'ADMIN_CLIENTE');

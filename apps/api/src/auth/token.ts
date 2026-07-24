@@ -25,16 +25,22 @@ export class TokenService {
     return jwt.sign(payload, this.cfg.segredoAcesso, opts);
   }
 
-  assinarRefresh(sub: string): string {
+  /**
+   * O refresh carrega a empresa ativa: sem isso, a cada renovação a sessão
+   * voltaria sozinha para a empresa padrão de quem administra vários CNPJs.
+   * O vínculo é revalidado no banco a cada refresh — o token não é a permissão,
+   * é só a lembrança de onde a pessoa estava.
+   */
+  assinarRefresh(sub: string, tenantAtivo?: string | null): string {
     const opts: jwt.SignOptions = { expiresIn: this.cfg.expiraRefresh as jwt.SignOptions['expiresIn'] };
-    return jwt.sign({ sub }, this.cfg.segredoRefresh, opts);
+    return jwt.sign({ sub, tenantAtivo: tenantAtivo ?? null }, this.cfg.segredoRefresh, opts);
   }
 
   verificarAcesso(token: string): PayloadAcesso {
     return jwt.verify(token, this.cfg.segredoAcesso) as PayloadAcesso;
   }
 
-  verificarRefresh(token: string): { sub: string } {
-    return jwt.verify(token, this.cfg.segredoRefresh) as { sub: string };
+  verificarRefresh(token: string): { sub: string; tenantAtivo?: string | null } {
+    return jwt.verify(token, this.cfg.segredoRefresh) as { sub: string; tenantAtivo?: string | null };
   }
 }

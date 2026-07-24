@@ -7,6 +7,7 @@ export interface RespLogin {
   tenantId: string | null;
   deveTrocarSenha?: boolean;
   fuso?: string;
+  empresas?: EmpresaAcesso[];
 }
 
 export interface Tenant {
@@ -494,4 +495,11 @@ export interface AjusteMeu {
   motivoDecisao: string | null;
   dtMarcacao: string | null;
   tpMarc: string | null;
+}
+
+export interface EmpresaAcesso {
+  tenantId: string;
+  perfil: 'ADMIN_CLIENTE' | 'RH';
+  razaoSocial: string;
+  cnpj: string;
 }

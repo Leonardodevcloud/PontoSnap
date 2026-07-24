@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import { tenant, pontoRep, usuario, comoMaster, type Db } from '@ponto/db';
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import { tenant, pontoRep, usuario, usuarioTenant, comoMaster, type Db } from '@ponto/db';
 import { TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { hashSenha } from '../auth/senha';
@@ -80,5 +80,63 @@ export class TenantService {
   async definirFuso(id: string, fuso: string) {
     await comoMaster(this.db, (tx) => tx.update(tenant).set({ fuso }).where(eq(tenant.id, id)));
     return this.obter(id);
+  }
+
+  // ---- Acesso multi-empresa (só MASTER concede) ----
+
+  /** Contas de administração (ADMIN/RH) e as empresas de cada uma. */
+  async listarAcessos() {
+    return comoMaster(this.db, async (tx) => {
+      const contas = await tx.select({
+        id: usuario.id, email: usuario.email, perfil: usuario.perfil,
+        tenantPadrao: usuario.tenantId, ativo: usuario.ativo,
+      }).from(usuario)
+        .where(inArray(usuario.perfil, ['ADMIN_CLIENTE', 'RH']))
+        .orderBy(asc(usuario.email));
+
+      const vinculos = await tx.select({
+        id: usuarioTenant.id, usuarioId: usuarioTenant.usuarioId, tenantId: usuarioTenant.tenantId,
+        perfil: usuarioTenant.perfil, razaoSocial: tenant.razaoSocial, cnpj: tenant.cnpj,
+      }).from(usuarioTenant).innerJoin(tenant, eq(tenant.id, usuarioTenant.tenantId));
+
+      const por = new Map<string, typeof vinculos>();
+      for (const v of vinculos) por.set(v.usuarioId, [...(por.get(v.usuarioId) ?? []), v]);
+      return contas.map((c) => ({ ...c, empresas: por.get(c.id) ?? [] }));
+    });
+  }
+
+  /** Dá a um acesso existente permissão em mais uma empresa. */
+  async vincularEmpresa(usuarioId: string, tenantId: string, perfil: 'ADMIN_CLIENTE' | 'RH') {
+    return comoMaster(this.db, async (tx) => {
+      const u = (await tx.select({ perfil: usuario.perfil }).from(usuario)
+        .where(eq(usuario.id, usuarioId)).limit(1))[0];
+      if (!u) throw new NotFoundException('Usuário não encontrado');
+      // Colaborador tem vínculo, CPF e registro fiscal numa CNPJ — não circula.
+      if (u.perfil !== 'ADMIN_CLIENTE' && u.perfil !== 'RH') {
+        throw new ConflictException('Só contas de administração (Admin ou RH) podem ver mais de uma empresa.');
+      }
+      const t = (await tx.select({ id: tenant.id }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      if (!t) throw new NotFoundException('Empresa não encontrada');
+
+      const ja = (await tx.select({ id: usuarioTenant.id }).from(usuarioTenant).where(and(
+        eq(usuarioTenant.usuarioId, usuarioId), eq(usuarioTenant.tenantId, tenantId))).limit(1))[0];
+      if (ja) throw new ConflictException('Este acesso já administra essa empresa.');
+
+      const [v] = await tx.insert(usuarioTenant).values({ usuarioId, tenantId, perfil }).returning();
+      return v;
+    });
+  }
+
+  /** Retira o acesso. Vale já na próxima renovação de sessão. */
+  async desvincularEmpresa(vinculoId: string) {
+    return comoMaster(this.db, async (tx) => {
+      const v = (await tx.select().from(usuarioTenant).where(eq(usuarioTenant.id, vinculoId)).limit(1))[0];
+      if (!v) throw new NotFoundException('Vínculo não encontrado');
+      const restantes = await tx.select({ id: usuarioTenant.id }).from(usuarioTenant)
+        .where(eq(usuarioTenant.usuarioId, v.usuarioId));
+      if (restantes.length <= 1) throw new ConflictException('Este acesso ficaria sem nenhuma empresa. Inative o usuário se for esse o caso.');
+      await tx.delete(usuarioTenant).where(eq(usuarioTenant.id, vinculoId));
+      return { removido: true };
+    });
   }
 }

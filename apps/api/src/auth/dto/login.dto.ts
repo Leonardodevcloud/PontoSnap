@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsEmail() email!: string;
@@ -21,4 +21,8 @@ export class RecuperarSenhaDto {
 export class RedefinirSenhaDto {
   @IsString() @MinLength(10) token!: string;
   @IsString() @MinLength(8) senhaNova!: string;
+}
+
+export class TrocarEmpresaDto {
+  @IsString() @IsNotEmpty() tenantId!: string;
 }

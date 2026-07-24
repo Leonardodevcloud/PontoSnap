@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { TenantService } from './tenant.service';
-import { CriarTenantDto, AtivoDto, FusoDto } from './dto/tenant.dto';
+import { CriarTenantDto, AtivoDto, FusoDto, VincularEmpresaDto } from './dto/tenant.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -19,6 +19,17 @@ export class TenantController {
   @Patch(':id/ativo') ativo(@Param('id') id: string, @Body() dto: AtivoDto) {
     return this.tenants.definirAtivo(id, dto.ativo);
   }
+  // ---- Acesso multi-empresa ----
+  @Get('acessos/lista') acessos() { return this.tenants.listarAcessos(); }
+
+  @Post('acessos') vincular(@Body() dto: VincularEmpresaDto) {
+    return this.tenants.vincularEmpresa(dto.usuarioId, dto.tenantId, dto.perfil);
+  }
+
+  @Delete('acessos/:vinculoId') desvincular(@Param('vinculoId') vinculoId: string) {
+    return this.tenants.desvincularEmpresa(vinculoId);
+  }
+
   @Patch(':id/fuso') fuso(@Param('id') id: string, @Body() dto: FusoDto) {
     return this.tenants.definirFuso(id, dto.fuso);
   }

@@ -35,6 +35,7 @@ import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
 import { Cobranca } from './master/Cobranca';
+import { Acessos } from './master/Acessos';
 import { Assinatura } from './rh/Assinatura';
 import { Quiosque } from './quiosque/Quiosque';
 import { Flash } from './components/Flash';
@@ -121,6 +122,7 @@ export function App() {
       <Route path="/master" element={<Protegida perfis={['MASTER']}><LayoutMaster /></Protegida>}>
         <Route index element={<Clientes />} />
         <Route path="cobranca" element={<Cobranca />} />
+        <Route path="acessos" element={<Acessos />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
