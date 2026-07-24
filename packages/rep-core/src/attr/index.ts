@@ -54,12 +54,15 @@ export function gerarATTR(d: DadosATTR): Promise<Buffer> {
     .text('ATESTADO TÉCNICO E TERMO DE RESPONSABILIDADE', { align: 'center' });
   doc.moveDown(1.5);
 
-  // Parágrafo de abertura — redação do modelo oficial.
+  // Parágrafo de abertura — redação do modelo oficial. O modelo prevê
+  // "(razão social ou nome)" e "(CNPJ/CPF)", ou seja, já contempla
+  // desenvolvedor pessoa física; aqui só ajustamos a palavra que antecede.
+  const ehPF = String(d.desenvolvedor.documento ?? '').replace(/\D/g, '').length === 11;
   doc.font('Helvetica').fontSize(10.5).text(
-    `Na qualidade de responsável técnico e de responsável legal da empresa ${d.desenvolvedor.razaoSocial}, ` +
-    `(CNPJ/CPF nº ${fmtDoc(d.desenvolvedor.documento)}), os signatários abaixo, em atenção ao art. 89 da ` +
-    'Portaria MTP nº 671/2021, atestam e declaram que o equipamento e/ou programa identificados abaixo ' +
-    'estão em conformidade com a Portaria MTP nº 671/2021.',
+    `Na qualidade de responsável técnico e de responsável legal ${ehPF ? 'do desenvolvedor' : 'da empresa'} ` +
+    `${d.desenvolvedor.razaoSocial}, (CNPJ/CPF nº ${fmtDoc(d.desenvolvedor.documento)}), os signatários abaixo, ` +
+    'em atenção ao art. 89 da Portaria MTP nº 671/2021, atestam e declaram que o equipamento e/ou programa ' +
+    'identificados abaixo estão em conformidade com a Portaria MTP nº 671/2021.',
     { align: 'justify', lineGap: 2 });
   doc.moveDown(1.2);
 
