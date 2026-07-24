@@ -13,7 +13,7 @@ const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', use
 const db = drizzle(client, { schema });
 const tokens = new TokenService({ segredoAcesso: 'a'.repeat(40), segredoRefresh: 'r'.repeat(40), expiraAcesso: '15m', expiraRefresh: '7d' });
 const auth = new AuthService(db, tokens, {} as never);
-const tenants = new TenantService(db);
+const tenants = new TenantService(db, { enviar: async () => true } as never);
 const empSvc = new EmpregadoService(db as never, {} as never);
 
 let falhas = 0;

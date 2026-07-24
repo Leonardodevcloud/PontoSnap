@@ -86,7 +86,7 @@ export function Clientes() {
   );
 }
 
-interface RespCriar { tenant: Tenant; admin: { email: string } }
+interface RespCriar { tenant: Tenant; admin: { email: string }; senhaProvisoria: string | null; emailEnviado: boolean }
 
 function ModalNovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCriado: () => void }) {
   const [razaoSocial, setRazao] = useState('');
@@ -94,19 +94,31 @@ function ModalNovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCria
   const [localPrestacao, setLocal] = useState('');
   const [fuso, setFuso] = useState('-0300');
   const [adminEmail, setEmail] = useState('');
-  const [adminSenha, setSenha] = useState('');
+  const [adminNome, setNome] = useState('');
+  const [caminho, setCaminho] = useState<'NOVO' | 'EXISTENTE'>('NOVO');
+  const [contas, setContas] = useState<{ id: string; email: string; perfil: string }[]>([]);
+  const [usuarioExistenteId, setUsuarioExistente] = useState('');
+  const [perfilNaEmpresa, setPerfilNaEmpresa] = useState<'RH' | 'ADMIN_CLIENTE'>('RH');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [criado, setCriado] = useState<RespCriar | null>(null);
 
+  // Contas de administração já existentes — para o caminho "outra empresa do mesmo cliente".
+  useEffect(() => {
+    api.get<{ id: string; email: string; perfil: string }[]>('/tenants/acessos/lista')
+      .then(setContas).catch(() => {});
+  }, []);
+
   async function salvar() {
     setErro(null); setEnviando(true);
     try {
-      const r = await api.post<RespCriar>('/tenants', {
+      const base = {
         razaoSocial: razaoSocial.trim(), cnpj: soDigitos(cnpj),
         localPrestacao: localPrestacao.trim() || undefined, fuso,
-        adminEmail: adminEmail.trim(), adminSenha,
-      });
+      };
+      const r = await api.post<RespCriar>('/tenants', caminho === 'NOVO'
+        ? { ...base, adminEmail: adminEmail.trim(), adminNome: adminNome.trim() || undefined }
+        : { ...base, usuarioExistenteId, perfilNaEmpresa });
       setCriado(r);
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
   }
@@ -114,11 +126,25 @@ function ModalNovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCria
   if (criado) {
     return (
       <Modal titulo="Cliente criado" onFechar={onCriado}>
-        <p className={css.sucesso}>● {criado.tenant.razaoSocial} está no ar, com REP-P e acesso de admin.</p>
+        <p className={css.sucesso}>● {criado.tenant.razaoSocial} está no ar, com REP-P configurado.</p>
         <div className={css.entrega}>
-          <span className={css.eLbl}>Entregue este acesso ao cliente</span>
-          <div className={css.eEmail}>{criado.admin.email}</div>
-          <p className={css.eNota}>A senha é a provisória que você definiu. No primeiro login, o cliente é obrigado a trocá-la.</p>
+          {criado.senhaProvisoria ? (
+            <>
+              <span className={css.eLbl}>
+                {criado.emailEnviado ? 'E-mail de boas-vindas enviado para' : 'Não consegui enviar o e-mail — entregue estes dados'}
+              </span>
+              <div className={css.eEmail}>{criado.admin.email}</div>
+              <span className={css.eLbl} style={{ marginTop: 12 }}>Senha provisória</span>
+              <div className={css.eSenha}>{criado.senhaProvisoria}</div>
+              <p className={css.eNota}>No primeiro login o cliente é obrigado a trocá-la. Guarde caso precise repassar por outro canal.</p>
+            </>
+          ) : (
+            <>
+              <span className={css.eLbl}>Empresa vinculada ao acesso</span>
+              <div className={css.eEmail}>{criado.admin.email}</div>
+              <p className={css.eNota}>Sem senha nova e sem e-mail: a empresa já aparece no seletor dele no próximo acesso.</p>
+            </>
+          )}
         </div>
         <Botao variante="coral" onClick={onCriado}>Concluir</Botao>
       </Modal>
@@ -137,12 +163,49 @@ function ModalNovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCria
         </select>
       </label>
       <p className={css.fusoNota}>Rege apuração, arquivos fiscais e espelhos. Cada batida grava o fuso do momento — defina certo antes das primeiras marcações.</p>
-      <div className={css.divider}>Acesso do administrador</div>
-      <Campo rotulo="E-mail do admin" type="email" value={adminEmail} onChange={(e) => setEmail(e.target.value)} placeholder="admin@empresa.com.br" />
-      <Campo rotulo="Senha provisória" type="password" value={adminSenha} onChange={(e) => setSenha(e.target.value)} placeholder="mínimo 8 caracteres" />
+      <div className={css.divider}>Quem vai administrar</div>
+      <div className={css.caminhos}>
+        <button className={`${css.cam} ${caminho === 'NOVO' ? css.camOn : ''}`} onClick={() => setCaminho('NOVO')}>
+          <span className={css.camT}>Cliente novo</span>
+          <span className={css.camD}>Cria o acesso e manda o e-mail de boas-vindas.</span>
+        </button>
+        <button className={`${css.cam} ${caminho === 'EXISTENTE' ? css.camOn : ''}`} onClick={() => setCaminho('EXISTENTE')}>
+          <span className={css.camT}>Outra empresa de um cliente meu</span>
+          <span className={css.camD}>Mesmo acesso administrando mais um CNPJ.</span>
+        </button>
+      </div>
+
+      {caminho === 'NOVO' ? (
+        <>
+          <Campo rotulo="Nome do responsável" value={adminNome} onChange={(e) => setNome(e.target.value)} placeholder="Marina Souza" />
+          <Campo rotulo="E-mail do responsável" type="email" value={adminEmail} onChange={(e) => setEmail(e.target.value)} placeholder="admin@empresa.com.br" />
+          <p className={css.fusoNota}>A senha provisória é gerada pelo sistema e enviada por e-mail junto com o link. Ela também aparece aqui depois de criar.</p>
+        </>
+      ) : (
+        <>
+          <label className={css.selWrap}>
+            <span className={css.selLb}>Acesso que vai administrar</span>
+            <select className={css.select} value={usuarioExistenteId} onChange={(e) => setUsuarioExistente(e.target.value)}>
+              <option value="">— escolher acesso —</option>
+              {contas.map((c) => <option key={c.id} value={c.id}>{c.email} · {c.perfil === 'ADMIN_CLIENTE' ? 'Admin' : 'RH'}</option>)}
+            </select>
+          </label>
+          <label className={css.selWrap}>
+            <span className={css.selLb}>Papel dele nesta empresa</span>
+            <select className={css.select} value={perfilNaEmpresa} onChange={(e) => setPerfilNaEmpresa(e.target.value as 'RH' | 'ADMIN_CLIENTE')}>
+              <option value="RH">RH</option>
+              <option value="ADMIN_CLIENTE">Admin</option>
+            </select>
+          </label>
+          <p className={css.fusoNota}>Sem e-mail novo e sem senha nova: esta empresa passa a aparecer no seletor de empresas dele.</p>
+        </>
+      )}
+
       {erro && <p className={css.erro}>{erro}</p>}
-      <Botao variante="coral" onClick={salvar} disabled={enviando || !razaoSocial || soDigitos(cnpj).length !== 14 || !adminEmail || adminSenha.length < 8}>
-        {enviando ? 'Criando…' : 'Criar cliente'}
+      <Botao variante="coral" onClick={salvar}
+        disabled={enviando || !razaoSocial || soDigitos(cnpj).length !== 14 ||
+          (caminho === 'NOVO' ? !adminEmail : !usuarioExistenteId)}>
+        {enviando ? 'Criando…' : 'Cadastrar empresa'}
       </Botao>
     </Modal>
   );

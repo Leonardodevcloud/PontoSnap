@@ -20,3 +20,9 @@
 .btnG{ background:transparent; color:var(--ink); border:1.5px solid rgba(16,64,63,.15); border-radius:var(--r-pill); padding:7px 13px; font:inherit; font-weight:800; font-size:12.5px; cursor:pointer; white-space:nowrap; }
 .link{ background:none; border:none; font:inherit; font-size:12.5px; font-weight:700; color:var(--ash); text-decoration:underline; cursor:pointer; }
 .nota{ background:var(--peach); border-radius:12px; padding:12px 15px; font-size:13px; color:var(--ash); line-height:1.55; margin-top:16px; }
+
+.voce{ display:flex; align-items:flex-start; gap:9px; background:#EAF4F1; border:1px solid rgba(16,64,63,.14); border-radius:12px; padding:11px 14px; font-size:13px; color:var(--ink); margin:0 0 18px; line-height:1.5; }
+.cli{ display:inline-block; font-family:var(--ff-mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--coral-dark); background:var(--peach); padding:2px 7px; border-radius:5px; }
+.emailConta{ display:block; margin-top:5px; }
+.quando{ background:var(--white); border:1px dashed rgba(16,64,63,.2); border-radius:12px; padding:13px 15px; font-size:13px; color:var(--ash); line-height:1.6; margin-top:14px; }
+.quando b{ color:var(--ink); }

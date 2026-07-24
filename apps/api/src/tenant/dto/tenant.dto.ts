@@ -8,8 +8,12 @@ export class CriarTenantDto {
   @IsString() @MinLength(2) razaoSocial!: string;
   @IsOptional() @IsString() localPrestacao?: string;
   @IsOptional() @IsIn(FUSOS_BR, { message: 'Fuso inválido' }) fuso?: string;
-  @IsEmail() adminEmail!: string;
-  @IsString() @MinLength(8) adminSenha!: string;
+  // Caminho A — cliente novo. A senha é gerada pelo sistema e vai por e-mail.
+  @IsOptional() @IsEmail() adminEmail?: string;
+  @IsOptional() @IsString() adminNome?: string;
+  // Caminho B — outra empresa de um cliente que já existe.
+  @IsOptional() @IsString() usuarioExistenteId?: string;
+  @IsOptional() @IsIn(['ADMIN_CLIENTE', 'RH']) perfilNaEmpresa?: 'ADMIN_CLIENTE' | 'RH';
 }
 
 export class AtivoDto {

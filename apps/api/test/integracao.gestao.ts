@@ -10,7 +10,7 @@ import { TokenService } from '../src/auth/token';
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
 const db = drizzle(client, { schema });
 
-const tenantSvc = new TenantService(db);
+const tenantSvc = new TenantService(db, { enviar: async () => true } as never);
 const emailFake = { enviar: async () => true } as unknown as import('../src/email/email.service').EmailService;
 const empSvc = new EmpregadoService(db, emailFake);
 const tokens = new TokenService({ segredoAcesso: 'a', segredoRefresh: 'r', expiraAcesso: '15m', expiraRefresh: '7d' });
@@ -21,15 +21,15 @@ const ok = (cond: boolean, msg: string) => console.log(`${cond ? 'OK  ' : 'FALHA
 async function main() {
   // MASTER cria 2 clientes, cada um com seu admin
   const a = await tenantSvc.criar({ cnpj: '11111111000111', razaoSocial: 'Cliente A',
-    localPrestacao: 'Salvador/BA', adminEmail: 'admin@a.com', adminSenha: 'senhaForte1' });
+    localPrestacao: 'Salvador/BA', adminEmail: 'admin@a.com' });
   const b = await tenantSvc.criar({ cnpj: '22222222000122', razaoSocial: 'Cliente B',
-    localPrestacao: 'Feira/BA', adminEmail: 'admin@b.com', adminSenha: 'senhaForte2' });
+    localPrestacao: 'Feira/BA', adminEmail: 'admin@b.com' });
   ok(!!a.repId && !!b.repId, 'cada cliente nasce com seu REP-P configurado');
   ok(a.admin.perfil === 'ADMIN_CLIENTE', 'admin do cliente criado com perfil ADMIN_CLIENTE');
 
   // Duplicidade de CNPJ é barrada
   let conflito = false;
-  try { await tenantSvc.criar({ cnpj: '11111111000111', razaoSocial: 'Dup', adminEmail: 'x@x.com', adminSenha: 'senhaForte9' }); }
+  try { await tenantSvc.criar({ cnpj: '11111111000111', razaoSocial: 'Dup', adminEmail: 'x@x.com' }); }
   catch { conflito = true; }
   ok(conflito, 'CNPJ duplicado é rejeitado');
 
@@ -49,17 +49,18 @@ async function main() {
      'resposta esconde o hash do PIN e sinaliza temPin');
 
   // O admin criado no provisionamento consegue logar de verdade
-  const login = await authSvc.login('admin@a.com', 'senhaForte1');
+  const provisoria = a.senhaProvisoria!;
+  const login = await authSvc.login('admin@a.com', provisoria);
   ok(!!login.accessToken && login.tenantId === a.tenant.id && login.perfil === 'ADMIN_CLIENTE',
      'admin do Cliente A loga e recebe token com o tenant certo');
 
   // primeiro acesso obriga a trocar a senha provisória
   ok(login.deveTrocarSenha === true, 'admin provisionado precisa trocar a senha no 1º acesso');
-  await authSvc.alterarSenha(a.admin.id, 'senhaForte1', 'novaSenhaForte9');
+  await authSvc.alterarSenha(a.admin.id, provisoria, 'novaSenhaForte9');
   const login2 = await authSvc.login('admin@a.com', 'novaSenhaForte9');
   ok(!!login2.accessToken && login2.deveTrocarSenha === false, 'após trocar, loga com a nova senha e sem obrigação');
   let velhaNega = false;
-  try { await authSvc.login('admin@a.com', 'senhaForte1'); } catch { velhaNega = true; }
+  try { await authSvc.login('admin@a.com', provisoria); } catch { velhaNega = true; }
   ok(velhaNega, 'a senha antiga não vale mais');
 
   // Senha errada é rejeitada

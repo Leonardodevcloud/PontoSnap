@@ -104,3 +104,31 @@ export function emailAcessoFuncionario(nome: string, email: string, senha: strin
       ${botao('Abrir o PontoSnap', urlApp)}`),
   };
 }
+
+/** Boas-vindas ao responsável pela empresa recém-cadastrada (admin do cliente). */
+export function emailBoasVindasCliente(
+  nome: string, razaoSocial: string, email: string, senha: string, urlApp: string,
+): { assunto: string; html: string } {
+  return {
+    assunto: `Bem-vindo ao PontoSnap — acesso de ${razaoSocial}`,
+    html: moldura(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">Sua empresa está pronta no PontoSnap</h1>
+      <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">Olá${nome ? `, ${nome}` : ''}!</p>
+      <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#5C4F49;">
+        O acesso de <strong>${razaoSocial}</strong> foi criado. Entre com os dados abaixo para cadastrar seus
+        funcionários e começar a registrar o ponto.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0;width:100%;background:#FFF8EE;border-radius:12px;">
+        <tr><td style="padding:16px 20px;">
+          <p style="margin:0 0 6px;font-size:13px;color:#5C4F49;">E-mail</p>
+          <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#10403F;">${email}</p>
+          <p style="margin:0 0 6px;font-size:13px;color:#5C4F49;">Senha provisória</p>
+          <p style="margin:0;font-size:18px;font-weight:700;color:#FF6B4A;font-family:'SF Mono',Menlo,monospace;letter-spacing:.02em;">${senha}</p>
+        </td></tr>
+      </table>
+      <p style="margin:0 0 4px;font-size:14px;line-height:1.6;color:#5C4F49;">
+        No primeiro acesso você vai criar sua própria senha. Guarde este e-mail até lá.
+      </p>
+      ${botao('Entrar no PontoSnap', urlApp)}`),
+  };
+}

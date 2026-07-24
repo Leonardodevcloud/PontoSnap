@@ -41,3 +41,12 @@
 .select{ padding:11px 12px; border:1px solid rgba(16,64,63,.18); border-radius:12px; font:inherit; background:var(--white); color:var(--ink); }
 .fusoNota{ font-size:12px; color:var(--ash); margin:-8px 0 16px; }
 .fusoCol{ font-family:var(--ff-mono); font-size:12px; color:var(--ash); }
+
+/* Caminhos de cadastro (cliente novo x outra empresa do mesmo cliente) */
+.caminhos{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:16px; }
+.cam{ border:2px solid rgba(16,64,63,.12); background:var(--cream); border-radius:14px; padding:12px 13px; cursor:pointer; text-align:left; font:inherit; }
+.camOn{ border-color:var(--coral); background:var(--peach); }
+.camT{ display:block; font-size:13.5px; font-weight:800; color:var(--ink); margin-bottom:3px; }
+.camD{ display:block; font-size:11.5px; color:var(--ash); line-height:1.4; }
+.eSenha{ font-family:var(--ff-mono); font-size:18px; font-weight:700; color:var(--coral-dark); letter-spacing:.06em; margin-top:3px; }
+@media (max-width: 560px){ .caminhos{ grid-template-columns:1fr; } }
