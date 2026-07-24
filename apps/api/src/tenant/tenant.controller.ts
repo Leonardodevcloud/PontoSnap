@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, StreamableFile, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { TenantService } from './tenant.service';
 import { CriarTenantDto, AtivoDto, FusoDto, VincularEmpresaDto } from './dto/tenant.dto';
@@ -19,6 +19,15 @@ export class TenantController {
   @Patch(':id/ativo') ativo(@Param('id') id: string, @Body() dto: AtivoDto) {
     return this.tenants.definirAtivo(id, dto.ativo);
   }
+  /** ATTR do cliente (art. 89). Baixa em PDF, para assinar com e-CPF. */
+  @Get(':id/attr') async attr(@Param('id') id: string) {
+    const { pdf, nomeArquivo } = await this.tenants.gerarAttr(id);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${nomeArquivo}"`,
+    });
+  }
+
   // ---- Acesso multi-empresa ----
   @Get('acessos/lista') acessos() { return this.tenants.listarAcessos(); }
 

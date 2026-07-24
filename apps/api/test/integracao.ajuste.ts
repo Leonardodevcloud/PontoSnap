@@ -160,6 +160,25 @@ async function main() {
   const depoisRh = await trat.apurarPeriodoCLT(t.id, emp4.id, DATA, DATA, []);
   ok(depoisRh.resultado.dias.find((d) => d.data === DATA)?.paresIncompletos === false, 'RH: batida a mais saiu da conta na hora');
 
+  // ---- o fuso do cliente manda (Manaus -0400, não Brasília) ----
+  const tMan = (await comoMaster(db, (tx) => tx.insert(tenant).values({
+    cnpj: '33344455000166', razaoSocial: 'MANAUS LTDA', fuso: '-0400',
+  }).returning()))[0]!;
+  await comoMaster(db, (tx) => tx.insert(pontoRep).values({
+    tenantId: tMan.id, tipoIdEmpregador: 1, documentoEmpregador: '33344455000166', razaoSocial: 'MANAUS LTDA',
+    numeroInpi: 'BR512024003334-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
+  }).returning());
+  const empMan = (await comoMaster(db, (tx) => tx.insert(empregado).values({
+    tenantId: tMan.id, cpf: '33300000001', nome: 'Zé do Norte', horarioContratualId: hor.id,
+  }).returning()))[0]!;
+  const pMan = await ajuste.solicitar(tMan.id, {
+    empregadoId: empMan.id, tipo: 'INCLUSAO', data: DATA, hora: '17:00', tpMarc: 'S',
+    observacao: 'Esqueci de bater a saída.',
+  });
+  // 17:00 em Manaus (-0400) = 21:00 UTC. Se assumisse Brasília, daria 20:00 UTC.
+  const horaUtc = pMan!.dtMarcacao!.toISOString().slice(11, 16);
+  ok(horaUtc === '21:00', `17:00 em Manaus vira 21:00 UTC, não 20:00 (deu ${horaUtc})`);
+
   console.log(falhas === 0 ? '\n>>> AJUSTE OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();
   process.exit(falhas === 0 ? 0 : 1);

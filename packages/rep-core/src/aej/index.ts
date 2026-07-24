@@ -24,10 +24,46 @@ export interface MontarAEJParams {
 }
 
 const soDig = (v: unknown) => String(v ?? '').replace(/\D/g, '');
+
+const TP_MARC = ['E', 'S', 'D'];
+const FONTE_MARC = ['O', 'I', 'P', 'X', 'T'];
+
+/**
+ * Recusa gerar arquivo fora do leiaute (Anexo VI). O AEJ vai assinado e serve
+ * de prova em fiscalização — melhor estourar aqui do que entregar um arquivo
+ * inválido que ninguém percebe.
+ */
+function validar(p: MontarAEJParams): void {
+  for (const t of p.tratamentos ?? []) {
+    if (!TP_MARC.includes(t.tpMarc)) {
+      throw new Error(`AEJ registro 05: tpMarc "${t.tpMarc}" inválido (esperado E, S ou D)`);
+    }
+    const fonte = t.fonteMarc ?? 'O';
+    if (!FONTE_MARC.includes(fonte)) {
+      throw new Error(`AEJ registro 05: fonteMarc "${fonte}" inválida (esperado O, I, P, X ou T)`);
+    }
+    if ((t.tpMarc === 'D' || fonte === 'I') && !t.motivo?.trim()) {
+      throw new Error('AEJ registro 05: motivo é obrigatório quando tpMarc="D" ou fonteMarc="I"');
+    }
+  }
+  for (const a of p.ausencias ?? []) {
+    // 1=DSR, 2=falta não justificada, 3=movimento no banco, 4=folga compensatória
+    if (![1, 2, 3, 4].includes(a.tipo)) {
+      throw new Error(`AEJ registro 07: tipoAusenOuComp "${a.tipo}" inválido (esperado 1 a 4)`);
+    }
+    if (a.tipo === 3) {
+      if (a.qtMinutos == null) throw new Error('AEJ registro 07: qtMinutos é obrigatório no movimento de banco de horas');
+      if (a.tipoMovBH !== 1 && a.tipoMovBH !== 2) {
+        throw new Error(`AEJ registro 07: tipoMovBH "${a.tipoMovBH}" inválido (1=inclusão, 2=compensação)`);
+      }
+    }
+  }
+}
 const linha = (...campos: unknown[]): string =>
   campos.map((c) => (c === null || c === undefined ? '' : String(c))).join('|');
 
 export function montarAEJ(p: MontarAEJParams): { conteudo: Buffer; nomeArquivo: string; totalRegistros: number } {
+  validar(p);
   const { rep, ptrp, empregados = [], horarios = [], tratamentos = [], ausencias = [], dataGeracao = new Date(), fuso = '-0300' } = p;
   const linhas: string[] = [];
   const cont = { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0, t8: 0 };
@@ -55,7 +91,7 @@ export function montarAEJ(p: MontarAEJParams): { conteudo: Buffer; nomeArquivo: 
   }
   for (const t of tratamentos) {
     linhas.push(linha('05', vinculoPorCpf.get(soDig(t.cpf)), formatarDataHoraAFD(t.dtMarcacao, fuso), idRepAej,
-      t.tpMarc, t.seqEntSaida, t.fonteMarc ?? 'O', t.codHorContratual ?? '', t.motivo ?? '')); cont.t5++;
+      t.tpMarc, String(t.seqEntSaida).padStart(3, '0'), t.fonteMarc ?? 'O', t.codHorContratual ?? '', t.motivo ?? '')); cont.t5++;
   }
   for (const e of empregados) {
     if (e.matriculaEsocial) {

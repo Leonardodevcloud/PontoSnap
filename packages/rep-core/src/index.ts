@@ -3,6 +3,7 @@ export * from './hash-chain/index.js';
 export * from './afd/index.js';
 export * from './aej/index.js';
 export * from './comprovante/index.js';
+export * from './attr/index.js';
 export * from './assinatura/index.js';
 export * from './relatorio-apuracao/index.js';
 export * from './relatorio-competencia/index.js';

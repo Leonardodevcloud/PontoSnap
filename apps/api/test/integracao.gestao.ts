@@ -16,7 +16,8 @@ const empSvc = new EmpregadoService(db, emailFake);
 const tokens = new TokenService({ segredoAcesso: 'a', segredoRefresh: 'r', expiraAcesso: '15m', expiraRefresh: '7d' });
 const authSvc = new AuthService(db, tokens, emailFake);
 
-const ok = (cond: boolean, msg: string) => console.log(`${cond ? 'OK  ' : 'FALHA'} — ${msg}`);
+let falhas = 0;
+const ok = (cond: boolean, msg: string) => { if (!cond) falhas++; console.log(`${cond ? 'OK  ' : 'FALHA'} — ${msg}`); };
 
 async function main() {
   // MASTER cria 2 clientes, cada um com seu admin

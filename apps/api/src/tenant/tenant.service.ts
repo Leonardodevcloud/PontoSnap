@@ -4,6 +4,7 @@ import { tenant, pontoRep, usuario, usuarioTenant, comoMaster, type Db } from '@
 import { TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { hashSenha } from '../auth/senha';
+import { gerarATTR } from '@ponto/rep-core';
 import { randomBytes } from 'node:crypto';
 import { EmailService } from '../email/email.service';
 import { emailBoasVindasCliente } from '../email/templates';
@@ -233,4 +234,47 @@ export class TenantService {
       return { removido: true };
     });
   }
+
+  /**
+   * Gera o ATTR (art. 89) para um cliente. Sai sem assinatura de propósito:
+   * a Portaria exige assinatura eletrônica qualificada de pessoa física, do
+   * responsável legal E do técnico — feita fora, com e-CPF.
+   */
+  async gerarAttr(tenantId: string): Promise<{ pdf: Buffer; nomeArquivo: string }> {
+    const t = (await comoMaster(this.db, (tx) =>
+      tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1)))[0];
+    if (!t) throw new NotFoundException('Cliente não encontrado');
+
+    const faltando = ['PLATAFORMA_RESP_LEGAL_NOME', 'PLATAFORMA_RESP_LEGAL_CPF',
+      'PLATAFORMA_RESP_TEC_NOME', 'PLATAFORMA_RESP_TEC_CPF'].filter((v) => !process.env[v]);
+    if (faltando.length) {
+      throw new ConflictException(
+        `Configure antes as variáveis do atestado: ${faltando.join(', ')}. ` +
+        'São os nomes e CPFs de quem assina o ATTR.');
+    }
+
+    const pdf = await gerarATTR({
+      desenvolvedor: {
+        razaoSocial: process.env.PLATAFORMA_RAZAO ?? 'Desenvolvedora',
+        documento: process.env.PLATAFORMA_DOC_DEV ?? '',
+      },
+      responsavelLegal: {
+        nome: process.env.PLATAFORMA_RESP_LEGAL_NOME!, cpf: process.env.PLATAFORMA_RESP_LEGAL_CPF!,
+      },
+      responsavelTecnico: {
+        nome: process.env.PLATAFORMA_RESP_TEC_NOME!, cpf: process.env.PLATAFORMA_RESP_TEC_CPF!,
+      },
+      programa: {
+        identificador: process.env.PLATAFORMA_NOME ?? 'PontoSnap',
+        versao: process.env.PLATAFORMA_VERSAO ?? '1.0.0',
+        numeroInpi: process.env.PLATAFORMA_INPI ?? '',
+        certificadoInpi: process.env.PLATAFORMA_CERT_INPI ?? null,
+      },
+      destinatario: { razaoSocial: t.razaoSocial, documento: t.cnpj },
+    });
+    const nomeArquivo = `ATTR_${soDigitosSimples(t.cnpj)}.pdf`;
+    return { pdf, nomeArquivo };
+  }
 }
+
+const soDigitosSimples = (v: string) => String(v ?? '').replace(/\D/g, '');

@@ -39,7 +39,7 @@ export class AjusteService {
   }
 
   /** Pedido do funcionário (ou lançamento do RH, com origem RH). */
-  async solicitar(tenantId: string, dto: NovoAjuste, origem: 'FUNCIONARIO' | 'RH' = 'FUNCIONARIO', fuso = '-0300') {
+  async solicitar(tenantId: string, dto: NovoAjuste, origem: 'FUNCIONARIO' | 'RH' = 'FUNCIONARIO') {
     if (!dto.observacao?.trim()) throw new BadRequestException('Escreva o que aconteceu — a observação é obrigatória.');
     if (dto.data > new Date().toISOString().slice(0, 10)) throw new BadRequestException('Não dá para pedir ajuste de um dia que ainda não aconteceu.');
     if (dto.data < limiteRetroativo()) throw new BadRequestException('Esse dia é de uma competência antiga. Fale com o RH.');
@@ -48,6 +48,12 @@ export class AjusteService {
       const emp = (await tx.select({ id: empregado.id }).from(empregado)
         .where(and(eq(empregado.id, dto.empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!emp) throw new NotFoundException('Empregado não encontrado');
+
+      // Fuso do cliente, NUNCA um padrão fixo: a hora informada vira uma batida
+      // que entra na apuração e no AEJ. Assumir Brasília erraria em 1h quem
+      // está em Manaus (-0400) ou no Acre (-0500).
+      const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant)
+        .where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
 
       let dtMarcacao: Date | null = null;
       if (dto.tipo === 'INCLUSAO') {

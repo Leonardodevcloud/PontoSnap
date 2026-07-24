@@ -31,7 +31,7 @@ export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, da
     num(rep.documentoEmpregador, 14) +                  // 4  doc empregador
     (rep.cnoCaepf ? num(rep.cnoCaepf, 14) : alfa('', 14)) + // 5  CNO/CAEPF
     alfa(rep.razaoSocial, 150) +                        // 6  razão social
-    alfa(rep.numeroInpi, 17) +                          // 7  nº INPI (VALIDAR)
+    num(rep.numeroInpi, 17) +                           // 7  nº INPI (campo N: só dígitos)
     dataD(dataInicial) +                                // 8  data inicial
     dataD(dataFinal) +                                  // 9  data final
     formatarDataHoraAFD(dataGeracao, fuso) +            // 10 geração
@@ -48,7 +48,7 @@ export function registro7(m: MarcacaoGravada): string {
   const fuso = m.fuso ?? '-0300';
   return num(m.nsr, 9) + '7' +
     formatarDataHoraAFD(m.dtMarcacao, fuso) +
-    alfa(soDigitos(m.cpf), 12) +
+    num(m.cpf, 12) +
     formatarDataHoraAFD(m.dtGravacao, fuso) +
     num(m.coletor, 2) +
     String(m.onlineOffline) +

@@ -17,7 +17,8 @@ const certs = new CertificadoService(db, new CriptoService());
 const marc = new MarcacaoService(db, certs);
 const trat = new TratamentoService(db);
 const fisc = new FiscalService(db, certs);
-const ok = (c: boolean, m: string) => console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`);
+let falhas = 0;
+const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };
 
 async function main() {
   const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '11111111000111', razaoSocial: 'Cliente A', localPrestacao: 'Salvador/BA' }).returning()))[0]!;
@@ -31,7 +32,7 @@ async function main() {
   // 4 batidas no mesmo dia
   for (const hm of ['08:00', '12:00', '13:00', '17:00']) {
     const dt = new Date(`2026-07-13T${hm}:00-0300`);
-    await marc.bater({ tenantId: t.id, cpf: '43461292850', coletor: Coletor.DISPOSITIVO, dtMarcacao: dt });
+    await marc.bater({ tenantId: t.id, cpf: '43461292850', coletor: Coletor.DISPOSITIVO, dtMarcacao: dt, declaradoOffline: true });
   }
 
   // apuração (pareamento E/S)
@@ -103,7 +104,7 @@ async function main() {
 
   // bate o dia 13 (trabalha) cumprindo 11h com 1h de intervalo
   for (const hm of ['07:00', '13:00', '14:00', '19:00']) {
-    await marc.bater({ tenantId: t.id, cpf: '52998224725', coletor: Coletor.DISPOSITIVO, dtMarcacao: new Date(`2026-07-13T${hm}:00-0300`) });
+    await marc.bater({ tenantId: t.id, cpf: '52998224725', coletor: Coletor.DISPOSITIVO, dtMarcacao: new Date(`2026-07-13T${hm}:00-0300`), declaradoOffline: true });
   }
   const clt12 = await trat.apurarPeriodoCLT(t.id, e2.id, '2026-07-13', '2026-07-15');
   const dia13 = clt12.resultado.dias.find((d) => d.data === '2026-07-13')!;
@@ -138,7 +139,7 @@ async function main() {
   ok(done.status === 'concluido' && !!res && res.linhas.length === 2, `job concluído com resultado (${res?.linhas.length} linhas)`);
 
   await client.end();
-  console.log('\n>>> FISCAL + TRATAMENTO OK <<<');
-  process.exit(0);
+  console.log(falhas === 0 ? '\n>>> FISCAL + TRATAMENTO OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
+  process.exit(falhas === 0 ? 0 : 1);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -10,11 +10,11 @@ import { Coletor, OnlineOffline } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { CertificadoService } from '../certificado/certificado.service';
 
-// Registro 07 do AEJ — movimento de banco de horas.
-// tipoMovBH: 1 = crédito ao banco, 2 = débito do banco.
-// ⚠️ O código de "tipo" do registro de banco deve ser conferido contra o leiaute
-// oficial do AEJ (item A3 do checklist) antes de gerar em produção.
-const TIPO_AEJ_MOV_BANCO = 5;
+// Registro 07 do AEJ — Ausências e Banco de Horas (leiaute oficial, Anexo VI).
+// tipoAusenOuComp: 1=DSR, 2=falta não justificada, 3=movimento no banco de
+// horas, 4=folga compensatória de feriado.
+// tipoMovBH: 1=inclusão de horas no banco, 2=compensação de horas do banco.
+const TIPO_AEJ_MOV_BANCO = 3;
 const MOV_BH_CREDITO = 1;
 const MOV_BH_DEBITO = 2;
 

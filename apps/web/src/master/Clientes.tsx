@@ -40,6 +40,24 @@ export function Clientes() {
 
   const ativos = lista?.filter((t) => t.ativo).length ?? 0;
 
+  const [msgAttr, setMsgAttr] = useState<string | null>(null);
+
+  /**
+   * ATTR (art. 89). O PDF sai SEM assinatura: a Portaria exige assinatura
+   * eletrônica qualificada de pessoa física — feita fora, com e-CPF.
+   */
+  async function baixarAttr(t: Tenant) {
+    setErro(null); setMsgAttr(null);
+    try {
+      const blob = await api.baixar(`/tenants/${t.id}/attr`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `ATTR_${soDigitos(t.cnpj)}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+      setMsgAttr(`ATTR de ${t.razaoSocial} baixado. Assine com o e-CPF do responsável legal e do técnico antes de entregar ao cliente.`);
+    } catch (e) { setErro((e as Error).message); }
+  }
+
   return (
     <div onClick={() => setMenu(null)}>
       <div className={css.head}>
@@ -53,6 +71,7 @@ export function Clientes() {
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
+      {msgAttr && <p className={css.okMsg}>{msgAttr}</p>}
 
       <div className={css.table}>
         <div className={`${css.row} ${css.thead}`}>
@@ -72,6 +91,7 @@ export function Clientes() {
               {menu === t.id && (
                 <div className={css.menu} onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => { setMenu(null); setEditarFuso(t); }}>Fuso horário</button>
+                  <button onClick={() => { setMenu(null); void baixarAttr(t); }}>Baixar ATTR</button>
                   <button onClick={() => void alternarAtivo(t)}>{t.ativo ? 'Inativar' : 'Reativar'}</button>
                 </div>
               )}
