@@ -12,7 +12,7 @@ import { CriptoService } from '../src/common/cripto.service';
 const dir = process.env.OUTDIR!;
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
 const db = drizzle(client, { schema });
-const certs = new CertificadoService(db, new CriptoService());
+const certs = new CertificadoService();
 const marc = new MarcacaoService(db, certs);
 const fisc = new FiscalService(db, certs);
 
@@ -25,8 +25,11 @@ async function main() {
     await marc.bater({ tenantId: t.id, cpf: '43461292850', coletor: Coletor.DISPOSITIVO, dtMarcacao: dt });
   }
 
-  const info = await certs.salvar(t.id, fs.readFileSync(`${dir}/cert.pfx`), '1234');
-  console.log('Certificado cifrado e salvo. CN:', info.cn);
+  // O certificado da plataforma vem de env var — configura antes de assinar.
+  process.env.PLATAFORMA_CERT_PFX_B64 = fs.readFileSync(`${dir}/cert.pfx`).toString('base64');
+  process.env.PLATAFORMA_CERT_SENHA = '1234';
+  const info = await certs.info();
+  console.log('Certificado da plataforma carregado. CN:', info.cn);
 
   const r = await fisc.gerarAfdAssinado(t.id);
   fs.writeFileSync(`${dir}/${r.nomeArquivo}`, r.conteudo);

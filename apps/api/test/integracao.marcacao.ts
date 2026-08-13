@@ -11,7 +11,7 @@ import { CriptoService } from '../src/common/cripto.service';
 
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
 const db = drizzle(client, { schema });
-const certs = new CertificadoService(db, new CriptoService());
+const certs = new CertificadoService();
 
 async function main() {
   // --- seed (como MASTER) ---

@@ -17,5 +17,4 @@ export * from './auditoria';
 export * from './tokenSenha';
 export * from './cobranca';
 export * from './dispositivo';
-export * from './certificado';
 export * from './job';

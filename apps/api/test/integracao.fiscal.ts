@@ -13,7 +13,7 @@ import { JobsService } from '../src/jobs/jobs.service';
 
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
 const db = drizzle(client, { schema });
-const certs = new CertificadoService(db, new CriptoService());
+const certs = new CertificadoService();
 const marc = new MarcacaoService(db, certs);
 const trat = new TratamentoService(db);
 const fisc = new FiscalService(db, certs);

@@ -1,0 +1,25 @@
+.tela{ padding:4px 0 40px; }
+.top{ margin-bottom:18px; }
+.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; margin:0 0 3px; }
+.sub{ color:var(--ash); font-size:13.5px; margin:0; max-width:72ch; line-height:1.5; }
+.erro{ background:#FFE9E3; color:var(--coral-dark); border-radius:var(--r-md); padding:10px 14px; font-size:14px; margin-bottom:14px; }
+.card{ background:var(--white); border:1px solid rgba(16,64,63,.09); border-radius:16px; padding:20px 22px; }
+.semCert{ display:flex; flex-direction:column; gap:9px; margin-bottom:18px; }
+.pill{ align-self:flex-start; font-family:var(--ff-mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; background:var(--peach); color:var(--coral-dark); padding:3px 9px; border-radius:6px; }
+.semTxt{ font-size:14px; color:var(--ash); line-height:1.55; margin:0; }
+.comoBox{ background:var(--cream); border-radius:12px; padding:15px 17px; }
+.comoTit{ font-weight:800; font-size:13.5px; margin:0 0 10px; }
+.passos{ margin:0; padding-left:18px; font-size:13.5px; color:var(--ink); line-height:1.6; }
+.passos li{ margin-bottom:10px; }
+.cmd, .env{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:8px; padding:6px 9px; margin-top:5px; font-size:11.5px; color:var(--ash); overflow-x:auto; }
+.cmd code, .env code{ font-family:var(--ff-mono); color:var(--ink); }
+.faixa{ border-radius:12px; padding:11px 14px; font-size:13.5px; font-weight:700; margin-bottom:16px; }
+.fOk{ background:#EAF7EE; color:#0FA968; }
+.fAviso{ background:#FFF6E8; color:var(--coral-dark); }
+.fVenc{ background:#FFE9E3; color:var(--coral-dark); }
+.linha{ display:flex; justify-content:space-between; gap:16px; padding:11px 0; border-bottom:1px solid rgba(16,64,63,.07); }
+.linha:last-of-type{ border-bottom:none; }
+.lb{ font-family:var(--ff-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ash); }
+.val{ font-size:14px; font-weight:700; color:var(--ink); text-align:right; }
+.trocar{ font-size:12.5px; color:var(--ash); line-height:1.55; margin:14px 0 0; }
+.trocar code{ font-family:var(--ff-mono); font-size:11.5px; background:var(--cream); padding:1px 5px; border-radius:5px; }

@@ -22,7 +22,6 @@ import { ApuracaoCLT } from './rh/ApuracaoCLT';
 import { Feriados } from './rh/Feriados';
 import { Fiscal } from './rh/Fiscal';
 import { Relatorios } from './rh/Relatorios';
-import { Certificado } from './rh/Certificado';
 import { Local } from './rh/Local';
 import { BancoHoras } from './rh/BancoHoras';
 import { Atestados } from './rh/Atestados';
@@ -36,6 +35,7 @@ import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
 import { Cobranca } from './master/Cobranca';
 import { Acessos } from './master/Acessos';
+import { CertificadoPlataforma } from './master/CertificadoPlataforma';
 import { Assinatura } from './rh/Assinatura';
 import { Quiosque } from './quiosque/Quiosque';
 import { Flash } from './components/Flash';
@@ -105,7 +105,6 @@ export function App() {
         <Route path="relatorios" element={<Relatorios />} />
         <Route path="feriados" element={<Feriados />} />
         <Route path="fiscal" element={<Fiscal />} />
-        <Route path="certificado" element={<Certificado />} />
         <Route path="local" element={<Local />} />
         <Route path="banco" element={<BancoHoras />} />
         <Route path="atestados" element={<Atestados />} />
@@ -123,6 +122,7 @@ export function App() {
         <Route index element={<Clientes />} />
         <Route path="cobranca" element={<Cobranca />} />
         <Route path="acessos" element={<Acessos />} />
+        <Route path="certificado" element={<CertificadoPlataforma />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

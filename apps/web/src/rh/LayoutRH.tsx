@@ -33,7 +33,6 @@ const GRUPOS: { titulo: string; itens: { to: string; rotulo: string; fim?: boole
     itens: [
       { to: '/rh/relatorios', rotulo: 'Relatórios' },
       { to: '/rh/fiscal', rotulo: 'Arquivos fiscais' },
-      { to: '/rh/certificado', rotulo: 'Certificado' },
     ],
   },
   {
