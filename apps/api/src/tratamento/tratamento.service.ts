@@ -327,7 +327,7 @@ export class TratamentoService {
       const diasUteis = horario?.diasSemana ?? [1, 2, 3, 4, 5]; // seg–sex por padrão
 
       // Regras por item: escolha do funcionário → padrão do tipo → CLT.
-      const itens = await resolverItens(tx as never, tenantId, emp);
+      const itens = await resolverItens(tx as never, tenantId, emp.perfilRegraId);
       const regras = montarRegrasApuracao(itens);
       const bancoAtivo = itens.banco?.bancoModo === 'ATIVO' ? true
         : itens.banco?.bancoModo === 'INATIVO' ? false

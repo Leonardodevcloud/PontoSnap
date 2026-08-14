@@ -2,7 +2,7 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import ExcelJS from 'exceljs';
 import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
 import { and, eq } from 'drizzle-orm';
-import { empregado, pontoHorarioContratual, pontoConvencao, pontoRegraItem, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
+import { empregado, pontoHorarioContratual, pontoPerfilRegra, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { registrarEventoRep } from '../fiscal/evento-rep';
 import { EmailService } from '../email/email.service';
@@ -177,49 +177,15 @@ export class EmpregadoService {
     });
   }
 
-  /** Monta as regras do funcionário: grava os itens escolhidos (null = padrão). */
-  async definirRegras(tenantId: string, id: string, ids: {
-    regraExtraId?: string | null; regraToleranciaId?: string | null; regraNoturnoId?: string | null;
-    regraJornadaId?: string | null; regraBancoId?: string | null; regraDestinacaoId?: string | null;
-  }) {
+  /** Aponta o funcionário para um perfil de regra (ou null = CLT padrão). */
+  async definirPerfil(tenantId: string, id: string, perfilRegraId: string | null) {
     return comTenant(this.db, tenantId, async (tx) => {
-      const rows = await tx.update(empregado).set({
-        regraExtraId: ids.regraExtraId ?? null, regraToleranciaId: ids.regraToleranciaId ?? null,
-        regraNoturnoId: ids.regraNoturnoId ?? null, regraJornadaId: ids.regraJornadaId ?? null,
-        regraBancoId: ids.regraBancoId ?? null, regraDestinacaoId: ids.regraDestinacaoId ?? null,
-      }).where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
-      if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
-      return this.semSegredos(rows[0]);
-    });
-  }
-
-  /** Atalho: aplica ao funcionário as peças que a IA gerou de uma convenção. */
-  async aplicarConvencao(tenantId: string, id: string, convencaoId: string) {
-    return comTenant(this.db, tenantId, async (tx) => {
-      const itens = await tx.select({ id: pontoRegraItem.id, tipo: pontoRegraItem.tipo }).from(pontoRegraItem)
-        .where(and(eq(pontoRegraItem.tenantId, tenantId), eq(pontoRegraItem.convencaoId, convencaoId)));
-      if (itens.length === 0) throw new NotFoundException('Esta convenção não gerou regras ainda. Use "gerar regra IA" na convenção.');
-      const porTipo = new Map(itens.map((i) => [i.tipo, i.id]));
-      const rows = await tx.update(empregado).set({
-        regraExtraId: porTipo.get('EXTRA') ?? null, regraToleranciaId: porTipo.get('TOLERANCIA') ?? null,
-        regraNoturnoId: porTipo.get('NOTURNO') ?? null, regraJornadaId: porTipo.get('JORNADA') ?? null,
-        regraBancoId: porTipo.get('BANCO') ?? null, regraDestinacaoId: porTipo.get('DESTINACAO') ?? null,
-        convencaoId,
-      }).where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
-      if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
-      return this.semSegredos(rows[0]);
-    });
-  }
-
-  /** Vincula o funcionário a uma convenção-documento (ou null). */
-  async definirConvencao(tenantId: string, id: string, convencaoId: string | null) {
-    return comTenant(this.db, tenantId, async (tx) => {
-      if (convencaoId) {
-        const c = await tx.select({ id: pontoConvencao.id }).from(pontoConvencao)
-          .where(and(eq(pontoConvencao.id, convencaoId), eq(pontoConvencao.tenantId, tenantId))).limit(1);
-        if (!c[0]) throw new NotFoundException('Convenção não encontrada');
+      if (perfilRegraId) {
+        const p = await tx.select({ id: pontoPerfilRegra.id }).from(pontoPerfilRegra)
+          .where(and(eq(pontoPerfilRegra.id, perfilRegraId), eq(pontoPerfilRegra.tenantId, tenantId))).limit(1);
+        if (!p[0]) throw new NotFoundException('Perfil de regra não encontrado');
       }
-      const rows = await tx.update(empregado).set({ convencaoId })
+      const rows = await tx.update(empregado).set({ perfilRegraId })
         .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
       return this.semSegredos(rows[0]);

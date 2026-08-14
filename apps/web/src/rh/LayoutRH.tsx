@@ -22,8 +22,7 @@ const GRUPOS: { titulo: string; itens: { to: string; rotulo: string; fim?: boole
     itens: [
       { to: '/rh/funcionarios', rotulo: 'Funcionários' },
       { to: '/rh/escalas', rotulo: 'Escalas' },
-      { to: '/rh/regras', rotulo: 'Regras de jornada' },
-      { to: '/rh/convencoes', rotulo: 'Convenções' },
+      { to: '/rh/regras', rotulo: 'Perfis de regra' },
       { to: '/rh/feriados', rotulo: 'Feriados' },
       { to: '/rh/local', rotulo: 'Local' },
     ],

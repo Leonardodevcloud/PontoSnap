@@ -8,6 +8,7 @@ export * from './regra-item';
 export * from './ajuste';
 export * from './usuario-tenant';
 export * from './evento-rep';
+export * from './perfil-regra';
 export * from './marcacao';
 export * from './tratamento';
 export * from './banco';

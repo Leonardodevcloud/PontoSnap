@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
-import type { Empregado, Horario, Convencao } from '../tipos';
+import type { Empregado, Horario } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Modal } from '../components/Modal';
@@ -9,41 +9,7 @@ import css from './Funcionarios.module.css';
 
 const fmtCpf = (c: string) => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
-type TipoItem = 'EXTRA' | 'TOLERANCIA' | 'NOTURNO' | 'JORNADA' | 'BANCO' | 'DESTINACAO';
-interface ItemRegra { id: string; tipo: TipoItem; nome: string; config: Record<string, unknown>; padrao: boolean; }
-
-const PECAS: { tipo: TipoItem; campo: keyof Empregado; lb: string }[] = [
-  { tipo: 'EXTRA', campo: 'regraExtraId', lb: 'extra' },
-  { tipo: 'TOLERANCIA', campo: 'regraToleranciaId', lb: 'tolerância' },
-  { tipo: 'NOTURNO', campo: 'regraNoturnoId', lb: 'noturno' },
-  { tipo: 'JORNADA', campo: 'regraJornadaId', lb: 'jornada' },
-  { tipo: 'BANCO', campo: 'regraBancoId', lb: 'banco' },
-  { tipo: 'DESTINACAO', campo: 'regraDestinacaoId', lb: 'destinação' },
-];
-
-/** Valor curto da peça, pra caber no chip. */
-function valorPeca(tipo: TipoItem, c: Record<string, unknown>): string {
-  const n = (k: string) => Number(c[k]);
-  switch (tipo) {
-    case 'EXTRA': return `${n('extraDiaUtilPct')}% útil`;
-    case 'TOLERANCIA': return `${n('toleranciaDiariaMin')}/${n('toleranciaPorMarcacaoMin')} min`;
-    case 'NOTURNO': return `${n('noturnoAdicionalPct')}%`;
-    case 'JORNADA': return `${Math.round(n('jornadaSemanalMin') / 60)}h semana`;
-    case 'BANCO': return c.bancoModo === 'ATIVO' ? `${c.bancoTipoAcordo === 'COLETIVO' ? 'Coletivo' : 'Individual'} ${n('bancoPrazoMeses')}m`
-      : c.bancoModo === 'INATIVO' ? 'sem banco' : 'herda empresa';
-    case 'DESTINACAO': return `falta ${String(c.destinacaoFaltas ?? '').toLowerCase()}`;
-  }
-}
-
-/** O que está VALENDO na peça: escolha do funcionário → padrão do item → CLT. */
-function pecaEfetiva(e: Empregado, p: { tipo: TipoItem; campo: keyof Empregado }, itens: ItemRegra[]): { texto: string; propria: boolean } {
-  const id = e[p.campo] as string | null | undefined;
-  const escolhido = id ? itens.find((i) => i.id === id) : undefined;
-  if (escolhido) return { texto: valorPeca(p.tipo, escolhido.config), propria: true };
-  const padrao = itens.find((i) => i.tipo === p.tipo && i.padrao);
-  if (padrao) return { texto: valorPeca(p.tipo, padrao.config), propria: false };
-  return { texto: p.tipo === 'BANCO' ? 'herda empresa' : 'CLT padrão', propria: false };
-}
+interface PerfilResumo { id: string; nome: string; padrao: boolean; }
 
 const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
@@ -55,10 +21,8 @@ export function Funcionarios() {
   const [menu, setMenu] = useState<string | null>(null);
   const [pinPara, setPinPara] = useState<Empregado | null>(null);
   const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
-  const [convencaoPara, setConvencaoPara] = useState<Empregado | null>(null);
-  const [convDocPara, setConvDocPara] = useState<Empregado | null>(null);
-  const [convMap, setConvMap] = useState<Record<string, string>>({});
-  const [itens, setItens] = useState<ItemRegra[]>([]);
+  const [perfilPara, setPerfilPara] = useState<Empregado | null>(null);
+  const [perfis, setPerfis] = useState<PerfilResumo[]>([]);
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS'>('TODOS');
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
@@ -71,9 +35,8 @@ export function Funcionarios() {
   }
   useEffect(() => { void carregar(); }, []);
   useEffect(() => {
-    api.get<{ id: string; nome: string }[]>('/convencoes').then((cs) => setConvMap(Object.fromEntries(cs.map((c) => [c.id, c.nome])))).catch(() => {});
-    api.get<ItemRegra[]>('/regra-itens').then(setItens).catch(() => {});
-  }, [convencaoPara, convDocPara]);
+    api.get<PerfilResumo[]>('/perfis-regra').then(setPerfis).catch(() => {});
+  }, [perfilPara]);
 
   async function alternarAtivo(e: Empregado) {
     setMenu(null);
@@ -82,16 +45,15 @@ export function Funcionarios() {
 
   const ativos = lista?.filter((e) => e.ativo).length ?? 0;
 
-  const temAlgumaPeca = (e: Empregado) =>
-    PECAS.some((p) => !!e[p.campo]) || !!e.convencaoId;
+  const temPerfil = (e: Empregado) => !!e.perfilRegraId;
 
   const visiveis = lista?.filter((e) => {
     const q = busca.trim().toLowerCase();
     if (q && !`${e.nome} ${e.cpf} ${e.matricula ?? ''}`.toLowerCase().includes(q)) return false;
     if (filtro === 'INATIVOS') return !e.ativo;
     if (!e.ativo) return false;
-    if (filtro === 'MONTADAS') return temAlgumaPeca(e);
-    if (filtro === 'PADRAO') return !temAlgumaPeca(e);
+    if (filtro === 'MONTADAS') return temPerfil(e);
+    if (filtro === 'PADRAO') return !temPerfil(e);
     return true;
   });
 
@@ -109,7 +71,7 @@ export function Funcionarios() {
 
       <div className={css.filtros}>
         <input className={css.busca} placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
-        {([['TODOS', 'Todos'], ['MONTADAS', 'Regras montadas'], ['PADRAO', 'Só CLT padrão'], ['INATIVOS', 'Inativos']] as const).map(([k, rot]) => (
+        {([['TODOS', 'Todos'], ['MONTADAS', 'Com perfil'], ['PADRAO', 'Sem perfil (CLT)'], ['INATIVOS', 'Inativos']] as const).map(([k, rot]) => (
           <button key={k} className={`${css.chipF} ${filtro === k ? css.chipFOn : ''}`} onClick={() => setFiltro(k)}>{rot}</button>
         ))}
       </div>
@@ -133,8 +95,7 @@ export function Funcionarios() {
                     <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
                     <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
                     <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
-                    <button onClick={() => { setConvencaoPara(e); setMenu(null); }}>Definir regra</button>
-                    <button onClick={() => { setConvDocPara(e); setMenu(null); }}>Definir convenção</button>
+                    <button onClick={() => { setPerfilPara(e); setMenu(null); }}>Perfil de regra</button>
                     <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
                     <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
                     <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
@@ -143,19 +104,15 @@ export function Funcionarios() {
               </span>
             </div>
 
-            <div className={css.pecas}>
-              {e.convencaoId
-                ? <span className={css.conv}>📄 {convMap[e.convencaoId] ?? 'Convenção'}</span>
-                : <span className={`${css.conv} ${css.semConv}`}>sem convenção</span>}
-              {PECAS.map((p) => {
-                const v = pecaEfetiva(e, p, itens);
-                return (
-                  <span key={p.tipo} className={`${css.peca} ${v.propria ? '' : css.pecaCLT}`}>
-                    <span className={css.pLb}>{p.lb}</span><span className={css.pVal}>{v.texto}</span>
-                  </span>
-                );
-              })}
-              <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setConvencaoPara(e); }}>editar regras</button>
+            <div className={css.perfilLinha}>
+              {(() => {
+                const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
+                const padrao = perfis.find((x) => x.padrao);
+                if (p) return <span className={css.perfilBadge}>⚙ {p.nome}</span>;
+                if (padrao) return <span className={`${css.perfilBadge} ${css.perfilHerda}`}>⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></span>;
+                return <span className={`${css.perfilBadge} ${css.perfilHerda}`}>CLT padrão</span>;
+              })()}
+              <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setPerfilPara(e); }}>trocar perfil</button>
             </div>
           </div>
         ))}
@@ -165,8 +122,7 @@ export function Funcionarios() {
       {importarAberto && <ModalImportar onFechar={() => setImportarAberto(false)} onImportado={() => void carregar()} />}
       {pinPara && <ModalPin empregado={pinPara} onFechar={() => setPinPara(null)} onSalvo={() => { setPinPara(null); void carregar(); }} />}
       {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
-      {convencaoPara && <ModalConvencao empregado={convencaoPara} onFechar={() => setConvencaoPara(null)} onSalvo={() => { setConvencaoPara(null); void carregar(); }} />}
-      {convDocPara && <ModalConvencaoDoc empregado={convDocPara} onFechar={() => setConvDocPara(null)} onSalvo={() => { setConvDocPara(null); void carregar(); }} />}
+      {perfilPara && <ModalPerfil empregado={perfilPara} perfis={perfis} onFechar={() => setPerfilPara(null)} onSalvo={() => { setPerfilPara(null); void carregar(); }} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
@@ -392,113 +348,44 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
   );
 }
 
-function ModalConvencao({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
-  type Tipo = 'EXTRA' | 'TOLERANCIA' | 'NOTURNO' | 'JORNADA' | 'BANCO' | 'DESTINACAO';
-  const TIPOS: { tipo: Tipo; campo: keyof Empregado; rotulo: string }[] = [
-    { tipo: 'EXTRA', campo: 'regraExtraId', rotulo: 'Hora extra' },
-    { tipo: 'TOLERANCIA', campo: 'regraToleranciaId', rotulo: 'Tolerância' },
-    { tipo: 'NOTURNO', campo: 'regraNoturnoId', rotulo: 'Adicional noturno' },
-    { tipo: 'JORNADA', campo: 'regraJornadaId', rotulo: 'Jornada' },
-    { tipo: 'BANCO', campo: 'regraBancoId', rotulo: 'Banco de horas' },
-    { tipo: 'DESTINACAO', campo: 'regraDestinacaoId', rotulo: 'Destinação' },
-  ];
-  const [opcoes, setOpcoes] = useState<Record<string, { id: string; nome: string }[]>>({});
-  const [sel, setSel] = useState<Record<string, string>>(() => {
-    const s: Record<string, string> = {};
-    for (const t of TIPOS) s[t.tipo] = (empregado[t.campo] as string) ?? '';
-    return s;
-  });
-  const [convs, setConvs] = useState<{ id: string; nome: string }[]>([]);
+function ModalPerfil({ empregado, perfis, onFechar, onSalvo }: {
+  empregado: Empregado; perfis: PerfilResumo[]; onFechar: () => void; onSalvo: () => void;
+}) {
+  const [sel, setSel] = useState<string>(empregado.perfilRegraId ?? '');
   const [erro, setErro] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
-
-  useEffect(() => {
-    api.get<{ id: string; tipo: Tipo; nome: string }[]>('/regra-itens').then((itens) => {
-      const por: Record<string, { id: string; nome: string }[]> = {};
-      for (const i of itens) (por[i.tipo] ??= []).push({ id: i.id, nome: i.nome });
-      setOpcoes(por);
-    }).catch((e) => setErro((e as Error).message));
-    api.get<{ id: string; nome: string }[]>('/convencoes').then(setConvs).catch(() => {});
-  }, []);
+  const [salvando, setSalvando] = useState(false);
+  const padrao = perfis.find((p) => p.padrao);
 
   async function salvar() {
-    setErro(null); setEnviando(true);
+    setErro(null); setSalvando(true);
     try {
-      await api.patch(`/empregados/${empregado.id}/regras`, {
-        regraExtraId: sel.EXTRA || null, regraToleranciaId: sel.TOLERANCIA || null, regraNoturnoId: sel.NOTURNO || null,
-        regraJornadaId: sel.JORNADA || null, regraBancoId: sel.BANCO || null, regraDestinacaoId: sel.DESTINACAO || null,
-      });
+      await api.patch(`/empregados/${empregado.id}/perfil`, { perfilRegraId: sel || null });
       onSalvo();
-    } catch (e) { setErro((e as Error).message); setEnviando(false); }
-  }
-
-  async function aplicarConvencao(convId: string) {
-    if (!convId) return;
-    setErro(null); setEnviando(true);
-    try {
-      await api.post(`/empregados/${empregado.id}/aplicar-convencao`, { convencaoId: convId });
-      onSalvo();
-    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+    } catch (e) { setErro((e as Error).message); setSalvando(false); }
   }
 
   return (
-    <Modal titulo={`Regras de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
-      {convs.length > 0 && (
-        <label className={css.selWrap}>
-          <span className={css.selLb}>Atalho: aplicar as peças de uma convenção</span>
-          <select className={css.select} defaultValue="" onChange={(e) => aplicarConvencao(e.target.value)}>
-            <option value="">— escolher convenção —</option>
-            {convs.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
-        </label>
-      )}
-      {TIPOS.map((t) => (
-        <label key={t.tipo} className={css.selWrap}>
-          <span className={css.selLb}>{t.rotulo}</span>
-          <select className={css.select} value={sel[t.tipo]} onChange={(e) => setSel((s) => ({ ...s, [t.tipo]: e.target.value }))}>
-            <option value="">Padrão CLT</option>
-            {(opcoes[t.tipo] ?? []).map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-          </select>
-        </label>
-      ))}
-      {erro && <p className={css.erroModal}>{erro}</p>}
-      <Botao variante="coral" onClick={salvar} disabled={enviando}>{enviando ? 'Salvando…' : 'Salvar regras'}</Botao>
-    </Modal>
-  );
-}
-
-function ModalConvencaoDoc({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
-  const [convs, setConvs] = useState<Convencao[]>([]);
-  const [sel, setSel] = useState(empregado.convencaoId ?? '');
-  const [erro, setErro] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
-
-  useEffect(() => {
-    api.get<Convencao[]>('/convencoes')
-      .then(setConvs)
-      .catch((e) => setErro((e as Error).message));
-  }, []);
-
-  async function salvar() {
-    setErro(null); setEnviando(true);
-    try {
-      await api.patch(`/empregados/${empregado.id}/convencao`, { convencaoId: sel || null });
-      onSalvo();
-    } catch (e) { setErro((e as Error).message); setEnviando(false); }
-  }
-
-  return (
-    <Modal titulo={`Convenção de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
+    <Modal titulo={`Perfil de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
+      <p className={css.aviso}>
+        Escolha o perfil de regra deste funcionário. Um clique aplica todas as regras de uma vez.
+        Os perfis são criados na tela <strong>Perfis de regra</strong>.
+      </p>
       <label className={css.selWrap}>
-        <span className={css.selLb}>Convenção (documento CCT/ACT)</span>
+        <span className={css.selLb}>Perfil de regra</span>
         <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
-          <option value="">Nenhuma</option>
-          {convs.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.uf ? ` · ${c.uf}` : ''}</option>)}
+          <option value="">
+            {padrao ? `Sem perfil próprio — usa “${padrao.nome}” (padrão)` : 'Sem perfil — usa CLT padrão'}
+          </option>
+          {perfis.map((p) => (
+            <option key={p.id} value={p.id}>{p.nome}{p.padrao ? ' (padrão)' : ''}</option>
+          ))}
         </select>
       </label>
-      {convs.length === 0 && <p className={css.aviso}>Nenhuma convenção cadastrada. Crie em <strong>Convenções</strong> primeiro.</p>}
+      {perfis.length === 0 && (
+        <p className={css.aviso}>Você ainda não criou perfis. Vá em <strong>Perfis de regra</strong> e crie o primeiro.</p>
+      )}
       {erro && <p className={css.erroModal}>{erro}</p>}
-      <Botao variante="coral" onClick={salvar} disabled={enviando}>{enviando ? 'Salvando…' : 'Vincular convenção'}</Botao>
+      <Botao variante="coral" onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar perfil'}</Botao>
     </Modal>
   );
 }

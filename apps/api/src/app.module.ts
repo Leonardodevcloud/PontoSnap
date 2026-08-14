@@ -9,8 +9,7 @@ import { MarcacaoModule } from './marcacao/marcacao.module';
 import { TratamentoModule } from './tratamento/tratamento.module';
 import { BancoModule } from './banco/banco.module';
 import { CctModule } from './cct/cct.module';
-import { ConvencaoModule } from './convencao/convencao.module';
-import { RegraItemModule } from './regra-item/regra-item.module';
+import { PerfilRegraModule } from './perfil-regra/perfil-regra.module';
 import { AjusteModule } from './ajuste/ajuste.module';
 import { DocumentoModule } from './documento/documento.module';
 import { AfastamentoModule } from './afastamento/afastamento.module';
@@ -24,7 +23,7 @@ import { JobsModule } from './jobs/jobs.module';
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, CctModule, ConvencaoModule, RegraItemModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule,
+    BancoModule, CctModule, PerfilRegraModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule,
   ],
 })
 export class AppModule {}

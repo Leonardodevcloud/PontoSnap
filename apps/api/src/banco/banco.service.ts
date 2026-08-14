@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
-import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, tenant, empregado, pontoRegraItem, comTenant, type Db } from '@ponto/db';
+import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, tenant, empregado, pontoPerfilRegra, comTenant, type Db } from '@ponto/db';
 import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
 import { movimentosBancoDoDia, type DestinoFalta, type DestinoAtraso } from '../tratamento/destinacao';
 import { resolverItens } from '../tratamento/resolver-itens';
@@ -101,34 +101,32 @@ export class BancoService {
   async cobertura(tenantId: string) {
     const empresa = await this.obterConfig(tenantId);
     return comTenant(this.db, tenantId, async (tx) => {
-      const emps = await tx.select({ id: empregado.id, regraBancoId: empregado.regraBancoId })
+      const emps = await tx.select({ id: empregado.id, perfilRegraId: empregado.perfilRegraId })
         .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)));
-      const itens = await tx.select().from(pontoRegraItem)
-        .where(and(eq(pontoRegraItem.tenantId, tenantId), eq(pontoRegraItem.tipo, 'BANCO')));
-      const porId = new Map(itens.map((i) => [i.id, i]));
-      const padrao = itens.find((i) => i.padrao);
+      const perfis = await tx.select().from(pontoPerfilRegra).where(eq(pontoPerfilRegra.tenantId, tenantId));
+      const porId = new Map(perfis.map((p) => [p.id, p]));
+      const padrao = perfis.find((p) => p.padrao);
 
-      let comRegraPropria = 0, seguindoEmpresa = 0, comBanco = 0, semBanco = 0;
+      let comPerfil = 0, seguindoEmpresa = 0, comBanco = 0, semBanco = 0;
       for (const e of emps) {
-        const item = e.regraBancoId ? porId.get(e.regraBancoId) : padrao;
-        const modo = (item?.config as { bancoModo?: string } | undefined)?.bancoModo ?? 'HERDA';
-        if (e.regraBancoId) comRegraPropria++;
+        const perfil = e.perfilRegraId ? porId.get(e.perfilRegraId) : padrao;
+        const banco = (perfil?.config as { banco?: { bancoModo?: string } } | undefined)?.banco;
+        const modo = banco?.bancoModo ?? 'HERDA';
+        if (e.perfilRegraId) comPerfil++;
         if (modo === 'HERDA') seguindoEmpresa++;
         const ativo = modo === 'ATIVO' ? true : modo === 'INATIVO' ? false : empresa.ativo;
         if (ativo) comBanco++; else semBanco++;
       }
-      return { total: emps.length, comRegraPropria, seguindoEmpresa, comBanco, semBanco, opcoesBanco: itens.length };
+      return { total: emps.length, comPerfil, seguindoEmpresa, comBanco, semBanco, opcoesPerfil: perfis.length };
     });
   }
 
   async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; formaCalculo: FormaCalculo }> {
     const empresa = await this.obterConfig(tenantId);
     const itens = await comTenant(this.db, tenantId, async (tx) => {
-      const emp = (await tx.select({
-        regraExtraId: empregado.regraExtraId, regraToleranciaId: empregado.regraToleranciaId, regraNoturnoId: empregado.regraNoturnoId,
-        regraJornadaId: empregado.regraJornadaId, regraBancoId: empregado.regraBancoId, regraDestinacaoId: empregado.regraDestinacaoId,
-      }).from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
-      return emp ? resolverItens(tx as never, tenantId, emp) : ({} as ItensResolvidos);
+      const emp = (await tx.select({ perfilRegraId: empregado.perfilRegraId })
+        .from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      return emp ? resolverItens(tx as never, tenantId, emp.perfilRegraId) : ({} as ItensResolvidos);
     });
     const banco = itens.banco;
     const destinacaoFaltas = itens.destinacao?.destinacaoFaltas ?? 'DESCONTA';

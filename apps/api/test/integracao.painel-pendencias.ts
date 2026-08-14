@@ -27,13 +27,21 @@ async function main() {
     hashRegistro: nsr.toString(16).padStart(64, '0'),
   }).returning());
 
+  // Datas ancoradas no mês corrente (o painel olha "este mês"). Pega dois dias
+  // já passados: um para Maria (ímpar de batidas), outro para João (par).
+  const HOJE = new Date();
+  const diaMes = HOJE.getUTCDate();
+  const d = (dia: number) => `${HOJE.toISOString().slice(0, 8)}${String(dia).padStart(2, '0')}`;
+  const diaMaria = d(Math.max(1, diaMes - 2));
+  const diaJoao = d(Math.max(1, diaMes - 3));
+
   // Maria: 3 batidas num dia passado (ímpar → esqueceu de bater a saída) → revisar
-  await bater(maria.cpf, '2026-07-16T11:00:00Z');
-  await bater(maria.cpf, '2026-07-16T15:00:00Z');
-  await bater(maria.cpf, '2026-07-16T16:00:00Z');
+  await bater(maria.cpf, `${diaMaria}T11:00:00Z`);
+  await bater(maria.cpf, `${diaMaria}T15:00:00Z`);
+  await bater(maria.cpf, `${diaMaria}T16:00:00Z`);
   // João: 2 batidas num dia passado (par) → NÃO entra em revisar
-  await bater(joao.cpf, '2026-07-15T11:00:00Z');
-  await bater(joao.cpf, '2026-07-15T20:00:00Z');
+  await bater(joao.cpf, `${diaJoao}T11:00:00Z`);
+  await bater(joao.cpf, `${diaJoao}T20:00:00Z`);
 
   // Atestados: 1 em análise (conta) + 1 já abonado (não conta)
   await comoMaster(db, (tx) => tx.insert(pontoDocumento).values([
@@ -62,7 +70,7 @@ async function main() {
   ok(p.pendencias.atestados === 1, `conta só os atestados em análise (${p.pendencias.atestados})`);
   ok(p.pendencias.revisarTotal === 1, `só o dia ímpar entra em revisar (${p.pendencias.revisarTotal})`);
   ok(p.pendencias.revisar[0]?.nome === 'Maria Souza', `aponta quem esqueceu (${p.pendencias.revisar[0]?.nome})`);
-  ok(p.pendencias.revisar[0]?.data === '2026-07-16', `aponta o dia certo (${p.pendencias.revisar[0]?.data})`);
+  ok(p.pendencias.revisar[0]?.data === diaMaria, `aponta o dia certo (${p.pendencias.revisar[0]?.data} esperava ${diaMaria})`);
   ok(p.ativos === 5, `conta os ativos (${p.ativos})`);
   ok(p.pendencias.naoBateramTotal === 1, `só a Ana é cobrada por não bater (${p.pendencias.naoBateramTotal}: ${p.pendencias.naoBateram.map((x) => x.nome).join(', ')})`);
   ok(p.pendencias.naoBateram[0]?.nome === 'Ana Reis', `aponta quem não bateu (${p.pendencias.naoBateram[0]?.nome})`);

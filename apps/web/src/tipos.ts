@@ -65,13 +65,7 @@ export interface Empregado {
   matriculaEsocial?: string | null;
   horarioContratualId?: string | null;
   cctId?: string | null;
-  convencaoId?: string | null;
-  regraExtraId?: string | null;
-  regraToleranciaId?: string | null;
-  regraNoturnoId?: string | null;
-  regraJornadaId?: string | null;
-  regraBancoId?: string | null;
-  regraDestinacaoId?: string | null;
+  perfilRegraId?: string | null;
 }
 
 export interface InfoCertificado {
@@ -469,20 +463,6 @@ export interface Cct {
   destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA';
   destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA';
   formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
-  funcionarios?: number;
-}
-
-export interface Convencao {
-  id: string;
-  nome: string;
-  sindicato: string | null;
-  uf: string | null;
-  vigencia: string | null;
-  numeroRegistroMte: string | null;
-  categoria: string | null;
-  observacoes: string | null;
-  pdfNome: string | null;
-  temPdf?: boolean;
   funcionarios?: number;
 }
 
