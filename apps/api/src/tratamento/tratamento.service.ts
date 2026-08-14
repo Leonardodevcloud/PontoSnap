@@ -8,7 +8,7 @@ import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
-import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio } from '@ponto/rep-core';
+import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
 import { montarRegrasApuracao } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
@@ -547,6 +547,111 @@ export class TratamentoService {
 
     const ref = (ap.matricula ?? empregadoId).replace(/[^\w-]/g, '');
     return { buffer, nomeArquivo: `apuracao_${ref}_${inicioStr}_a_${fimStr}.pdf` };
+  }
+
+  /**
+   * Demonstrativo de Espelho de Ponto — o documento que o funcionário confere e
+   * assina. Puxa a apuração real, mostra as marcações originais e a jornada
+   * tratada (respeitando ajustes aprovados) e os eventos do dia.
+   */
+  async gerarEspelhoPdf(
+    tenantId: string, empregadoId: string, inicioStr: string, fimStr: string,
+    assinatura?: { nome: string; cpf: string; em: string; via: string; hashDocumento?: string; referencia?: string } | null,
+  ): Promise<{ buffer: Buffer; nomeArquivo: string }> {
+    const ap = await this.apurarPeriodoCLT(tenantId, empregadoId, inicioStr, fimStr);
+    const r = ap.resultado;
+
+    const [rep, emp, t] = await Promise.all([
+      comTenant(this.db, tenantId, (tx) => tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1)),
+      comTenant(this.db, tenantId, (tx) => tx.select().from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1)),
+      comoMaster(this.db, (tx) => tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1)),
+    ]);
+    const rep0 = rep[0]; const emp0 = emp[0]; const t0 = t[0];
+    if (!emp0) throw new NotFoundException('Empregado não encontrado');
+    const fuso = t0?.fuso ?? '-0300';
+
+    const hhmm = (min: number) => this.hhmm(min);
+    const hora = (d: Date) => {
+      // hora local no fuso do tenant: desloca o instante e lê HH:MM do ISO
+      const iso = new Date(d.getTime() + offsetMin(fuso) * 60000).toISOString();
+      return iso.slice(11, 16);
+    };
+    const paresEsperados = (ap.horarioPares ?? []).map((p) => `${p.entrada}-${p.saida}`).join(' ');
+
+    // afastamentos por dia (férias/atestado dia inteiro) para o rótulo do tipo
+    const afastPorDia = new Map<string, string>();
+    for (const a of ap.afastamentos ?? []) {
+      for (let dt = a.dataInicio; dt <= a.dataFim; dt = TratamentoService.somarDias(dt, 1)) afastPorDia.set(dt, a.tipo);
+    }
+
+    const linhas = r.dias.map((d) => {
+      const orig = (ap.batidas?.[d.data] ?? []);
+      const originais = orig.filter((b) => b.origem !== 'INCLUIDA').map((b) => hora(b.dtMarcacao)).join(' ');
+      const realizada = d.marcacoes.length
+        ? this.paresDe(d.marcacoes.map((m) => hora(m)))
+        : '';
+
+      const eventos: string[] = [];
+      if (d.ehDescansoDia && d.minutosTrabalhados > 0) eventos.push('Trabalho em descanso');
+      const afast = afastPorDia.get(d.data);
+      if (afast) eventos.push(afast === 'FERIAS' ? 'Férias' : afast === 'ATESTADO' ? 'Atestado' : afast);
+      if (orig.some((b) => b.origem === 'INCLUIDA')) eventos.push('Batida incluída (ajuste)');
+      if (orig.some((b) => b.origem === 'DESCONSIDERADA')) eventos.push('Batida desconsiderada (ajuste)');
+      for (const o of d.observacoes ?? []) if (!eventos.includes(o)) eventos.push(o);
+
+      const tipoDia: LinhaEspelho['tipoDia'] =
+        afast === 'FERIAS' ? 'FOLGA'
+        : afast === 'ATESTADO' ? 'ATESTADO'
+        : d.faltaInjustificada ? 'FALTA'
+        : eventos.some((e) => /feriado/i.test(e)) ? 'FERIADO'
+        : d.ehDescansoDia && d.minutosTrabalhados === 0 ? 'FOLGA'
+        : 'TRAB';
+
+      const positivas = d.extrasTotalMin > 0 ? hhmm(d.extrasTotalMin) : '';
+      const noturna = d.minutosNoturnosLegais > 0 ? hhmm(d.minutosNoturnosLegais) : '';
+      const atrFalt = d.faltaMin > 0 ? hhmm(d.faltaMin) : d.atrasoMin > 0 ? hhmm(d.atrasoMin) : '';
+
+      return {
+        data: d.data, tipoDia,
+        jornadaEsperada: tipoDia === 'TRAB' ? paresEsperados : '—',
+        marcacoesOriginais: originais || '—',
+        jornadaRealizada: realizada || '—',
+        horasRealizadas: d.minutosTrabalhados > 0 ? hhmm(d.minutosTrabalhados) : '',
+        horasPositivas: positivas,
+        atrasosFaltas: atrFalt,
+        horaNoturna: noturna,
+        compensadasDebito: '',
+        compensadasCredito: r.bancoDeHorasMin > 0 && d.saldoMin > 0 ? hhmm(d.saldoMin) : '',
+        eventos: eventos.join(' · '),
+      } satisfies LinhaEspelho;
+    });
+
+    const buffer = await gerarEspelhoPontoPdf({
+      empresa: rep0?.razaoSocial ?? t0?.razaoSocial ?? '',
+      cnpj: t0?.cnpj ?? '',
+      endereco: t0?.localPrestacao ?? undefined,
+      nome: emp0.nome, matricula: emp0.matricula, cpf: emp0.cpf,
+      competenciaInicio: inicioStr, competenciaFim: fimStr, fuso,
+      linhas,
+      totais: {
+        trabalhado: hhmm(r.totalTrabalhadoMin),
+        horasNormaisEsperadas: hhmm(r.totalContratadoMin),
+        saldoBanco: r.bancoDeHorasMin > 0 ? hhmm(r.bancoDeHorasMin) : undefined,
+      },
+      assinaturaEletronica: assinatura ?? null,
+    });
+
+    const ref = (emp0.matricula ?? empregadoId).replace(/[^\w-]/g, '');
+    return { buffer, nomeArquivo: `espelho_${ref}_${inicioStr}_a_${fimStr}.pdf` };
+  }
+
+  /** Junta horários em pares "entrada-saída" para o espelho. */
+  private paresDe(horas: string[]): string {
+    const out: string[] = [];
+    for (let i = 0; i < horas.length; i += 2) {
+      out.push(horas[i + 1] ? `${horas[i]}-${horas[i + 1]}` : `${horas[i]}`);
+    }
+    return out.join(' ');
   }
 
   /** Relatório consolidado em PDF (paisagem). */

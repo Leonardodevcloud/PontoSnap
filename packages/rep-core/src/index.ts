@@ -4,6 +4,7 @@ export * from './afd/index.js';
 export * from './aej/index.js';
 export * from './comprovante/index.js';
 export * from './attr/index.js';
+export * from './espelho-ponto/index.js';
 export * from './assinatura/index.js';
 export * from './relatorio-apuracao/index.js';
 export * from './relatorio-competencia/index.js';

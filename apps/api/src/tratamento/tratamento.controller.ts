@@ -134,4 +134,16 @@ export class TratamentoController {
     const r = await this.tratamento.gerarApuracaoPdf(this.tenant(u), empregadoId, inicio, fim, fer);
     return new StreamableFile(r.buffer, { type: 'application/pdf', disposition: `attachment; filename="${r.nomeArquivo}"` });
   }
+
+  /** Demonstrativo de Espelho de Ponto — documento que o funcionário confere e assina. */
+  @Get('espelho/pdf') async espelhoPdf(
+    @UsuarioAtual() u: PayloadAcesso,
+    @Query('empregadoId') empregadoId?: string,
+    @Query('inicio') inicio?: string,
+    @Query('fim') fim?: string,
+  ) {
+    if (!empregadoId || !inicio || !fim) throw new BadRequestException('Informe empregadoId, inicio e fim (YYYY-MM-DD)');
+    const r = await this.tratamento.gerarEspelhoPdf(this.tenant(u), empregadoId, inicio, fim);
+    return new StreamableFile(r.buffer, { type: 'application/pdf', disposition: `attachment; filename="${r.nomeArquivo}"` });
+  }
 }

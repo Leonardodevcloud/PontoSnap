@@ -62,6 +62,17 @@ export function ApuracaoCLT() {
     finally { setBaixando(false); }
   }
 
+  const [baixandoEspelho, setBaixandoEspelho] = useState(false);
+  async function baixarEspelho() {
+    const { inicio, fim } = faixaDoMes(mes);
+    setBaixandoEspelho(true);
+    try {
+      const blob = await api.baixar(`/tratamento/espelho/pdf?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+      salvarBlob(blob, `espelho_${mes}.pdf`);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setBaixandoEspelho(false); }
+  }
+
   const r = ap?.resultado;
   const extra50 = r?.extrasPorAdicional['50'] ?? 0;
   const extra100 = r?.extrasPorAdicional['100'] ?? 0;
@@ -71,7 +82,12 @@ export function ApuracaoCLT() {
     <div>
       <div className={css.head}>
         <div><h2>Apuração CLT</h2><p>Fechamento de competência pelo motor de regras</p></div>
-        {ap && <Botao variante="coral" className={css.pdfBtn} onClick={baixarPdf} disabled={baixando}>{baixando ? 'Gerando…' : 'Baixar PDF'}</Botao>}
+        {ap && (
+          <div className={css.acoesPdf}>
+            <Botao variante="ghost" className={css.pdfBtn} onClick={baixarEspelho} disabled={baixandoEspelho}>{baixandoEspelho ? 'Gerando…' : 'Espelho de ponto'}</Botao>
+            <Botao variante="coral" className={css.pdfBtn} onClick={baixarPdf} disabled={baixando}>{baixando ? 'Gerando…' : 'Apuração (PDF)'}</Botao>
+          </div>
+        )}
       </div>
 
       <div className={css.controles}>
