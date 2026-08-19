@@ -6,7 +6,7 @@ import type { RepConfig, MarcacaoGravada } from '@ponto/shared';
  * CONFORMIDADE COM O LEIAUTE OFICIAL — Portaria MTP 671/2021.
  *
  * Conferido contra os PDFs publicados no portal gov.br:
- *   · leiaute-do-arquivo-fonte-de-dados-afd.pdf (Anexo V, versão "003")
+ *   · leiaute-do-arquivo-fonte-de-dados-afd.pdf (Anexo V, versão "004")
  *   · leiaute-do-arquivo-eletronico-de-jornada-aej.pdf (Anexo VI, versão "001")
  *
  * Este teste existe porque o AFD é IMUTÁVEL: arquivo gerado com campo errado
@@ -64,7 +64,7 @@ describe('AFD — leiaute oficial (Anexo V)', () => {
     expect(cab!.slice(206, 216)).toMatch(DATA);          // 8 data inicial
     expect(cab!.slice(216, 226)).toMatch(DATA);          // 9 data final
     expect(cab!.slice(226, 250)).toMatch(DH);            // 10 geração
-    expect(cab!.slice(250, 253)).toBe('003');            // 11 versão do leiaute
+    expect(cab!.slice(250, 253)).toBe('004');            // 11 versão do leiaute
     expect(cab!.slice(253, 254)).toBe('1');              // 12 tpIdtDesenvolvedor
     expect(cab!.slice(254, 268)).toBe('98765432000188'); // 13 doc desenvolvedor
     expect(cab!.slice(268, 298)).toBe(' '.repeat(30));   // 14 modelo (só REP-C)

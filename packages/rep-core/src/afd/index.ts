@@ -35,7 +35,7 @@ export function registro1(rep: RepConfig, dataInicial: Date, dataFinal: Date, da
     dataD(dataInicial) +                                // 8  data inicial
     dataD(dataFinal) +                                  // 9  data final
     formatarDataHoraAFD(dataGeracao, fuso) +            // 10 geração
-    '003' +                                             // 11 versão
+    '004' +                                             // 11 versão (Anexo V vigente)
     String(rep.tipoIdDesenvolvedor) +                   // 12
     num(rep.documentoDesenvolvedor, 14) +               // 13 doc desenvolvedor
     alfa('', 30);                                       // 14 modelo (vazio REP-P)
