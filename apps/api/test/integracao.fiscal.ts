@@ -83,6 +83,12 @@ async function main() {
      `AFD válido: cabeçalho 302, ${tipo7} marcações, trailer 999999999`);
   ok(afd.nomeArquivo.startsWith('AFD') && afd.nomeArquivo.endsWith('REP_P.txt'), `nome do AFD: ${afd.nomeArquivo}`);
 
+  // Regressão: a tela manda o período como ISO completo (…T00:00:00-03:00).
+  // O service deve aceitar tanto YYYY-MM-DD quanto ISO sem quebrar ("Invalid time value").
+  const soData = (s: string) => s.slice(0, 10);
+  const afdIso = await fisc.gerarAfd(t.id, { inicio: soData('2020-01-01T00:00:00-03:00'), fim: soData('2100-12-31T23:59:59-03:00') } as never);
+  ok(afdIso.conteudo.length > 300, 'AFD gera com período recortado de ISO (não quebra com Invalid time value)');
+
   // AEJ
   const aej = await fisc.gerarAej(t.id);
   const lae = aej.conteudo.toString('latin1').split('\r\n').filter(Boolean);

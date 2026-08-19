@@ -19,7 +19,10 @@ export class FiscalController {
   private periodo(inicio?: string, fim?: string): Periodo {
     // As datas "YYYY-MM-DD" viram limites de dia no service, usando o fuso do
     // tenant — sem isso, um cliente fora de Brasília perde batidas na virada.
-    return { inicio, fim };
+    // A tela pode mandar ISO completo (…T00:00:00-03:00); aqui reduzimos à
+    // data-calendário, que é o que inicioDoDia/fimDoDia esperam.
+    const soData = (s?: string) => (s ? s.slice(0, 10) : undefined);
+    return { inicio: soData(inicio), fim: soData(fim) };
   }
   private arquivo(conteudo: Buffer, nome: string, tipo = 'text/plain') {
     return new StreamableFile(conteudo, { type: tipo, disposition: `attachment; filename="${nome}"` });
