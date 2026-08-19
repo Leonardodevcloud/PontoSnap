@@ -554,10 +554,12 @@ export class TratamentoService {
    * assina. Puxa a apuração real, mostra as marcações originais e a jornada
    * tratada (respeitando ajustes aprovados) e os eventos do dia.
    */
-  async gerarEspelhoPdf(
-    tenantId: string, empregadoId: string, inicioStr: string, fimStr: string,
-    assinatura?: { nome: string; cpf: string; em: string; via: string; hashDocumento?: string; referencia?: string } | null,
-  ): Promise<{ buffer: Buffer; nomeArquivo: string }> {
+  /**
+   * Conteúdo estruturado do espelho (cabeçalho + linhas + totais), sem gerar
+   * PDF. Base tanto do PDF quanto do hash de assinatura — o hash é deste
+   * conteúdo, então não muda pela data de geração impressa no rodapé.
+   */
+  async conteudoEspelho(tenantId: string, empregadoId: string, inicioStr: string, fimStr: string) {
     const ap = await this.apurarPeriodoCLT(tenantId, empregadoId, inicioStr, fimStr);
     const r = ap.resultado;
 
@@ -572,13 +574,11 @@ export class TratamentoService {
 
     const hhmm = (min: number) => this.hhmm(min);
     const hora = (d: Date) => {
-      // hora local no fuso do tenant: desloca o instante e lê HH:MM do ISO
       const iso = new Date(d.getTime() + offsetMin(fuso) * 60000).toISOString();
       return iso.slice(11, 16);
     };
     const paresEsperados = (ap.horarioPares ?? []).map((p) => `${p.entrada}-${p.saida}`).join(' ');
 
-    // afastamentos por dia (férias/atestado dia inteiro) para o rótulo do tipo
     const afastPorDia = new Map<string, string>();
     for (const a of ap.afastamentos ?? []) {
       for (let dt = a.dataInicio; dt <= a.dataFim; dt = TratamentoService.somarDias(dt, 1)) afastPorDia.set(dt, a.tipo);
@@ -587,9 +587,7 @@ export class TratamentoService {
     const linhas = r.dias.map((d) => {
       const orig = (ap.batidas?.[d.data] ?? []);
       const originais = orig.filter((b) => b.origem !== 'INCLUIDA').map((b) => hora(b.dtMarcacao)).join(' ');
-      const realizada = d.marcacoes.length
-        ? this.paresDe(d.marcacoes.map((m) => hora(m)))
-        : '';
+      const realizada = d.marcacoes.length ? this.paresDe(d.marcacoes.map((m) => hora(m))) : '';
 
       const eventos: string[] = [];
       if (d.ehDescansoDia && d.minutosTrabalhados > 0) eventos.push('Trabalho em descanso');
@@ -607,26 +605,22 @@ export class TratamentoService {
         : d.ehDescansoDia && d.minutosTrabalhados === 0 ? 'FOLGA'
         : 'TRAB';
 
-      const positivas = d.extrasTotalMin > 0 ? hhmm(d.extrasTotalMin) : '';
-      const noturna = d.minutosNoturnosLegais > 0 ? hhmm(d.minutosNoturnosLegais) : '';
-      const atrFalt = d.faltaMin > 0 ? hhmm(d.faltaMin) : d.atrasoMin > 0 ? hhmm(d.atrasoMin) : '';
-
       return {
         data: d.data, tipoDia,
         jornadaEsperada: tipoDia === 'TRAB' ? paresEsperados : '—',
         marcacoesOriginais: originais || '—',
         jornadaRealizada: realizada || '—',
         horasRealizadas: d.minutosTrabalhados > 0 ? hhmm(d.minutosTrabalhados) : '',
-        horasPositivas: positivas,
-        atrasosFaltas: atrFalt,
-        horaNoturna: noturna,
+        horasPositivas: d.extrasTotalMin > 0 ? hhmm(d.extrasTotalMin) : '',
+        atrasosFaltas: d.faltaMin > 0 ? hhmm(d.faltaMin) : d.atrasoMin > 0 ? hhmm(d.atrasoMin) : '',
+        horaNoturna: d.minutosNoturnosLegais > 0 ? hhmm(d.minutosNoturnosLegais) : '',
         compensadasDebito: '',
         compensadasCredito: r.bancoDeHorasMin > 0 && d.saldoMin > 0 ? hhmm(d.saldoMin) : '',
         eventos: eventos.join(' · '),
       } satisfies LinhaEspelho;
     });
 
-    const buffer = await gerarEspelhoPontoPdf({
+    return {
       empresa: rep0?.razaoSocial ?? t0?.razaoSocial ?? '',
       cnpj: t0?.cnpj ?? '',
       endereco: t0?.localPrestacao ?? undefined,
@@ -638,6 +632,22 @@ export class TratamentoService {
         horasNormaisEsperadas: hhmm(r.totalContratadoMin),
         saldoBanco: r.bancoDeHorasMin > 0 ? hhmm(r.bancoDeHorasMin) : undefined,
       },
+    };
+  }
+
+  async gerarEspelhoPdf(
+    tenantId: string, empregadoId: string, inicioStr: string, fimStr: string,
+    assinatura?: { nome: string; cpf: string; em: string; via: string; hashDocumento?: string; referencia?: string } | null,
+  ): Promise<{ buffer: Buffer; nomeArquivo: string }> {
+    const c = await this.conteudoEspelho(tenantId, empregadoId, inicioStr, fimStr);
+    const emp0 = { nome: c.nome, matricula: c.matricula };
+
+    const buffer = await gerarEspelhoPontoPdf({
+      empresa: c.empresa, cnpj: c.cnpj, endereco: c.endereco,
+      nome: c.nome, matricula: c.matricula, cpf: c.cpf,
+      competenciaInicio: inicioStr, competenciaFim: fimStr, fuso: c.fuso,
+      linhas: c.linhas,
+      totais: c.totais,
       assinaturaEletronica: assinatura ?? null,
     });
 

@@ -104,6 +104,8 @@ export function EspelhoMes() {
 
           {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
 
+          <BlocoAssinatura competencia={comp} podeAssinar={!ehMesAtual} />
+
           {dias.map((d) => {
             const dia = new Date(`${d.data}T12:00:00-0300`);
             const motivo = motivoDoDia(d.data);
@@ -133,6 +135,108 @@ export function EspelhoMes() {
           })}
         </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+interface StatusAssinatura {
+  assinado: boolean;
+  confere: boolean;
+  assinadoEm?: string;
+  via?: string;
+}
+
+/** Bloco de concordância do funcionário com o espelho do mês. */
+function BlocoAssinatura({ competencia, podeAssinar }: { competencia: string; podeAssinar: boolean }) {
+  const [status, setStatus] = useState<StatusAssinatura | null>(null);
+  const [modal, setModal] = useState(false);
+  const [pin, setPin] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    try { setStatus(await api.get<StatusAssinatura>(`/espelho-assinatura/status?competencia=${competencia}`)); }
+    catch { setStatus(null); }
+  }, [competencia]);
+  useEffect(() => { void carregar(); }, [carregar]);
+
+  async function assinar() {
+    if (pin.length < 4) { setErro('Digite seu PIN.'); return; }
+    setErro(null); setEnviando(true);
+    try {
+      await api.post('/espelho-assinatura/assinar', { competencia, pin });
+      setModal(false); setPin('');
+      await carregar();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setEnviando(false); }
+  }
+
+  if (!status) return null;
+
+  // Assinado e ainda batendo com o espelho atual.
+  if (status.assinado && status.confere) {
+    return (
+      <div className={css.assinOk}>
+        <span className={css.assinEstrela}>✦</span>
+        <div>
+          <div className={css.assinTit}>Você assinou este espelho</div>
+          <div className={css.assinSub}>
+            {status.assinadoEm ? `Em ${new Date(status.assinadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''} · {status.via ?? 'PIN no app'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Assinou antes, mas o espelho mudou depois (hash não bate mais).
+  if (status.assinado && !status.confere) {
+    return (
+      <div className={css.assinAlerta}>
+        <div className={css.assinTit}>Este espelho mudou depois que você assinou</div>
+        <div className={css.assinSub}>Alguma batida ou ajuste foi alterado. Confira novamente e assine de novo.</div>
+        {podeAssinar && <button className={css.assinBtn} onClick={() => setModal(true)}>Revisar e assinar de novo</button>}
+        {modal && <ModalPin pin={pin} setPin={setPin} erro={erro} enviando={enviando} onCancelar={() => { setModal(false); setErro(null); }} onConfirmar={assinar} />}
+      </div>
+    );
+  }
+
+  // Ainda não assinado.
+  return (
+    <div className={css.assinPend}>
+      <div className={css.assinTit}>Confira e assine seu espelho</div>
+      <div className={css.assinSub}>
+        {podeAssinar
+          ? 'Depois de conferir os dias abaixo, assine para registrar sua concordância com as marcações.'
+          : 'O mês ainda está em curso. Você poderá assinar quando a competência fechar.'}
+      </div>
+      {podeAssinar && <button className={css.assinBtn} onClick={() => setModal(true)}>Concordo e assino</button>}
+      {modal && <ModalPin pin={pin} setPin={setPin} erro={erro} enviando={enviando} onCancelar={() => { setModal(false); setErro(null); }} onConfirmar={assinar} />}
+    </div>
+  );
+}
+
+function ModalPin({ pin, setPin, erro, enviando, onCancelar, onConfirmar }: {
+  pin: string; setPin: (v: string) => void; erro: string | null; enviando: boolean; onCancelar: () => void; onConfirmar: () => void;
+}) {
+  return (
+    <div className={css.modalFundo} onClick={onCancelar}>
+      <div className={css.modalCaixa} onClick={(e) => e.stopPropagation()}>
+        <div className={css.modalTit}>Assinar com seu PIN</div>
+        <div className={css.modalTxt}>Ao assinar, você concorda com as marcações deste espelho. A prova da jornada continua sendo o registro oficial do ponto.</div>
+        <input
+          className={css.modalPin}
+          type="password" inputMode="numeric" autoComplete="off"
+          placeholder="Seu PIN" value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+        />
+        {erro && <p className={css.modalErro}>{erro}</p>}
+        <div className={css.modalAcoes}>
+          <button className={css.modalCancelar} onClick={onCancelar} disabled={enviando}>Cancelar</button>
+          <button className={css.modalConfirmar} onClick={onConfirmar} disabled={enviando || pin.length < 4}>{enviando ? 'Assinando…' : 'Assinar'}</button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -64,10 +64,9 @@ export function ApuracaoCLT() {
 
   const [baixandoEspelho, setBaixandoEspelho] = useState(false);
   async function baixarEspelho() {
-    const { inicio, fim } = faixaDoMes(mes);
     setBaixandoEspelho(true);
     try {
-      const blob = await api.baixar(`/tratamento/espelho/pdf?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+      const blob = await api.baixar(`/espelho-assinatura/rh/pdf?empregadoId=${empregadoId}&competencia=${mes}`);
       salvarBlob(blob, `espelho_${mes}.pdf`);
     } catch (e) { setErro((e as Error).message); }
     finally { setBaixandoEspelho(false); }
