@@ -5,7 +5,7 @@ const doDia = (total: number) => Array.from({ length: total }, (_, i) => rotuloM
 
 describe('rótulo das marcações', () => {
   it('dia normal (2 pares = 4 marcações)', () => {
-    expect(doDia(4)).toEqual(['Entrada', 'Saída descanso', 'Retorno descanso', 'Saída']);
+    expect(doDia(4)).toEqual(['Entrada', 'Saída para o almoço', 'Volta do almoço', 'Saída']);
   });
 
   it('sábado (1 par = 2 marcações) não inventa descanso', () => {
@@ -21,7 +21,7 @@ describe('rótulo das marcações', () => {
   it('jornada de 4 batidas com uma extra à noite: a saída fica no lugar certo', () => {
     // 5 batidas num dia que prevê 4 (08:00, 11:00, 12:00, 18:00 + 23:28 extra)
     const rots = Array.from({ length: 5 }, (_, i) => rotuloMarcacao(i, 4));
-    expect(rots).toEqual(['Entrada', 'Saída descanso', 'Retorno descanso', 'Saída', 'Entrada']);
+    expect(rots).toEqual(['Entrada', 'Saída para o almoço', 'Volta do almoço', 'Saída', 'Entrada']);
   });
 
   it('dia ímpar SEM horário contratual: a última é retorno em aberto', () => {
@@ -34,18 +34,18 @@ describe('rótulo das marcações', () => {
   it('marcação excedente não some nem quebra o rótulo', () => {
     // esperava 4, bateu 6 (hora extra à noite): as 2 extras alternam
     const rots = Array.from({ length: 6 }, (_, i) => rotuloMarcacao(i, 4));
-    expect(rots).toEqual(['Entrada', 'Saída descanso', 'Retorno descanso', 'Saída', 'Entrada', 'Saída']);
+    expect(rots).toEqual(['Entrada', 'Saída para o almoço', 'Volta do almoço', 'Saída', 'Entrada', 'Saída']);
   });
 
   it('sem horário contratual, rotula pelo que já foi batido', () => {
     expect(doDia(1)).toEqual(['Entrada']);
-    expect(doDia(3)).toEqual(['Entrada', 'Saída descanso', 'Retorno descanso']);
+    expect(doDia(3)).toEqual(['Entrada', 'Saída para o almoço', 'Volta do almoço']);
   });
 
   it('próxima marcação: o botão diz o que vai gravar', () => {
     expect(rotuloProxima(0, 4)).toBe('Entrada');
-    expect(rotuloProxima(1, 4)).toBe('Saída descanso');
-    expect(rotuloProxima(2, 4)).toBe('Retorno descanso');
+    expect(rotuloProxima(1, 4)).toBe('Saída para o almoço');
+    expect(rotuloProxima(2, 4)).toBe('Volta do almoço');
     expect(rotuloProxima(3, 4)).toBe('Saída');
     expect(rotuloProxima(4, 4)).toBe('Entrada'); // excedente: voltou pra hora extra
   });
@@ -53,6 +53,6 @@ describe('rótulo das marcações', () => {
   it('próxima sem horário definido não promete descanso', () => {
     expect(rotuloProxima(0, 0)).toBe('Entrada');
     expect(rotuloProxima(1, 0)).toBe('Saída');
-    expect(rotuloProxima(2, 0)).toBe('Retorno descanso');
+    expect(rotuloProxima(2, 0)).toBe('Volta do almoço');
   });
 });

@@ -31,11 +31,12 @@ export class TratamentoService {
   }
 
   // ---- Horário contratual ----
-  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string }) {
+  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null }) {
     return comTenant(this.db, tenantId, async (tx) =>
       (await tx.insert(pontoHorarioContratual).values({
         tenantId, codigo: dto.codigo, durJornadaMin: dto.durJornadaMin, pares: dto.pares,
         diasSemana: dto.diasSemana ?? [1, 2, 3, 4, 5], regime: dto.regime ?? 'normal',
+        jornadaPorDia: dto.jornadaPorDia ?? null,
       }).returning())[0]);
   }
 
@@ -44,7 +45,7 @@ export class TratamentoService {
    * Recalcula a apuração de todos que a usam — por isso é para CORREÇÃO, não
    * para mudança real de jornada (essa usa mudarEscalaComVigencia).
    */
-  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string }) {
+  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null }) {
     return comTenant(this.db, tenantId, async (tx) => {
       const set: Record<string, unknown> = {};
       if (dto.codigo !== undefined) set.codigo = dto.codigo;
@@ -52,6 +53,7 @@ export class TratamentoService {
       if (dto.pares !== undefined) set.pares = dto.pares;
       if (dto.diasSemana !== undefined) set.diasSemana = dto.diasSemana;
       if (dto.regime !== undefined) set.regime = dto.regime;
+      if (dto.jornadaPorDia !== undefined) set.jornadaPorDia = dto.jornadaPorDia;
       const rows = await tx.update(pontoHorarioContratual).set(set)
         .where(and(eq(pontoHorarioContratual.id, id), eq(pontoHorarioContratual.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Escala não encontrada');
@@ -523,7 +525,12 @@ export class TratamentoService {
           const data = this.diaLocalISO(cursor, fuso);
           const dow = diaSemana(data);
           const escDia = escalaDoDia(data);
-          const durDia = escDia?.durJornadaMin ?? 0;
+          // Jornada do dia: se a escala tem jornada_por_dia com valor para este
+          // dia da semana, usa ele; senão cai na jornada única (dur_jornada_min).
+          const porDiaMap = escDia?.jornadaPorDia as Record<string, number> | null | undefined;
+          const durDia = (porDiaMap && porDiaMap[String(dow)] != null)
+            ? porDiaMap[String(dow)]!
+            : (escDia?.durJornadaMin ?? 0);
           const uteisDia = escDia?.diasSemana ?? [1, 2, 3, 4, 5];
           const ehFeriado = feriadoSet.has(data);
           const ehDomingo = dow === 0;
@@ -531,13 +538,18 @@ export class TratamentoService {
           const ehDescanso = descansoPorAusencia.has(data)
             || (!ehDomingo && !ehFeriado && !uteisDia.includes(dow)); // ex.: sábado de folga
           const jornada = ehUtil ? durDia : 0;
+          // Se o dia usa jornada-por-dia diferente da base, a janela fixa (pares)
+          // não corresponde a este dia — usá-la geraria "saída antecipada" falsa.
+          // Nesse caso avalia só pela duração do dia (a janela fica de fora).
+          const jornadaCustomizada = porDiaMap != null && porDiaMap[String(dow)] != null
+            && porDiaMap[String(dow)] !== escDia?.durJornadaMin;
           dias.push({
             data,
             marcacoes: porDia.get(data) ?? [],
             jornadaContratadaMin: jornada,
             ehDomingo, ehFeriado, ehDescanso,
             regime: 'normal',
-            janelaPrevista: ehUtil ? escDia?.pares : undefined,
+            janelaPrevista: (ehUtil && !jornadaCustomizada) ? escDia?.pares : undefined,
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);

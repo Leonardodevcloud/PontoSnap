@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
+import { IsArray, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
 
 export class CriarHorarioDto {
   @IsString() codigo!: string;
@@ -6,6 +6,7 @@ export class CriarHorarioDto {
   @IsArray() pares!: { entrada: string; saida: string }[];
   @IsOptional() @IsArray() diasSemana?: number[]; // 0=dom ... 6=sáb; padrão seg–sex
   @IsOptional() @IsString() regime?: string; // 'normal' | 'r12x36'
+  @IsOptional() @IsObject() jornadaPorDia?: Record<string, number> | null; // {dia(0-6): minutos} sobrepõe durJornadaMin
 }
 
 export class CriarAusenciaDto {

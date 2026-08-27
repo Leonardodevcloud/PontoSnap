@@ -56,7 +56,12 @@ export function rotuloMarcacao(i: number, total: number): string {
   // Dia com mais de um intervalo: numera pra não repetir o mesmo rótulo.
   const intervalos = total % 2 === 0 ? (total - 2) / 2 : (total - 1) / 2;
   const nesimo = Math.ceil(i / 2);
-  const sufixo = intervalos > 1 ? ` ${nesimo}` : '';
+  // Com um único intervalo, chama pelo nome que o funcionário entende: almoço.
+  // Com vários, numera ("saída descanso 1/2") pra não confundir.
+  if (intervalos <= 1) {
+    return ehSaida ? 'Saída para o almoço' : 'Volta do almoço';
+  }
+  const sufixo = ` ${nesimo}`;
   return ehSaida ? `Saída descanso${sufixo}` : `Retorno descanso${sufixo}`;
 }
 
@@ -64,7 +69,7 @@ export function rotuloMarcacao(i: number, total: number): string {
 export function rotuloProxima(jaBatidas: number, esperadas: number): string {
   if (jaBatidas === 0) return 'Entrada';
   if (esperadas > 0) return rotuloMarcacao(jaBatidas, esperadas);
-  return jaBatidas % 2 === 1 ? 'Saída' : 'Retorno descanso';
+  return jaBatidas % 2 === 1 ? 'Saída' : 'Volta do almoço';
 }
 
 export const reaisDeCentavos = (c: number) =>

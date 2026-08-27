@@ -225,6 +225,13 @@
       "when": 1784601300000,
       "tag": "0031_escala_vigencia",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1784601400000,
+      "tag": "0032_jornada_por_dia",
+      "breakpoints": true
     }
   ]
 }

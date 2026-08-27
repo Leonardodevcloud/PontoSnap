@@ -187,6 +187,7 @@ export interface Horario {
   pares: ParEntradaSaida[];
   diasSemana: number[];
   regime: string;
+  jornadaPorDia?: Record<string, number> | null;
   criadoEm?: string;
 }
 

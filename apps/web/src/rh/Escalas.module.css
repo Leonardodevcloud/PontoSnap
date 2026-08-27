@@ -42,3 +42,14 @@
 .btnExcluir { background: #fff; color: var(--ash, #5C4F49); border: 1px solid #e5ded8; }
 .btnEditar:hover { filter: brightness(0.97); }
 .btnExcluir:hover { background: #faf7f4; }
+
+.porDiaBox { margin: 16px 0; }
+.porDiaToggle { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--ash, #5C4F49); line-height: 1.4; cursor: pointer; background: #FFF6E8; border-radius: 10px; padding: 11px 12px; }
+.porDiaToggle input { margin-top: 2px; flex-shrink: 0; }
+.porDiaToggle strong { color: var(--ink, #10403F); }
+.porDiaGrade { margin-top: 12px; border: 1px solid #f0ebe4; border-radius: 12px; overflow: hidden; }
+.porDiaLinha { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f4f1ec; }
+.porDiaLinha:last-of-type { border-bottom: none; }
+.porDiaNome { font-weight: 700; width: 44px; color: var(--ink, #10403F); font-size: 14px; }
+.porDiaInput { padding: 6px 10px; border: 1.5px solid rgba(16,64,63,.15); border-radius: 8px; font-size: 14px; }
+.porDiaUn { font-size: 12.5px; color: var(--ash, #5C4F49); }

@@ -11,6 +11,7 @@ const DIAS = [
   { n: 5, l: 'Sex' }, { n: 6, l: 'Sáb' }, { n: 0, l: 'Dom' },
 ];
 const hhmmParaMin = (v: string) => { const [h, m] = v.split(':').map(Number); return (h ?? 0) * 60 + (m ?? 0); };
+const minParaHhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 export function Escalas() {
   const [lista, setLista] = useState<Horario[] | null>(null);
@@ -22,6 +23,9 @@ export function Escalas() {
   const [regime, setRegime] = useState('normal');
   const [salvando, setSalvando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  // Jornada por dia: quando ligado, cada dia pode ter uma carga horária própria.
+  const [porDiaLigado, setPorDiaLigado] = useState(false);
+  const [jornadaDia, setJornadaDia] = useState<Record<number, string>>({}); // dia(0-6) -> "HH:MM"
 
   function editar(h: Horario) {
     setEditandoId(h.id);
@@ -29,11 +33,20 @@ export function Escalas() {
     setDias(h.diasSemana);
     setPares(h.pares.map((p) => ({ entrada: `${p.entrada.slice(0, 2)}:${p.entrada.slice(2)}`, saida: `${p.saida.slice(0, 2)}:${p.saida.slice(2)}` })));
     setRegime(h.regime);
+    if (h.jornadaPorDia && Object.keys(h.jornadaPorDia).length > 0) {
+      setPorDiaLigado(true);
+      const jd: Record<number, string> = {};
+      for (const [d, min] of Object.entries(h.jornadaPorDia)) jd[Number(d)] = minParaHhmm(min);
+      setJornadaDia(jd);
+    } else {
+      setPorDiaLigado(false); setJornadaDia({});
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   function cancelarEdicao() {
     setEditandoId(null); setCodigo(''); setDias([1, 2, 3, 4, 5]);
     setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
+    setPorDiaLigado(false); setJornadaDia({});
   }
   async function excluir(h: Horario) {
     if (!confirm(`Excluir a escala "${h.codigo}"? Só é possível se nenhum funcionário estiver usando.`)) return;
@@ -61,14 +74,18 @@ export function Escalas() {
     setErro(null); setSalvando(true);
     try {
       const paresAfd = pares.map((p) => ({ entrada: p.entrada.replace(':', ''), saida: p.saida.replace(':', '') }));
-      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime };
+      // Monta jornadaPorDia só com os dias marcados, quando o modo está ligado.
+      const jornadaPorDia = porDiaLigado
+        ? Object.fromEntries(dias.map((d) => [String(d), hhmmParaMin(jornadaDia[d] ?? minParaHhmm(durTotal))]))
+        : null;
+      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime, jornadaPorDia };
       if (editandoId) {
         await api.patch(`/tratamento/horarios/${editandoId}`, corpo);
       } else {
         await api.post('/tratamento/horarios', corpo);
       }
       setEditandoId(null);
-      setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
+      setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal'); setPorDiaLigado(false); setJornadaDia({});
       void carregar();
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
@@ -115,6 +132,30 @@ export function Escalas() {
             </div>
           ))}
           <button className={css.addPar} onClick={() => setPares((ps) => [...ps, { entrada: '', saida: '' }])}>+ período</button>
+        </div>
+
+        <div className={css.porDiaBox}>
+          <label className={css.porDiaToggle}>
+            <input type="checkbox" checked={porDiaLigado} onChange={(e) => setPorDiaLigado(e.target.checked)} />
+            <span><strong>Jornada diferente por dia</strong> — marque quando um dia tem carga horária diferente (ex.: sábado menor).</span>
+          </label>
+          {porDiaLigado && (
+            <div className={css.porDiaGrade}>
+              {DIAS.filter((d) => dias.includes(d.n)).map((d) => (
+                <div key={d.n} className={css.porDiaLinha}>
+                  <span className={css.porDiaNome}>{d.l}</span>
+                  <input
+                    type="time"
+                    className={css.porDiaInput}
+                    value={jornadaDia[d.n] ?? minParaHhmm(durTotal)}
+                    onChange={(e) => setJornadaDia((jd) => ({ ...jd, [d.n]: e.target.value }))}
+                  />
+                  <span className={css.porDiaUn}>de trabalho</span>
+                </div>
+              ))}
+              <p className={css.hint}>Defina quanto o funcionário deve trabalhar em cada dia. O horário de almoço real vem das batidas dele — aqui você informa só a carga horária.</p>
+            </div>
+          )}
         </div>
 
         {erro && <p className={css.erro}>{erro}</p>}

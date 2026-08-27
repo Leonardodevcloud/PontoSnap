@@ -17,6 +17,8 @@ export const pontoHorarioContratual = pgTable('ponto_horario_contratual', {
   pares: jsonb('pares').$type<ParEntradaSaida[]>().notNull().default([]),
   diasSemana: jsonb('dias_semana').$type<number[]>().notNull().default([1, 2, 3, 4, 5]),
   regime: varchar('regime', { length: 10 }).notNull().default('normal'),
+  /** Mapa opcional {diaSemana(0-6): minutos}. Se presente, sobrepõe durJornadaMin naquele dia. */
+  jornadaPorDia: jsonb('jornada_por_dia').$type<Record<string, number>>(),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });
 
