@@ -26,3 +26,11 @@
 .emailConta{ display:block; margin-top:5px; }
 .quando{ background:var(--white); border:1px dashed rgba(16,64,63,.2); border-radius:12px; padding:13px 15px; font-size:13px; color:var(--ash); line-height:1.6; margin-top:14px; }
 .quando b{ color:var(--ink); }
+
+.trocarPapel {
+  margin-left: 8px; border: 1px solid var(--coral, #FF6B4A); background: #fff;
+  color: var(--coral-d, #E4502F); border-radius: 999px; padding: 2px 10px;
+  font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.trocarPapel:hover:not(:disabled) { background: var(--peach, #FFE2D1); }
+.trocarPapel:disabled { opacity: .5; cursor: default; }

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, StreamableFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, StreamableFile, UseGuards, BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { TenantService } from './tenant.service';
 import { CriarTenantDto, AtivoDto, FusoDto, VincularEmpresaDto } from './dto/tenant.dto';
@@ -38,6 +38,15 @@ export class TenantController {
 
   @Post('acessos') vincular(@Body() dto: VincularEmpresaDto) {
     return this.tenants.vincularEmpresa(dto.usuarioId, dto.tenantId, dto.perfil);
+  }
+
+  /** Troca o perfil de uma conta de administração entre RH e Admin. */
+  @Patch('acessos/:usuarioId/perfil')
+  trocarPerfil(@Param('usuarioId') usuarioId: string, @Body() dto: { perfil: 'ADMIN_CLIENTE' | 'RH' }) {
+    if (dto?.perfil !== 'ADMIN_CLIENTE' && dto?.perfil !== 'RH') {
+      throw new BadRequestException('Perfil deve ser ADMIN_CLIENTE ou RH.');
+    }
+    return this.tenants.trocarPerfilConta(usuarioId, dto.perfil);
   }
 
   @Delete('acessos/:vinculoId') desvincular(@Param('vinculoId') vinculoId: string) {

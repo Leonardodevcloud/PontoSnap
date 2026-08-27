@@ -244,6 +244,27 @@ export class TenantService {
   }
 
   /**
+   * Troca o perfil de uma conta de administração entre RH e ADMIN_CLIENTE.
+   * Atualiza tanto o perfil da conta quanto o de todos os seus vínculos de
+   * empresa, para manter tudo coerente. Colaborador não pode ser convertido
+   * (tem CPF e registro fiscal atrelados a uma empresa).
+   */
+  async trocarPerfilConta(usuarioId: string, novoPerfil: 'ADMIN_CLIENTE' | 'RH') {
+    return comoMaster(this.db, async (tx) => {
+      const u = (await tx.select({ perfil: usuario.perfil }).from(usuario)
+        .where(eq(usuario.id, usuarioId)).limit(1))[0];
+      if (!u) throw new NotFoundException('Usuário não encontrado');
+      if (u.perfil !== 'ADMIN_CLIENTE' && u.perfil !== 'RH') {
+        throw new ConflictException('Só contas de administração (Admin ou RH) têm o perfil alterado por aqui.');
+      }
+      await tx.update(usuario).set({ perfil: novoPerfil }).where(eq(usuario.id, usuarioId));
+      // Mantém os vínculos de empresa coerentes com o novo papel.
+      await tx.update(usuarioTenant).set({ perfil: novoPerfil }).where(eq(usuarioTenant.usuarioId, usuarioId));
+      return { ok: true, perfil: novoPerfil };
+    });
+  }
+
+  /**
    * Gera o ATTR (art. 89) para um cliente. Sai sem assinatura de propósito:
    * a Portaria exige assinatura eletrônica qualificada de pessoa física, do
    * responsável legal E do técnico — feita fora, com e-CPF.

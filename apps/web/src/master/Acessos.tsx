@@ -19,6 +19,7 @@ export function Acessos() {
   const [tenantSel, setTenantSel] = useState('');
   const [perfilSel, setPerfilSel] = useState<'RH' | 'ADMIN_CLIENTE'>('RH');
   const [salvando, setSalvando] = useState(false);
+  const [trocando, setTrocando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setErro(null);
@@ -28,6 +29,18 @@ export function Acessos() {
     } catch (e) { setErro((e as Error).message); }
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
+
+  async function trocarPerfil(usuarioId: string, novo: 'RH' | 'ADMIN_CLIENTE') {
+    const rotulo = novo === 'ADMIN_CLIENTE' ? 'Administrador' : 'RH';
+    if (!confirm(`Tornar esta conta ${rotulo}? Vale na próxima renovação de sessão dela.`)) return;
+    setErro(null); setMsg(null); setTrocando(usuarioId);
+    try {
+      await api.patch(`/tenants/acessos/${usuarioId}/perfil`, { perfil: novo });
+      setMsg(`Perfil alterado para ${rotulo}. Vale no próximo login (ou renovação de sessão).`);
+      await carregar();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setTrocando(null); }
+  }
 
   async function vincular(usuarioId: string) {
     if (!tenantSel) { setErro('Escolha a empresa.'); return; }
@@ -78,7 +91,19 @@ export function Acessos() {
                   <td>
                     {c.empresaOrigem && <span className={css.cli}>Cliente: {c.empresaOrigem}</span>}
                     <strong className={css.emailConta}>{c.email}</strong>
-                    <div className={css.meta}>{papelLongo(c.perfil)}{c.ativo ? '' : ' · inativo'}</div>
+                    <div className={css.meta}>
+                      {papelLongo(c.perfil)}{c.ativo ? '' : ' · inativo'}
+                      {(c.perfil === 'RH' || c.perfil === 'ADMIN_CLIENTE') && (
+                        <button
+                          className={css.trocarPapel}
+                          disabled={trocando === c.id}
+                          onClick={() => trocarPerfil(c.id, c.perfil === 'RH' ? 'ADMIN_CLIENTE' : 'RH')}
+                          title={c.perfil === 'RH' ? 'Promover a Administrador' : 'Rebaixar para RH'}
+                        >
+                          {trocando === c.id ? '…' : c.perfil === 'RH' ? '→ tornar Admin' : '→ tornar RH'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td>
                     {c.empresas.length === 0
