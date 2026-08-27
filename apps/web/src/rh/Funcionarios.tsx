@@ -313,6 +313,8 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
   const [sel, setSel] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [modo, setModo] = useState<'corrigir' | 'mudar'>('corrigir');
+  const [dataInicio, setDataInicio] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     api.get<Horario[]>('/tratamento/horarios')
@@ -323,7 +325,11 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
   async function salvar() {
     setErro(null); setEnviando(true);
     try {
-      await api.patch(`/empregados/${empregado.id}/horario`, { horarioContratualId: sel });
+      if (modo === 'mudar') {
+        await api.post(`/tratamento/empregados/${empregado.id}/mudar-escala`, { horarioContratualId: sel, dataInicio });
+      } else {
+        await api.patch(`/empregados/${empregado.id}/horario`, { horarioContratualId: sel });
+      }
       onSalvo();
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
   }
@@ -333,16 +339,36 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
       {horarios.length === 0 ? (
         <p className={css.aviso}>Nenhuma escala cadastrada ainda. Crie uma em <strong>Escalas</strong> primeiro.</p>
       ) : (
-        <label className={css.selWrap}>
-          <span className={css.selLb}>Escala</span>
-          <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
-            {horarios.map((h) => <option key={h.id} value={h.id}>{h.codigo}</option>)}
-          </select>
-        </label>
+        <>
+          <label className={css.selWrap}>
+            <span className={css.selLb}>Escala</span>
+            <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
+              {horarios.map((h) => <option key={h.id} value={h.id}>{h.codigo}</option>)}
+            </select>
+          </label>
+          <div className={css.modoEscala}>
+            <label className={css.radioLinha}>
+              <input type="radio" checked={modo === 'corrigir'} onChange={() => setModo('corrigir')} />
+              <span><strong>Corrigir cadastro</strong> — a escala estava errada. Vale para toda a apuração.</span>
+            </label>
+            <label className={css.radioLinha}>
+              <input type="radio" checked={modo === 'mudar'} onChange={() => setModo('mudar')} />
+              <span><strong>Mudar a partir de uma data</strong> — o funcionário trocou de escala. O passado é preservado.</span>
+            </label>
+          </div>
+          {modo === 'mudar' && (
+            <label className={css.selWrap}>
+              <span className={css.selLb}>A nova escala vale a partir de</span>
+              <input type="date" className={css.select} value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+            </label>
+          )}
+        </>
       )}
       {erro && <p className={css.erroModal}>{erro}</p>}
       {horarios.length > 0 && (
-        <Botao variante="coral" onClick={salvar} disabled={enviando || !sel}>{enviando ? 'Salvando…' : 'Vincular escala'}</Botao>
+        <Botao variante="coral" onClick={salvar} disabled={enviando || !sel || (modo === 'mudar' && !dataInicio)}>
+          {enviando ? 'Salvando…' : modo === 'mudar' ? 'Mudar escala' : 'Vincular escala'}
+        </Botao>
       )}
     </Modal>
   );

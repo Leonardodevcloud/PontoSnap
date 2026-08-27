@@ -1,8 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
-import { and, eq } from 'drizzle-orm';
-import { empregado, pontoHorarioContratual, pontoPerfilRegra, usuario, comTenant, comoMaster, type Db } from '@ponto/db';
+import { and, eq, isNull } from 'drizzle-orm';
+import { empregado, pontoHorarioContratual, pontoPerfilRegra, usuario, empregadoEscalaVigencia, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { registrarEventoRep } from '../fiscal/evento-rep';
 import { EmailService } from '../email/email.service';
@@ -173,6 +173,21 @@ export class EmpregadoService {
       const rows = await tx.update(empregado).set({ horarioContratualId })
         .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
+
+      // Vínculo/correção de escala: mantém UMA vigência aberta, cobrindo todo o
+      // histórico (é correção, não mudança de escala a partir de uma data —
+      // essa é feita por mudarEscalaComVigencia). Substitui a vigência aberta
+      // existente, ou cria a primeira "desde sempre".
+      const aberta = (await tx.select().from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.empregadoId, id), eq(empregadoEscalaVigencia.tenantId, tenantId), isNull(empregadoEscalaVigencia.dataFim))).limit(1))[0];
+      if (aberta) {
+        await tx.update(empregadoEscalaVigencia).set({ horarioContratualId })
+          .where(eq(empregadoEscalaVigencia.id, aberta.id));
+      } else {
+        await tx.insert(empregadoEscalaVigencia).values({
+          tenantId, empregadoId: id, horarioContratualId, dataInicio: '2000-01-01',
+        });
+      }
       return this.semSegredos(rows[0]);
     });
   }

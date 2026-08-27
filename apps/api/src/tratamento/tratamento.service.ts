@@ -1,7 +1,7 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { and, asc, desc, eq, gte, inArray, lte, isNull } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -38,6 +38,80 @@ export class TratamentoService {
         diasSemana: dto.diasSemana ?? [1, 2, 3, 4, 5], regime: dto.regime ?? 'normal',
       }).returning())[0]);
   }
+
+  /**
+   * Corrige o cadastro de uma escala (a jornada estava errada desde o começo).
+   * Recalcula a apuração de todos que a usam — por isso é para CORREÇÃO, não
+   * para mudança real de jornada (essa usa mudarEscalaComVigencia).
+   */
+  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string }) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const set: Record<string, unknown> = {};
+      if (dto.codigo !== undefined) set.codigo = dto.codigo;
+      if (dto.durJornadaMin !== undefined) set.durJornadaMin = dto.durJornadaMin;
+      if (dto.pares !== undefined) set.pares = dto.pares;
+      if (dto.diasSemana !== undefined) set.diasSemana = dto.diasSemana;
+      if (dto.regime !== undefined) set.regime = dto.regime;
+      const rows = await tx.update(pontoHorarioContratual).set(set)
+        .where(and(eq(pontoHorarioContratual.id, id), eq(pontoHorarioContratual.tenantId, tenantId))).returning();
+      if (!rows[0]) throw new NotFoundException('Escala não encontrada');
+      return rows[0];
+    });
+  }
+
+  /** Exclui uma escala, apenas se ninguém a estiver usando (vínculo ou vigência). */
+  excluirHorario(tenantId: string, id: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emUso = (await tx.select({ id: empregado.id }).from(empregado)
+        .where(and(eq(empregado.horarioContratualId, id), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      const emVig = (await tx.select({ id: empregadoEscalaVigencia.id }).from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.horarioContratualId, id), eq(empregadoEscalaVigencia.tenantId, tenantId))).limit(1))[0];
+      if (emUso || emVig) {
+        throw new ConflictException('Esta escala está em uso por funcionários. Troque a escala deles antes de excluir.');
+      }
+      const rows = await tx.delete(pontoHorarioContratual)
+        .where(and(eq(pontoHorarioContratual.id, id), eq(pontoHorarioContratual.tenantId, tenantId))).returning();
+      if (!rows[0]) throw new NotFoundException('Escala não encontrada');
+      return { excluido: true };
+    });
+  }
+
+  /**
+   * Mudança REAL de escala a partir de uma data: encerra a vigência atual no dia
+   * anterior e abre a nova a partir de dataInicio. O passado é preservado — a
+   * apuração dos dias anteriores continua usando a escala antiga.
+   * Também atualiza o horário "atual" do empregado (leitura rápida).
+   */
+  mudarEscalaComVigencia(tenantId: string, empregadoId: string, horarioContratualId: string, dataInicio: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const hor = (await tx.select().from(pontoHorarioContratual)
+        .where(and(eq(pontoHorarioContratual.id, horarioContratualId), eq(pontoHorarioContratual.tenantId, tenantId))).limit(1))[0];
+      if (!hor) throw new NotFoundException('Escala não encontrada');
+      const emp = (await tx.select({ id: empregado.id }).from(empregado)
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!emp) throw new NotFoundException('Empregado não encontrado');
+
+      // Encerra qualquer vigência aberta no dia anterior a dataInicio.
+      const diaAnterior = TratamentoService.somarDias(dataInicio, -1);
+      await tx.update(empregadoEscalaVigencia)
+        .set({ dataFim: diaAnterior })
+        .where(and(
+          eq(empregadoEscalaVigencia.empregadoId, empregadoId),
+          eq(empregadoEscalaVigencia.tenantId, tenantId),
+          isNull(empregadoEscalaVigencia.dataFim),
+        ));
+
+      // Abre a nova vigência.
+      await tx.insert(empregadoEscalaVigencia).values({
+        tenantId, empregadoId, horarioContratualId, dataInicio,
+      });
+      // Atualiza o "atual" do empregado.
+      await tx.update(empregado).set({ horarioContratualId })
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId)));
+      return { ok: true, dataInicio };
+    });
+  }
+
   listarHorarios(tenantId: string) {
     return comTenant(this.db, tenantId, (tx) =>
       tx.select().from(pontoHorarioContratual).where(eq(pontoHorarioContratual.tenantId, tenantId)));
@@ -326,6 +400,30 @@ export class TratamentoService {
       const durJornada = horario?.durJornadaMin ?? 0;
       const diasUteis = horario?.diasSemana ?? [1, 2, 3, 4, 5]; // seg–sex por padrão
 
+      // Vigências de escala do funcionário: qual escala valia em cada período.
+      // Para cada dia, escalaDoDia() devolve o horário vigente naquele dia —
+      // é isso que preserva o passado quando a escala muda no meio do vínculo.
+      const vigencias = await tx.select().from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.empregadoId, empregadoId), eq(empregadoEscalaVigencia.tenantId, tenantId)))
+        .orderBy(asc(empregadoEscalaVigencia.dataInicio));
+      const horariosVig = new Map<string, typeof horario>();
+      for (const v of vigencias) {
+        if (!horariosVig.has(v.horarioContratualId)) {
+          horariosVig.set(v.horarioContratualId,
+            (await tx.select().from(pontoHorarioContratual).where(eq(pontoHorarioContratual.id, v.horarioContratualId)).limit(1))[0]);
+        }
+      }
+      // Resolve a escala vigente numa data (YYYY-MM-DD). Se não houver vigência
+      // cobrindo o dia, cai no horário atual do funcionário (compatibilidade).
+      const escalaDoDia = (data: string): typeof horario => {
+        for (const v of vigencias) {
+          if (data >= v.dataInicio && (v.dataFim == null || data <= v.dataFim)) {
+            return horariosVig.get(v.horarioContratualId) ?? horario;
+          }
+        }
+        return horario;
+      };
+
       // Regras por item: escolha do funcionário → padrão do tipo → CLT.
       const itens = await resolverItens(tx as never, tenantId, emp.perfilRegraId);
       const regras = montarRegrasApuracao(itens);
@@ -424,19 +522,22 @@ export class TratamentoService {
         while (cursor.getTime() <= ultimo.getTime()) {
           const data = this.diaLocalISO(cursor, fuso);
           const dow = diaSemana(data);
+          const escDia = escalaDoDia(data);
+          const durDia = escDia?.durJornadaMin ?? 0;
+          const uteisDia = escDia?.diasSemana ?? [1, 2, 3, 4, 5];
           const ehFeriado = feriadoSet.has(data);
           const ehDomingo = dow === 0;
-          const ehUtil = diasUteis.includes(dow) && !ehFeriado && !descansoPorAusencia.has(data);
+          const ehUtil = uteisDia.includes(dow) && !ehFeriado && !descansoPorAusencia.has(data);
           const ehDescanso = descansoPorAusencia.has(data)
-            || (!ehDomingo && !ehFeriado && !diasUteis.includes(dow)); // ex.: sábado de folga
-          const jornada = ehUtil ? durJornada : 0;
+            || (!ehDomingo && !ehFeriado && !uteisDia.includes(dow)); // ex.: sábado de folga
+          const jornada = ehUtil ? durDia : 0;
           dias.push({
             data,
             marcacoes: porDia.get(data) ?? [],
             jornadaContratadaMin: jornada,
             ehDomingo, ehFeriado, ehDescanso,
             regime: 'normal',
-            janelaPrevista: ehUtil ? horario?.pares : undefined,
+            janelaPrevista: ehUtil ? escDia?.pares : undefined,
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);

@@ -218,6 +218,13 @@
       "when": 1784601200000,
       "tag": "0030_espelho_assinatura",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1784601300000,
+      "tag": "0031_escala_vigencia",
+      "breakpoints": true
     }
   ]
 }

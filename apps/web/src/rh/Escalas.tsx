@@ -21,6 +21,26 @@ export function Escalas() {
   const [pares, setPares] = useState<ParEntradaSaida[]>([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]);
   const [regime, setRegime] = useState('normal');
   const [salvando, setSalvando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  function editar(h: Horario) {
+    setEditandoId(h.id);
+    setCodigo(h.codigo);
+    setDias(h.diasSemana);
+    setPares(h.pares.map((p) => ({ entrada: `${p.entrada.slice(0, 2)}:${p.entrada.slice(2)}`, saida: `${p.saida.slice(0, 2)}:${p.saida.slice(2)}` })));
+    setRegime(h.regime);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function cancelarEdicao() {
+    setEditandoId(null); setCodigo(''); setDias([1, 2, 3, 4, 5]);
+    setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
+  }
+  async function excluir(h: Horario) {
+    if (!confirm(`Excluir a escala "${h.codigo}"? Só é possível se nenhum funcionário estiver usando.`)) return;
+    setErro(null);
+    try { await api.del(`/tratamento/horarios/${h.id}`); void carregar(); }
+    catch (e) { setErro((e as Error).message); }
+  }
 
   async function carregar() {
     try { setLista(await api.get<Horario[]>('/tratamento/horarios')); }
@@ -41,7 +61,13 @@ export function Escalas() {
     setErro(null); setSalvando(true);
     try {
       const paresAfd = pares.map((p) => ({ entrada: p.entrada.replace(':', ''), saida: p.saida.replace(':', '') }));
-      await api.post('/tratamento/horarios', { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime });
+      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime };
+      if (editandoId) {
+        await api.patch(`/tratamento/horarios/${editandoId}`, corpo);
+      } else {
+        await api.post('/tratamento/horarios', corpo);
+      }
+      setEditandoId(null);
       setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
       void carregar();
     } catch (e) { setErro((e as Error).message); }
@@ -93,12 +119,17 @@ export function Escalas() {
 
         {erro && <p className={css.erro}>{erro}</p>}
         <Botao variante="coral" className={css.salvar} onClick={salvar} disabled={salvando || !codigo || dias.length === 0 || durTotal === 0}>
-          {salvando ? 'Salvando…' : 'Criar escala'}
+          {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Criar escala'}
         </Botao>
+        {editandoId && (
+          <Botao variante="ghost" className={css.salvar} onClick={cancelarEdicao} disabled={salvando}>
+            Cancelar
+          </Botao>
+        )}
       </div>
 
       <div className={css.table}>
-        <div className={`${css.row} ${css.thead}`}><span>Código</span><span>Jornada</span><span>Dias</span><span>Regime</span></div>
+        <div className={`${css.row} ${css.thead}`}><span>Código</span><span>Jornada</span><span>Dias</span><span>Regime</span><span></span></div>
         {lista?.length === 0 && <div className={css.vazio}>Nenhuma escala ainda.</div>}
         {lista?.map((h) => (
           <div key={h.id} className={css.row}>
@@ -106,6 +137,10 @@ export function Escalas() {
             <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
             <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
             <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}</span>
+            <span className={css.acoes}>
+              <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
+              <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>
+            </span>
           </div>
         ))}
       </div>

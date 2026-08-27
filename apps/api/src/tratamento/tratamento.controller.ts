@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { TratamentoService } from './tratamento.service';
 import { CriarHorarioDto, CriarAusenciaDto, CriarTratamentoDto, ApurarDto } from './dto/tratamento.dto';
@@ -23,6 +23,19 @@ export class TratamentoController {
   }
   @Get('horarios') listarHorarios(@UsuarioAtual() u: PayloadAcesso) {
     return this.tratamento.listarHorarios(this.tenant(u));
+  }
+  @Patch('horarios/:id') atualizarHorario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: CriarHorarioDto) {
+    return this.tratamento.atualizarHorario(this.tenant(u), id, dto);
+  }
+  @Delete('horarios/:id') excluirHorario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.tratamento.excluirHorario(this.tenant(u), id);
+  }
+  /** Mudança de escala a partir de uma data (preserva o passado). */
+  @Post('empregados/:id/mudar-escala') mudarEscala(
+    @UsuarioAtual() u: PayloadAcesso, @Param('id') id: string,
+    @Body() dto: { horarioContratualId: string; dataInicio: string },
+  ) {
+    return this.tratamento.mudarEscalaComVigencia(this.tenant(u), id, dto.horarioContratualId, dto.dataInicio);
   }
   @Post('ausencias') criarAusencia(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CriarAusenciaDto) {
     return this.tratamento.criarAusencia(this.tenant(u), dto);

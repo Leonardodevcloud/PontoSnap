@@ -114,3 +114,8 @@
 .perfilBadge{ display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:800; background:var(--peach); color:var(--coral-d); border-radius:999px; padding:6px 13px; }
 .perfilHerda{ background:var(--cream); color:var(--ash); font-weight:700; }
 .herdaTxt{ font-weight:400; font-size:11.5px; }
+
+.modoEscala { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+.radioLinha { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--ash, #5C4F49); line-height: 1.4; cursor: pointer; }
+.radioLinha input { margin-top: 2px; flex-shrink: 0; }
+.radioLinha strong { color: var(--ink, #10403F); }

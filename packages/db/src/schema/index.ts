@@ -10,6 +10,7 @@ export * from './usuario-tenant';
 export * from './evento-rep';
 export * from './perfil-regra';
 export * from './espelho-assinatura';
+export * from './escala-vigencia';
 export * from './marcacao';
 export * from './tratamento';
 export * from './banco';
