@@ -48,6 +48,13 @@ export function BancoHoras() {
   const [folgaHoras, setFolgaHoras] = useState('');
   const [regFolga, setRegFolga] = useState(false);
 
+  // Saldo de abertura (migração do sistema anterior)
+  const [abData, setAbData] = useState(hojeSP());
+  const [abHoras, setAbHoras] = useState('');
+  const [abSinal, setAbSinal] = useState<'mais' | 'menos'>('mais');
+  const [abEnviando, setAbEnviando] = useState(false);
+  const [abMsg, setAbMsg] = useState<string | null>(null);
+
   const [erro, setErro] = useState<string | null>(null);
 
   const [cob, setCob] = useState<Cobertura | null>(null);
@@ -145,6 +152,37 @@ export function BancoHoras() {
       });
       await carregarBanco(sel);
     } catch (e) { setErro((e as Error).message); }
+  }
+
+  // Converte "12:30" ou "12h30" ou "12" em minutos. Retorna null se inválido.
+  function horasParaMin(v: string): number | null {
+    const limpo = v.trim().replace('h', ':').replace(/[^\d:]/g, '');
+    if (!limpo) return null;
+    const [h, m] = limpo.split(':');
+    const horas = Number(h || 0);
+    const mins = Number(m || 0);
+    if (Number.isNaN(horas) || Number.isNaN(mins) || mins >= 60) return null;
+    return horas * 60 + mins;
+  }
+
+  async function lancarAbertura() {
+    if (!sel) return;
+    setAbMsg(null); setErro(null);
+    const min = horasParaMin(abHoras);
+    if (min == null || min === 0) { setErro('Informe o saldo no formato HH:MM (ex.: 12:30).'); return; }
+    setAbEnviando(true);
+    try {
+      const minutos = abSinal === 'menos' ? -min : min;
+      await api.post('/banco/movimento', {
+        empregadoId: sel, data: abData, minutos,
+        tipo: 'AJUSTE', descricao: 'Saldo importado do sistema anterior',
+      });
+      const nome = emps.find((e) => e.id === sel)?.nome ?? 'funcionário';
+      setAbMsg(`Saldo de abertura de ${abSinal === 'menos' ? '−' : '+'}${minutosParaHhMm(min)} lançado para ${nome}.`);
+      setAbHoras('');
+      await carregarBanco(sel);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setAbEnviando(false); }
   }
 
   const s = banco?.saldo;
@@ -345,6 +383,39 @@ export function BancoHoras() {
                 <p className={css.dica}>
                   A folga <strong>debita o banco</strong> e faz o dia <strong>não contar como falta</strong>.
                   Deixe as horas em branco pra usar a jornada do dia do funcionário.
+                </p>
+              </div>
+            )}
+
+            {sel && (
+              <div className={css.folga}>
+                <div className={css.folgaTit}>Saldo de abertura (migração)</div>
+                <p className={css.dica} style={{ marginTop: 0, marginBottom: 10 }}>
+                  Traga o saldo que o funcionário já tinha no sistema anterior. Lance uma vez,
+                  na data em que começaram a usar o PontoSnap.
+                </p>
+                <div className={css.folgaLinha}>
+                  <input className={css.mes} type="date" value={abData}
+                    onChange={(e) => e.target.value && setAbData(e.target.value)} />
+                  <input className={css.folgaH} inputMode="numeric" value={abHoras}
+                    placeholder="saldo HH:MM (ex.: 12:30)"
+                    onChange={(e) => setAbHoras(e.target.value)} />
+                </div>
+                <div className={css.abSinal}>
+                  <button type="button"
+                    className={`${css.abSinalBtn} ${abSinal === 'mais' ? css.abSinalOn : ''}`}
+                    onClick={() => setAbSinal('mais')}>A favor (+) — tem horas guardadas</button>
+                  <button type="button"
+                    className={`${css.abSinalBtn} ${abSinal === 'menos' ? css.abSinalOnNeg : ''}`}
+                    onClick={() => setAbSinal('menos')}>Devendo (−) — deve horas</button>
+                </div>
+                <Botao variante="coral" onClick={lancarAbertura} disabled={abEnviando || !abHoras}>
+                  {abEnviando ? 'Lançando…' : 'Lançar saldo de abertura'}
+                </Botao>
+                {abMsg && <p className={css.abOk}>{abMsg}</p>}
+                <p className={css.dica}>
+                  Só o <strong>saldo</strong> é trazido. As batidas antigas ficam no sistema anterior
+                  (o histórico fiscal de lá).
                 </p>
               </div>
             )}

@@ -130,3 +130,9 @@
 .cobertura{ display:flex; flex-direction:column; gap:5px; background:var(--cream); border-radius:12px; padding:11px 14px; margin-top:12px; }
 .cobLinha{ font-size:13px; color:var(--ash); }
 .cobLink{ font-size:12.5px; font-weight:800; color:var(--coral-dark); text-decoration:underline; margin-top:3px; }
+
+.abSinal { display: flex; gap: 8px; margin: 10px 0; }
+.abSinalBtn { flex: 1; padding: 9px 10px; border: 1.5px solid #e5ded8; border-radius: 10px; background: #fff; font: inherit; font-weight: 700; font-size: 12.5px; color: var(--ash, #5C4F49); cursor: pointer; }
+.abSinalOn { background: #EAF7EE; border-color: #0FA968; color: #0a7f4e; }
+.abSinalOnNeg { background: #FFF3F0; border-color: var(--coral-d, #E4502F); color: #c23a1c; }
+.abOk { font-size: 13px; color: #0a7f4e; background: #EAF7EE; border-radius: 10px; padding: 10px 12px; margin: 10px 0 0; }
