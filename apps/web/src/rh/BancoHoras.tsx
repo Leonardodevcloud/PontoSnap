@@ -55,6 +55,10 @@ export function BancoHoras() {
   const [abEnviando, setAbEnviando] = useState(false);
   const [abMsg, setAbMsg] = useState<string | null>(null);
 
+  // Organização da tela: aba ativa e qual ação (folga/abertura) está aberta.
+  const [aba, setAba] = useState<'empresa' | 'funcionario'>('funcionario');
+  const [acao, setAcao] = useState<'folga' | 'abertura' | null>(null);
+
   const [erro, setErro] = useState<string | null>(null);
 
   const [cob, setCob] = useState<Cobertura | null>(null);
@@ -199,6 +203,16 @@ export function BancoHoras() {
       {erro && <p className={css.erro}>{erro}</p>}
       {msg && <p className={css.ok}>{msg}</p>}
 
+      <div className={css.abas} role="tablist">
+        <button role="tab" aria-selected={aba === 'funcionario'}
+          className={`${css.aba} ${aba === 'funcionario' ? css.abaOn : ''}`}
+          onClick={() => setAba('funcionario')}>Por funcionário</button>
+        <button role="tab" aria-selected={aba === 'empresa'}
+          className={`${css.aba} ${aba === 'empresa' ? css.abaOn : ''}`}
+          onClick={() => setAba('empresa')}>Da empresa</button>
+      </div>
+
+      {aba === 'empresa' && <>
       {/* ---------- ACORDO ---------- */}
       {!editandoAcordo && cfg && (
         <div className={css.bloco}>
@@ -356,10 +370,19 @@ export function BancoHoras() {
               </div>
             )}
           </div>
+        </>
+      )}
+      </>}
 
-          {/* ---------- SALDO POR FUNCIONÁRIO ---------- */}
+      {aba === 'funcionario' && (
           <div className={css.bloco}>
             <div className={css.blocoH}>Saldo por funcionário</div>
+            {cfg && !cfg.ativo && (
+              <p className={css.dica} style={{ marginTop: 0 }}>
+                O banco de horas está <strong>desativado</strong> para a empresa. Ative o acordo na aba
+                <strong> Da empresa</strong> para poder lançar folgas e saldos.
+              </p>
+            )}
             <div className={css.linha}>
               <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
                 <option value="">Escolha o funcionário…</option>
@@ -368,55 +391,71 @@ export function BancoHoras() {
             </div>
 
             {sel && (
-              <div className={css.folga}>
-                <div className={css.folgaTit}>Registrar folga compensatória</div>
-                <div className={css.folgaLinha}>
-                  <input className={css.mes} type="date" value={folgaData} max={hojeSP()}
-                    onChange={(e) => e.target.value && setFolgaData(e.target.value)} />
-                  <input className={css.folgaH} inputMode="decimal" value={folgaHoras}
-                    placeholder="horas (ou jornada do dia)"
-                    onChange={(e) => setFolgaHoras(e.target.value)} />
-                  <Botao variante="ghost" onClick={registrarFolga} disabled={regFolga}>
-                    {regFolga ? 'Registrando…' : 'Registrar folga'}
-                  </Botao>
+              <div className={css.acaoBox}>
+                <button className={`${css.acaoH} ${acao === 'folga' ? css.acaoHOn : ''}`}
+                  onClick={() => setAcao(acao === 'folga' ? null : 'folga')}>
+                  <span>Registrar folga compensatória</span>
+                  <span className={css.acaoChev}>{acao === 'folga' ? '▴' : '▾'}</span>
+                </button>
+                {acao === 'folga' && (
+                <div className={css.acaoBody}>
+                  <div className={css.folgaLinha}>
+                    <input className={css.mes} type="date" value={folgaData} max={hojeSP()}
+                      onChange={(e) => e.target.value && setFolgaData(e.target.value)} />
+                    <input className={css.folgaH} inputMode="decimal" value={folgaHoras}
+                      placeholder="horas (ou jornada do dia)"
+                      onChange={(e) => setFolgaHoras(e.target.value)} />
+                    <Botao variante="ghost" onClick={registrarFolga} disabled={regFolga}>
+                      {regFolga ? 'Registrando…' : 'Registrar folga'}
+                    </Botao>
+                  </div>
+                  <p className={css.dica}>
+                    A folga <strong>debita o banco</strong> e faz o dia <strong>não contar como falta</strong>.
+                    Deixe as horas em branco pra usar a jornada do dia do funcionário.
+                  </p>
                 </div>
-                <p className={css.dica}>
-                  A folga <strong>debita o banco</strong> e faz o dia <strong>não contar como falta</strong>.
-                  Deixe as horas em branco pra usar a jornada do dia do funcionário.
-                </p>
+                )}
               </div>
             )}
 
             {sel && (
-              <div className={css.folga}>
-                <div className={css.folgaTit}>Saldo de abertura (migração)</div>
-                <p className={css.dica} style={{ marginTop: 0, marginBottom: 10 }}>
-                  Traga o saldo que o funcionário já tinha no sistema anterior. Lance uma vez,
-                  na data em que começaram a usar o PontoSnap.
-                </p>
-                <div className={css.folgaLinha}>
-                  <input className={css.mes} type="date" value={abData}
-                    onChange={(e) => e.target.value && setAbData(e.target.value)} />
-                  <input className={css.folgaH} inputMode="numeric" value={abHoras}
-                    placeholder="saldo HH:MM (ex.: 12:30)"
-                    onChange={(e) => setAbHoras(e.target.value)} />
+              <div className={css.acaoBox}>
+                <button className={`${css.acaoH} ${acao === 'abertura' ? css.acaoHOn : ''}`}
+                  onClick={() => setAcao(acao === 'abertura' ? null : 'abertura')}>
+                  <span>Saldo de abertura (migração)</span>
+                  <span className={css.acaoChev}>{acao === 'abertura' ? '▴' : '▾'}</span>
+                </button>
+                {acao === 'abertura' && (
+                <div className={css.acaoBody}>
+                  <p className={css.dica} style={{ marginTop: 0, marginBottom: 10 }}>
+                    Traga o saldo que o funcionário já tinha no sistema anterior. Lance uma vez,
+                    na data em que começaram a usar o PontoSnap.
+                  </p>
+                  <div className={css.folgaLinha}>
+                    <input className={css.mes} type="date" value={abData}
+                      onChange={(e) => e.target.value && setAbData(e.target.value)} />
+                    <input className={css.folgaH} inputMode="numeric" value={abHoras}
+                      placeholder="saldo HH:MM (ex.: 12:30)"
+                      onChange={(e) => setAbHoras(e.target.value)} />
+                  </div>
+                  <div className={css.abSinal}>
+                    <button type="button"
+                      className={`${css.abSinalBtn} ${abSinal === 'mais' ? css.abSinalOn : ''}`}
+                      onClick={() => setAbSinal('mais')}>A favor (+) — tem horas guardadas</button>
+                    <button type="button"
+                      className={`${css.abSinalBtn} ${abSinal === 'menos' ? css.abSinalOnNeg : ''}`}
+                      onClick={() => setAbSinal('menos')}>Devendo (−) — deve horas</button>
+                  </div>
+                  <Botao variante="coral" onClick={lancarAbertura} disabled={abEnviando || !abHoras}>
+                    {abEnviando ? 'Lançando…' : 'Lançar saldo de abertura'}
+                  </Botao>
+                  {abMsg && <p className={css.abOk}>{abMsg}</p>}
+                  <p className={css.dica}>
+                    Só o <strong>saldo</strong> é trazido. As batidas antigas ficam no sistema anterior
+                    (o histórico fiscal de lá).
+                  </p>
                 </div>
-                <div className={css.abSinal}>
-                  <button type="button"
-                    className={`${css.abSinalBtn} ${abSinal === 'mais' ? css.abSinalOn : ''}`}
-                    onClick={() => setAbSinal('mais')}>A favor (+) — tem horas guardadas</button>
-                  <button type="button"
-                    className={`${css.abSinalBtn} ${abSinal === 'menos' ? css.abSinalOnNeg : ''}`}
-                    onClick={() => setAbSinal('menos')}>Devendo (−) — deve horas</button>
-                </div>
-                <Botao variante="coral" onClick={lancarAbertura} disabled={abEnviando || !abHoras}>
-                  {abEnviando ? 'Lançando…' : 'Lançar saldo de abertura'}
-                </Botao>
-                {abMsg && <p className={css.abOk}>{abMsg}</p>}
-                <p className={css.dica}>
-                  Só o <strong>saldo</strong> é trazido. As batidas antigas ficam no sistema anterior
-                  (o histórico fiscal de lá).
-                </p>
+                )}
               </div>
             )}
 
@@ -450,7 +489,6 @@ export function BancoHoras() {
               </>
             )}
           </div>
-        </>
       )}
     </div>
   );

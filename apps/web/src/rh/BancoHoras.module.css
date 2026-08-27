@@ -136,3 +136,18 @@
 .abSinalOn { background: #EAF7EE; border-color: #0FA968; color: #0a7f4e; }
 .abSinalOnNeg { background: #FFF3F0; border-color: var(--coral-d, #E4502F); color: #c23a1c; }
 .abOk { font-size: 13px; color: #0a7f4e; background: #EAF7EE; border-radius: 10px; padding: 10px 12px; margin: 10px 0 0; }
+
+/* Abas da tela de banco de horas */
+.abas { display: inline-flex; gap: 4px; background: #fff; border-radius: 999px; padding: 4px; margin-bottom: 18px; border: 1px solid rgba(16,64,63,.08); }
+.aba { border: none; background: transparent; font: inherit; font-size: 13.5px; font-weight: 800; color: var(--ash, #5C4F49); padding: 9px 20px; border-radius: 999px; cursor: pointer; transition: background .12s, color .12s; }
+.aba:hover { color: var(--ink, #10403F); }
+.abaOn { background: var(--ink, #10403F); color: #fff; }
+.abaOn:hover { color: #fff; }
+
+/* Accordion de ações do funcionário */
+.acaoBox { border: 1px solid rgba(16,64,63,.1); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+.acaoH { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: #fff; border: none; font: inherit; font-weight: 800; font-size: 13.5px; color: var(--ink, #10403F); cursor: pointer; }
+.acaoH:hover { background: var(--cream, #FFF8EE); }
+.acaoHOn { background: var(--cream, #FFF8EE); }
+.acaoChev { color: var(--ash, #5C4F49); font-size: 12px; }
+.acaoBody { padding: 14px; border-top: 1px solid rgba(16,64,63,.08); }
