@@ -176,7 +176,9 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
         aoLigar={(on) => setBloco('noturno', on ? { noturnoAdicionalPct: 20, noturnoReduzida: true, noturnoInicioMin: 1320, noturnoFimMin: 300 } : null)}
         explicacao="Percentual a mais pago pelas horas trabalhadas de madrugada. A CLT define 20% a mais, das 22h às 5h.">
         {cfg.noturno && (
-          <Num rot="A mais no período noturno (%)" v={cfg.noturno.noturnoAdicionalPct} on={(n) => setBloco('noturno', { ...cfg.noturno!, noturnoAdicionalPct: n })} />
+          <div className={css.dupla}>
+            <Num rot="A mais no período noturno (%)" v={cfg.noturno.noturnoAdicionalPct} on={(n) => setBloco('noturno', { ...cfg.noturno!, noturnoAdicionalPct: n })} />
+          </div>
         )}
       </Secao>
 
@@ -185,8 +187,10 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
         aoLigar={(on) => setBloco('jornada', on ? { jornadaSemanalMin: 2640, interjornadaMinimaMin: 660, intervaloMaior6hMin: 60 } : null)}
         explicacao="Quantas horas por semana compõem a jornada normal. Acima disso vira hora extra. O padrão CLT é 44 horas semanais.">
         {cfg.jornada && (
-          <Num rot="Horas por semana" v={Math.round(cfg.jornada.jornadaSemanalMin / 60 * 10) / 10}
-            on={(n) => setBloco('jornada', { ...cfg.jornada!, jornadaSemanalMin: Math.round(n * 60) })} />
+          <div className={css.dupla}>
+            <Num rot="Horas por semana" v={Math.round(cfg.jornada.jornadaSemanalMin / 60 * 10) / 10}
+              on={(n) => setBloco('jornada', { ...cfg.jornada!, jornadaSemanalMin: Math.round(n * 60) })} />
+          </div>
         )}
       </Secao>
 
@@ -270,10 +274,20 @@ function Secao({ titulo, explicacao, ligado, aoLigar, children }: {
           <p className={css.secaoTit}>{titulo}</p>
           <p className={css.exp}>{explicacao}</p>
         </div>
-        <label className={css.toggle}>
-          <input type="checkbox" checked={ligado} onChange={(e) => aoLigar(e.target.checked)} />
-          <span>{ligado ? 'personalizado' : 'segue a CLT'}</span>
-        </label>
+        <div className={css.seg} role="group" aria-label={`${titulo}: seguir a CLT ou personalizar`}>
+          <button
+            type="button"
+            className={`${css.segBtn} ${!ligado ? css.segOnClt : ''}`}
+            aria-pressed={!ligado}
+            onClick={() => aoLigar(false)}
+          >Segue a CLT</button>
+          <button
+            type="button"
+            className={`${css.segBtn} ${ligado ? css.segOnCustom : ''}`}
+            aria-pressed={ligado}
+            onClick={() => aoLigar(true)}
+          >Personalizado</button>
+        </div>
       </div>
       {children}
     </div>

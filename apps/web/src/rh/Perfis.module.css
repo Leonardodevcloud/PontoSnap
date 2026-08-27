@@ -26,7 +26,7 @@
 .lb{ display:block; font-size:13px; font-weight:800; margin:0 0 4px; }
 .inp{ width:100%; background:var(--cream); border:1.5px solid rgba(16,64,63,.12); border-radius:10px; padding:9px 11px; font:inherit; font-size:14px; color:var(--ink); }
 .inp:focus{ outline:none; border-color:var(--coral); }
-.dupla{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.dupla{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; padding-top:14px; border-top:1px dashed rgba(16,64,63,.12); }
 @media(max-width:620px){ .dupla{ grid-template-columns:1fr; } }
 
 .check{ display:flex; align-items:center; gap:9px; font-size:13.5px; color:var(--ink); cursor:pointer; margin-top:4px; }
@@ -39,6 +39,15 @@
 
 .toggle{ display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:800; color:var(--ash); white-space:nowrap; cursor:pointer; background:var(--cream); border-radius:999px; padding:6px 12px; }
 .toggle input{ accent-color:var(--coral); }
+
+/* Segmented control: CLT vs Personalizado. O lado aceso mostra o estado. */
+.seg{ display:inline-flex; background:var(--cream); border-radius:999px; padding:3px; flex-shrink:0; border:1px solid rgba(16,64,63,.08); }
+.segBtn{ border:none; background:transparent; font:inherit; font-size:12px; font-weight:800; color:var(--ash); padding:6px 13px; border-radius:999px; cursor:pointer; white-space:nowrap; transition:background .12s, color .12s; }
+.segBtn:hover{ color:var(--ink); }
+.segOnClt{ background:var(--ink); color:#fff; }
+.segOnClt:hover{ color:#fff; }
+.segOnCustom{ background:var(--coral); color:#fff; }
+.segOnCustom:hover{ color:#fff; }
 
 .arquivo{ display:block; text-align:center; border:1.5px dashed rgba(16,64,63,.22); border-radius:12px; padding:13px; font-size:13px; font-weight:700; color:var(--ash); cursor:pointer; margin-top:6px; }
 .arquivo:hover{ border-color:var(--coral); color:var(--coral-d); }
