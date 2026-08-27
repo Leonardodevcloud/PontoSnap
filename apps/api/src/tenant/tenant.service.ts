@@ -231,6 +231,20 @@ export class TenantService {
   }
 
   /** Retira o acesso. Vale já na próxima renovação de sessão. */
+  /**
+   * Troca o perfil de UM vínculo de empresa (o acesso da conta àquela empresa
+   * específica), sem mexer nas outras. Permite ser Admin numa empresa e RH em
+   * outra. O perfil-mestre da conta (usuario.perfil) não muda aqui.
+   */
+  async trocarPerfilVinculo(vinculoId: string, novoPerfil: 'ADMIN_CLIENTE' | 'RH') {
+    return comoMaster(this.db, async (tx) => {
+      const v = (await tx.select().from(usuarioTenant).where(eq(usuarioTenant.id, vinculoId)).limit(1))[0];
+      if (!v) throw new NotFoundException('Vínculo não encontrado');
+      await tx.update(usuarioTenant).set({ perfil: novoPerfil }).where(eq(usuarioTenant.id, vinculoId));
+      return { ok: true, perfil: novoPerfil };
+    });
+  }
+
   async desvincularEmpresa(vinculoId: string) {
     return comoMaster(this.db, async (tx) => {
       const v = (await tx.select().from(usuarioTenant).where(eq(usuarioTenant.id, vinculoId)).limit(1))[0];

@@ -20,6 +20,7 @@ export function Acessos() {
   const [perfilSel, setPerfilSel] = useState<'RH' | 'ADMIN_CLIENTE'>('RH');
   const [salvando, setSalvando] = useState(false);
   const [trocando, setTrocando] = useState<string | null>(null);
+  const [trocandoVinc, setTrocandoVinc] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setErro(null);
@@ -29,6 +30,18 @@ export function Acessos() {
     } catch (e) { setErro((e as Error).message); }
   }, []);
   useEffect(() => { void carregar(); }, [carregar]);
+
+  async function trocarPerfilVinculo(v: Vinculo, novo: 'RH' | 'ADMIN_CLIENTE') {
+    const rotulo = novo === 'ADMIN_CLIENTE' ? 'Administrador' : 'RH';
+    if (!confirm(`Tornar esta conta ${rotulo} na empresa ${v.razaoSocial}? Vale na próxima renovação de sessão.`)) return;
+    setErro(null); setMsg(null); setTrocandoVinc(v.id);
+    try {
+      await api.patch(`/tenants/vinculos/${v.id}/perfil`, { perfil: novo });
+      setMsg(`Agora é ${rotulo} em ${v.razaoSocial}. Vale na próxima renovação de sessão.`);
+      await carregar();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setTrocandoVinc(null); }
+  }
 
   async function trocarPerfil(usuarioId: string, novo: 'RH' | 'ADMIN_CLIENTE') {
     const rotulo = novo === 'ADMIN_CLIENTE' ? 'Administrador' : 'RH';
@@ -111,6 +124,12 @@ export function Acessos() {
                       : c.empresas.map((v) => (
                         <span key={v.id} className={css.chip}>
                           {v.razaoSocial} · {papel(v.perfil)}
+                          <button
+                            className={css.chipPapel}
+                            disabled={trocandoVinc === v.id}
+                            title={v.perfil === 'RH' ? 'Tornar Admin nesta empresa' : 'Tornar RH nesta empresa'}
+                            onClick={() => trocarPerfilVinculo(v, v.perfil === 'RH' ? 'ADMIN_CLIENTE' : 'RH')}
+                          >{trocandoVinc === v.id ? '…' : v.perfil === 'RH' ? '→ Admin' : '→ RH'}</button>
                           <button className={css.chipX} title="Retirar acesso" onClick={() => desvincular(v, c.email)}>×</button>
                         </span>
                       ))}

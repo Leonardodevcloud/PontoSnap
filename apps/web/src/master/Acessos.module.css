@@ -34,3 +34,11 @@
 }
 .trocarPapel:hover:not(:disabled) { background: var(--peach, #FFE2D1); }
 .trocarPapel:disabled { opacity: .5; cursor: default; }
+
+.chipPapel {
+  margin-left: 6px; border: 1px solid var(--coral, #FF6B4A); background: #fff;
+  color: var(--coral-d, #E4502F); border-radius: 999px; padding: 1px 8px;
+  font-size: 10.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.chipPapel:hover:not(:disabled) { background: var(--peach, #FFE2D1); }
+.chipPapel:disabled { opacity: .5; cursor: default; }

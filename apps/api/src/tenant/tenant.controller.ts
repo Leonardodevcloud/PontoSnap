@@ -53,6 +53,15 @@ export class TenantController {
     return this.tenants.desvincularEmpresa(vinculoId);
   }
 
+  /** Troca o perfil de UM vínculo de empresa (RH↔Admin naquela empresa só). */
+  @Patch('vinculos/:vinculoId/perfil')
+  trocarPerfilVinculo(@Param('vinculoId') vinculoId: string, @Body() dto: { perfil: 'ADMIN_CLIENTE' | 'RH' }) {
+    if (dto?.perfil !== 'ADMIN_CLIENTE' && dto?.perfil !== 'RH') {
+      throw new BadRequestException('Perfil deve ser ADMIN_CLIENTE ou RH.');
+    }
+    return this.tenants.trocarPerfilVinculo(vinculoId, dto.perfil);
+  }
+
   @Patch(':id/fuso') fuso(@Param('id') id: string, @Body() dto: FusoDto) {
     return this.tenants.definirFuso(id, dto.fuso);
   }
