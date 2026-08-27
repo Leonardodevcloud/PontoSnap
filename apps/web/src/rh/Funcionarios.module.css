@@ -119,3 +119,17 @@
 .radioLinha { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--ash, #5C4F49); line-height: 1.4; cursor: pointer; }
 .radioLinha input { margin-top: 2px; flex-shrink: 0; }
 .radioLinha strong { color: var(--ink, #10403F); }
+
+/* Tag de perfil clicável (abre o modal de regras) */
+.perfilBadge { cursor: pointer; border: none; font: inherit; transition: filter .12s; }
+.perfilBadge:hover { filter: brightness(0.96); }
+
+/* Modal de regras do perfil */
+.regrasSub { font-size: 12.5px; color: var(--ash, #5C4F49); margin: 0 0 8px; }
+.regrasLista { display: flex; flex-direction: column; }
+.regraItem { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #f4f1ec; }
+.regraItem:last-child { border-bottom: none; }
+.regraNome { font-size: 14px; font-weight: 700; color: var(--ink, #10403F); }
+.regraDesc { font-size: 11.5px; color: var(--ash, #5C4F49); margin-top: 2px; }
+.regraValCustom { font-size: 13px; font-weight: 800; color: var(--coral-d, #E4502F); text-align: right; white-space: nowrap; }
+.regraValClt { font-size: 11.5px; font-weight: 700; color: var(--ash, #5C4F49); background: var(--cream, #FFF8EE); padding: 3px 10px; border-radius: 20px; white-space: nowrap; }

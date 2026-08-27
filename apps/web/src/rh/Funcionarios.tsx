@@ -9,7 +9,15 @@ import css from './Funcionarios.module.css';
 
 const fmtCpf = (c: string) => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
-interface PerfilResumo { id: string; nome: string; padrao: boolean; }
+interface ConfigRegra {
+  extra?: { extraDiaUtilPct: number; extraDomingoFeriadoPct: number; extraLimiteDiarioMin: number } | null;
+  tolerancia?: { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number } | null;
+  noturno?: { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number } | null;
+  jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
+  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' } | null;
+  destinacao?: { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' } | null;
+}
+interface PerfilResumo { id: string; nome: string; padrao: boolean; config?: ConfigRegra; usadoPor?: number; }
 
 const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
@@ -22,6 +30,7 @@ export function Funcionarios() {
   const [pinPara, setPinPara] = useState<Empregado | null>(null);
   const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
   const [perfilPara, setPerfilPara] = useState<Empregado | null>(null);
+  const [regrasDe, setRegrasDe] = useState<PerfilResumo | null | undefined>(undefined);
   const [perfis, setPerfis] = useState<PerfilResumo[]>([]);
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS'>('TODOS');
@@ -108,9 +117,9 @@ export function Funcionarios() {
               {(() => {
                 const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
                 const padrao = perfis.find((x) => x.padrao);
-                if (p) return <span className={css.perfilBadge}>⚙ {p.nome}</span>;
-                if (padrao) return <span className={`${css.perfilBadge} ${css.perfilHerda}`}>⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></span>;
-                return <span className={`${css.perfilBadge} ${css.perfilHerda}`}>CLT padrão</span>;
+                if (p) return <button type="button" className={css.perfilBadge} onClick={() => setRegrasDe(p)} title="Ver as regras deste perfil">⚙ {p.nome}</button>;
+                if (padrao) return <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(padrao)} title="Ver as regras deste perfil">⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></button>;
+                return <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(null)} title="Ver as regras aplicadas">CLT padrão</button>;
               })()}
               <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setPerfilPara(e); }}>trocar perfil</button>
             </div>
@@ -123,6 +132,7 @@ export function Funcionarios() {
       {pinPara && <ModalPin empregado={pinPara} onFechar={() => setPinPara(null)} onSalvo={() => { setPinPara(null); void carregar(); }} />}
       {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
       {perfilPara && <ModalPerfil empregado={perfilPara} perfis={perfis} onFechar={() => setPerfilPara(null)} onSalvo={() => { setPerfilPara(null); void carregar(); }} />}
+      {regrasDe !== undefined && <ModalRegras perfil={regrasDe} onFechar={() => setRegrasDe(undefined)} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
@@ -534,6 +544,65 @@ function ModalAcesso({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
           </Botao>
         </>
       )}
+    </Modal>
+  );
+}
+
+// Modal que mostra todas as regras de um perfil de forma legível.
+// perfil = objeto → perfil específico · null → "CLT padrão" (tudo segue a lei).
+function ModalRegras({ perfil, onFechar }: { perfil: PerfilResumo | null; onFechar: () => void }) {
+  const c = perfil?.config ?? {};
+  const h = (min: number) => Math.round(min / 60 * 10) / 10;
+
+  // Cada regra: rótulo, descrição, e o valor (custom em coral) ou "Segue a CLT (x)".
+  const clt = (txt: string) => ({ custom: false as const, texto: `Segue a CLT (${txt})` });
+  const val = (txt: string) => ({ custom: true as const, texto: txt });
+
+  const bancoTxt = () => {
+    const b = c.banco;
+    if (!b || b.bancoModo === 'HERDA') return clt('como a empresa');
+    if (b.bancoModo === 'INATIVO') return val('Não usa banco');
+    const acordo = b.bancoTipoAcordo === 'COLETIVO' ? 'Acordo coletivo' : 'Acordo individual';
+    return val(`${acordo} · ${b.bancoPrazoMeses}m`);
+  };
+  const faltaTxt = () => {
+    const f = c.destinacao?.destinacaoFaltas;
+    if (!f || f === 'DESCONTA') return clt('descontam');
+    return val(f === 'BANCO' ? 'Abatem do banco' : 'Abonadas');
+  };
+
+  const regras = [
+    { nome: 'Horas extras', desc: 'Adicional em dia útil / domingo e feriado',
+      r: c.extra ? val(`${c.extra.extraDiaUtilPct}% / ${c.extra.extraDomingoFeriadoPct}%`) : clt('50% / 100%') },
+    { nome: 'Tolerância de atraso', desc: 'Minutos perdoados por dia',
+      r: c.tolerancia ? val(`${c.tolerancia.toleranciaDiariaMin} min/dia`) : clt('10 min/dia') },
+    { nome: 'Adicional noturno', desc: 'A mais nas horas de madrugada',
+      r: c.noturno ? val(`${c.noturno.noturnoAdicionalPct}%`) : clt('20%') },
+    { nome: 'Jornada semanal', desc: 'Horas normais antes de virar extra',
+      r: c.jornada ? val(`${h(c.jornada.jornadaSemanalMin)}h/semana`) : clt('44h') },
+    { nome: 'Banco de horas', desc: 'Como as horas extras são tratadas', r: bancoTxt() },
+    { nome: 'Faltas não justificadas', desc: 'O que acontece com a falta', r: faltaTxt() },
+  ];
+
+  const titulo = perfil ? `⚙ ${perfil.nome}` : 'CLT padrão';
+  const sub = perfil
+    ? `Regras aplicadas${perfil.usadoPor != null ? ` · usado por ${perfil.usadoPor}` : ''}`
+    : 'Este funcionário segue integralmente a CLT.';
+
+  return (
+    <Modal titulo={titulo} onFechar={onFechar}>
+      <p className={css.regrasSub}>{sub}</p>
+      <div className={css.regrasLista}>
+        {regras.map((rg) => (
+          <div key={rg.nome} className={css.regraItem}>
+            <div>
+              <div className={css.regraNome}>{rg.nome}</div>
+              <div className={css.regraDesc}>{rg.desc}</div>
+            </div>
+            <div className={rg.r.custom ? css.regraValCustom : css.regraValClt}>{rg.r.texto}</div>
+          </div>
+        ))}
+      </div>
     </Modal>
   );
 }
