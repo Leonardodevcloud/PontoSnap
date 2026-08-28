@@ -13,7 +13,7 @@ function moldura(conteudo: string): string {
         <tr><td style="background:#10403F;padding:20px 32px;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
             <td style="vertical-align:middle;padding-right:10px;">
-              <img src="https://app.pontosnap.online/icon-192.png" width="30" height="30" alt="" style="display:block;border-radius:8px;" />
+              <img src="https://painel.pontosnap.app.br/icon-192.png" width="30" height="30" alt="" style="display:block;border-radius:8px;" />
             </td>
             <td style="vertical-align:middle;">
               <span style="color:#FFFFFF;font-size:20px;font-weight:700;letter-spacing:-.01em;">Ponto<span style="color:#FF6B4A;">Snap</span></span>

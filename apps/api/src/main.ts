@@ -24,7 +24,7 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  // Em produção, restrinja aos domínios do front (ex.: https://app.pontosnap.online).
+  // Em produção, restrinja aos domínios do front (ex.: https://painel.pontosnap.app.br).
   // Sem CORS_ORIGINS, libera geral — ok em dev, ruim em produção.
   const origins = process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({ origin: origins?.length ? origins : true });

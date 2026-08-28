@@ -129,7 +129,7 @@ export class TenantService {
     // E-mail fora da transação: falha de envio não pode desfazer o cadastro.
     let emailEnviado = false;
     if (resultado.senhaProvisoria) {
-      const url = process.env.APP_WEB_URL ?? 'https://pontosnap.online';
+      const url = process.env.APP_WEB_URL ?? 'https://pontosnap.app.br';
       const msg = emailBoasVindasCliente(p.adminNome ?? '', p.razaoSocial, resultado.admin.email, resultado.senhaProvisoria, url);
       emailEnviado = await this.email.enviar({ para: resultado.admin.email, ...msg }).catch(() => false);
     }
@@ -339,7 +339,7 @@ export class TenantService {
       return { razaoSocial: t.razaoSocial, email: u.email, senha };
     });
 
-    const url = process.env.APP_WEB_URL ?? 'https://pontosnap.online';
+    const url = process.env.APP_WEB_URL ?? 'https://pontosnap.app.br';
     const msg = emailBoasVindasCliente('', dados.razaoSocial, dados.email, dados.senha, url);
     const emailEnviado = await this.email.enviar({ para: dados.email, ...msg }).catch(() => false);
     return { email: dados.email, senhaProvisoria: dados.senha, emailEnviado };

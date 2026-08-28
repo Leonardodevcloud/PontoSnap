@@ -194,7 +194,7 @@ export class AuthService {
       await comoMaster(this.db, (tx) =>
         tx.insert(tokenSenha).values({ usuarioId: u.id, tokenHash, expiraEm }));
 
-      const base = process.env.APP_WEB_URL ?? 'https://app.pontosnap.online';
+      const base = process.env.APP_WEB_URL ?? 'https://painel.pontosnap.app.br';
       const url = `${base}/redefinir?token=${tokenCru}`;
       const { assunto, html } = emailRecuperacao('', url);
       await this.email.enviar({ para: u.email, assunto, html });

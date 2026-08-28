@@ -124,7 +124,7 @@ function gerarAEJ() {
   const { conteudo } = montarAEJ({
     fuso: '-0300',
     rep: REP,
-    ptrp: { nome: 'PontoSnap', versao: '1.0.0', tpIdtDesenv: 1, idtDesenv: '98765432000188', razaoNome: 'TUTTS LTDA', email: 'contato@pontosnap.online' },
+    ptrp: { nome: 'PontoSnap', versao: '1.0.0', tpIdtDesenv: 1, idtDesenv: '98765432000188', razaoNome: 'TUTTS LTDA', email: 'contato@pontosnap.app.br' },
     empregados: [{ cpf: '12345678901', nome: 'FULANO DE TAL' }],
     horarios: [{ codigo: 'ADM', durJornadaMin: 480, pares: [{ entrada: '0800', saida: '1200' }, { entrada: '1300', saida: '1700' }] }],
     tratamentos: [

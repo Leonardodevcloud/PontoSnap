@@ -92,7 +92,7 @@ export class DocumentoService {
   private async notificarRh(nomeFunc: string, p: { tipo: TipoDocumento; dataInicio: string; dataFim: string }, emails: string[]) {
     if (emails.length === 0) return;
     const periodo = p.dataInicio === p.dataFim ? fmtDataBR(p.dataInicio) : `${fmtDataBR(p.dataInicio)} a ${fmtDataBR(p.dataFim)}`;
-    const urlRh = `${process.env.APP_WEB_URL ?? 'https://app.pontosnap.online'}/rh/atestados`;
+    const urlRh = `${process.env.APP_WEB_URL ?? 'https://painel.pontosnap.app.br'}/rh/atestados`;
     const { assunto, html } = emailAtestadoRecebido(nomeFunc, ROTULO_DOC[p.tipo] ?? 'Documento', periodo, urlRh);
     for (const email of emails) {
       await this.email.enviar({ para: email, assunto, html });

@@ -60,7 +60,7 @@ async function main() {
   const meio = await trat.apurarPeriodoCLT(t.id, emp.id, DATA, DATA, []);
   ok(meio.resultado.dias.find((d) => d.data === DATA)?.paresIncompletos === true, 'em análise não muda a apuração');
 
-  await ajuste.decidir(t.id, pedido!.id, true, null, 'leonardo.santos@pontosnap.online');
+  await ajuste.decidir(t.id, pedido!.id, true, null, 'leonardo.santos@pontosnap.app.br');
   const depois = await trat.apurarPeriodoCLT(t.id, emp.id, DATA, DATA, []);
   const diaDepois = depois.resultado.dias.find((d) => d.data === DATA);
   ok(diaDepois?.paresIncompletos === false, `aprovado: batida a mais sai da conta (par completo=${!diaDepois?.paresIncompletos})`);
@@ -78,7 +78,7 @@ async function main() {
   const recusaSemMotivo = await ajuste.decidir(t.id, p2!.id, false, null, 'rh').catch(() => 'recusou');
   ok(recusaSemMotivo === 'recusou', 'recusa sem motivo é bloqueada');
 
-  await ajuste.decidir(t.id, p2!.id, true, null, 'leonardo.santos@pontosnap.online');
+  await ajuste.decidir(t.id, p2!.id, true, null, 'leonardo.santos@pontosnap.app.br');
   const ap2 = await trat.apurarPeriodoCLT(t.id, emp2.id, DATA, DATA, []);
   const d2 = ap2.resultado.dias.find((d) => d.data === DATA);
   ok(d2?.paresIncompletos === false, `inclusão fecha o par (incompleto=${d2?.paresIncompletos})`);
