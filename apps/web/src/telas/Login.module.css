@@ -103,8 +103,69 @@
   .sub{ margin-bottom:20px; }
 }
 
+/* ── Foco reativo nos campos ── */
+.entrada{ transition:border-color .2s, box-shadow .2s, transform .2s; }
+.entrada:focus-within{ transform:translateY(-1px); }
+.entrada > svg{ transition:transform .2s, color .2s; }
+.entrada:focus-within > svg{ transform:scale(1.18) rotate(8deg); color:var(--coral); opacity:.9; }
+
+/* ── Botão Entrar com vida ── */
+.entrar{ transition:transform .15s, box-shadow .15s, filter .15s; }
+.entrar:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 10px 24px rgba(255,107,74,.38); }
+.entrar:active:not(:disabled){ transform:translateY(0) scale(.98); }
+
+/* ── O "estalo" pulsa sozinho de vez em quando ── */
+.marcaTit span{ display:inline-block; animation:pulsa-estalo 5s ease-in-out infinite; }
+@keyframes pulsa-estalo{
+  0%, 86%, 100%{ transform:scale(1) rotate(0); }
+  90%{ transform:scale(1.16) rotate(-3deg); }
+  94%{ transform:scale(.97); }
+}
+
+/* ── Abertura em cascata ── */
+.animAbrir .marcaLogo{ animation:surgir .6s .05s both, gira-devagar 22s linear infinite; }
+.animAbrir .marcaTit{ animation:surgir-g .7s .18s both; }
+.animAbrir .titulo{ animation:surgir .55s .1s both; }
+.animAbrir .sub{ animation:surgir .55s .17s both; }
+.animAbrir .campo:nth-of-type(1){ animation:surgir .55s .26s both; }
+.animAbrir .campo:nth-of-type(2){ animation:surgir .55s .34s both; }
+.animAbrir .entrar{ animation:surgir-pop .6s .44s both; }
+@keyframes surgir{ from{ opacity:0; transform:translateY(16px); } to{ opacity:1; transform:none; } }
+@keyframes surgir-g{ from{ opacity:0; transform:translateY(24px) scale(.96); } to{ opacity:1; transform:none; } }
+@keyframes surgir-pop{ 0%{ opacity:0; transform:translateY(16px) scale(.9); } 70%{ transform:scale(1.05); } 100%{ opacity:1; transform:none; } }
+
+/* ── Saída da tela no sucesso ── */
+.saindo{ animation:sair-tela .7s cubic-bezier(.7,0,.3,1) forwards; }
+@keyframes sair-tela{ 0%{ transform:scale(1); opacity:1; filter:blur(0); } 100%{ transform:scale(.92); opacity:0; filter:blur(4px); } }
+
+/* ── Overlay de sucesso (confete + estrela) ── */
+.sucesso{
+  position:fixed; inset:0; z-index:99; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(circle, #155251, var(--ink));
+  animation:flash-ok 1.15s ease forwards; overflow:hidden;
+}
+@keyframes flash-ok{ 0%{ opacity:0; } 15%{ opacity:1; } 100%{ opacity:1; } }
+.estrelaSucesso{ position:relative; z-index:1; animation:estrela-sucesso 1.15s cubic-bezier(.3,1.4,.5,1); }
+@keyframes estrela-sucesso{
+  0%{ transform:scale(0) rotate(-180deg); opacity:0; }
+  30%{ transform:scale(1.4) rotate(15deg); opacity:1; }
+  45%{ transform:scale(1) rotate(0); }
+  100%{ transform:scale(1.15) rotate(0); opacity:1; }
+}
+.sucessoTxt{
+  position:absolute; bottom:32%; z-index:1; color:var(--cream);
+  font-family:var(--ff-display); font-weight:600; font-size:22px;
+  animation:sucesso-txt 1.15s ease;
+}
+@keyframes sucesso-txt{ 0%,25%{ opacity:0; transform:translateY(10px); } 45%,100%{ opacity:1; transform:none; } }
+
 @media (prefers-reduced-motion:reduce){
-  .amb, .giraLogo, .giraBtn{ animation:none; }
+  .amb, .giraLogo, .giraBtn, .marcaTit span{ animation:none; }
+  .animAbrir .marcaLogo, .animAbrir .marcaTit, .animAbrir .titulo, .animAbrir .sub,
+  .animAbrir .campo, .animAbrir .entrar{ animation:none; }
+  .saindo{ animation:none; opacity:0; }
+  .sucesso{ animation:none; opacity:1; }
+  .estrelaSucesso, .sucessoTxt{ animation:none; }
 }
 
 /* Link inline (recuperar senha, voltar ao login) */

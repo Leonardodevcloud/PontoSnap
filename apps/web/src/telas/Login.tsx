@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { EstrelasCanvas, ParticulasCanvas, ConfeteCanvas } from './LoginFx';
 import css from './Login.module.css';
 
 /** Ícones do formulário — inline para não puxar biblioteca por 3 traços. */
@@ -37,25 +38,41 @@ export function Login() {
   const [verSenha, setVerSenha] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [sucesso, setSucesso] = useState(false);
+  const dispararParticulas = useRef<((x: number, y: number) => void) | null>(null);
+  const botaoRef = useRef<HTMLButtonElement | null>(null);
+  const telaRef = useRef<HTMLDivElement | null>(null);
+
+  // Explode estrelinhas a partir do centro do botão Entrar.
+  function estourarNoBotao() {
+    const btn = botaoRef.current, tela = telaRef.current;
+    if (!btn || !tela || !dispararParticulas.current) return;
+    const r = btn.getBoundingClientRect();
+    const t = tela.getBoundingClientRect();
+    dispararParticulas.current(r.left - t.left + r.width / 2, r.top - t.top + r.height / 2);
+  }
 
   async function submeter() {
     if (!email || !senha || enviando) return;
     setErro(null);
     setEnviando(true);
+    estourarNoBotao();
     try {
       await entrar(email.trim(), senha);
-      navegar('/', { replace: true });
+      // Sucesso: dispara o overlay de confete e navega logo depois.
+      setSucesso(true);
+      setTimeout(() => navegar('/', { replace: true }), 1100);
     } catch (e) {
       setErro((e as Error).message);
-    } finally {
       setEnviando(false);
     }
   }
 
   return (
-    <div className={css.tela}>
+    <div className={`${css.tela} ${css.animAbrir} ${sucesso ? css.saindo : ''}`} ref={telaRef}>
       {/* Painel da marca — some no celular, vira faixa */}
       <aside className={css.marca}>
+        <EstrelasCanvas />
         <div className={css.ambiente} aria-hidden="true">
           <FlashSvg tamanho={460} cor="var(--coral)" className={`${css.amb} ${css.amb1}`} />
           <FlashSvg tamanho={220} cor="var(--lime)" className={`${css.amb} ${css.amb2}`} />
@@ -66,6 +83,7 @@ export function Login() {
         </div>
         <h2 className={css.marcaTit}>Bater ponto<br />num <span>estalo</span>.</h2>
       </aside>
+      <ParticulasCanvas dispararRef={dispararParticulas} />
 
       {/* Faixa da marca — só no celular */}
       <div className={css.faixaMob}>
@@ -119,7 +137,7 @@ export function Login() {
 
           {erro && <p className={css.erro} role="alert">{erro}</p>}
 
-          <button className={css.entrar} onClick={submeter} disabled={enviando || !email || !senha}>
+          <button ref={botaoRef} className={css.entrar} onClick={submeter} disabled={enviando || !email || !senha}>
             {!enviando && <FlashSvg tamanho={17} cor="var(--cream)" className={css.giraBtn} />}
             {enviando ? 'Entrando…' : 'Entrar'}
           </button>
@@ -137,6 +155,14 @@ export function Login() {
           </div>
         </div>
       </main>
+
+      {sucesso && (
+        <div className={css.sucesso} aria-hidden="true">
+          <ConfeteCanvas ativo={sucesso} />
+          <FlashSvg tamanho={90} cor="var(--lime)" className={css.estrelaSucesso} />
+          <div className={css.sucessoTxt}>Tudo certo! Entrando…</div>
+        </div>
+      )}
     </div>
   );
 }
