@@ -97,3 +97,25 @@
 .gBtn2{ background:transparent; color:var(--ink); border:1.5px solid rgba(16,64,63,.15); border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:800; cursor:pointer; text-decoration:none; }
 
 .acoesPdf{ display:flex; gap:9px; }
+
+/* Modal de apuração em lote */
+.loteOverlay { position: fixed; inset: 0; background: rgba(16,64,63,.35); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+.loteModal { background: #fff; border-radius: 18px; max-width: 460px; width: 100%; max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(16,64,63,.25); }
+.loteHead { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; background: var(--cream); border-bottom: 1px solid rgba(16,64,63,.08); }
+.loteHead h3 { font-family: 'Fredoka', sans-serif; font-size: 18px; margin: 0; color: var(--ink); }
+.loteX { border: none; background: none; font-size: 16px; cursor: pointer; color: var(--ash); }
+.loteBody { padding: 18px 22px 22px; overflow-y: auto; }
+.loteLb { display: block; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--coral-d); font-weight: 800; margin-bottom: 8px; }
+.lotecampos { display: flex; gap: 12px; }
+.lotecampos label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ash); flex: 1; }
+.lotecampos input { padding: 9px 11px; border: 1.5px solid rgba(16,64,63,.15); border-radius: 9px; font-size: 14px; }
+.loteAtalho { margin-top: 8px; font-size: 11.5px; font-weight: 700; background: var(--cream); border: 1px solid rgba(16,64,63,.12); border-radius: 20px; padding: 5px 12px; cursor: pointer; color: var(--ink); }
+.loteCheck { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink); padding: 5px 0; cursor: pointer; }
+.loteFuncH { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px; }
+.loteLink { background: none; border: none; color: var(--coral-d); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.loteLista { border: 1px solid rgba(16,64,63,.1); border-radius: 12px; max-height: 200px; overflow-y: auto; }
+.loteFunc { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #f4f1ec; font-size: 14px; cursor: pointer; }
+.loteFunc:last-child { border-bottom: none; }
+.loteMat { margin-left: auto; font-size: 11px; color: var(--ash); font-family: 'JetBrains Mono', monospace; }
+.loteErro { color: var(--coral-d); font-size: 13px; margin: 10px 0; }
+.loteDica { font-size: 11.5px; color: var(--ash); margin-top: 10px; line-height: 1.5; }

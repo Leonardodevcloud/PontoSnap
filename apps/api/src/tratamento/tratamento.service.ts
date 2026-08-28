@@ -768,6 +768,49 @@ export class TratamentoService {
     return { buffer, nomeArquivo: `espelho_${ref}_${inicioStr}_a_${fimStr}.pdf` };
   }
 
+  /**
+   * Gera, em lote, apuração e/ou espelho de vários funcionários e devolve um
+   * único ZIP. Cada arquivo é nomeado com o nome do funcionário e o período,
+   * para o RH conseguir identificar sem abrir. Se um funcionário falhar (ex.:
+   * sem escala), registra num arquivo ERROS.txt e segue com os demais.
+   */
+  async gerarLoteZip(
+    tenantId: string, empregadoIds: string[], inicioStr: string, fimStr: string,
+    docs: { apuracao: boolean; espelho: boolean }, feriados: string[] = [],
+  ): Promise<{ buffer: Buffer; nomeArquivo: string }> {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const erros: string[] = [];
+    // Nome legível do funcionário para o arquivo (sem acentos/espaços problemáticos).
+    const nomes = await comTenant(this.db, tenantId, async (tx) =>
+      tx.select({ id: empregado.id, nome: empregado.nome, matricula: empregado.matricula })
+        .from(empregado).where(and(eq(empregado.tenantId, tenantId), inArray(empregado.id, empregadoIds))));
+    const nomePorId = new Map(nomes.map((n) => [n.id, n]));
+    const slug = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+    for (const id of empregadoIds) {
+      const info = nomePorId.get(id);
+      const base = info ? `${slug(info.nome)}${info.matricula ? `_mat${info.matricula}` : ''}` : id;
+      try {
+        if (docs.apuracao) {
+          const r = await this.gerarApuracaoPdf(tenantId, id, inicioStr, fimStr, feriados);
+          zip.file(`${base}/apuracao_${inicioStr}_a_${fimStr}.pdf`, r.buffer);
+        }
+        if (docs.espelho) {
+          const r = await this.gerarEspelhoPdf(tenantId, id, inicioStr, fimStr);
+          zip.file(`${base}/espelho_${inicioStr}_a_${fimStr}.pdf`, r.buffer);
+        }
+      } catch (e) {
+        erros.push(`${info?.nome ?? id}: ${(e as Error).message}`);
+      }
+    }
+    if (erros.length > 0) {
+      zip.file('ERROS.txt', `Não foi possível gerar para:\n\n${erros.join('\n')}\n`);
+    }
+    const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+    return { buffer, nomeArquivo: `apuracoes_${inicioStr}_a_${fimStr}.zip` };
+  }
+
   /** Junta horários em pares "entrada-saída" para o espelho. */
   private paresDe(horas: string[]): string {
     const out: string[] = [];

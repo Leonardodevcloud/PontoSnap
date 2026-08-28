@@ -148,6 +148,21 @@ export class TratamentoController {
     return new StreamableFile(r.buffer, { type: 'application/pdf', disposition: `attachment; filename="${r.nomeArquivo}"` });
   }
 
+  /** Apuração/espelho em lote: gera um ZIP com os PDFs dos funcionários selecionados. */
+  @Post('apuracao/lote')
+  async apuracaoLote(
+    @UsuarioAtual() u: PayloadAcesso,
+    @Body() dto: { empregadoIds: string[]; inicio: string; fim: string; apuracao?: boolean; espelho?: boolean; feriados?: string[] },
+  ) {
+    if (!dto.empregadoIds?.length || !dto.inicio || !dto.fim) {
+      throw new BadRequestException('Informe empregadoIds, inicio e fim (YYYY-MM-DD).');
+    }
+    const docs = { apuracao: dto.apuracao !== false, espelho: dto.espelho !== false };
+    if (!docs.apuracao && !docs.espelho) throw new BadRequestException('Escolha ao menos um documento.');
+    const r = await this.tratamento.gerarLoteZip(this.tenant(u), dto.empregadoIds, dto.inicio, dto.fim, docs, dto.feriados ?? []);
+    return new StreamableFile(r.buffer, { type: 'application/zip', disposition: `attachment; filename="${r.nomeArquivo}"` });
+  }
+
   /** Demonstrativo de Espelho de Ponto — documento que o funcionário confere e assina. */
   @Get('espelho/pdf') async espelhoPdf(
     @UsuarioAtual() u: PayloadAcesso,

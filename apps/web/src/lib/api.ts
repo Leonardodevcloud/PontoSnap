@@ -76,6 +76,21 @@ export const api = {
     }
     return res.blob();
   },
+  /** Como baixar(), mas via POST com corpo JSON (ex.: gerar ZIP em lote). */
+  baixarPost(path: string, body: unknown): Promise<Blob> { return rastrear(this._baixarPost(path, body)); },
+  async _baixarPost(path: string, body: unknown): Promise<Blob> {
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(acesso ? { Authorization: `Bearer ${acesso}` } : {}) },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401 && (await tentarRefresh())) return this._baixarPost(path, body);
+    if (!res.ok) {
+      const msg = await res.json().then((j) => j.message).catch(() => null);
+      throw new Error(msg ?? 'Não consegui gerar o arquivo.');
+    }
+    return res.blob();
+  },
   /** Envia um arquivo (multipart). Não seta Content-Type: o browser põe o boundary. */
   enviarArquivo<T>(path: string, arquivo: File, campo = 'arquivo'): Promise<T> { return rastrear(this._enviarArquivo<T>(path, arquivo, campo)); },
   async _enviarArquivo<T>(path: string, arquivo: File, campo = 'arquivo'): Promise<T> {

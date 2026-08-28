@@ -63,6 +63,7 @@ export function ApuracaoCLT() {
   }
 
   const [baixandoEspelho, setBaixandoEspelho] = useState(false);
+  const [loteAberto, setLoteAberto] = useState(false);
   async function baixarEspelho() {
     setBaixandoEspelho(true);
     try {
@@ -81,12 +82,15 @@ export function ApuracaoCLT() {
     <div>
       <div className={css.head}>
         <div><h2>Apuração CLT</h2><p>Fechamento de competência pelo motor de regras</p></div>
-        {ap && (
-          <div className={css.acoesPdf}>
-            <Botao variante="ghost" className={css.pdfBtn} onClick={baixarEspelho} disabled={baixandoEspelho}>{baixandoEspelho ? 'Gerando…' : 'Espelho de ponto'}</Botao>
-            <Botao variante="coral" className={css.pdfBtn} onClick={baixarPdf} disabled={baixando}>{baixando ? 'Gerando…' : 'Apuração (PDF)'}</Botao>
-          </div>
-        )}
+        <div className={css.acoesPdf}>
+          <Botao variante="ghost" className={css.pdfBtn} onClick={() => setLoteAberto(true)}>Apuração em lote</Botao>
+          {ap && (
+            <>
+              <Botao variante="ghost" className={css.pdfBtn} onClick={baixarEspelho} disabled={baixandoEspelho}>{baixandoEspelho ? 'Gerando…' : 'Espelho de ponto'}</Botao>
+              <Botao variante="coral" className={css.pdfBtn} onClick={baixarPdf} disabled={baixando}>{baixando ? 'Gerando…' : 'Apuração (PDF)'}</Botao>
+            </>
+          )}
+        </div>
       </div>
 
       <div className={css.controles}>
@@ -213,6 +217,7 @@ export function ApuracaoCLT() {
           </p>
         </>
       )}
+      {loteAberto && <ModalLote emps={emps} mesInicial={mes} onFechar={() => setLoteAberto(false)} />}
     </div>
   );
 }
@@ -355,6 +360,88 @@ function Caixa({ k, v, bom, ruim }: { k: string; v: string; bom?: boolean; ruim?
     <div className={css.gBox}>
       <span className={css.gBoxL}>{k}</span>
       <span className={`${css.gBoxV} ${bom ? css.gBom : ''} ${ruim ? css.gRuim : ''}`}>{v}</span>
+    </div>
+  );
+}
+
+// Apuração em lote: seleciona funcionários + período e baixa um ZIP com os PDFs.
+function ModalLote({ emps, mesInicial, onFechar }: { emps: Empregado[]; mesInicial: string; onFechar: () => void }) {
+  const faixa = faixaDoMes(mesInicial);
+  const [inicio, setInicio] = useState(faixa.inicio);
+  const [fim, setFim] = useState(faixa.fim);
+  const [sel, setSel] = useState<Set<string>>(new Set(emps.map((e) => e.id)));
+  const [apuracao, setApuracao] = useState(true);
+  const [espelho, setEspelho] = useState(true);
+  const [gerando, setGerando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const todos = sel.size === emps.length;
+  function toggle(id: string) {
+    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  function toggleTodos() {
+    setSel(todos ? new Set() : new Set(emps.map((e) => e.id)));
+  }
+  // Atalho: do dia 29 (ou outro) até o fim do mês de início.
+  function ate29() {
+    const [a, m] = inicio.split('-');
+    const ultimo = new Date(Number(a), Number(m), 0).getDate();
+    setFim(`${a}-${m}-${String(ultimo).padStart(2, '0')}`);
+  }
+
+  async function gerar() {
+    if (sel.size === 0) { setErro('Selecione ao menos um funcionário.'); return; }
+    if (!apuracao && !espelho) { setErro('Escolha ao menos um documento.'); return; }
+    setErro(null); setGerando(true);
+    try {
+      const blob = await api.baixarPost('/tratamento/apuracao/lote', {
+        empregadoIds: [...sel], inicio, fim, apuracao, espelho,
+      });
+      salvarBlob(blob, `apuracoes_${inicio}_a_${fim}.zip`);
+      onFechar();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setGerando(false); }
+  }
+
+  return (
+    <div className={css.loteOverlay} onClick={onFechar}>
+      <div className={css.loteModal} onClick={(e) => e.stopPropagation()}>
+        <div className={css.loteHead}>
+          <h3>Apuração em lote</h3>
+          <button className={css.loteX} onClick={onFechar} aria-label="Fechar">✕</button>
+        </div>
+        <div className={css.loteBody}>
+          <span className={css.loteLb}>Período</span>
+          <div className={css.lotecampos}>
+            <label>Início<input type="date" value={inicio} onChange={(e) => e.target.value && setInicio(e.target.value)} /></label>
+            <label>Fim<input type="date" value={fim} onChange={(e) => e.target.value && setFim(e.target.value)} /></label>
+          </div>
+          <button className={css.loteAtalho} onClick={ate29}>Até o fim do mês</button>
+
+          <span className={css.loteLb} style={{ marginTop: 16 }}>Documentos</span>
+          <label className={css.loteCheck}><input type="checkbox" checked={apuracao} onChange={(e) => setApuracao(e.target.checked)} /> Apuração (fechamento CLT)</label>
+          <label className={css.loteCheck}><input type="checkbox" checked={espelho} onChange={(e) => setEspelho(e.target.checked)} /> Espelho de ponto (confere/assina)</label>
+
+          <div className={css.loteFuncH}>
+            <span className={css.loteLb} style={{ margin: 0 }}>Funcionários ({sel.size})</span>
+            <button className={css.loteLink} onClick={toggleTodos}>{todos ? 'Limpar' : 'Selecionar todos'}</button>
+          </div>
+          <div className={css.loteLista}>
+            {emps.map((e) => (
+              <label key={e.id} className={css.loteFunc}>
+                <input type="checkbox" checked={sel.has(e.id)} onChange={() => toggle(e.id)} />
+                <span>{e.nome}</span>
+                {e.matricula && <span className={css.loteMat}>{e.matricula}</span>}
+              </label>
+            ))}
+          </div>
+          {erro && <p className={css.loteErro}>{erro}</p>}
+          <Botao variante="coral" onClick={gerar} disabled={gerando || sel.size === 0}>
+            {gerando ? 'Gerando ZIP…' : `Gerar ${sel.size} ${sel.size === 1 ? 'apuração' : 'apurações'} (ZIP)`}
+          </Botao>
+          <p className={css.loteDica}>Cada funcionário vira um PDF nomeado com o nome dele e o período, tudo num ZIP.</p>
+        </div>
+      </div>
     </div>
   );
 }
