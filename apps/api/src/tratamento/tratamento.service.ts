@@ -488,6 +488,11 @@ export class TratamentoService {
       const regime = (horario?.regime === 'r12x36' ? 'r12x36' : 'normal') as 'normal' | 'r12x36';
       const dias: EntradaDia[] = [];
 
+      // Data de início de uso do ponto: dias anteriores são ignorados por
+      // completo (migração de sistema ou admissão no meio do período).
+      const dataInicioPonto = emp.dataInicioPonto ?? null;
+      const antesDoInicio = (data: string) => dataInicioPonto != null && data < dataInicioPonto;
+
       if (regime === 'r12x36') {
         // escala 12x36 vem do calendário de dias trabalhados. Com escala, faltas
         // de dia inteiro aparecem; sem escala, apuramos só os dias com batida/abono.
@@ -500,6 +505,7 @@ export class TratamentoService {
           ...escalaSet, ...porDia.keys(), ...abonoPorData.keys(), ...abonoDiaInteiro,
         ]);
         for (const data of [...datas].sort()) {
+          if (antesDoInicio(data)) continue; // antes do início de uso do ponto
           const trabalhaHoje = (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data))
             && !descansoPorAusencia.has(data);
           const jornada = trabalhaHoje ? durJornada : 0;
@@ -523,6 +529,8 @@ export class TratamentoService {
         const ultimo = new Date(`${fimStr}T12:00:00${fuso}`);
         while (cursor.getTime() <= ultimo.getTime()) {
           const data = this.diaLocalISO(cursor, fuso);
+          // Antes do início de uso do ponto: dia não existe para a apuração.
+          if (antesDoInicio(data)) { cursor.setUTCDate(cursor.getUTCDate() + 1); continue; }
           const dow = diaSemana(data);
           const escDia = escalaDoDia(data);
           // Jornada do dia: se a escala tem jornada_por_dia com valor para este

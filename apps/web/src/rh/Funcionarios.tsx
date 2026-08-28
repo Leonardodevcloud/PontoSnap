@@ -35,6 +35,7 @@ export function Funcionarios() {
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS'>('TODOS');
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
+  const [dataInicioPara, setDataInicioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
   const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
 
@@ -106,6 +107,7 @@ export function Funcionarios() {
                     <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
                     <button onClick={() => { setPerfilPara(e); setMenu(null); }}>Perfil de regra</button>
                     <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
+                    <button onClick={() => { setDataInicioPara(e); setMenu(null); }}>Início do ponto</button>
                     <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
                     <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
                   </div>
@@ -134,6 +136,7 @@ export function Funcionarios() {
       {perfilPara && <ModalPerfil empregado={perfilPara} perfis={perfis} onFechar={() => setPerfilPara(null)} onSalvo={() => { setPerfilPara(null); void carregar(); }} />}
       {regrasDe !== undefined && <ModalRegras perfil={regrasDe} onFechar={() => setRegrasDe(undefined)} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
+      {dataInicioPara && <ModalDataInicio empregado={dataInicioPara} onFechar={() => setDataInicioPara(null)} onSalvo={() => { setDataInicioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
     </div>
@@ -248,6 +251,7 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
   const [matricula, setMatricula] = useState('');
   const [pin, setPin] = useState('');
   const [salario, setSalario] = useState('');
+  const [dataInicio, setDataInicio] = useState('');
   const [email, setEmail] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -262,6 +266,7 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
         matricula: matricula.trim() || undefined,
         pin: pin.trim() || undefined,
         salarioMensal: sal,
+        dataInicioPonto: dataInicio || undefined,
         email: email.trim() || undefined,
       });
       if (r.acesso) { setAcessoCriado(r.acesso); return; }
@@ -285,6 +290,8 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
       <Campo rotulo="Matrícula (opcional)" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="001" />
       <Campo rotulo="PIN do quiosque (opcional)" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="4 a 8 dígitos" />
       <Campo rotulo="Salário mensal (opcional)" inputMode="decimal" value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2200.00" />
+      <Campo rotulo="Começa a bater ponto em (opcional)" type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+      <p className={css.aviso}>Se informado, a apuração ignora tudo antes dessa data. Use na migração de sistema ou em quem foi admitido no meio do mês.</p>
       <Campo rotulo="E-mail para acesso ao app (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com.br" />
       <p className={css.aviso}>Com e-mail, ele recebe login no app. Sem e-mail, bate ponto só no quiosque (matrícula + PIN).</p>
       {erro && <p className={css.erro}>{erro}</p>}
@@ -445,6 +452,36 @@ function ModalSalario({ empregado, onFechar, onSalvo }: { empregado: Empregado; 
       <p className={css.aviso}>Usado para calcular extras, adicional noturno e descontos em R$ (divisor 220h).</p>
       {erro && <p className={css.erroModal}>{erro}</p>}
       <Botao variante="coral" onClick={salvar} disabled={enviando || !salario}>{enviando ? 'Salvando…' : 'Salvar salário'}</Botao>
+    </Modal>
+  );
+}
+
+function ModalDataInicio({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
+  const [data, setData] = useState(empregado.dataInicioPonto ?? '');
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  async function salvar(remover = false) {
+    setErro(null); setEnviando(true);
+    try {
+      await api.patch(`/empregados/${empregado.id}/data-inicio-ponto`, { data: remover ? null : (data || null) });
+      onSalvo();
+    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  }
+
+  return (
+    <Modal titulo={`Início do ponto — ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
+      <Campo rotulo="Começa a bater ponto em" type="date" value={data} onChange={(e) => setData(e.target.value)} />
+      <p className={css.aviso}>
+        A apuração <strong>ignora tudo antes dessa data</strong> — não gera falta nem cobra jornada.
+        Use na migração de sistema (a empresa começou a usar o PontoSnap nessa data) ou para quem foi
+        admitido no meio do mês.
+      </p>
+      {erro && <p className={css.erroModal}>{erro}</p>}
+      <Botao variante="coral" onClick={() => salvar(false)} disabled={enviando || !data}>{enviando ? 'Salvando…' : 'Salvar data'}</Botao>
+      {empregado.dataInicioPonto && (
+        <Botao variante="ghost" onClick={() => salvar(true)} disabled={enviando}>Remover data (apurar desde sempre)</Botao>
+      )}
     </Modal>
   );
 }

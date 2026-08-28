@@ -1,4 +1,4 @@
-import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric } from 'drizzle-orm/pg-core';
+import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 
 export const empregado = pgTable('empregado', {
@@ -15,6 +15,8 @@ export const empregado = pgTable('empregado', {
   perfilRegraId: uuid('perfil_regra_id'),
   matriculaEsocial: varchar('matricula_esocial', { length: 30 }),
   ativo: boolean('ativo').notNull().default(true),
+  /** A apuração ignora dias anteriores a esta data (migração / admissão). Nulo = sem corte. */
+  dataInicioPonto: date('data_inicio_ponto'),
   salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

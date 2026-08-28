@@ -232,6 +232,13 @@
       "when": 1784601400000,
       "tag": "0032_jornada_por_dia",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1784601500000,
+      "tag": "0033_data_inicio_ponto",
+      "breakpoints": true
     }
   ]
 }

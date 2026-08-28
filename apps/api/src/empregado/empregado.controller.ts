@@ -9,7 +9,7 @@ interface RespostaHttp {
 import { BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { EmpregadoService } from './empregado.service';
-import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, AcessoDto } from './dto/empregado.dto';
+import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, DefinirDataInicioPontoDto, AcessoDto } from './dto/empregado.dto';
 
 import { DefinirPerfilDto } from '../perfil-regra/dto/perfil-regra.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -83,5 +83,8 @@ export class EmpregadoController {
   }
   @Patch(':id/salario') salario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirSalarioDto) {
     return this.empregados.definirSalario(this.tenant(u), id, dto.salarioMensal);
+  }
+  @Patch(':id/data-inicio-ponto') dataInicioPonto(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirDataInicioPontoDto) {
+    return this.empregados.definirDataInicioPonto(this.tenant(u), id, dto.data ?? null);
   }
 }

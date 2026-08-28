@@ -66,6 +66,7 @@ export interface Empregado {
   horarioContratualId?: string | null;
   cctId?: string | null;
   perfilRegraId?: string | null;
+  dataInicioPonto?: string | null;
 }
 
 export interface InfoCertificado {

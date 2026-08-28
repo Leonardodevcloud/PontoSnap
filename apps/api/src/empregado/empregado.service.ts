@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -12,7 +12,7 @@ import { hashSenha } from '../auth/senha';
 import { randomBytes } from 'node:crypto';
 
 export interface CriarEmpregadoParams {
-  cpf: string; nome: string; matricula?: string; pin?: string; pis?: string; salarioMensal?: number;
+  cpf: string; nome: string; matricula?: string; pin?: string; pis?: string; salarioMensal?: number; dataInicioPonto?: string | null;
   email?: string;
 }
 
@@ -51,6 +51,7 @@ export class EmpregadoService {
         tenantId, cpf: p.cpf, nome: p.nome,
         matricula: p.matricula ?? null, pinHash, pis: p.pis ?? null,
         salarioMensal: p.salarioMensal != null ? String(p.salarioMensal) : null,
+        dataInicioPonto: p.dataInicioPonto ?? null,
       }).returning();
 
       // Registro 5 do AFD: inclusão de empregado no REP.
@@ -210,6 +211,21 @@ export class EmpregadoService {
   async definirSalario(tenantId: string, id: string, salarioMensal: number) {
     const rows = await comTenant(this.db, tenantId, (tx) =>
       tx.update(empregado).set({ salarioMensal: String(salarioMensal) })
+        .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning());
+    if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
+    return this.semSegredos(rows[0]);
+  }
+
+  /**
+   * Define a partir de quando o funcionário passa a ser apurado. Antes desta
+   * data a apuração o ignora. null remove o corte (volta a apurar desde sempre).
+   */
+  async definirDataInicioPonto(tenantId: string, id: string, data: string | null) {
+    if (data != null && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+      throw new BadRequestException('Data inválida (use AAAA-MM-DD).');
+    }
+    const rows = await comTenant(this.db, tenantId, (tx) =>
+      tx.update(empregado).set({ dataInicioPonto: data })
         .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning());
     if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
     return this.semSegredos(rows[0]);
