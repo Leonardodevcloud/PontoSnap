@@ -210,6 +210,7 @@ export interface PainelResp {
     noPrazo?: number;
     folgaHoje?: number;
     semJornadaHoje?: number;
+    aindaNaoIniciou?: number;
   };
 }
 

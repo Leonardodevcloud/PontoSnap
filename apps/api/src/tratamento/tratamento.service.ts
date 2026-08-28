@@ -931,8 +931,16 @@ export class TratamentoService {
         const k = `${m.cpf}|${this.diaLocalISO(m.dt, fuso)}`;
         porDia.set(k, (porDia.get(k) ?? 0) + 1);
       }
+      // Data de início do ponto por CPF: dias anteriores não entram em "revisar".
+      const inicioPorCpf = new Map(emps.filter((e) => e.dataInicioPonto).map((e) => [e.cpf, e.dataInicioPonto!]));
       const revisar = [...porDia.entries()]
-        .filter(([k, n]) => n % 2 === 1 && (k.split('|')[1] ?? '') < hojeISO)
+        .filter(([k, n]) => {
+          const [cpf, data] = k.split('|') as [string, string];
+          if (n % 2 !== 1 || data >= hojeISO) return false;
+          const ini = inicioPorCpf.get(cpf);
+          if (ini && data < ini) return false; // antes de entrar no ponto
+          return true;
+        })
         .map(([k]) => { const [cpf, data] = k.split('|') as [string, string]; return { nome: nomePorCpf.get(cpf)?.nome ?? cpf, data }; })
         .sort((a, b) => (a.data < b.data ? 1 : -1));
 
@@ -967,6 +975,7 @@ export class TratamentoService {
         .filter((e) => {
           if (presentes.has(e.cpf)) return false;         // já bateu
           if (dispensados.has(e.id)) return false;         // folga/afastamento hoje
+          if (e.dataInicioPonto && hojeISO < e.dataInicioPonto) return false; // ainda não entrou no ponto
           const h = e.horarioContratualId ? horPorId.get(e.horarioContratualId) : undefined;
           if (!h || h.regime === 'r12x36') return false;   // sem horário fixo → não dá pra cobrar
           if (!h.diasSemana.includes(dowHoje)) return false; // não trabalha hoje
@@ -985,8 +994,10 @@ export class TratamentoService {
       let noPrazo = 0;       // dia de trabalho, mas ainda dentro do horário/carência
       let folgaHojeN = 0;    // de folga ou afastado hoje
       let semJornadaHoje = 0; // não trabalha hoje (dia fora da escala) ou sem horário/12x36
+      let aindaNaoIniciou = 0; // data de início do ponto ainda não chegou
       for (const e of emps) {
         if (presentes.has(e.cpf)) continue;
+        if (e.dataInicioPonto && hojeISO < e.dataInicioPonto) { aindaNaoIniciou++; continue; }
         if (dispensados.has(e.id)) { folgaHojeN++; continue; }
         const h = e.horarioContratualId ? horPorId.get(e.horarioContratualId) : undefined;
         if (!h || h.regime === 'r12x36' || !h.diasSemana.includes(dowHoje)) { semJornadaHoje++; continue; }
@@ -1014,6 +1025,7 @@ export class TratamentoService {
           noPrazo,
           folgaHoje: folgaHojeN,
           semJornadaHoje,
+          aindaNaoIniciou,
         },
       };
     });

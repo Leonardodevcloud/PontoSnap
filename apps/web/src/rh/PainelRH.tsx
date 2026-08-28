@@ -37,6 +37,7 @@ export function PainelRH() {
                 {(() => {
                   const extras: string[] = [];
                   if ((p.pendencias.noPrazo ?? 0) > 0) extras.push(`${p.pendencias.noPrazo} ainda no horário de entrada`);
+                  if ((p.pendencias.aindaNaoIniciou ?? 0) > 0) extras.push(`${p.pendencias.aindaNaoIniciou} ainda não iniciaram o ponto`);
                   if ((p.pendencias.folgaHoje ?? 0) > 0) extras.push(`${p.pendencias.folgaHoje} de folga/afastamento`);
                   if ((p.pendencias.semJornadaHoje ?? 0) > 0) extras.push(`${p.pendencias.semJornadaHoje} sem jornada hoje`);
                   return extras.length > 0
