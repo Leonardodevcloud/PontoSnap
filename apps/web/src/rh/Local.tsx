@@ -4,6 +4,8 @@ import { capturarPosicao } from '../lib/geolocalizacao';
 import { Campo } from '../components/Campo';
 import { Botao } from '../components/Botao';
 import { Flash } from '../components/Flash';
+import { MapaLocal } from './MapaLocal';
+import { temMapa } from '../lib/googleMaps';
 import css from './Local.module.css';
 
 interface Local {
@@ -140,11 +142,17 @@ export function Local() {
               </div>
             </div>
             <div className={css.cobertura} aria-hidden="true">
-              <svg width="96" height="96" viewBox="0 0 96 96">
-                <circle cx="48" cy="52" r="30" fill="rgba(255,107,74,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
-                <path d="M48 24 C40 24 34 30 34 38 C34 48 48 60 48 60 C48 60 62 48 62 38 C62 30 56 24 48 24 Z" fill="var(--coral)" />
-                <circle cx="48" cy="38" r="5" fill="var(--cream)" />
-              </svg>
+              {temMapa() && salvo.latitude != null && salvo.longitude != null ? (
+                <div className={css.miniMapa}>
+                  <MapaLocal lat={salvo.latitude} lon={salvo.longitude} raio={salvo.raioMetros} somenteLeitura />
+                </div>
+              ) : (
+                <svg width="96" height="96" viewBox="0 0 96 96">
+                  <circle cx="48" cy="52" r="30" fill="rgba(255,107,74,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
+                  <path d="M48 24 C40 24 34 30 34 38 C34 48 48 60 48 60 C48 60 62 48 62 38 C62 30 56 24 48 24 Z" fill="var(--coral)" />
+                  <circle cx="48" cy="38" r="5" fill="var(--cream)" />
+                </svg>
+              )}
             </div>
           </div>
         </div>
@@ -169,6 +177,16 @@ export function Local() {
             onChange={(e) => setEndereco(e.target.value)}
             placeholder="Av. Tancredo Neves, 1283 — Salvador/BA" />
 
+          {temMapa() && (
+            <MapaLocal
+              lat={lat ? Number(lat) : null}
+              lon={lon ? Number(lon) : null}
+              raio={raio ? Number(raio) : null}
+              onMover={(la, lo) => { setLat(la.toFixed(7)); setLon(lo.toFixed(7)); }}
+              onEndereco={(end) => { if (!endereco.trim()) setEndereco(end); }}
+            />
+          )}
+
           <div className={css.coords}>
             <Campo rotulo="Latitude" inputMode="decimal" value={lat}
               onChange={(e) => setLat(e.target.value)} placeholder="-12.9777000" />
@@ -180,8 +198,9 @@ export function Local() {
             {buscando ? 'Buscando…' : 'Usar a localização deste aparelho'}
           </button>
           <p className={css.dica}>
-            Abra esta tela no escritório e toque no botão acima — é o jeito mais fácil.
-            Ou copie as coordenadas do Google Maps (clique com o botão direito no ponto → a primeira linha).
+            {temMapa()
+              ? <>Abra esta tela no escritório e toque no botão acima — pega o GPS do aparelho. Ou busque o endereço no mapa e ajuste o pino.</>
+              : <>Abra esta tela no escritório e toque no botão acima — é o jeito mais fácil. Ou copie as coordenadas do Google Maps (clique com o botão direito no ponto → a primeira linha).</>}
           </p>
 
           <Campo rotulo="Raio em metros" inputMode="numeric" value={raio}
