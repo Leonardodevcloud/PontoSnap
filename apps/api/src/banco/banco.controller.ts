@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { BancoService } from './banco.service';
 import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto, LancarLoteDto, FolgaDto } from './dto/banco.dto';
@@ -80,5 +80,12 @@ export class BancoController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   folga(@UsuarioAtual() u: PayloadAcesso, @Body() dto: FolgaDto) {
     return this.banco.registrarFolga(this.tenant(u), dto.empregadoId, dto.data, dto.minutos ?? null);
+  }
+
+  /** Remove um lançamento manual do banco (folga, ajuste, saldo de abertura). */
+  @Delete('movimento/:id')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  removerMovimento(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.banco.removerMovimento(this.tenant(u), id);
   }
 }

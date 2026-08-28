@@ -58,6 +58,7 @@ export function BancoHoras() {
   // Organização da tela: aba ativa e qual ação (folga/abertura) está aberta.
   const [aba, setAba] = useState<'empresa' | 'funcionario'>('funcionario');
   const [acao, setAcao] = useState<'folga' | 'abertura' | null>(null);
+  const [removendo, setRemovendo] = useState<string | null>(null);
 
   const [erro, setErro] = useState<string | null>(null);
 
@@ -187,6 +188,17 @@ export function BancoHoras() {
       await carregarBanco(sel);
     } catch (e) { setErro((e as Error).message); }
     finally { setAbEnviando(false); }
+  }
+
+  async function removerMovimento(id: string, descricao: string) {
+    if (!confirm(`Remover o lançamento "${descricao}"? Essa ação desfaz o efeito dele no saldo.`)) return;
+    setErro(null); setMsg(null); setRemovendo(id);
+    try {
+      await api.del(`/banco/movimento/${id}`);
+      setMsg('Lançamento removido.');
+      await carregarBanco(sel);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setRemovendo(null); }
   }
 
   const s = banco?.saldo;
@@ -484,6 +496,13 @@ export function BancoHoras() {
                     <span className={css.extD}>{fmtData(m.data)}</span>
                     <span className={css.extE}>{m.descricao || m.tipo}</span>
                     <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
+                    {m.id && (
+                      <button className={css.extRemover} title="Remover este lançamento"
+                        disabled={removendo === m.id}
+                        onClick={() => removerMovimento(m.id!, m.descricao || m.tipo)}>
+                        {removendo === m.id ? '…' : '×'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </>

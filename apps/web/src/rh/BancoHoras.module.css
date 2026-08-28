@@ -151,3 +151,7 @@
 .acaoHOn { background: var(--cream, #FFF8EE); }
 .acaoChev { color: var(--ash, #5C4F49); font-size: 12px; }
 .acaoBody { padding: 14px; border-top: 1px solid rgba(16,64,63,.08); }
+
+.extRemover { margin-left: 8px; border: none; background: transparent; color: var(--ash, #5C4F49); font-size: 15px; font-weight: 700; cursor: pointer; padding: 0 4px; border-radius: 6px; line-height: 1; }
+.extRemover:hover:not(:disabled) { background: #FFF3F0; color: var(--coral-d, #E4502F); }
+.extRemover:disabled { opacity: .5; cursor: default; }

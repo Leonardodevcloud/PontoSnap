@@ -309,6 +309,7 @@ export interface SaldoBanco {
 }
 
 export interface MovimentoBanco {
+  id?: string;
   data: string;
   minutos: number;
   tipo: 'CREDITO' | 'DEBITO' | 'PAGAMENTO' | 'AJUSTE';

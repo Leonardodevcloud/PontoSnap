@@ -55,15 +55,41 @@ export class BancoService {
   }
 
   /** Extrato cru, para auditoria e para o cálculo. */
-  private async extrato(tenantId: string, empregadoId: string): Promise<MovimentoBanco[]> {
+  private async extrato(tenantId: string, empregadoId: string): Promise<(MovimentoBanco & { id: string })[]> {
     return comTenant(this.db, tenantId, async (tx) => {
       const linhas = await tx.select().from(pontoBancoMov).where(and(
         eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, empregadoId),
       )).orderBy(asc(pontoBancoMov.data));
       return linhas.map((l) => ({
+        id: l.id,
         data: l.data, minutos: l.minutos,
         tipo: l.tipo as TipoMovBanco, descricao: l.descricao ?? undefined,
       }));
+    });
+  }
+
+  /**
+   * Remove um lançamento manual do banco (folga, ajuste, saldo de abertura).
+   * Se for uma folga compensatória, remove também a ausência (tipo 4) daquele
+   * dia — os dois foram criados juntos. Lançamentos de fechamento de competência
+   * não saem por aqui (são refeitos ao relançar o mês).
+   */
+  async removerMovimento(tenantId: string, movimentoId: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const mov = (await tx.select().from(pontoBancoMov)
+        .where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId))).limit(1))[0];
+      if (!mov) throw new NotFoundException('Lançamento não encontrado');
+      if (mov.competencia) {
+        throw new BadRequestException('Este lançamento veio do fechamento de um mês. Para desfazer, relance a competência.');
+      }
+      // Se é folga compensatória, tira também a ausência do mesmo dia.
+      if (mov.descricao === 'Folga compensatória') {
+        await tx.delete(pontoAusencia).where(and(
+          eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, mov.empregadoId),
+          eq(pontoAusencia.data, mov.data), eq(pontoAusencia.tipo, 4)));
+      }
+      await tx.delete(pontoBancoMov).where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId)));
+      return { removido: true };
     });
   }
 
