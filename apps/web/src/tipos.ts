@@ -206,6 +206,9 @@ export interface PainelResp {
     revisarTotal: number;
     naoBateram: { nome: string; desde: string }[];
     naoBateramTotal: number;
+    noPrazo?: number;
+    folgaHoje?: number;
+    semJornadaHoje?: number;
   };
 }
 

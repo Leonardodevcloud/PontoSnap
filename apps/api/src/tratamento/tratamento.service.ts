@@ -929,6 +929,22 @@ export class TratamentoService {
           return { nome: e.nome, desde: `${ent.slice(0, 2)}:${ent.slice(2)}` };
         });
 
+      // Ausentes que ainda NÃO são cobrança: explica a diferença entre "ausentes"
+      // e "não bateram". Cada um cai em uma categoria clara.
+      let noPrazo = 0;       // dia de trabalho, mas ainda dentro do horário/carência
+      let folgaHojeN = 0;    // de folga ou afastado hoje
+      let semJornadaHoje = 0; // não trabalha hoje (dia fora da escala) ou sem horário/12x36
+      for (const e of emps) {
+        if (presentes.has(e.cpf)) continue;
+        if (dispensados.has(e.id)) { folgaHojeN++; continue; }
+        const h = e.horarioContratualId ? horPorId.get(e.horarioContratualId) : undefined;
+        if (!h || h.regime === 'r12x36' || !h.diasSemana.includes(dowHoje)) { semJornadaHoje++; continue; }
+        const ent = h.pares[0]?.entrada;
+        if (!ent) { semJornadaHoje++; continue; }
+        const entradaMin = Number(ent.slice(0, 2)) * 60 + Number(ent.slice(2));
+        if (minsAgora < entradaMin + GRACA_MIN) noPrazo++; // ainda dentro do horário
+      }
+
       return {
         data: hojeISO,
         ativos: emps.length,
@@ -944,6 +960,9 @@ export class TratamentoService {
           revisarTotal: revisar.length,
           naoBateram: naoBateram.slice(0, 12),
           naoBateramTotal: naoBateram.length,
+          noPrazo,
+          folgaHoje: folgaHojeN,
+          semJornadaHoje,
         },
       };
     });

@@ -34,6 +34,15 @@ export function PainelRH() {
                   {p.pendencias.naoBateram.slice(0, 3).map((r) => `${r.nome.split(' ')[0]} (desde ${r.desde})`).join(' · ')}
                   {p.pendencias.naoBateramTotal > 3 ? '…' : ''} →
                 </em>
+                {(() => {
+                  const extras: string[] = [];
+                  if ((p.pendencias.noPrazo ?? 0) > 0) extras.push(`${p.pendencias.noPrazo} ainda no horário de entrada`);
+                  if ((p.pendencias.folgaHoje ?? 0) > 0) extras.push(`${p.pendencias.folgaHoje} de folga/afastamento`);
+                  if ((p.pendencias.semJornadaHoje ?? 0) > 0) extras.push(`${p.pendencias.semJornadaHoje} sem jornada hoje`);
+                  return extras.length > 0
+                    ? <em className={css.pendNota}>Fora da cobrança: {extras.join(' · ')}.</em>
+                    : null;
+                })()}
               </span>
             </Link>
           )}
