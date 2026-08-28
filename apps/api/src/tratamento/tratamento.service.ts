@@ -493,6 +493,13 @@ export class TratamentoService {
       const dataInicioPonto = emp.dataInicioPonto ?? null;
       const antesDoInicio = (data: string) => dataInicioPonto != null && data < dataInicioPonto;
 
+      // Dias que ainda não aconteceram não viram falta: o funcionário ainda vai
+      // bater ponto neles. Só apuramos até ontem (o dia de hoje ainda está em
+      // curso, então também fica de fora do cálculo de falta de dia inteiro).
+      const hojeISO = this.diaLocalISO(new Date(), fuso);
+      const naoChegou = (data: string) => data >= hojeISO;
+      const foraDoPeriodoReal = (data: string) => antesDoInicio(data) || naoChegou(data);
+
       if (regime === 'r12x36') {
         // escala 12x36 vem do calendário de dias trabalhados. Com escala, faltas
         // de dia inteiro aparecem; sem escala, apuramos só os dias com batida/abono.
@@ -505,7 +512,7 @@ export class TratamentoService {
           ...escalaSet, ...porDia.keys(), ...abonoPorData.keys(), ...abonoDiaInteiro,
         ]);
         for (const data of [...datas].sort()) {
-          if (antesDoInicio(data)) continue; // antes do início de uso do ponto
+          if (foraDoPeriodoReal(data)) continue; // antes do início de uso do ponto
           const trabalhaHoje = (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data))
             && !descansoPorAusencia.has(data);
           const jornada = trabalhaHoje ? durJornada : 0;
@@ -530,7 +537,7 @@ export class TratamentoService {
         while (cursor.getTime() <= ultimo.getTime()) {
           const data = this.diaLocalISO(cursor, fuso);
           // Antes do início de uso do ponto: dia não existe para a apuração.
-          if (antesDoInicio(data)) { cursor.setUTCDate(cursor.getUTCDate() + 1); continue; }
+          if (foraDoPeriodoReal(data)) { cursor.setUTCDate(cursor.getUTCDate() + 1); continue; }
           const dow = diaSemana(data);
           const escDia = escalaDoDia(data);
           // Jornada do dia: se a escala tem jornada_por_dia com valor para este
