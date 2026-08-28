@@ -65,13 +65,13 @@
   background:radial-gradient(circle at 50% 46%, rgba(255,107,74,.12), rgba(255,107,74,0) 62%), var(--cream);
   border:1px solid rgba(16,64,63,.08); display:flex; align-items:center; justify-content:center;
 }
-/* Quando há mapa real, a moldura cresce e vira um mapa de verdade. */
-.cobertura:has(.miniMapa){
-  width:300px; height:200px; background:none; border:none;
+/* Mapa grande em destaque no topo do card (modo ver) */
+.mapaDestaque{ margin-bottom:18px; }
+.mapaDestaque :global(.mapa){ height:340px; }
+.savedInfo{ }
+@media(max-width:640px){
+  .mapaDestaque :global(.mapa){ height:240px; }
 }
-.miniMapa{ width:100%; height:100%; }
-.miniMapa > div{ margin:0; height:100%; }
-.miniMapa :global(.mapa){ height:200px; }
 
 /* ---------- empty state ---------- */
 .empty{ text-align:center; padding:34px 20px; }
@@ -82,5 +82,4 @@
 @media(max-width:640px){
   .saved{ flex-direction:column-reverse; }
   .cobertura{ width:100%; height:120px; }
-  .cobertura:has(.miniMapa){ width:100%; height:200px; }
 }

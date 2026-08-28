@@ -113,7 +113,40 @@ export function Local() {
       {erro && <p className={css.erro}>{erro}</p>}
 
       {/* ---------- ESTADO SALVO ---------- */}
-      {modo === 'ver' && salvo && (
+      {modo === 'ver' && salvo && temMapa() && salvo.latitude != null && salvo.longitude != null && (
+        <div className={css.bloco}>
+          <div className={css.mapaDestaque}>
+            <MapaLocal lat={salvo.latitude} lon={salvo.longitude} raio={salvo.raioMetros} somenteLeitura />
+          </div>
+
+          <div className={css.savedInfo}>
+            <span className={css.pillOk}><span className={css.dot} />Localização ativa</span>
+            {salvo.localPrestacao && <div className={css.endereco}>{salvo.localPrestacao}</div>}
+            <div className={css.facts}>
+              <div className={css.fact}>
+                <div className={css.fl}>Coordenadas</div>
+                <div className={css.fv}>{salvo.latitude}, {salvo.longitude}</div>
+              </div>
+              <div className={css.fact}>
+                <div className={css.fl}>Raio</div>
+                <div className={css.fv}>{salvo.raioMetros != null ? `${salvo.raioMetros} m` : 'sem raio'}</div>
+              </div>
+            </div>
+            <p className={css.hint}>
+              {salvo.raioMetros != null
+                ? <>Fora de <b>{salvo.raioMetros} m</b>, o app pede uma observação ao funcionário. Dentro do raio, bate direto. <b>Nunca bloqueia.</b></>
+                : <>Sem raio definido, o app não pede observação por distância. <b>Nunca bloqueia a batida.</b></>}
+            </p>
+            <div className={css.acoesLivres}>
+              <Botao variante="ghost" onClick={abrirEdicao}>Editar local</Botao>
+              <button className={css.remover} onClick={remover} disabled={enviando}>Remover localização</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- ESTADO SALVO (sem mapa — layout com ícone) ---------- */}
+      {modo === 'ver' && salvo && !(temMapa() && salvo.latitude != null && salvo.longitude != null) && (
         <div className={css.bloco}>
           <div className={css.saved}>
             <div className={css.info}>
@@ -142,17 +175,11 @@ export function Local() {
               </div>
             </div>
             <div className={css.cobertura} aria-hidden="true">
-              {temMapa() && salvo.latitude != null && salvo.longitude != null ? (
-                <div className={css.miniMapa}>
-                  <MapaLocal lat={salvo.latitude} lon={salvo.longitude} raio={salvo.raioMetros} somenteLeitura />
-                </div>
-              ) : (
-                <svg width="96" height="96" viewBox="0 0 96 96">
-                  <circle cx="48" cy="52" r="30" fill="rgba(255,107,74,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
-                  <path d="M48 24 C40 24 34 30 34 38 C34 48 48 60 48 60 C48 60 62 48 62 38 C62 30 56 24 48 24 Z" fill="var(--coral)" />
-                  <circle cx="48" cy="38" r="5" fill="var(--cream)" />
-                </svg>
-              )}
+              <svg width="96" height="96" viewBox="0 0 96 96">
+                <circle cx="48" cy="52" r="30" fill="rgba(255,107,74,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
+                <path d="M48 24 C40 24 34 30 34 38 C34 48 48 60 48 60 C48 60 62 48 62 38 C62 30 56 24 48 24 Z" fill="var(--coral)" />
+                <circle cx="48" cy="38" r="5" fill="var(--cream)" />
+              </svg>
             </div>
           </div>
         </div>

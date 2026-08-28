@@ -43,7 +43,7 @@ export function MapaLocal({ lat, lon, raio, onMover, onEndereco, somenteLeitura 
       const map = new g.maps.Map(div.current, {
         center: centro, zoom: lat != null ? 16 : 12,
         mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
-        gestureHandling: 'greedy',
+        gestureHandling: somenteLeitura ? 'cooperative' : 'greedy',
       });
       const marker = new g.maps.Marker({
         position: centro, map, draggable: !somenteLeitura, animation: g.maps.Animation.DROP,
