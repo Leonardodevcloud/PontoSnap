@@ -8,6 +8,7 @@ import { enfileirar, sincronizar, contar, type BatidaPendente } from '../lib/fil
 import type { Batida, MinhasMarcacoes } from '../tipos';
 import { Flash } from '../components/Flash';
 import { Botao } from '../components/Botao';
+import { ParticulasCanvas, ConfeteCanvas } from './LoginFx';
 import css from './BaterPonto.module.css';
 
 /** Tempo de pressão para confirmar. Curto o bastante pra não irritar,
@@ -33,6 +34,19 @@ export function BaterPonto() {
   const [naFila, setNaFila] = useState(0);
   const raf = useRef<number | null>(null);
   const inicio = useRef<number>(0);
+  const dispararParticulas = useRef<((x: number, y: number) => void) | null>(null);
+  const botaoRef = useRef<HTMLButtonElement | null>(null);
+  const zonaRef = useRef<HTMLDivElement | null>(null);
+
+  // Explode estrelinhas a partir do centro do botão de bater.
+  function estourarNoBotao() {
+    const btn = botaoRef.current, zona = zonaRef.current;
+    if (!btn || !zona || !dispararParticulas.current) return;
+    const r = btn.getBoundingClientRect();
+    const z = zona.getBoundingClientRect();
+    dispararParticulas.current(r.left - z.left + r.width / 2, r.top - z.top + r.height / 2);
+    if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+  }
 
   const carregar = useCallback(async () => {
     try { setDados(await api.get<MinhasMarcacoes>(`/marcacao/minhas?data=${hojeSP()}`)); }
@@ -126,7 +140,7 @@ export function BaterPonto() {
   function passo() {
     const p = Math.min(1, (performance.now() - inicio.current) / DUR_SEGURAR);
     setProgresso(p);
-    if (p >= 1) { raf.current = null; void bater(); return; }
+    if (p >= 1) { raf.current = null; estourarNoBotao(); void bater(); return; }
     raf.current = requestAnimationFrame(passo);
   }
   function aoSegurar(e: React.PointerEvent) {
@@ -144,6 +158,7 @@ export function BaterPonto() {
   if (confirmada) {
     return (
       <div className={`appshell ${css.conf}`}>
+        <ConfeteCanvas ativo />
         <Flash tamanho={92} cor="var(--peach)" girando className={css.confFlash} />
         <div className={css.check} aria-hidden="true">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
@@ -171,7 +186,8 @@ export function BaterPonto() {
   const primeiroNome = dados?.nome?.split(' ')[0] ?? '';
 
   return (
-    <div className="appshell">
+    <div className="appshell" ref={zonaRef} style={{ position: 'relative' }}>
+      <ParticulasCanvas dispararRef={dispararParticulas} />
       <div className={css.oi}>Oi{primeiroNome ? `, ${primeiroNome}` : ''}</div>
       <div className={css.hoje}>
         {fmtDataCurta()}
@@ -202,7 +218,8 @@ export function BaterPonto() {
 
       <div className={css.btnzona}>
         <button
-          className={css.snapbtn}
+          ref={botaoRef}
+          className={`${css.snapbtn} ${progresso > 0 && !batendo ? css.segurando : ''}`}
           onPointerDown={aoSegurar}
           onPointerUp={aoSoltar}
           onPointerLeave={aoSoltar}
