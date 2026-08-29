@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { CobrancaService } from './cobranca.service';
+import { PlanoLimiteService } from './plano-limite.service';
 import { CriarPlanoDto, DefinirAssinaturaDto, GerarCobrancaDto, AnexarBoletoDto } from './dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -42,7 +43,10 @@ export class CobrancaMasterController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Perfis(Perfil.ADMIN_CLIENTE)
 export class AssinaturaClienteController {
-  constructor(private readonly cob: CobrancaService) {}
+  constructor(
+    private readonly cob: CobrancaService,
+    private readonly limites: PlanoLimiteService,
+  ) {}
 
   private tenant(u: PayloadAcesso): string {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
@@ -51,6 +55,11 @@ export class AssinaturaClienteController {
 
   @Get() minha(@UsuarioAtual() u: PayloadAcesso) {
     return this.cob.minhaAssinatura(this.tenant(u));
+  }
+
+  /** Retorna o uso atual do plano (quantos funcionários ativos vs teto). */
+  @Get('uso') uso(@UsuarioAtual() u: PayloadAcesso) {
+    return this.limites.uso(this.tenant(u));
   }
 
   @Post('cobrancas/:id/ja-paguei')

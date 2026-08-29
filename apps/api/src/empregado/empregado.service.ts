@@ -7,6 +7,7 @@ import { DB } from '../database/database.module';
 import { registrarEventoRep } from '../fiscal/evento-rep';
 import { EmailService } from '../email/email.service';
 import { emailAcessoFuncionario } from '../email/templates';
+import { PlanoLimiteService } from '../cobranca/plano-limite.service';
 import { hashPin } from '../auth/pin';
 import { hashSenha } from '../auth/senha';
 import { randomBytes } from 'node:crypto';
@@ -32,6 +33,7 @@ export class EmpregadoService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly email: EmailService,
+    private readonly limites: PlanoLimiteService,
   ) {}
 
   /** Remove campos sensíveis antes de devolver ao cliente. */
@@ -41,6 +43,7 @@ export class EmpregadoService {
   }
 
   async criar(tenantId: string, p: CriarEmpregadoParams) {
+    await this.limites.exigirVaga(tenantId, 1);
     const criado = await comTenant(this.db, tenantId, async (tx) => {
       const dup = await tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.cpf, p.cpf))).limit(1);
@@ -243,6 +246,10 @@ export class EmpregadoService {
   async importarLote(tenantId: string, arquivo: Buffer, nomeArquivo: string) {
     const ehCsv = nomeArquivo.toLowerCase().endsWith('.csv');
     const parse = ehCsv ? parseCsv(arquivo.toString('utf8')) : await parseXlsx(arquivo);
+
+    // Valida se o plano comporta todo o lote antes de começar a importar.
+    // Melhor travar aqui do que importar metade e travar no meio.
+    await this.limites.exigirVaga(tenantId, parse.validas.length);
 
     const erros: ErroLinha[] = [...parse.erros];
     let criados = 0;

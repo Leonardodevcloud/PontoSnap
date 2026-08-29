@@ -12,7 +12,7 @@ import { EspelhoAssinaturaService } from '../src/espelho-assinatura/espelho-assi
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
 const db = drizzle(client, { schema });
 const tenants = new TenantService(db, { enviar: async () => true } as never);
-const empSvc = new EmpregadoService(db as never, {} as never);
+const empSvc = new EmpregadoService(db as never, {} as never, { exigirVaga: async () => {} } as never);
 const marc = new MarcacaoService(db as never, {} as never);
 const trat = new TratamentoService(db as never);
 const svc = new EspelhoAssinaturaService(db as never, trat);

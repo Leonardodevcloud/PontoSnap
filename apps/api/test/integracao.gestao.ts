@@ -12,7 +12,7 @@ const db = drizzle(client, { schema });
 
 const tenantSvc = new TenantService(db, { enviar: async () => true } as never);
 const emailFake = { enviar: async () => true } as unknown as import('../src/email/email.service').EmailService;
-const empSvc = new EmpregadoService(db, emailFake);
+const empSvc = new EmpregadoService(db, emailFake, { exigirVaga: async () => {} } as never);
 const tokens = new TokenService({ segredoAcesso: 'a', segredoRefresh: 'r', expiraAcesso: '15m', expiraRefresh: '7d' });
 const authSvc = new AuthService(db, tokens, emailFake);
 

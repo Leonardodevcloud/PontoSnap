@@ -14,7 +14,7 @@ const db = drizzle(client, { schema });
 const tokens = new TokenService({ segredoAcesso: 'a'.repeat(40), segredoRefresh: 'r'.repeat(40), expiraAcesso: '15m', expiraRefresh: '7d' });
 const auth = new AuthService(db, tokens, {} as never);
 const tenants = new TenantService(db, { enviar: async () => true } as never);
-const empSvc = new EmpregadoService(db as never, {} as never);
+const empSvc = new EmpregadoService(db as never, {} as never, { exigirVaga: async () => {} } as never);
 
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };

@@ -9,7 +9,7 @@ import { TratamentoService } from '../src/tratamento/tratamento.service';
 const client = postgres({ host: process.env.PGSOCKET!, database:'postgres', user:'app_user', password:'x', max:5 });
 const db = drizzle(client, { schema });
 const tenants = new TenantService(db, { enviar: async()=>true } as never);
-const empSvc = new EmpregadoService(db as never, {} as never);
+const empSvc = new EmpregadoService(db as never, {} as never, { exigirVaga: async () => {} } as never);
 const trat = new TratamentoService(db as never);
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c?'OK  ':'FALHA'} — ${m}`); };

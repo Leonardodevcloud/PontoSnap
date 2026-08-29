@@ -29,6 +29,10 @@ export const plano = pgTable('plano', {
   modo: varchar('modo', { length: 16 }).notNull().default('FIXO'),
   /** FIXO: mensalidade cheia. POR_FUNCIONARIO: preço de cada funcionário ativo. */
   valor: numeric('valor', { precision: 10, scale: 2 }).notNull(),
+  /** Teto de empregados ativos permitidos. NULL = sem limite (customizado). */
+  maxFuncionarios: integer('max_funcionarios'),
+  /** Teto de CNPJs (tenants) no mesmo grupo de cobrança. NULL = sem limite. */
+  maxCnpjs: integer('max_cnpjs'),
   /** Só informativo, ajuda o MASTER a escolher (ex.: "até 20 funcionários"). */
   descricao: varchar('descricao', { length: 160 }),
   ativo: varchar('ativo', { length: 3 }).notNull().default('sim'),
