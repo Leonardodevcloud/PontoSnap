@@ -279,6 +279,180 @@ a{color:inherit}
 }
 .mes-btn:hover:not(:disabled){ background:var(--peach); }
 .mes-btn:disabled{ opacity:.3; cursor:not-allowed; }
+
+/* ═══ PREÇOS ═══ */
+.planos{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+  align-items:start;
+}
+.plano{
+  background:var(--white);
+  border:1.5px solid rgba(16,64,63,.10);
+  border-radius:var(--r-lg);
+  padding:32px 28px 28px;
+  position:relative;
+  transition:transform .14s, box-shadow .14s;
+}
+.plano:hover{
+  transform:translateY(-4px);
+  box-shadow:0 18px 42px -18px rgba(16,64,63,.18);
+}
+.plano.destaque{
+  border-color:var(--coral);
+  border-width:2px;
+}
+.plano-tag{
+  position:absolute;
+  top:-13px; left:50%; transform:translateX(-50%);
+  background:var(--coral);
+  color:var(--white);
+  font-family:var(--ff-body);
+  font-weight:800;
+  font-size:11.5px;
+  letter-spacing:.04em;
+  padding:5px 16px;
+  border-radius:var(--r-pill);
+  white-space:nowrap;
+}
+.plano-nome{
+  font-family:var(--ff-display);
+  font-weight:600;
+  font-size:22px;
+  color:var(--ink);
+}
+.plano-desc{
+  font-size:14.5px;
+  color:var(--ash);
+  margin-top:4px;
+  min-height:44px;
+}
+.plano-preco{
+  margin:22px 0 6px;
+  display:flex;
+  align-items:baseline;
+  gap:4px;
+}
+.plano-cifrao{
+  font-family:var(--ff-mono);
+  font-size:16px;
+  font-weight:500;
+  color:var(--ash);
+  align-self:flex-start;
+  margin-top:8px;
+}
+.plano-valor{
+  font-family:var(--ff-display);
+  font-weight:700;
+  font-size:52px;
+  line-height:1;
+  color:var(--ink);
+}
+.plano-periodo{
+  font-family:var(--ff-mono);
+  font-size:12px;
+  color:var(--ash);
+}
+.plano-perfunc{
+  font-family:var(--ff-mono);
+  font-size:11.5px;
+  color:var(--ash);
+  margin-bottom:22px;
+}
+.plano-sep{
+  border:none;
+  border-top:1px solid rgba(16,64,63,.10);
+  margin:0 0 18px;
+}
+.plano-specs{
+  list-style:none;
+  display:flex;
+  flex-direction:column;
+  gap:11px;
+  margin-bottom:26px;
+  padding:0;
+}
+.plano-specs li{
+  display:flex;
+  gap:10px;
+  font-size:15px;
+  align-items:flex-start;
+  line-height:1.45;
+}
+.plano-specs li::before{
+  content:'';
+  width:18px; height:18px;
+  border-radius:50%;
+  background:var(--lime);
+  flex:none;
+  margin-top:2px;
+  background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 12.5 L9.5 18 L20 6' stroke='%2310403F' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:10px;
+}
+.plano-specs .limite{
+  font-family:var(--ff-mono);
+  font-weight:500;
+  font-size:13px;
+  background:rgba(16,64,63,.06);
+  padding:2px 8px;
+  border-radius:6px;
+}
+.planos-nota{
+  margin-top:32px;
+  text-align:center;
+  font-size:14.5px;
+  color:var(--ash);
+}
+.planos-nota a{
+  color:var(--coral-dark);
+  font-weight:700;
+  text-decoration:none;
+}
+.planos-nota a:hover{text-decoration:underline}
+.incluso{
+  margin-top:52px;
+  background:var(--white);
+  border:1px solid rgba(16,64,63,.10);
+  border-radius:var(--r-lg);
+  padding:34px 36px;
+}
+.incluso-titulo{
+  font-family:var(--ff-display);
+  font-weight:600;
+  font-size:20px;
+  margin-bottom:20px;
+}
+.incluso-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px 28px;
+}
+.incluso-item{
+  display:flex;
+  gap:10px;
+  font-size:14.5px;
+  align-items:flex-start;
+  line-height:1.45;
+}
+.incluso-item::before{
+  content:'';
+  width:6px; height:6px;
+  border-radius:50%;
+  background:var(--coral);
+  flex:none;
+  margin-top:8px;
+}
+@media (max-width:980px){
+  .planos{grid-template-columns:1fr; max-width:420px; margin:0 auto}
+  .plano.destaque{order:-1}
+  .incluso-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:520px){
+  .incluso-grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -293,6 +467,7 @@ a{color:inherit}
       <a href="#como">Como funciona</a>
       <a href="#telas">As telas</a>
       <a href="#lei">A lei</a>
+      <a href="#precos">Preços</a>
     </div>
     <div class="nav-acoes">
       <a class="btn btn-ghost btn-sm" href="https://painel.pontosnap.app.br/login">Acessar área do cliente</a>
@@ -530,6 +705,100 @@ a{color:inherit}
   </div>
 </section>
 
+<!-- ═══ PREÇOS ═══ -->
+<section class="secao" id="precos">
+  <div class="wrap">
+    <div class="cab">
+      <div class="eyebrow">Preços</div>
+      <h2>Escolhe o tamanho<br />da sua equipe.</h2>
+      <p>Todos os planos incluem tudo — REP-P, apuração CLT, espelho, banco de horas. Sem surpresa na fatura.</p>
+    </div>
+
+    <div class="planos">
+      <!-- ESSENCIAL -->
+      <div class="plano">
+        <div class="plano-nome">Essencial</div>
+        <div class="plano-desc">Pra quem está começando ou tem uma equipe enxuta.</div>
+        <div class="plano-preco">
+          <span class="plano-cifrao">R$</span>
+          <span class="plano-valor">79</span>
+          <span class="plano-periodo">/mês</span>
+        </div>
+        <div class="plano-perfunc">até R$ 7,90 por funcionário</div>
+        <hr class="plano-sep" />
+        <ul class="plano-specs">
+          <li><span class="limite">1 CNPJ</span></li>
+          <li><span class="limite">Até 10 funcionários</span></li>
+          <li>Todas as funcionalidades incluídas</li>
+        </ul>
+        <a class="btn btn-ghost btn-sm" href="#falar" style="width:100%;text-align:center;border-radius:100px">Começar</a>
+      </div>
+
+      <!-- PROFISSIONAL -->
+      <div class="plano destaque">
+        <div class="plano-tag">Mais escolhido</div>
+        <div class="plano-nome">Profissional</div>
+        <div class="plano-desc">Pra empresas que já têm uma equipe estabelecida.</div>
+        <div class="plano-preco">
+          <span class="plano-cifrao">R$</span>
+          <span class="plano-valor">159</span>
+          <span class="plano-periodo">/mês</span>
+        </div>
+        <div class="plano-perfunc">até R$ 5,30 por funcionário</div>
+        <hr class="plano-sep" />
+        <ul class="plano-specs">
+          <li><span class="limite">1 CNPJ</span></li>
+          <li><span class="limite">Até 30 funcionários</span></li>
+          <li>Todas as funcionalidades incluídas</li>
+        </ul>
+        <a class="btn btn-coral btn-sm" href="#falar" style="width:100%;text-align:center;border-radius:100px">Começar</a>
+      </div>
+
+      <!-- EMPRESA -->
+      <div class="plano">
+        <div class="plano-nome">Empresa</div>
+        <div class="plano-desc">Pra quem tem mais de um CNPJ ou filiais.</div>
+        <div class="plano-preco">
+          <span class="plano-cifrao">R$</span>
+          <span class="plano-valor">299</span>
+          <span class="plano-periodo">/mês</span>
+        </div>
+        <div class="plano-perfunc">até R$ 4,98 por funcionário</div>
+        <hr class="plano-sep" />
+        <ul class="plano-specs">
+          <li><span class="limite">Até 3 CNPJs</span></li>
+          <li><span class="limite">Até 60 funcionários</span></li>
+          <li>Todas as funcionalidades incluídas</li>
+        </ul>
+        <a class="btn btn-ghost btn-sm" href="#falar" style="width:100%;text-align:center;border-radius:100px">Começar</a>
+      </div>
+    </div>
+
+    <p class="planos-nota">
+      Mais de 60 funcionários ou precisa de algo diferente? <a href="#falar">Fale com a gente</a> — a gente monta um plano sob medida.
+    </p>
+
+    <!-- TUDO INCLUSO -->
+    <div class="incluso">
+      <div class="incluso-titulo">Incluso em todos os planos</div>
+      <div class="incluso-grid">
+        <div class="incluso-item">Ponto pelo celular (PWA, sem instalar app)</div>
+        <div class="incluso-item">Quiosque no tablet da recepção</div>
+        <div class="incluso-item">REP-P completo (Portaria 671)</div>
+        <div class="incluso-item">Arquivo fiscal AFD e AEJ</div>
+        <div class="incluso-item">Apuração CLT automática</div>
+        <div class="incluso-item">Horas extras, noturno e DSR</div>
+        <div class="incluso-item">Espelho de ponto com assinatura</div>
+        <div class="incluso-item">Banco de horas</div>
+        <div class="incluso-item">Escalas normais, 12×36 e feriados</div>
+        <div class="incluso-item">Exportação PDF e Excel</div>
+        <div class="incluso-item">Registro INPI em cada arquivo</div>
+        <div class="incluso-item">Suporte por WhatsApp</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="secao" id="falar">
   <div class="wrap">
     <div class="cta">
@@ -560,6 +829,7 @@ a{color:inherit}
       <a href="#como">Como funciona</a>
       <a href="#telas">As telas</a>
       <a href="#lei">A lei</a>
+      <a href="#precos">Preços</a>
       <a href="https://painel.pontosnap.app.br/login">Área do cliente</a>
       <a href="mailto:contato@pontosnap.app.br">Contato</a>
     </div>
