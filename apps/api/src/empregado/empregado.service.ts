@@ -179,14 +179,24 @@ export class EmpregadoService {
       if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
 
       // Vínculo/correção de escala: mantém UMA vigência aberta, cobrindo todo o
-      // histórico (é correção, não mudança de escala a partir de uma data —
-      // essa é feita por mudarEscalaComVigencia). Substitui a vigência aberta
-      // existente, ou cria a primeira "desde sempre".
-      const aberta = (await tx.select().from(empregadoEscalaVigencia)
-        .where(and(eq(empregadoEscalaVigencia.empregadoId, id), eq(empregadoEscalaVigencia.tenantId, tenantId), isNull(empregadoEscalaVigencia.dataFim))).limit(1))[0];
-      if (aberta) {
+      // histórico. Limpa corrompidas e duplicadas antes.
+      const todas = await tx.select().from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.empregadoId, id), eq(empregadoEscalaVigencia.tenantId, tenantId)));
+
+      // Deletar corrompidas (data_fim < data_inicio) e fechadas duplicadas
+      const abertas = todas.filter((v) => v.dataFim == null);
+      const corrompidas = todas.filter((v) => v.dataFim != null && v.dataFim < v.dataInicio);
+      for (const v of corrompidas) {
+        await tx.delete(empregadoEscalaVigencia).where(eq(empregadoEscalaVigencia.id, v.id));
+      }
+
+      if (abertas.length > 0) {
+        // Atualizar a primeira aberta, deletar as demais
         await tx.update(empregadoEscalaVigencia).set({ horarioContratualId })
-          .where(eq(empregadoEscalaVigencia.id, aberta.id));
+          .where(eq(empregadoEscalaVigencia.id, abertas[0]!.id));
+        for (let i = 1; i < abertas.length; i++) {
+          await tx.delete(empregadoEscalaVigencia).where(eq(empregadoEscalaVigencia.id, abertas[i]!.id));
+        }
       } else {
         await tx.insert(empregadoEscalaVigencia).values({
           tenantId, empregadoId: id, horarioContratualId, dataInicio: '2000-01-01',

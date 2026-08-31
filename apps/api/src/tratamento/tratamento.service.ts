@@ -93,6 +93,16 @@ export class TratamentoService {
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!emp) throw new NotFoundException('Empregado não encontrado');
 
+      // Limpar vigências corrompidas (data_fim < data_inicio) ou fechadas
+      // que sobraram de chamadas anteriores duplicadas.
+      const todas = await tx.select().from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.empregadoId, empregadoId), eq(empregadoEscalaVigencia.tenantId, tenantId)));
+      for (const v of todas) {
+        if (v.dataFim != null && v.dataFim < v.dataInicio) {
+          await tx.delete(empregadoEscalaVigencia).where(eq(empregadoEscalaVigencia.id, v.id));
+        }
+      }
+
       // Encerra qualquer vigência aberta no dia anterior a dataInicio.
       const diaAnterior = TratamentoService.somarDias(dataInicio, -1);
       await tx.update(empregadoEscalaVigencia)
