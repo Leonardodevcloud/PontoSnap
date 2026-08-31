@@ -346,20 +346,9 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
           <button className={`${css.optB} ${tipo === 'DESCONSIDERAR' ? css.optOn : ''}`} onClick={() => setTipo('DESCONSIDERAR')}>Tirar batida a mais</button>
         </div>
 
-        {tipo === 'INCLUSAO' ? (
+        {(tipo === 'CORRECAO' || tipo === 'DESCONSIDERAR') && (
           <>
-            <span className={css.lb}>Horário</span>
-            <div className={css.dupla}>
-              <input className={css.inp} type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
-              <select className={css.inp} value={tpMarc} onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
-                <option value="E">entrada</option>
-                <option value="S">saída</option>
-              </select>
-            </div>
-          </>
-        ) : (
-          <>
-            <span className={css.lb}>Qual batida sai da conta</span>
+            <span className={css.lb}>{tipo === 'CORRECAO' ? 'Qual batida corrigir' : 'Qual batida sai da conta'}</span>
             {batidas.length === 0 ? (
               <p className={css.semBat}>Nenhuma batida neste dia.</p>
             ) : (
@@ -373,6 +362,18 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
                 ))}
               </div>
             )}
+          </>
+        )}
+        {(tipo === 'INCLUSAO' || tipo === 'CORRECAO') && (
+          <>
+            <span className={css.lb}>{tipo === 'CORRECAO' ? 'Horário correto' : 'Horário'}</span>
+            <div className={css.dupla}>
+              <input className={css.inp} type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+              <select className={css.inp} value={tpMarc} onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
+                <option value="E">entrada</option>
+                <option value="S">saída</option>
+              </select>
+            </div>
           </>
         )}
 
