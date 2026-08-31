@@ -44,10 +44,12 @@ ALTER TABLE notificacao_preferencia ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'push_subscription_tenant') THEN
     CREATE POLICY push_subscription_tenant ON push_subscription
-      USING (tenant_id::text = current_setting('app.tenant_id', true));
+      USING (tenant_id::text = current_setting('app.tenant_id', true))
+      WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'notificacao_preferencia_tenant') THEN
     CREATE POLICY notificacao_preferencia_tenant ON notificacao_preferencia
-      USING (tenant_id::text = current_setting('app.tenant_id', true));
+      USING (tenant_id::text = current_setting('app.tenant_id', true))
+      WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
   END IF;
 END $$;

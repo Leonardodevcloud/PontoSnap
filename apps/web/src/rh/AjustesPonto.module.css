@@ -84,3 +84,4 @@
 .slotFalta .slotTag{ background:var(--erro-bg); color:var(--coral-dark); }
 .slotClicavel{ cursor:pointer; }
 .slotClicavel:hover{ background:var(--peach); }
+.slotSelecionado{ border-color:var(--coral) !important; background:var(--aviso-bg) !important; }

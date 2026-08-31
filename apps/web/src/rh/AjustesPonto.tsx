@@ -6,7 +6,7 @@ import css from './AjustesPonto.module.css';
 
 interface Pedido {
   id: string;
-  tipo: 'INCLUSAO' | 'DESCONSIDERAR';
+  tipo: 'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO';
   data: string;
   dtMarcacao: string | null;
   tpMarc: string | null;
@@ -126,7 +126,7 @@ export default function AjustesPonto() {
           <div key={p.id} className={css.ped}>
             <div className={css.pedTop}>
               <span className={`${css.badge} ${p.tipo === 'INCLUSAO' ? css.bInc : css.bDesc}`}>
-                {p.tipo === 'INCLUSAO' ? 'inclusão' : 'desconsiderar'}
+                {p.tipo === 'INCLUSAO' ? 'inclusão' : p.tipo === 'CORRECAO' ? 'correção' : 'desconsiderar'}
               </span>
               <span className={css.quando}>pedido às {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
@@ -226,7 +226,7 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
   const [emps, setEmps] = useState<EmpLite[]>([]);
   const [empregadoId, setEmpregadoId] = useState(empregadoIdInicial);
   const [data, setData] = useState(dataInicial || new Date().toISOString().slice(0, 10));
-  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR'>('INCLUSAO');
+  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO'>('INCLUSAO');
   const [hora, setHora] = useState('');
   const [tpMarc, setTpMarc] = useState<'E' | 'S'>('E');
   const [dia, setDia] = useState<{ batidas: BatidaLite[]; pares: { entrada: string; saida: string }[]; esperadas: number }>({ batidas: [], pares: [], esperadas: 0 });
@@ -272,13 +272,13 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
   async function enviar() {
     if (!empregadoId) { setErro('Escolha o funcionário.'); return; }
     if (obs.trim().length < 5) { setErro('Escreva o motivo — fica registrado na auditoria.'); return; }
-    if (tipo === 'INCLUSAO' && !/^\d{2}:\d{2}$/.test(hora)) { setErro('Informe a hora (HH:MM).'); return; }
-    if (tipo === 'DESCONSIDERAR' && !alvo) { setErro('Escolha qual batida sai da conta.'); return; }
+    if ((tipo === 'INCLUSAO' || tipo === 'CORRECAO') && !/^\d{2}:\d{2}$/.test(hora)) { setErro('Informe a hora (HH:MM).'); return; }
+    if ((tipo === 'DESCONSIDERAR' || tipo === 'CORRECAO') && !alvo) { setErro('Escolha qual batida.'); return; }
     setErro(null); setEnviando(true);
     try {
       await api.post('/ajustes/lancar', {
         empregadoId, tipo, data,
-        ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : { marcacaoId: alvo }),
+        ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : tipo === 'CORRECAO' ? { hora, tpMarc, marcacaoId: alvo } : { marcacaoId: alvo }),
         observacao: obs.trim(),
       });
       onPronto();
@@ -315,19 +315,26 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
               <p className={css.semBat}>Sem horário contratual e sem batidas neste dia.</p>
             )}
             <div className={css.slots}>
-              {slots.map((s2, i) => (
+              {slots.map((s2, i) => {
+                const clicavelInc = !s2.batida && tipo === 'INCLUSAO';
+                const clicavelCorr = !!s2.batida && tipo === 'CORRECAO';
+                return (
                 <button
                   key={i}
-                  className={`${css.slot} ${s2.batida ? css.slotOk : css.slotFalta} ${!s2.batida && tipo === 'INCLUSAO' ? css.slotClicavel : ''}`}
-                  disabled={!!s2.batida || tipo !== 'INCLUSAO'}
-                  onClick={() => { if (s2.sugestao) { setHora(s2.sugestao); setTpMarc(s2.tp); } }}
-                  title={!s2.batida && tipo === 'INCLUSAO' ? 'Clique pra preencher esta batida' : ''}
+                  className={`${css.slot} ${s2.batida ? css.slotOk : css.slotFalta} ${clicavelInc || clicavelCorr ? css.slotClicavel : ''} ${clicavelCorr && alvo === s2.batida?.id ? css.slotSelecionado : ''}`}
+                  disabled={!clicavelInc && !clicavelCorr}
+                  onClick={() => {
+                    if (clicavelInc && s2.sugestao) { setHora(s2.sugestao); setTpMarc(s2.tp); }
+                    if (clicavelCorr && s2.batida?.id) { setAlvo(s2.batida.id); setTpMarc(s2.tp); }
+                  }}
+                  title={clicavelInc ? 'Clique pra preencher esta batida' : clicavelCorr ? 'Clique pra corrigir o horário desta batida' : ''}
                 >
                   <span className={css.slotLb}>{s2.rotulo}</span>
                   <span className={css.slotV}>{s2.batida ? hhmm(s2.batida.dtMarcacao) : (s2.sugestao ?? '—')}</span>
                   <span className={css.slotTag}>{s2.batida ? (s2.batida.nsr == null ? 'ajuste' : 'batido') : 'faltando'}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -335,6 +342,7 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
         <span className={css.lb}>O que fazer</span>
         <div className={css.opts}>
           <button className={`${css.optB} ${tipo === 'INCLUSAO' ? css.optOn : ''}`} onClick={() => setTipo('INCLUSAO')}>Incluir batida que faltou</button>
+          <button className={`${css.optB} ${tipo === 'CORRECAO' ? css.optOn : ''}`} onClick={() => setTipo('CORRECAO')}>Corrigir horário</button>
           <button className={`${css.optB} ${tipo === 'DESCONSIDERAR' ? css.optOn : ''}`} onClick={() => setTipo('DESCONSIDERAR')}>Tirar batida a mais</button>
         </div>
 

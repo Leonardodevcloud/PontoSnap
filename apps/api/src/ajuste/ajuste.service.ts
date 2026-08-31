@@ -10,12 +10,12 @@ import { PushService } from '../notificacao/push.service';
 
 export interface NovoAjuste {
   empregadoId: string;
-  tipo: 'INCLUSAO' | 'DESCONSIDERAR';
+  tipo: 'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO';
   data: string;
-  /** INCLUSAO: hora no formato HH:MM (local) */
+  /** INCLUSAO / CORRECAO: hora no formato HH:MM (local) */
   hora?: string;
   tpMarc?: 'E' | 'S';
-  /** DESCONSIDERAR: qual marcação original (id ou NSR) */
+  /** DESCONSIDERAR / CORRECAO: qual marcação original (id ou NSR) */
   marcacaoId?: string;
   nsr?: number;
   observacao: string;
@@ -65,11 +65,12 @@ export class AjusteService {
         .where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
 
       let dtMarcacao: Date | null = null;
-      if (dto.tipo === 'INCLUSAO') {
-        if (!dto.hora || !/^\d{2}:\d{2}$/.test(dto.hora)) throw new BadRequestException('Informe a hora que faltou (HH:MM).');
+      if (dto.tipo === 'INCLUSAO' || dto.tipo === 'CORRECAO') {
+        if (!dto.hora || !/^\d{2}:\d{2}$/.test(dto.hora)) throw new BadRequestException('Informe a hora correta (HH:MM).');
         dtMarcacao = new Date(`${dto.data}T${dto.hora}:00${fuso.slice(0, 3)}:${fuso.slice(3)}`);
         if (Number.isNaN(dtMarcacao.getTime())) throw new BadRequestException('Hora inválida.');
-      } else {
+      }
+      if (dto.tipo === 'DESCONSIDERAR' || dto.tipo === 'CORRECAO') {
         // O funcionário aponta pelo NSR (que ele vê na tela); o RH pode mandar o id.
         if (!dto.marcacaoId && dto.nsr != null) {
           const emp2 = (await tx.select({ cpf: empregado.cpf }).from(empregado)
@@ -80,14 +81,33 @@ export class AjusteService {
           if (!achada) throw new NotFoundException('Batida não encontrada');
           dto = { ...dto, marcacaoId: achada.id };
         }
-        if (!dto.marcacaoId) throw new BadRequestException('Escolha qual batida deve ser desconsiderada.');
+        if (!dto.marcacaoId) throw new BadRequestException('Escolha qual batida deve ser corrigida.');
         const m = (await tx.select({ id: pontoMarcacao.id }).from(pontoMarcacao)
           .where(eq(pontoMarcacao.id, dto.marcacaoId)).limit(1))[0];
         if (!m) throw new NotFoundException('Batida não encontrada');
-        const jaTem = (await tx.select({ id: pontoAjuste.id }).from(pontoAjuste).where(and(
-          eq(pontoAjuste.tenantId, tenantId), eq(pontoAjuste.marcacaoId, dto.marcacaoId),
-          eq(pontoAjuste.status, 'EM_ANALISE'))).limit(1))[0];
-        if (jaTem) throw new BadRequestException('Já existe um pedido em análise para essa batida.');
+      }
+
+      // CORRECAO = dois registros atômicos: desconsiderar a errada + incluir a certa
+      if (dto.tipo === 'CORRECAO') {
+        const statusFinal = origem === 'RH' ? 'APROVADO' : 'EM_ANALISE';
+        const decididoPor = origem === 'RH' ? 'RH' : null;
+        // 1. Desconsiderar a original
+        await tx.insert(pontoAjuste).values({
+          tenantId, empregadoId: dto.empregadoId, tipo: 'DESCONSIDERAR', data: dto.data,
+          dtMarcacao: null, tpMarc: null, marcacaoId: dto.marcacaoId!,
+          observacao: `Correção: ${dto.observacao.trim()}`, origem,
+          status: statusFinal, decididoPor,
+          decididoEm: origem === 'RH' ? new Date() : null,
+        });
+        // 2. Incluir a correta
+        const [a] = await tx.insert(pontoAjuste).values({
+          tenantId, empregadoId: dto.empregadoId, tipo: 'INCLUSAO', data: dto.data,
+          dtMarcacao, tpMarc: dto.tpMarc ?? 'E', marcacaoId: null,
+          observacao: `Correção: ${dto.observacao.trim()}`, origem,
+          status: statusFinal, decididoPor,
+          decididoEm: origem === 'RH' ? new Date() : null,
+        }).returning();
+        return a;
       }
 
       const [a] = await tx.insert(pontoAjuste).values({
