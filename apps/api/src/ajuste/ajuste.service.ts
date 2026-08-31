@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { pontoAjuste, empregado, pontoMarcacao, pontoRep, pontoHorarioContratual, usuario, tenant, comTenant, type Db } from '@ponto/db';
 import { inicioDoDia, fimDoDia } from '@ponto/rep-core';
@@ -6,6 +6,7 @@ import { ajustesAprovados } from '../tratamento/ajustes';
 import { DB } from '../database/database.module';
 import { EmailService } from '../email/email.service';
 import { emailAjusteDecidido } from '../email/templates';
+import { PushService } from '../notificacao/push.service';
 
 export interface NovoAjuste {
   empregadoId: string;
@@ -28,9 +29,12 @@ function limiteRetroativo(hoje = new Date()): string {
 
 @Injectable()
 export class AjusteService {
+  private readonly log = new Logger(AjusteService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly email?: EmailService,
+    private readonly push?: PushService,
   ) {}
 
   /** Descobre o empregado vinculado ao usuário logado (colaborador). */
@@ -146,6 +150,23 @@ export class AjusteService {
         motivoDecisao: motivo?.trim() ?? null,
         decididoPor: quem.slice(0, 160), decididoEm: new Date(),
       }).where(and(eq(pontoAjuste.id, id), eq(pontoAjuste.tenantId, tenantId))).returning();
+
+      // Notificar o funcionário via push (fire-and-forget)
+      if (a) {
+        const u = (await tx.select({ id: usuario.id }).from(usuario)
+          .where(and(eq(usuario.empregadoId, atual.empregadoId), eq(usuario.tenantId, tenantId))).limit(1))[0];
+        if (u && this.push) {
+          const dataFmt = atual.data.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2');
+          const titulo = aprovar ? 'Ajuste aprovado ✓' : 'Ajuste recusado';
+          const corpo = aprovar
+            ? `Seu pedido de ajuste do dia ${dataFmt} foi aprovado pelo RH.`
+            : `Seu pedido de ajuste do dia ${dataFmt} foi recusado.${motivo ? ` Motivo: "${motivo.trim()}"` : ''}`;
+          this.push.enviarParaEmpregado(tenantId, atual.empregadoId, u.id, 'ajusteRespondido', {
+            titulo, corpo, url: '/espelho', tag: `ajuste-${id}`,
+          }).catch((e) => this.log.warn(`Push ajuste falhou: ${(e as Error).message}`));
+        }
+      }
+
       return a;
     });
   }
