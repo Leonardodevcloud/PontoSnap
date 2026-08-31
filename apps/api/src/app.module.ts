@@ -18,13 +18,14 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
 import { CobrancaModule } from './cobranca/cobranca.module';
 import { FiscalModule } from './fiscal/fiscal.module';
 import { HealthModule } from './health/health.module';
+import { NotificacaoModule } from './notificacao/notificacao.module';
 import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule,
+    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule,
   ],
 })
 export class AppModule {}

@@ -21,3 +21,4 @@ export * from './tokenSenha';
 export * from './cobranca';
 export * from './dispositivo';
 export * from './job';
+export * from './notificacao';

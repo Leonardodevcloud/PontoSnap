@@ -64,7 +64,8 @@ export const api = {
   get: <T>(p: string) => rastrear(req<T>(p)),
   post: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'POST', body })),
   patch: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PATCH', body })),
-  del: <T>(p: string) => rastrear(req<T>(p, { method: 'DELETE' })),
+  del: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'DELETE', body })),
+  put: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PUT', body })),
   /** Baixa binário (ex.: comprovante PDF) já com o token. */
   baixar(path: string): Promise<Blob> { return rastrear(this._baixar(path)); },
   async _baixar(path: string): Promise<Blob> {

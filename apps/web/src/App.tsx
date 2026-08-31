@@ -13,6 +13,7 @@ import { MinhaEscala } from './telas/MinhaEscala';
 import { MeuBanco } from './telas/MeuBanco';
 import { MeusAtestados } from './telas/MeusAtestados';
 import { EspelhoDia } from './telas/EspelhoDia';
+import { NotificacaoPrefs } from './telas/NotificacaoPrefs';
 import { LayoutRH } from './rh/LayoutRH';
 import { PainelRH } from './rh/PainelRH';
 import { Funcionarios } from './rh/Funcionarios';
@@ -92,6 +93,7 @@ export function App() {
         <Route path="escala" element={<MinhaEscala />} />
         <Route path="banco" element={<MeuBanco />} />
         <Route path="atestados" element={<MeusAtestados />} />
+        <Route path="notificacoes" element={<NotificacaoPrefs />} />
       </Route>
 
       {/* RH / Admin (desktop) */}

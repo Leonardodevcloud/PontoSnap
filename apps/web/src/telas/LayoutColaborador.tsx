@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { Flash } from '../components/Flash';
 import { PromptInstalar } from '../components/PromptInstalar';
+import { NotificacaoPrompt } from './NotificacaoPrompt';
 import css from './LayoutColaborador.module.css';
 
 /** Casca das telas do funcionário: marca, navegação e a saída. */
@@ -57,6 +58,7 @@ export function LayoutColaborador() {
                   <button role="menuitem" onClick={() => { setMenu(false); navegar('/banco'); }}>Banco de horas</button>
                 )}
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/trocar-senha'); }}>Trocar minha senha</button>
+                <button role="menuitem" onClick={() => { setMenu(false); navegar('/notificacoes'); }}>Notificações</button>
                 <button role="menuitem" className={css.sair} onClick={() => { sair(); navegar('/login', { replace: true }); }}>
                   Sair
                 </button>
@@ -68,6 +70,7 @@ export function LayoutColaborador() {
 
       <div className={css.instalarZona}>
         <PromptInstalar />
+        <NotificacaoPrompt />
       </div>
 
       <main className={css.conteudo}>
