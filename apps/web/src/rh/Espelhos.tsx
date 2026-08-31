@@ -53,32 +53,31 @@ export function Espelhos() {
         <div className={css.grid}>
           <div className={css.timeline}>
             <div className={css.tHead}>Batidas de {esp.nome.split(' ')[0]}</div>
-            {esp.marcacoes.length === 0 && <div className={css.vazio}>Nenhuma batida nesse dia.</div>}
-            {esp.marcacoes.map((m, i) => (
-              <div key={m.nsr} className={css.row}>
-                <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
-                <span>
-                  <span className={css.k}>{rotuloMarcacao(i, esp.esperadas || esp.marcacoes.length)}</span>
-                  {m.offline && (
-                    <span className={css.offSelo} title={m.defasagemSeg ? `Relógio do aparelho ${m.defasagemSeg > 0 ? 'atrasado' : 'adiantado'} ${Math.abs(Math.round(m.defasagemSeg / 60))} min` : undefined}>
-                      Offline{m.defasagemSeg && Math.abs(m.defasagemSeg) > 120 ? ` · ${m.defasagemSeg > 0 ? '−' : '+'}${Math.abs(Math.round(m.defasagemSeg / 60))}min` : ''}
+            {(() => {
+              // Unifica originais + incluídas por ajuste, ordenadas por hora
+              const todas: Array<{ dt: string | Date; nsr?: number; offline?: boolean; fora?: boolean; obs?: string | null; defSeg?: number | null; lat?: number | null; desc?: boolean; origem: 'O' | 'A' }> = [];
+              for (const m of esp.marcacoes) todas.push({ dt: m.dtMarcacao, nsr: m.nsr, offline: m.offline, fora: m.fora, obs: m.observacao, defSeg: m.defasagemSeg, lat: m.latitude, desc: m.desconsiderada, origem: 'O' });
+              for (const inc of (esp.incluidas ?? [])) todas.push({ dt: inc.dtMarcacao, origem: 'A' });
+              todas.sort((a, b) => new Date(a.dt).getTime() - new Date(b.dt).getTime());
+              const ativas = todas.filter((t) => !t.desc);
+              if (todas.length === 0) return <div className={css.vazio}>Nenhuma batida nesse dia.</div>;
+              return todas.map((t, _i) => {
+                const idx = ativas.indexOf(t);
+                const rotulo = idx >= 0 ? rotuloMarcacao(idx, esp.esperadas || ativas.length) : 'Desconsiderada';
+                return (
+                  <div key={`b${_i}`} className={`${css.row} ${t.desc ? css.riscado : ''}`}>
+                    <span className={`${css.dot} ${t.desc ? css.desc : idx % 2 === 0 ? css.e : css.s}`} />
+                    <span>
+                      <span className={css.k}>{rotulo}</span>
+                      {t.origem === 'A' && <span className={css.ajTag}>Ajuste</span>}
+                      {t.desc && <span className={css.descTag}>Desconsiderada</span>}
                     </span>
-                  )}
-                  {(m.fora || m.observacao) && (
-                    <span className={css.geoLinha}>
-                      <span className={m.fora ? css.geoFora : css.geoSem}>
-                        {m.fora
-                          ? 'Fora'
-                          : m.latitude == null ? 'Sem localização' : 'No escritório'}
-                      </span>
-                      {m.observacao && <span className={css.geoObs}>“{m.observacao}”</span>}
-                    </span>
-                  )}
-                </span>
-                <span className={css.t}>{fmtHora(m.dtMarcacao)}</span>
-                <span className={css.nsr}>NSR #{String(m.nsr).padStart(5, '0')}</span>
-              </div>
-            ))}
+                    <span className={css.t}>{fmtHora(String(t.dt))}</span>
+                    <span className={css.nsr}>{t.nsr != null ? `NSR #${String(t.nsr).padStart(5, '0')}` : 'ajuste'}</span>
+                  </div>
+                );
+              });
+            })()}
             {r?.paresIncompletos && <div className={css.aviso}>Batida em aberto — falta uma saída/entrada.</div>}
           </div>
 

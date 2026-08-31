@@ -55,3 +55,10 @@
   font-size:10.5px; font-weight:800; color:var(--coral-dark);
   background:var(--peach); padding:2px 8px; border-radius:var(--r-pill);
 }
+
+/* Batidas de ajuste aprovado */
+.ajTag{ display:inline-block; font-family:var(--ff-mono); font-size:9px; background:var(--lime); color:var(--ink); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; vertical-align:middle; }
+.descTag{ display:inline-block; font-family:var(--ff-mono); font-size:9px; background:#FFE9E3; color:var(--coral-dark); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:600; vertical-align:middle; }
+.riscado{ opacity:.5; }
+.riscado .t{ text-decoration:line-through; }
+.desc{ background:var(--ash) !important; }

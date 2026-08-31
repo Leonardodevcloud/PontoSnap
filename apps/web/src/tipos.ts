@@ -89,14 +89,14 @@ export interface MarcacaoEspelho {
   latitude?: number | null;
   longitude?: number | null;
   observacao?: string | null;
-  /** true quando a batida saiu de fora do raio do estabelecimento. */
   fora?: boolean;
-  /** Distância em metros até o estabelecimento. null = sem localização. */
   distancia?: number | null;
-  /** Batida capturada sem rede — a hora veio do relógio do aparelho. */
   offline?: boolean;
-  /** Defasagem aparelho→servidor em segundos, quando offline. */
   defasagemSeg?: number | null;
+  /** Marcação desconsiderada por ajuste aprovado (não conta na apuração). */
+  desconsiderada?: boolean;
+  motivoAjuste?: string | null;
+  marcacaoId?: string;
 }
 
 export interface EspelhoResp {
