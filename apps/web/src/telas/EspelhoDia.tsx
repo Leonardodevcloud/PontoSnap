@@ -151,7 +151,7 @@ export function EspelhoDia() {
       {pedidosDoDia.map((a) => {
         const alvo = a.dtMarcacao ? fmtHora(a.dtMarcacao) : null;
         const qual = a.tipo === 'INCLUSAO'
-          ? `incluir ${alvo ?? 'uma batida'}${a.tpMarc === 'S' ? ' (saída)' : a.tpMarc === 'E' ? ' (entrada)' : ''}`
+          ? `incluir ${alvo ?? 'uma batida'}${a.tpMarc === 'S' ? ' (saída)' : a.tpMarc === 'E' ? ' (entrada/retorno)' : ''}`
           : 'desconsiderar uma batida';
         return (
           <div key={a.id} className={`${css.pedBox} ${a.status === 'RECUSADO' ? css.pedNo : a.status === 'APROVADO' ? css.pedOk : ''}`}>
@@ -182,10 +182,14 @@ export function EspelhoDia() {
             <>
               <span className={css.lbF}>Horário que faltou</span>
               <div className={css.dupla}>
-                <input className={css.inpF} type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
-                <select className={css.inpF} value={tpMarc} onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
-                  <option value="E">entrada</option>
-                  <option value="S">saída</option>
+                <input className={css.inpF} type="time" value={hora} onChange={(e) => setHora(e.target.value)}
+                  step="60" />
+                <select className={css.inpF} value={tpMarc}
+                  onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
+                  <option value="E">Entrada</option>
+                  <option value="S">Saída (almoço)</option>
+                  <option value="E">Retorno (almoço)</option>
+                  <option value="S">Saída</option>
                 </select>
               </div>
             </>
