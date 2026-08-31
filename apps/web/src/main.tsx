@@ -5,19 +5,10 @@ import { AuthProvider } from './lib/auth';
 import { App } from './App';
 import './styles/global.css';
 
-// ── Registrar SW com auto-reload ao detectar atualização ──
+// ── Service worker: auto-update check ──
 if ('serviceWorker' in navigator) {
-  // Registrar o SW de push separado (o workbox SW é registrado pelo vite-plugin-pwa)
-  navigator.serviceWorker.register('/sw-push.js').catch(() => {});
-
   navigator.serviceWorker.ready.then((reg) => {
     setInterval(() => reg.update(), 60_000);
-  });
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    window.location.reload();
   });
 }
 

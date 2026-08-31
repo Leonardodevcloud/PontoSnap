@@ -8,6 +8,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      workbox: {
+        // Injeta o handler de push dentro do SW gerado pelo workbox
+        importScripts: ['sw-push.js'],
+      },
       manifest: {
         name: 'PontoSnap',
         short_name: 'PontoSnap',
