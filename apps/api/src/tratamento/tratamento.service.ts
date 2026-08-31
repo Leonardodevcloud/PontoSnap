@@ -947,12 +947,40 @@ export class TratamentoService {
       // 2) Dias (passados, deste mês) com número ímpar de batidas: alguém esqueceu
       //    de bater a entrada ou a saída. O dia de hoje fica de fora (ainda em curso).
       const inicioMesTs = inicioDoDia(`${hojeISO.slice(0, 7)}-01`, fuso);
-      const marcsMes = await tx.select({ cpf: pontoMarcacao.cpf, dt: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
+      const marcsMes = await tx.select({ cpf: pontoMarcacao.cpf, dt: pontoMarcacao.dtMarcacao, id: pontoMarcacao.id }).from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.tenantId, tenantId), gte(pontoMarcacao.dtMarcacao, inicioMesTs), lte(pontoMarcacao.dtMarcacao, fim)));
+
+      // Ajustes aprovados do mês: desconsiderados e incluídos.
+      const inicioMesStr = `${hojeISO.slice(0, 7)}-01`;
+      const ajustesMes = await tx.select({
+        tipo: pontoAjuste.tipo, marcacaoId: pontoAjuste.marcacaoId,
+        data: pontoAjuste.data, empregadoId: pontoAjuste.empregadoId,
+      }).from(pontoAjuste).where(and(
+        eq(pontoAjuste.tenantId, tenantId), eq(pontoAjuste.status, 'APROVADO'),
+        gte(pontoAjuste.data, inicioMesStr), lte(pontoAjuste.data, hojeISO)));
+
+      const desconsideradas = new Set(ajustesMes.filter((a) => a.tipo === 'DESCONSIDERAR' && a.marcacaoId).map((a) => a.marcacaoId!));
+      // Incluídas por dia (empregadoId|data → count)
+      const inclPorDia = new Map<string, number>();
+      for (const a of ajustesMes) {
+        if (a.tipo === 'INCLUSAO') {
+          const empCpf = emps.find((e) => e.id === a.empregadoId)?.cpf;
+          if (empCpf) {
+            const k = `${empCpf}|${a.data}`;
+            inclPorDia.set(k, (inclPorDia.get(k) ?? 0) + 1);
+          }
+        }
+      }
+
       const porDia = new Map<string, number>();
       for (const m of marcsMes) {
+        if (desconsideradas.has(m.id)) continue; // não conta desconsiderada
         const k = `${m.cpf}|${this.diaLocalISO(m.dt, fuso)}`;
         porDia.set(k, (porDia.get(k) ?? 0) + 1);
+      }
+      // Somar incluídas
+      for (const [k, n] of inclPorDia) {
+        porDia.set(k, (porDia.get(k) ?? 0) + n);
       }
       // Data de início do ponto por CPF: dias anteriores não entram em "revisar".
       const inicioPorCpf = new Map(emps.filter((e) => e.dataInicioPonto).map((e) => [e.cpf, e.dataInicioPonto!]));

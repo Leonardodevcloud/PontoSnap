@@ -267,6 +267,8 @@ export interface ApuracaoResp {
   /** Batidas previstas pelo horário contratual (2 por par). */
   esperadas?: number;
   horarioPares?: { entrada: string; saida: string }[];
+  horarioDurMin?: number;
+  jornadaPorDia?: Record<string, number> | null;
 }
 
 export interface BatidaDia {

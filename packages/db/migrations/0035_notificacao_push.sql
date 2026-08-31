@@ -53,3 +53,11 @@ DO $$ BEGIN
       WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true));
   END IF;
 END $$;
+
+-- Permissões pro role da API (ponto_app, sem superuser, sem bypassrls)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ponto_app') THEN
+    EXECUTE 'GRANT ALL ON push_subscription TO ponto_app';
+    EXECUTE 'GRANT ALL ON notificacao_preferencia TO ponto_app';
+  END IF;
+END $$;

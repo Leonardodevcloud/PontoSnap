@@ -197,18 +197,25 @@ export function ApuracaoCLT() {
             </div>
           )}
 
-          {diaAberto && (
+          {diaAberto && (() => {
+            const dow = new Date(`${diaAberto}T12:00:00-0300`).getDay();
+            const jornadaDia = (ap!.jornadaPorDia as Record<string, number> | null)?.[String(dow)] ?? ap!.horarioDurMin ?? 0;
+            const todosOsPares = ap!.horarioPares ?? [];
+            const paresEfetivos = jornadaDia > 0 && jornadaDia <= 360 && todosOsPares.length > 1
+              ? [todosOsPares[0]!] : todosOsPares;
+            return (
             <GavetaDia
               data={diaAberto}
               dia={r.dias.find((x) => x.data === diaAberto)}
               batidas={ap!.batidas?.[diaAberto] ?? []}
-              esperadas={ap!.esperadas ?? 0}
-              pares={ap!.horarioPares ?? []}
+              esperadas={paresEfetivos.length * 2}
+              pares={paresEfetivos}
               nome={ap!.nome}
               empregadoId={empregadoId}
               onFechar={() => setDiaAberto(null)}
             />
-          )}
+            );
+          })()}
 
           <p className={css.disclaimer}>
             Regras aplicadas: <strong>{ap!.regras}</strong>. Escala considerada seg–sex quando não há configuração específica;
