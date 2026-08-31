@@ -37,7 +37,7 @@
 
 .folga{ background:transparent; border-style:dashed; }
 .folga .dM{ font-style:italic; }
-.alerta{ border-color:var(--coral); background:#FFF3EC; }
+.alerta{ border-color:var(--coral); background:var(--aviso-bg); }
 
 .tag{
   display:inline-block; font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
@@ -53,10 +53,10 @@
 }
 
 .assinOk, .assinPend, .assinAlerta { border-radius:14px; padding:15px 16px; margin:14px 0; }
-.assinOk { background:#EAF7EE; display:flex; gap:12px; align-items:center; }
-.assinEstrela { color:#0FA968; font-size:22px; }
+.assinOk { background:var(--ok-bg); display:flex; gap:12px; align-items:center; }
+.assinEstrela { color:var(--ok-text); font-size:22px; }
 .assinPend { background:var(--peach, #FFE2D1); }
-.assinAlerta { background:#FFF6E8; }
+.assinAlerta { background:var(--aviso-bg); }
 .assinTit { font-weight:800; font-size:15px; color:var(--ink, #10403F); }
 .assinSub { font-size:12.5px; color:var(--ash, #5C4F49); margin-top:3px; line-height:1.45; }
 .assinBtn { margin-top:11px; width:100%; background:var(--coral, #FF6B4A); color:#fff; border:none; border-radius:999px; padding:12px; font:inherit; font-weight:800; font-size:14px; cursor:pointer; }

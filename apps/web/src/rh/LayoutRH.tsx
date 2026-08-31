@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { BannerCobranca } from './BannerCobranca';
 import { useAuth } from '../lib/auth';
+import { BotaoTema } from '../components/BotaoTema';
 import css from './LayoutRH.module.css';
 
 const GRUPOS: { titulo: string; itens: { to: string; rotulo: string; fim?: boolean; soAdmin?: boolean }[] }[] = [
@@ -131,6 +132,7 @@ export function LayoutRH() {
         </nav>
         <div className={css.foot}>
           <div className={css.who}>{NOME_PERFIL[sessao?.perfil ?? ''] ?? 'Usuário'}</div>
+          <BotaoTema />
           <button className={css.sair} onClick={() => { sair(); navegar('/login', { replace: true }); }}>sair →</button>
         </div>
       </aside>

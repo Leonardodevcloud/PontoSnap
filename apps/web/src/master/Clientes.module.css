@@ -51,4 +51,4 @@
 .eSenha{ font-family:var(--ff-mono); font-size:18px; font-weight:700; color:var(--coral-dark); letter-spacing:.06em; margin-top:3px; }
 @media (max-width: 560px){ .caminhos{ grid-template-columns:1fr; } }
 
-.okMsg{ background:#EAF7EE; color:#0FA968; border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; margin-bottom:14px; line-height:1.5; }
+.okMsg{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; margin-bottom:14px; line-height:1.5; }

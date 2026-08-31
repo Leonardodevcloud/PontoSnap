@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { Flash } from '../components/Flash';
+import { BotaoTema } from '../components/BotaoTema';
 import { PromptInstalar } from '../components/PromptInstalar';
 import { NotificacaoPrompt } from './NotificacaoPrompt';
 import css from './LayoutColaborador.module.css';
@@ -59,6 +60,9 @@ export function LayoutColaborador() {
                 )}
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/trocar-senha'); }}>Trocar minha senha</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/notificacoes'); }}>Notificações</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px' }}>
+                  <BotaoTema /> <span style={{ fontSize: 13, color: 'var(--ash)' }}>Tema</span>
+                </div>
                 <button role="menuitem" className={css.sair} onClick={() => { sair(); navegar('/login', { replace: true }); }}>
                   Sair
                 </button>
