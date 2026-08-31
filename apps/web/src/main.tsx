@@ -7,11 +7,12 @@ import './styles/global.css';
 
 // ── Registrar SW com auto-reload ao detectar atualização ──
 if ('serviceWorker' in navigator) {
+  // Registrar o SW de push separado (o workbox SW é registrado pelo vite-plugin-pwa)
+  navigator.serviceWorker.register('/sw-push.js').catch(() => {});
+
   navigator.serviceWorker.ready.then((reg) => {
-    // Checa por atualização a cada 60s (o browser checa a cada 24h por padrão)
     setInterval(() => reg.update(), 60_000);
   });
-  // Se o SW novo assumiu o controle (skipWaiting + clientsClaim), recarrega a página
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
