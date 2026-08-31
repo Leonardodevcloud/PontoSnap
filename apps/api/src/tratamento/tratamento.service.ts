@@ -262,10 +262,13 @@ export class TratamentoService {
             .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]
         : undefined;
       const dur = hor?.durJornadaMin ?? 0;
-      // Quantas batidas o dia prevê (2 por par). O rótulo (entrada / saída
-      // descanso / retorno / saída) sai daqui — sem isso, uma batida extra
-      // faz o rótulo da saída escorregar.
-      const esperadas = (hor?.pares?.length ?? 0) * 2;
+      // CLT Art. 71: jornada ≤ 6h não tem intervalo obrigatório.
+      // Resolve quantos pares o dia realmente tem baseado na jornada efetiva.
+      const dowEsp = new Date(`${dataStr}T12:00:00${fuso.slice(0, 3)}:${fuso.slice(3)}`).getDay();
+      const jornadaDiaEsp = hor?.jornadaPorDia?.[String(dowEsp)] ?? dur;
+      const paresEfetivos = jornadaDiaEsp > 0 && jornadaDiaEsp <= 360 && (hor?.pares?.length ?? 0) > 1
+        ? 1 : (hor?.pares?.length ?? 0);
+      const esperadas = paresEfetivos * 2;
 
       const local = t?.latitude && t?.longitude
         ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
@@ -621,6 +624,8 @@ export class TratamentoService {
         /** Batidas previstas pelo horário contratual (2 por par). */
         esperadas: (horario?.pares?.length ?? 0) * 2,
         horarioPares: horario?.pares ?? [],
+        horarioDurMin: horario?.durJornadaMin ?? 0,
+        jornadaPorDia: horario?.jornadaPorDia ?? null,
       };
     });
   }

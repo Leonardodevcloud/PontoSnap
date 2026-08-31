@@ -139,7 +139,13 @@ export class MarcacaoService {
           .where(eq(pontoHorarioContratual.id, e.horarioContratualId)).limit(1))[0];
         if (h) {
           const dia = diaDaSemanaLocal(dataStr ?? new Date().toISOString().slice(0, 10), fuso);
-          if (h.diasSemana.includes(dia)) esperadas = h.pares.length * 2;
+          if (h.diasSemana.includes(dia)) {
+            // CLT Art. 71: jornada ≤ 6h = sem intervalo = 1 par (entrada+saída)
+            const jornadaDia = h.jornadaPorDia?.[String(dia)] ?? h.durJornadaMin;
+            const nPares = jornadaDia > 0 && jornadaDia <= 360 && h.pares.length > 1
+              ? 1 : h.pares.length;
+            esperadas = nPares * 2;
+          }
         }
       }
 

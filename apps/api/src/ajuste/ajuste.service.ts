@@ -206,8 +206,16 @@ export class AjusteService {
             .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0]
         : undefined;
       const pares = horario?.pares ?? [];
+
+      // CLT Art. 71: jornada ≤ 6h não tem intervalo obrigatório.
+      // Se o dia tem jornada reduzida (ex.: sábado 4h), mostra só 1 par.
+      const dow = new Date(`${data}T12:00:00-0300`).getDay(); // 0=dom, 6=sáb
+      const jornadaDia = horario?.jornadaPorDia?.[String(dow)] ?? horario?.durJornadaMin ?? 0;
+      const paresEfetivos = jornadaDia > 0 && jornadaDia <= 360 && pares.length > 1
+        ? [pares[0]!] // ≤ 6h: sem intervalo, só entrada + saída
+        : pares;
       const rep = (await tx.select({ id: pontoRep.id }).from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
-      if (!rep) return { batidas: [], pares, esperadas: pares.length * 2 };
+      if (!rep) return { batidas: [], pares: paresEfetivos, esperadas: paresEfetivos.length * 2 };
       const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
       const originais = await tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao, nsr: pontoMarcacao.nsr })
         .from(pontoMarcacao)
@@ -223,7 +231,7 @@ export class AjusteService {
         ...originais.filter((m) => !aj.desconsideradas.has(m.id)),
         ...aj.inclusoes.map((i) => ({ id: i.id, dtMarcacao: i.dtMarcacao, nsr: null as number | null })),
       ].sort((a, b) => a.dtMarcacao.getTime() - b.dtMarcacao.getTime());
-      return { batidas, pares, esperadas: pares.length * 2 };
+      return { batidas, pares: paresEfetivos, esperadas: paresEfetivos.length * 2 };
     });
   }
 }
