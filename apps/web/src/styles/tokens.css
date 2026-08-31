@@ -1,8 +1,23 @@
 :root{
   --coral:#FF6B4A; --coral-dark:#E5502F; --ink:#10403F; --lime:#CBF54D;
   --cream:#FFF8EE; --peach:#FFE2D1; --ash:#5C4F49; --white:#FFFFFF;
+  --ink-rgb:16,64,63;
   --r-lg:28px; --r-md:16px; --r-pill:100px;
   --ff-display:'Fredoka', sans-serif;
   --ff-body:'Nunito Sans', sans-serif;
   --ff-mono:'JetBrains Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cream: #161615;
+    --ink: #EDE8E1;
+    --white: #222221;
+    --ash: #9A9590;
+    --peach: #3D2A22;
+    --coral: #FF7F63;
+    --coral-dark: #FF6B4A;
+    --ink-rgb:237,232,225;
+    /* --lime fica igual: #CBF54D já funciona bem em fundo escuro */
+  }
 }

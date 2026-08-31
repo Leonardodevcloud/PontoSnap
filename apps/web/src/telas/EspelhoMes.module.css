@@ -3,7 +3,7 @@
 
 .nav{
   display:flex; align-items:center; justify-content:space-between; gap:6px;
-  background:var(--white); border:1.5px solid rgba(16,64,63,.1);
+  background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1);
   border-radius:var(--r-pill); padding:5px 6px; margin-bottom:14px;
 }
 .nav button{
@@ -24,7 +24,7 @@
 
 .dia{
   width:100%; display:grid; grid-template-columns:36px 1fr auto; gap:10px; align-items:center; text-align:left;
-  background:var(--white); border:1.5px solid rgba(16,64,63,.1); border-radius:11px;
+  background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1); border-radius:11px;
   padding:10px 12px; margin-bottom:6px; cursor:pointer; font:inherit; color:var(--ink);
 }
 .dia:hover{ border-color:var(--coral); }
@@ -61,13 +61,13 @@
 .assinSub { font-size:12.5px; color:var(--ash, #5C4F49); margin-top:3px; line-height:1.45; }
 .assinBtn { margin-top:11px; width:100%; background:var(--coral, #FF6B4A); color:#fff; border:none; border-radius:999px; padding:12px; font:inherit; font-weight:800; font-size:14px; cursor:pointer; }
 
-.modalFundo { position:fixed; inset:0; background:rgba(16,64,63,.45); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
-.modalCaixa { background:#fff; border-radius:20px 20px 0 0; padding:22px 20px calc(22px + env(safe-area-inset-bottom)); width:100%; max-width:460px; }
+.modalFundo { position:fixed; inset:0; background:rgba(var(--ink-rgb),.45); display:flex; align-items:flex-end; justify-content:center; z-index:50; }
+.modalCaixa { background:var(--white); border-radius:20px 20px 0 0; padding:22px 20px calc(22px + env(safe-area-inset-bottom)); width:100%; max-width:460px; }
 .modalTit { font-family:var(--ff-display, inherit); font-weight:700; font-size:19px; color:var(--ink, #10403F); }
 .modalTxt { font-size:13px; color:var(--ash, #5C4F49); margin:6px 0 16px; line-height:1.5; }
-.modalPin { width:100%; text-align:center; letter-spacing:.4em; font-size:22px; padding:14px; border:1.5px solid rgba(16,64,63,.15); border-radius:12px; background:var(--cream, #FFF8EE); }
+.modalPin { width:100%; text-align:center; letter-spacing:.4em; font-size:22px; padding:14px; border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:12px; background:var(--cream, #FFF8EE); }
 .modalErro { color:var(--coral-d, #E4502F); font-size:13px; margin:8px 0 0; text-align:center; }
 .modalAcoes { display:flex; gap:10px; margin-top:16px; }
-.modalCancelar { flex:1; background:transparent; border:1.5px solid rgba(16,64,63,.15); border-radius:999px; padding:13px; font:inherit; font-weight:800; color:var(--ink, #10403F); cursor:pointer; }
+.modalCancelar { flex:1; background:transparent; border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:999px; padding:13px; font:inherit; font-weight:800; color:var(--ink, #10403F); cursor:pointer; }
 .modalConfirmar { flex:2; background:var(--coral, #FF6B4A); color:#fff; border:none; border-radius:999px; padding:13px; font:inherit; font-weight:800; cursor:pointer; }
 .modalConfirmar:disabled { opacity:.6; }

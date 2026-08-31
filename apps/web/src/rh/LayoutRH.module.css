@@ -38,7 +38,7 @@
 .selSeta{ flex:0 0 auto; font-size:9px; opacity:.6; }
 .selFundo{ position:fixed; inset:0; z-index:40; }
 /* Mais largo que a sidebar (236px) de propósito: nome e CNPJ inteiros, sem corte. */
-.selDd{ position:absolute; top:calc(100% + 6px); left:0; right:auto; width:max-content; min-width:100%; max-width:330px; background:var(--white); border:1px solid rgba(16,64,63,.12); border-radius:14px; box-shadow:0 12px 30px rgba(16,64,63,.18); padding:6px; z-index:41; }
+.selDd{ position:absolute; top:calc(100% + 6px); left:0; right:auto; width:max-content; min-width:100%; max-width:330px; background:var(--white); border:1px solid rgba(var(--ink-rgb),.12); border-radius:14px; box-shadow:0 12px 30px rgba(var(--ink-rgb),.18); padding:6px; z-index:41; }
 .selDdLb{ font-family:var(--ff-mono); font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); padding:6px 10px 4px; }
 .selItem{ width:100%; display:flex; align-items:flex-start; gap:9px; padding:9px 10px; border-radius:10px; border:none; background:none; cursor:pointer; font:inherit; text-align:left; }
 .selItem:hover:not(:disabled){ background:var(--cream); }

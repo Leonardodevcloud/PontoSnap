@@ -4,13 +4,13 @@
 .sub strong{ color:var(--ink); }
 
 .bloco{
-  background:var(--white); border:1px solid rgba(16,64,63,.1);
+  background:var(--white); border:1px solid rgba(var(--ink-rgb),.1);
   border-radius:var(--r-md); padding:22px;
 }
 .coords{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 
 .aqui{
-  width:100%; margin-top:4px; background:transparent; border:1.5px dashed rgba(16,64,63,.28);
+  width:100%; margin-top:4px; background:transparent; border:1.5px dashed rgba(var(--ink-rgb),.28);
   border-radius:var(--r-pill); padding:11px; font:inherit; font-size:14px; font-weight:800;
   color:var(--ink); cursor:pointer;
 }
@@ -63,7 +63,7 @@
 .cobertura{
   width:132px; height:132px; flex-shrink:0; border-radius:var(--r-md);
   background:radial-gradient(circle at 50% 46%, rgba(255,107,74,.12), rgba(255,107,74,0) 62%), var(--cream);
-  border:1px solid rgba(16,64,63,.08); display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(var(--ink-rgb),.08); display:flex; align-items:center; justify-content:center;
 }
 /* Mapa grande em destaque no topo do card (modo ver) */
 .mapaDestaque{ margin-bottom:18px; }

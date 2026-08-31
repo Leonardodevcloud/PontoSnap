@@ -46,7 +46,7 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  border: 1px solid rgba(16,64,63,.06);
+  border: 1px solid rgba(var(--ink-rgb),.06);
 }
 .rowIco {
   flex: none; width: 34px; height: 34px;
@@ -70,7 +70,7 @@
 .extra select {
   font-family: var(--ff-body);
   font-size: 12px;
-  border: 1px solid rgba(16,64,63,.15);
+  border: 1px solid rgba(var(--ink-rgb),.15);
   border-radius: 8px;
   padding: 4px 8px;
   background: var(--cream);
@@ -82,7 +82,7 @@
 .toggle input { display: none; }
 .track {
   width: 44px; height: 26px; border-radius: 13px;
-  background: rgba(16,64,63,.12);
+  background: rgba(var(--ink-rgb),.12);
   display: block;
   transition: background .2s;
   position: relative;

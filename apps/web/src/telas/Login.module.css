@@ -77,13 +77,13 @@
 .ajuda{ margin-top:14px; font-size:13px; color:var(--ash); text-align:center; }
 
 .quiosque{
-  margin-top:22px; border-top:1px solid rgba(16,64,63,.1); padding-top:20px;
+  margin-top:22px; border-top:1px solid rgba(var(--ink-rgb),.1); padding-top:20px;
   display:flex; align-items:center; justify-content:space-between; gap:12px;
 }
 .quiosque p{ font-size:13.5px; color:var(--ash); line-height:1.45; }
 .quiosque button{
   flex:none; font-family:var(--ff-body); font-size:13px; font-weight:800; color:var(--ink);
-  background:transparent; border:1.5px solid rgba(16,64,63,.2); border-radius:var(--r-pill);
+  background:transparent; border:1.5px solid rgba(var(--ink-rgb),.2); border-radius:var(--r-pill);
   padding:9px 16px; cursor:pointer;
 }
 .quiosque button:hover{ background:var(--white); }

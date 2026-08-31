@@ -3,7 +3,7 @@
 .sub{ color:var(--ash); font-size:14.5px; margin:6px 0 20px; line-height:1.55; }
 
 .bloco{
-  background:var(--white); border:1px solid rgba(16,64,63,.1);
+  background:var(--white); border:1px solid rgba(var(--ink-rgb),.1);
   border-radius:var(--r-md); padding:20px; margin-bottom:16px;
 }
 .blocoH{
@@ -13,7 +13,7 @@
 
 .opcoes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:9px; margin-bottom:14px; }
 .opcao{
-  text-align:left; background:var(--cream); border:1.5px solid rgba(16,64,63,.1);
+  text-align:left; background:var(--cream); border:1.5px solid rgba(var(--ink-rgb),.1);
   border-radius:12px; padding:12px 13px; cursor:pointer; font:inherit; color:var(--ink);
 }
 .opcao b{ display:block; font-size:14px; margin-bottom:3px; }
@@ -26,7 +26,7 @@
 
 .linha{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; }
 .select, .mes{
-  background:var(--cream); border:1.5px solid rgba(16,64,63,.1); border-radius:11px;
+  background:var(--cream); border:1.5px solid rgba(var(--ink-rgb),.1); border-radius:11px;
   padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); outline:none;
 }
 .select{ flex:1; min-width:180px; }
@@ -48,7 +48,7 @@
 
 .ext{
   display:grid; grid-template-columns:90px 1fr auto; gap:12px; align-items:center;
-  padding:9px 0; border-top:1px solid rgba(16,64,63,.08); font-size:13.5px;
+  padding:9px 0; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13.5px;
 }
 .extD{ font-family:var(--ff-mono); font-size:11.5px; color:var(--ash); }
 .extE{ font-weight:600; }
@@ -80,7 +80,7 @@
 .muted b{ color:var(--ink); }
 .mono{ font-family:var(--ff-mono); font-weight:500; }
 .btnEditar{
-  margin-left:auto; background:transparent; border:1.5px solid rgba(16,64,63,.15);
+  margin-left:auto; background:transparent; border:1.5px solid rgba(var(--ink-rgb),.15);
   color:var(--ink); font:inherit; font-weight:800; font-size:13.5px;
   padding:9px 18px; border-radius:var(--r-pill); cursor:pointer;
 }
@@ -101,10 +101,10 @@
 .result b{ color:var(--ink); }
 
 /* ---------- histórico ---------- */
-.hist{ border:1px solid rgba(16,64,63,.1); border-radius:12px; overflow:hidden; }
+.hist{ border:1px solid rgba(var(--ink-rgb),.1); border-radius:12px; overflow:hidden; }
 .hrow{
   display:grid; grid-template-columns:1.2fr .9fr 1fr 1fr 40px; align-items:center; gap:12px;
-  padding:12px 16px; border-top:1px solid rgba(16,64,63,.07); font-size:13.5px; cursor:pointer;
+  padding:12px 16px; border-top:1px solid rgba(var(--ink-rgb),.07); font-size:13.5px; cursor:pointer;
 }
 .hrow:first-child{ border-top:none; }
 .hhead{ background:#fbf4e8; cursor:default; }
@@ -120,10 +120,10 @@
 .detV{ font-family:var(--ff-mono); font-size:13px; }
 
 /* ---- Folga compensatória ---- */
-.folga{ background:var(--cream); border:1px solid rgba(16,64,63,.1); border-radius:14px; padding:14px 16px; margin-top:12px; }
+.folga{ background:var(--cream); border:1px solid rgba(var(--ink-rgb),.1); border-radius:14px; padding:14px 16px; margin-top:12px; }
 .folgaTit{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); margin-bottom:10px; }
 .folgaLinha{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; }
-.folgaH{ flex:1; min-width:150px; background:var(--white); border:1.5px solid rgba(16,64,63,.1); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); outline:none; }
+.folgaH{ flex:1; min-width:150px; background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); outline:none; }
 .folgaH:focus{ border-color:var(--coral); }
 
 /* Cobertura: quem segue o padrão e quem tem regra própria */
@@ -132,25 +132,25 @@
 .cobLink{ font-size:12.5px; font-weight:800; color:var(--coral-dark); text-decoration:underline; margin-top:3px; }
 
 .abSinal { display: flex; gap: 8px; margin: 10px 0; }
-.abSinalBtn { flex: 1; padding: 9px 10px; border: 1.5px solid #e5ded8; border-radius: 10px; background: #fff; font: inherit; font-weight: 700; font-size: 12.5px; color: var(--ash, #5C4F49); cursor: pointer; }
+.abSinalBtn { flex: 1; padding: 9px 10px; border: 1.5px solid #e5ded8; border-radius: 10px; background:var(--white); font: inherit; font-weight: 700; font-size: 12.5px; color: var(--ash, #5C4F49); cursor: pointer; }
 .abSinalOn { background: #EAF7EE; border-color: #0FA968; color: #0a7f4e; }
 .abSinalOnNeg { background: #FFF3F0; border-color: var(--coral-d, #E4502F); color: #c23a1c; }
 .abOk { font-size: 13px; color: #0a7f4e; background: #EAF7EE; border-radius: 10px; padding: 10px 12px; margin: 10px 0 0; }
 
 /* Abas da tela de banco de horas */
-.abas { display: inline-flex; gap: 4px; background: #fff; border-radius: 999px; padding: 4px; margin-bottom: 18px; border: 1px solid rgba(16,64,63,.08); }
+.abas { display: inline-flex; gap: 4px; background:var(--white); border-radius: 999px; padding: 4px; margin-bottom: 18px; border: 1px solid rgba(var(--ink-rgb),.08); }
 .aba { border: none; background: transparent; font: inherit; font-size: 13.5px; font-weight: 800; color: var(--ash, #5C4F49); padding: 9px 20px; border-radius: 999px; cursor: pointer; transition: background .12s, color .12s; }
 .aba:hover { color: var(--ink, #10403F); }
 .abaOn { background: var(--ink, #10403F); color: #fff; }
 .abaOn:hover { color: #fff; }
 
 /* Accordion de ações do funcionário */
-.acaoBox { border: 1px solid rgba(16,64,63,.1); border-radius: 12px; margin-top: 10px; overflow: hidden; }
-.acaoH { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: #fff; border: none; font: inherit; font-weight: 800; font-size: 13.5px; color: var(--ink, #10403F); cursor: pointer; }
+.acaoBox { border: 1px solid rgba(var(--ink-rgb),.1); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+.acaoH { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background:var(--white); border: none; font: inherit; font-weight: 800; font-size: 13.5px; color: var(--ink, #10403F); cursor: pointer; }
 .acaoH:hover { background: var(--cream, #FFF8EE); }
 .acaoHOn { background: var(--cream, #FFF8EE); }
 .acaoChev { color: var(--ash, #5C4F49); font-size: 12px; }
-.acaoBody { padding: 14px; border-top: 1px solid rgba(16,64,63,.08); }
+.acaoBody { padding: 14px; border-top: 1px solid rgba(var(--ink-rgb),.08); }
 
 .extRemover { margin-left: 8px; border: none; background: transparent; color: var(--ash, #5C4F49); font-size: 15px; font-weight: 700; cursor: pointer; padding: 0 4px; border-radius: 6px; line-height: 1; }
 .extRemover:hover:not(:disabled) { background: #FFF3F0; color: var(--coral-d, #E4502F); }

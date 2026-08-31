@@ -2,7 +2,7 @@
 .head h2{ font-size:28px; }
 .head p{ margin:6px 0 0; color:var(--ash); font-size:14.5px; }
 .grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
-.card{ background:var(--white); border:1px solid rgba(16,64,63,.1); border-radius:var(--r-md); padding:24px 26px; }
+.card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:24px 26px; }
 .kicker{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
 .card h3{ font-size:22px; margin:8px 0; }
 .card p{ color:var(--ash); font-size:14px; margin:0 0 16px; }

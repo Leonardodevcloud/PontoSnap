@@ -17,8 +17,8 @@
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  box-shadow: 0 12px 32px -8px rgba(16,64,63,.18);
-  border: 1px solid rgba(16,64,63,.06);
+  box-shadow: 0 12px 32px -8px rgba(var(--ink-rgb),.18);
+  border: 1px solid rgba(var(--ink-rgb),.06);
   max-width: 440px;
   margin: 0 auto;
 }

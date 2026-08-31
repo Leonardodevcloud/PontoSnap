@@ -41,7 +41,7 @@
 
 /* pareamento */
 .tokenInput{
-  width:min(440px, 90%); background:var(--white); border:2px solid rgba(16,64,63,.12);
+  width:min(440px, 90%); background:var(--white); border:2px solid rgba(var(--ink-rgb),.12);
   border-radius:var(--r-md); padding:14px 18px; font-family:var(--ff-mono); font-size:15px;
   color:var(--ink); outline:none; margin:22px 0 16px; text-align:center;
 }

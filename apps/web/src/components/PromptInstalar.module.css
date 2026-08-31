@@ -1,9 +1,9 @@
 .banner{
   max-width:440px; margin:0 auto 4px; width:100%;
   display:flex; align-items:center; gap:10px;
-  background:var(--white); border:1px solid rgba(16,64,63,.1);
+  background:var(--white); border:1px solid rgba(var(--ink-rgb),.1);
   border-radius:var(--r-md); padding:11px 12px 11px 14px;
-  box-shadow:0 10px 26px -18px rgba(16,64,63,.35);
+  box-shadow:0 10px 26px -18px rgba(var(--ink-rgb),.35);
 }
 .txt{ flex:1; font-size:13px; line-height:1.4; color:var(--ink); }
 .txt b{ font-weight:800; color:var(--coral-dark); }

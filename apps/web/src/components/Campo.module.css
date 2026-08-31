@@ -1,5 +1,5 @@
 .campo{
-  display:block; background:var(--white); border:2px solid rgba(16,64,63,.1);
+  display:block; background:var(--white); border:2px solid rgba(var(--ink-rgb),.1);
   border-radius:var(--r-md); padding:11px 16px; margin-bottom:12px;
   transition:border-color .15s ease;
 }
