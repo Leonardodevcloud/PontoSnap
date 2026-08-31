@@ -25,7 +25,7 @@
 .tabela{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:hidden; }
 .linha{ display:grid; grid-template-columns:1.6fr .7fr .7fr .8fr .7fr .7fr .9fr .9fr; align-items:center; gap:8px; padding:11px 16px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13px; }
 .linha:first-child{ border-top:none; }
-.thead{ background:#fbf4e8; }
+.thead{ background:var(--thead-bg); }
 .thead span{ font-family:var(--ff-mono); font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--ash); }
 .nome{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .semSal{ font-style:normal; font-family:var(--ff-mono); font-size:10px; color:var(--ash); }

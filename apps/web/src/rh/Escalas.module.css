@@ -24,7 +24,7 @@
 .regime{ padding:10px 12px; border:1px solid rgba(var(--ink-rgb),.18); border-radius:10px; font:inherit; background:var(--white); max-width:180px; }
 .regimeTxt{ font-family:var(--ff-mono); font-size:12px; color:var(--ash); }
 .row:first-child{ border-top:none; }
-.thead{ background:#fbf4e8; }
+.thead{ background:var(--thead-bg); }
 .thead span{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); }
 .vazio{ padding:20px 18px; color:var(--ash); font-size:14px; }
 .cod{ font-weight:700; font-size:14.5px; }
@@ -41,14 +41,14 @@
 .btnEditar { background: var(--peach, #FFE2D1); color: var(--coral-d, #E4502F); }
 .btnExcluir { background:var(--white); color: var(--ash, #5C4F49); border: 1px solid rgba(var(--ink-rgb),.12); }
 .btnEditar:hover { filter: brightness(0.97); }
-.btnExcluir:hover { background: #faf7f4; }
+.btnExcluir:hover { background: var(--field-bg); }
 
 .porDiaBox { margin: 16px 0; }
 .porDiaToggle { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--ash, #5C4F49); line-height: 1.4; cursor: pointer; background: var(--peach); border-radius: 10px; padding: 11px 12px; }
 .porDiaToggle input { margin-top: 2px; flex-shrink: 0; }
 .porDiaToggle strong { color: var(--ink, #10403F); }
-.porDiaGrade { margin-top: 12px; border: 1px solid #f0ebe4; border-radius: 12px; overflow: hidden; }
-.porDiaLinha { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f4f1ec; }
+.porDiaGrade { margin-top: 12px; border: 1px solid var(--row-border); border-radius: 12px; overflow: hidden; }
+.porDiaLinha { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--row-border); }
 .porDiaLinha:last-of-type { border-bottom: none; }
 .porDiaNome { font-weight: 700; width: 44px; color: var(--ink, #10403F); font-size: 14px; }
 .porDiaInput { padding: 6px 10px; border: 1.5px solid rgba(var(--ink-rgb),.15); border-radius: 8px; font-size: 14px; }

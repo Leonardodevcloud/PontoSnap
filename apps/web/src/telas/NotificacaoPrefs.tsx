@@ -36,22 +36,31 @@ export function NotificacaoPrefs() {
 
   useEffect(() => { void carregar(); }, [carregar]);
 
+  const [erroMsg, setErroMsg] = useState<string | null>(null);
+
   async function salvar(campo: keyof Prefs, valor: boolean | number) {
+    const anterior = { ...prefs };
     const novo = { ...prefs, [campo]: valor };
     setPrefs(novo);
     setSalvando(true);
-    try { await api.put('/notificacao/preferencias', { [campo]: valor }); }
-    catch { setPrefs(prefs); } // rollback
-    finally { setSalvando(false); }
+    setErroMsg(null);
+    try {
+      await api.put('/notificacao/preferencias', { [campo]: valor });
+    } catch (e) {
+      setPrefs(anterior); // rollback
+      setErroMsg((e as Error).message || 'Erro ao salvar preferência.');
+    } finally { setSalvando(false); }
   }
 
   async function togglePush() {
+    setErroMsg(null);
     if (pushAtivo) {
       await desativarNotificacoes();
       setPushAtivo(false);
     } else {
-      const ok = await ativarNotificacoes();
-      setPushAtivo(ok);
+      const res = await ativarNotificacoes();
+      setPushAtivo(res.ok);
+      if (!res.ok) setErroMsg(res.erro ?? 'Não foi possível ativar.');
     }
   }
 
@@ -70,6 +79,9 @@ export function NotificacaoPrefs() {
       )}
       {negado && (
         <div className={css.aviso}>Notificações bloqueadas nas configurações do navegador. Ative nas permissões do site.</div>
+      )}
+      {erroMsg && (
+        <div className={css.aviso}>{erroMsg}</div>
       )}
 
       {/* Master toggle */}

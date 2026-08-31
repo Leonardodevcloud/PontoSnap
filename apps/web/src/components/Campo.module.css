@@ -13,4 +13,4 @@
   font-family:var(--ff-body); font-size:16px; font-weight:600; color:var(--ink);
   margin-top:2px; padding:0;
 }
-.input::placeholder{ color:#a8b3b0; font-weight:400; }
+.input::placeholder{ color:var(--placeholder); font-weight:400; }

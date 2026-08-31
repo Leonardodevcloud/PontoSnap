@@ -107,12 +107,12 @@
   padding:12px 16px; border-top:1px solid rgba(var(--ink-rgb),.07); font-size:13.5px; cursor:pointer;
 }
 .hrow:first-child{ border-top:none; }
-.hhead{ background:#fbf4e8; cursor:default; }
+.hhead{ background:var(--thead-bg); cursor:default; }
 .hhead span{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); }
 .hcomp{ font-family:var(--ff-display); font-weight:600; font-size:15px; text-transform:capitalize; }
 .pos{ color:var(--verde); font-weight:700; }
 .chev{ color:var(--ash); text-align:center; }
-.detalhe{ background:#fdfaf3; padding:4px 16px 14px; }
+.detalhe{ background:var(--field-bg); padding:4px 16px 14px; }
 .detTit{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); margin:12px 0 8px; }
 .det{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:4px 24px; max-width:560px; }
 .detItem{ display:flex; justify-content:space-between; gap:16px; }

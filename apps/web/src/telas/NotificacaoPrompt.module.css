@@ -47,3 +47,5 @@
   font-size: 13px; color: var(--ash);
   text-decoration: underline; cursor: pointer;
 }
+
+.erro { font-size: 12px; color: var(--erro-text); background: var(--erro-bg); padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; }

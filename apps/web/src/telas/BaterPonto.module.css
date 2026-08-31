@@ -88,7 +88,7 @@
 }
 .geoPt{ width:7px; height:7px; border-radius:50%; flex:none; }
 .geoDentro{ background:rgba(203,245,77,.4); color:var(--ink); }
-.geoDentro .geoPt{ background:#3E9E3E; }
+.geoDentro .geoPt{ background:var(--ok-text); }
 .geoFora{ background:var(--peach); color:var(--coral-dark); }
 .geoFora .geoPt{ background:var(--coral); }
 .geoSem{ background:rgba(var(--ink-rgb),.07); color:var(--ash); }

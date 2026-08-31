@@ -11,7 +11,7 @@
 .table{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:visible; }
 .row{ display:grid; grid-template-columns:1.6fr 1.1fr 1fr 1.1fr .8fr .9fr 40px; align-items:center; gap:14px; padding:14px 20px; border-top:1px solid rgba(var(--ink-rgb),.1); }
 .row:first-child{ border-top:none; }
-.thead{ background:#fbf4e8; }
+.thead{ background:var(--thead-bg); }
 .thead span{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ash); }
 .vazio{ padding:22px 20px; color:var(--ash); font-size:14.5px; }
 .rz{ font-weight:700; font-size:15px; }

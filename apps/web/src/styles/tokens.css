@@ -11,6 +11,17 @@
   --erro-bg:#FFE9E3; --erro-text:var(--coral-dark);
   --aviso-bg:#FFF6E8; --aviso-border:rgba(255,107,74,.25);
   --info-bg:#EAF4F1;
+  /* Superfícies de tabela e campos */
+  --thead-bg:#fbf4e8; --row-border:#f4f1ec; --field-bg:#faf7f4;
+  --placeholder:#a8b3b0;
+  /* Tags de categoria */
+  --tag-green-bg:#e6f3e6; --tag-green-text:#3a7a3a;
+  --tag-blue-bg:#e9edff; --tag-blue-text:#3a4a9a;
+  --tag-yellow-bg:#FCEFCE; --tag-yellow-text:#B7791F;
+  --tag-purple-bg:#F3E5F5;
+  --tag-orange-bg:#FFF3E0;
+  --tag-ltblue-bg:#E3F2FD;
+  --tag-ltgreen-bg:#E8F5E9;
 }
 
 :root[data-theme="dark"] {
@@ -26,4 +37,13 @@
   --erro-bg:#2E1A1A; --erro-text:#FF7F63;
   --aviso-bg:#2E2518; --aviso-border:rgba(255,127,99,.2);
   --info-bg:#1A2625;
+  --thead-bg:rgba(255,255,255,.04); --row-border:rgba(255,255,255,.06); --field-bg:rgba(255,255,255,.04);
+  --placeholder:#6B6560;
+  --tag-green-bg:#1A2E1F; --tag-green-text:#4ADE80;
+  --tag-blue-bg:#1A1F2E; --tag-blue-text:#7B9BFF;
+  --tag-yellow-bg:#2E2518; --tag-yellow-text:#F5C842;
+  --tag-purple-bg:#251A2E;
+  --tag-orange-bg:#2E2015;
+  --tag-ltblue-bg:#1A2530;
+  --tag-ltgreen-bg:#1A2E1F;
 }

@@ -4,13 +4,10 @@ import css from './NotificacaoPrompt.module.css';
 
 const CHAVE_DESCARTOU = 'pontosnap.push.descartou';
 
-/**
- * Prompt de ativação de notificações. Aparece uma vez pra quem nunca ativou
- * e nunca descartou. Mostra no rodapé, não como modal bloqueante.
- */
 export function NotificacaoPrompt() {
   const [visivel, setVisivel] = useState(false);
   const [ativando, setAtivando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pushSuportado()) return;
@@ -26,9 +23,14 @@ export function NotificacaoPrompt() {
 
   async function ativar() {
     setAtivando(true);
-    const ok = await ativarNotificacoes();
+    setErro(null);
+    const res = await ativarNotificacoes();
     setAtivando(false);
-    if (ok) setVisivel(false);
+    if (res.ok) {
+      setVisivel(false);
+    } else {
+      setErro(res.erro ?? 'Não foi possível ativar.');
+    }
   }
 
   function descartar() {
@@ -45,6 +47,7 @@ export function NotificacaoPrompt() {
           <div className={css.desc}>
             A gente te avisa se você esquecer de bater o ponto, quando o RH aprovar seus ajustes, e mais. Você escolhe o que receber.
           </div>
+          {erro && <div className={css.erro}>{erro}</div>}
           <div className={css.acoes}>
             <button className={css.btn} onClick={ativar} disabled={ativando}>
               {ativando ? 'Ativando…' : 'Ativar notificações'}
