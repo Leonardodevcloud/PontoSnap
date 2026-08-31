@@ -87,6 +87,15 @@ export function PainelRH() {
         <Stat k="Marcações hoje" v={p?.marcacoesHoje ?? '—'} />
       </div>
 
+      {p?.marcacoesPorTipo && p.marcacoesPorTipo.total > 0 && (
+        <div className={css.tipoGrid}>
+          <TipoBar label="Entradas" feito={p.marcacoesPorTipo.entradas} total={p.marcacoesPorTipo.total} />
+          {p.marcacoesPorTipo.saidasAlmoco > 0 && <TipoBar label="Saída almoço" feito={p.marcacoesPorTipo.saidasAlmoco} total={p.marcacoesPorTipo.total} />}
+          {p.marcacoesPorTipo.retornos > 0 && <TipoBar label="Retorno almoço" feito={p.marcacoesPorTipo.retornos} total={p.marcacoesPorTipo.total} />}
+          <TipoBar label="Saídas" feito={p.marcacoesPorTipo.saidas} total={p.marcacoesPorTipo.total} />
+        </div>
+      )}
+
       <div className={css.painel}>
         <div className={css.bloco}>
           <h3>Presença</h3>
@@ -154,4 +163,19 @@ function fmtDataExtenso(iso: string) {
   const [a, m, d] = iso.split('-');
   const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   return `${d} de ${meses[Number(m) - 1]}. ${a}`;
+}
+
+function TipoBar({ label, feito, total }: { label: string; feito: number; total: number }) {
+  const pct = total > 0 ? Math.round((feito / total) * 100) : 0;
+  return (
+    <div className={css.tipoItem}>
+      <div className={css.tipoHead}>
+        <span className={css.tipoLabel}>{label}</span>
+        <span className={css.tipoNum}>{feito}/{total}</span>
+      </div>
+      <div className={css.tipoBarra}>
+        <div className={css.tipoFill} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
 }

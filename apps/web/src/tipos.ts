@@ -201,6 +201,13 @@ export interface PainelResp {
   listaAusentes: { nome: string; matricula: string | null }[];
   marcacoesHoje: number;
   ultimas: { nome: string; dt: string; coletor: number }[];
+  marcacoesPorTipo?: {
+    total: number;
+    entradas: number;
+    saidasAlmoco: number;
+    retornos: number;
+    saidas: number;
+  };
   pendencias: {
     atestados: number;
     ajustes?: number;

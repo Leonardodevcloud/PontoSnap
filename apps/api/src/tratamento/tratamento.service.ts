@@ -1030,6 +1030,43 @@ export class TratamentoService {
         if (minsAgora < entradaMin + GRACA_MIN) noPrazo++; // ainda dentro do horário
       }
 
+      // Detalhamento de marcações por tipo (quantos bateram cada ponto do dia)
+      const trabalhando = emps.filter((e) => {
+        if (!e.horarioContratualId) return false;
+        const h = horPorId.get(e.horarioContratualId);
+        if (!h || !h.diasSemana.includes(dowHoje)) return false;
+        if (dispensados.has(e.id)) return false;
+        if (e.dataInicioPonto && hojeISO < e.dataInicioPonto) return false;
+        return true;
+      });
+      const totalTrabalhando = trabalhando.length;
+
+      // Contar marcações por funcionário hoje
+      const marcsPorCpf = new Map<string, number>();
+      for (const m of marcsHoje) {
+        marcsPorCpf.set(m.cpf, (marcsPorCpf.get(m.cpf) ?? 0) + 1);
+      }
+
+      // Quantos têm ≥1 marcação (entrada), ≥2 (saída almoço), ≥3 (retorno), ≥4 (saída)
+      let entradas = 0, saidasAlmoco = 0, retornos = 0, saidas = 0;
+      for (const e of trabalhando) {
+        const n = marcsPorCpf.get(e.cpf) ?? 0;
+        const h = horPorId.get(e.horarioContratualId!);
+        const jornadaDia = h?.jornadaPorDia?.[String(dowHoje)] ?? h?.durJornadaMin ?? 0;
+        const nPares = jornadaDia > 0 && jornadaDia <= 360 && (h?.pares?.length ?? 0) > 1 ? 1 : (h?.pares?.length ?? 0);
+
+        if (n >= 1) entradas++;
+        if (nPares > 1) {
+          // Jornada com almoço (4 batidas)
+          if (n >= 2) saidasAlmoco++;
+          if (n >= 3) retornos++;
+          if (n >= 4) saidas++;
+        } else {
+          // Jornada sem almoço (2 batidas)
+          if (n >= 2) saidas++;
+        }
+      }
+
       return {
         data: hojeISO,
         ativos: emps.length,
@@ -1038,6 +1075,14 @@ export class TratamentoService {
         listaAusentes: ausentes,
         marcacoesHoje: marcsHoje.length,
         ultimas,
+        /** Detalhamento de marcações por tipo do dia. */
+        marcacoesPorTipo: {
+          total: totalTrabalhando,
+          entradas,
+          saidasAlmoco,
+          retornos,
+          saidas,
+        },
         pendencias: {
           atestados: pendDocs.length,
           ajustes: ajustesPend.length,
