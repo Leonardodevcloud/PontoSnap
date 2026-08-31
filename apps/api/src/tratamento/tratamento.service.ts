@@ -494,10 +494,11 @@ export class TratamentoService {
       const antesDoInicio = (data: string) => dataInicioPonto != null && data < dataInicioPonto;
 
       // Dias que ainda não aconteceram não viram falta: o funcionário ainda vai
-      // bater ponto neles. Só apuramos até ontem (o dia de hoje ainda está em
-      // curso, então também fica de fora do cálculo de falta de dia inteiro).
+      // bater ponto neles. O dia de hoje entra na apuração (pode ter batidas
+      // parciais e o funcionário precisa ver/solicitar ajuste), mas não gera
+      // falta de dia inteiro — só dias estritamente passados geram falta.
       const hojeISO = this.diaLocalISO(new Date(), fuso);
-      const naoChegou = (data: string) => data >= hojeISO;
+      const naoChegou = (data: string) => data > hojeISO;
       const foraDoPeriodoReal = (data: string) => antesDoInicio(data) || naoChegou(data);
 
       if (regime === 'r12x36') {
