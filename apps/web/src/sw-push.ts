@@ -1,8 +1,19 @@
 /// <reference lib="webworker" />
 // @ts-expect-error — workbox-precaching é injetado pelo vite-plugin-pwa em build time
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+// @ts-expect-error
+import { clientsClaim } from 'workbox-core';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: string; revision: string | null }> };
+
+// ── Forçar ativação imediata ──
+// skipWaiting: não esperar o usuário fechar todas as abas
+// clientsClaim: assumir controle de todas as abas abertas imediatamente
+self.skipWaiting();
+clientsClaim();
+
+// Limpa caches antigos de versões anteriores
+cleanupOutdatedCaches();
 
 // Workbox precache (gerado pelo vite-plugin-pwa)
 precacheAndRoute(self.__WB_MANIFEST);
