@@ -94,7 +94,7 @@ export function Funcionarios() {
               <span className={css.avatar}>{iniciais(e.nome)}</span>
               <span className={css.quem}>
                 <span className={css.nomeC}>{e.nome}</span>
-                <span className={css.metaC}>mat. {e.matricula ?? '—'} · {fmtCpf(e.cpf)} · {e.horarioContratualId ? 'horário vinculado' : 'sem horário'}</span>
+                <span className={css.metaC}>mat. {e.matricula ?? '—'} · {fmtCpf(e.cpf)} · {e.escalaCodigo ? `escala ${e.escalaCodigo}` : e.horarioContratualId ? 'horário vinculado' : 'sem horário'}</span>
               </span>
               <span className={`${css.status} ${e.ativo ? css.ativo : css.inativo}`}><span className={css.sdot} />{e.ativo ? 'Ativo' : 'Inativo'}</span>
               <span className={css.pinC}>{e.temPin ? 'PIN ✓' : 'sem PIN'}</span>

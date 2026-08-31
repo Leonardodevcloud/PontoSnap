@@ -64,6 +64,7 @@ export interface Empregado {
   temPin: boolean;
   matriculaEsocial?: string | null;
   horarioContratualId?: string | null;
+  escalaCodigo?: string | null;
   cctId?: string | null;
   perfilRegraId?: string | null;
   dataInicioPonto?: string | null;

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { empregado, pontoHorarioContratual, pontoPerfilRegra, usuario, empregadoEscalaVigencia, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { registrarEventoRep } from '../fiscal/evento-rep';
@@ -129,8 +129,21 @@ export class EmpregadoService {
   }
 
   async listar(tenantId: string) {
-    const rows = await comTenant(this.db, tenantId, (tx) => tx.select().from(empregado));
-    return rows.map((e) => this.semSegredos(e));
+    const rows = await comTenant(this.db, tenantId, async (tx) => {
+      const emps = await tx.select().from(empregado);
+      // Buscar códigos das escalas vinculadas
+      const horIds = [...new Set(emps.map((e) => e.horarioContratualId).filter((x): x is string => !!x))];
+      const horarios = horIds.length > 0
+        ? await tx.select({ id: pontoHorarioContratual.id, codigo: pontoHorarioContratual.codigo })
+            .from(pontoHorarioContratual).where(inArray(pontoHorarioContratual.id, horIds))
+        : [];
+      const mapCodigo = new Map(horarios.map((h) => [h.id, h.codigo]));
+      return emps.map((e) => ({
+        ...this.semSegredos(e),
+        escalaCodigo: e.horarioContratualId ? (mapCodigo.get(e.horarioContratualId) ?? null) : null,
+      }));
+    });
+    return rows;
   }
 
   async obter(tenantId: string, id: string) {
