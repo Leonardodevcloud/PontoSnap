@@ -280,6 +280,11 @@ export class TratamentoService {
         ? 1 : (hor?.pares?.length ?? 0);
       const esperadas = paresEfetivos * 2;
 
+      // Verificar se o dia é feriado
+      const feriadoDia = (await tx.select({ id: pontoFeriado.id }).from(pontoFeriado)
+        .where(and(eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.data, dataStr))).limit(1))[0];
+      const ehFeriadoHoje = !!feriadoDia;
+
       const local = t?.latitude && t?.longitude
         ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
         : null;
@@ -306,7 +311,19 @@ export class TratamentoService {
         }),
         // Batidas incluídas por ajuste aprovado (não existem no AFD original).
         incluidas: aj.inclusoes.map((i) => ({ dtMarcacao: i.dtMarcacao, tpMarc: i.tpMarc, motivo: i.motivo })),
-        resumo: apurarJornada(efetivas.map((m) => m.dtMarcacao), dur),
+        resumo: (() => {
+          // Feriado ou dia fora da escala: jornada esperada = 0 (sem falta/atraso).
+          const ehDomingo = dowEsp === 0;
+          const uteisDia = hor?.diasSemana ?? [1, 2, 3, 4, 5];
+          const ehDiaUtil = uteisDia.includes(dowEsp);
+          // Verificar feriado direto no banco (síncrono — já estamos dentro da tx)
+          const jornadaEfetiva = ehFeriadoHoje || ehDomingo || !ehDiaUtil ? 0 : jornadaDiaEsp;
+          return apurarJornada(efetivas.map((m) => m.dtMarcacao), jornadaEfetiva);
+        })(),
+        /** Indicadores extras pro frontend */
+        ehFeriado: ehFeriadoHoje,
+        ehDomingo: dowEsp === 0,
+        ehFolga: !(hor?.diasSemana ?? [1, 2, 3, 4, 5]).includes(dowEsp),
       };
     });
   }
