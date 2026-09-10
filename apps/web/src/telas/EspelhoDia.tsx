@@ -23,7 +23,6 @@ export function EspelhoDia() {
   const [pedindo, setPedindo] = useState(false);
   const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR'>('INCLUSAO');
   const [hora, setHora] = useState('');
-  const [tpMarc, setTpMarc] = useState<'E' | 'S'>('S');
   const [nsrAlvo, setNsrAlvo] = useState<number | null>(null);
   const [obs, setObs] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -65,7 +64,7 @@ export function EspelhoDia() {
     try {
       await api.post('/ajustes/meus', {
         tipo, data,
-        ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : { nsr: nsrAlvo }),
+        ...(tipo === 'INCLUSAO' ? { hora, tpMarc: marcs.length % 2 === 0 ? 'E' : 'S' } : { nsr: nsrAlvo }),
         observacao: obs.trim(),
       });
       setOkMsg('Pedido enviado! O RH vai analisar.');
@@ -184,13 +183,14 @@ export function EspelhoDia() {
               <div className={css.dupla}>
                 <input className={css.inpF} type="time" value={hora} onChange={(e) => setHora(e.target.value)}
                   step="60" />
-                <select className={css.inpF} value={tpMarc}
-                  onChange={(e) => setTpMarc(e.target.value as 'E' | 'S')}>
-                  <option value="E">Entrada</option>
-                  <option value="S">Saída (almoço)</option>
-                  <option value="E">Retorno (almoço)</option>
-                  <option value="S">Saída</option>
-                </select>
+                <span className={css.tipoAuto}>
+                  {(() => {
+                    // Conta batidas ativas + a nova pra determinar o rótulo
+                    const qtd = marcs.length;
+                    const labels = ['Entrada', 'Saída almoço', 'Retorno almoço', 'Saída'];
+                    return labels[qtd] ?? 'Batida';
+                  })()}
+                </span>
               </div>
             </>
           ) : (

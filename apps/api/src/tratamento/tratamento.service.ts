@@ -487,7 +487,11 @@ export class TratamentoService {
       // feriados do banco (calendário do cliente) + os passados por parâmetro
       const feriadosBanco = await tx.select({ data: pontoFeriado.data }).from(pontoFeriado).where(and(
         eq(pontoFeriado.tenantId, tenantId), gte(pontoFeriado.data, inicioStr), lte(pontoFeriado.data, fimStr)));
-      const feriadoSet = new Set<string>([...feriados, ...feriadosBanco.map((f) => f.data)]);
+      // Normaliza: date() do Drizzle pode devolver string 'YYYY-MM-DD' ou Date
+      const feriadoSet = new Set<string>([
+        ...feriados,
+        ...feriadosBanco.map((f) => typeof f.data === 'string' ? f.data.slice(0, 10) : (f.data as unknown as Date).toISOString().slice(0, 10)),
+      ]);
 
       // agrupa as batidas EFETIVAS (com ajustes aprovados) por dia local
       const porDia = new Map<string, Date[]>();
