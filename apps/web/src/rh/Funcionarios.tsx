@@ -285,15 +285,16 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
 
   return (
     <Modal titulo="Adicionar funcionário" onFechar={onFechar}>
-      <Campo rotulo="Nome completo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Maria Silva" />
-      <Campo rotulo="CPF" inputMode="numeric" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
-      <Campo rotulo="Matrícula (opcional)" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="001" />
-      <Campo rotulo="PIN do quiosque (opcional)" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="4 a 8 dígitos" />
-      <Campo rotulo="Salário mensal (opcional)" inputMode="decimal" value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2200.00" />
-      <Campo rotulo="Começa a bater ponto em (opcional)" type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-      <p className={css.aviso}>Se informado, a apuração ignora tudo antes dessa data. Use na migração de sistema ou em quem foi admitido no meio do mês.</p>
-      <Campo rotulo="E-mail para acesso ao app (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com.br" />
-      <p className={css.aviso}>Com e-mail, ele recebe login no app. Sem e-mail, bate ponto só no quiosque (matrícula + PIN).</p>
+      <div className={css.formGrid}>
+        <div className={css.spanFull}><Campo rotulo="Nome completo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Maria Silva" /></div>
+        <Campo rotulo="CPF" inputMode="numeric" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
+        <Campo rotulo="Matrícula (opcional)" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="001" />
+        <Campo rotulo="PIN do quiosque (opcional)" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="4 a 8 dígitos" />
+        <Campo rotulo="Salário mensal (opcional)" inputMode="decimal" value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2200.00" />
+        <Campo rotulo="Começa a bater ponto em (opcional)" type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+        <Campo rotulo="E-mail para acesso ao app (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com.br" />
+      </div>
+      <p className={css.aviso}>Sem e-mail → bate ponto só no quiosque (matrícula + PIN). Com data de início → a apuração ignora dias anteriores.</p>
       {erro && <p className={css.erro}>{erro}</p>}
       <Botao variante="coral" onClick={salvar} disabled={enviando || !nome || cpf.length < 11}>
         {enviando ? 'Salvando…' : 'Adicionar'}

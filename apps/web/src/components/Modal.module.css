@@ -5,7 +5,7 @@
   -webkit-overflow-scrolling:touch;
 }
 .card{
-  background:var(--cream); border-radius:var(--r-lg); padding:24px; width:100%; max-width:520px;
+  background:var(--cream); border-radius:var(--r-lg); padding:24px; width:100%; max-width:680px;
   box-shadow:0 30px 70px -20px rgba(var(--ink-rgb),.5);
   margin:auto 0;
   max-height:calc(100dvh - 40px);

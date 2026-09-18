@@ -133,3 +133,8 @@
 .regraDesc { font-size: 11.5px; color: var(--ash, #5C4F49); margin-top: 2px; }
 .regraValCustom { font-size: 13px; font-weight: 800; color: var(--coral-d, #E4502F); text-align: right; white-space: nowrap; }
 .regraValClt { font-size: 11.5px; font-weight: 700; color: var(--ash, #5C4F49); background: var(--cream, #FFF8EE); padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+
+/* Grid de 2 colunas pro formulário de cadastro */
+.formGrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+.spanFull{ grid-column:1 / -1; }
+@media (max-width:600px){ .formGrid{ grid-template-columns:1fr; } }
