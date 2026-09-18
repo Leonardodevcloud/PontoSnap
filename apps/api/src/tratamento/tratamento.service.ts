@@ -286,6 +286,7 @@ export class TratamentoService {
 
       return {
         nome: emp.nome, matricula: emp.matricula, esperadas,
+        horarioPares: hor?.pares ?? [],
         marcacoes: marcs.map((m) => {
           const pos = m.latitude != null && m.longitude != null
             ? { latitude: Number(m.latitude), longitude: Number(m.longitude) } : null;

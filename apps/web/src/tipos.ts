@@ -39,9 +39,8 @@ export interface LocalEstabelecimento {
 
 export interface MinhasMarcacoes {
   nome: string;
-  /** Quantas marcações o dia prevê pelo horário contratual. 0 = desconhecido. */
   esperadas?: number;
-  /** Local da empresa. null = sem endereço cadastrado (ex.: empresa remota). */
+  horarioPares?: Array<{ entrada: string; saida: string }>;
   local?: LocalEstabelecimento | null;
   marcacoes: Marcacao[];
 }
@@ -105,6 +104,7 @@ export interface EspelhoResp {
   matricula: string | null;
   /** Batidas previstas pelo horário contratual (2 por par). 0 = sem horário. */
   esperadas?: number;
+  horarioPares?: Array<{ entrada: string; saida: string }>;
   marcacoes: MarcacaoEspelho[];
   /** Batidas que entraram por ajuste aprovado (não têm NSR). */
   incluidas?: { dtMarcacao: string; tpMarc: string | null; motivo: string }[];

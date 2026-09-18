@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato';
+import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/formato';
 import type { MinhasMarcacoes, AjusteMeu } from '../tipos';
 import { Botao } from '../components/Botao';
 import css from './EspelhoDia.module.css';
@@ -125,7 +125,7 @@ export function EspelhoDia() {
           title={m.nsr != null ? 'Baixar comprovante' : 'Batida incluída por ajuste aprovado'}
         >
           <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
-          <span className={css.kk}>{rotuloMarcacao(i, dados?.esperadas || marcs.length)}</span>
+          <span className={css.kk}>{rotuloMarcacaoPorHora(m.dtMarcacao, dados?.horarioPares ?? [], i, dados?.esperadas || marcs.length)}</span>
           <span className={css.tt}>{fmtHora(m.dtMarcacao)}</span>
           {m.nsr != null ? <span className={css.pdf}>PDF</span> : <span className={css.tagInc}>ajuste</span>}
         </button>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { fmtDataCurta, fmtHora, hojeSP, rotuloMarcacao, rotuloProxima } from '../lib/formato';
+import { fmtDataCurta, fmtHora, hojeSP, rotuloMarcacaoPorHora, rotuloProxima } from '../lib/formato';
 import { capturarPosicao, type ResultadoGeo } from '../lib/geolocalizacao';
 import { foraDoRaio } from '@ponto/shared';
 import { enfileirar, sincronizar, contar, type BatidaPendente } from '../lib/filaOffline';
@@ -286,7 +286,7 @@ export function BaterPonto() {
         {marcs.map((m, i) => (
           <div key={m.nsr} className={css.row}>
             <span>
-              <span className={css.k}>{rotuloMarcacao(i, esperadas || marcs.length)}</span>
+              <span className={css.k}>{rotuloMarcacaoPorHora(m.dtMarcacao, dados?.horarioPares ?? [], i, esperadas || marcs.length)}</span>
               {m.observacao && <span className={css.rowObs}>{m.observacao}</span>}
             </span>
             <span className={css.t}>{fmtHora(m.dtMarcacao)}</span>

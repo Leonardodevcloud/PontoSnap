@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacao } from '../lib/formato';
+import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/formato';
 import type { Empregado, EspelhoResp } from '../tipos';
 import css from './Espelhos.module.css';
 
@@ -63,7 +63,7 @@ export function Espelhos() {
               if (todas.length === 0) return <div className={css.vazio}>Nenhuma batida nesse dia.</div>;
               return todas.map((t, _i) => {
                 const idx = ativas.indexOf(t);
-                const rotulo = idx >= 0 ? rotuloMarcacao(idx, esp.esperadas || ativas.length) : 'Desconsiderada';
+                const rotulo = idx >= 0 ? rotuloMarcacaoPorHora(String(t.dt), esp.horarioPares ?? [], idx, esp.esperadas || ativas.length) : 'Desconsiderada';
                 return (
                   <div key={`b${_i}`} className={`${css.row} ${t.desc ? css.riscado : ''}`}>
                     <span className={`${css.dot} ${t.desc ? css.desc : idx % 2 === 0 ? css.e : css.s}`} />

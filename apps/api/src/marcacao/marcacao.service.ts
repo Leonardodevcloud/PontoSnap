@@ -134,13 +134,14 @@ export class MarcacaoService {
       // Quantas marcações o dia prevê (2 por par do horário contratual).
       // 0 = desconhecido: o app rotula pelo que já foi batido, sem inventar descanso.
       let esperadas = 0;
+      let horarioPares: Array<{ entrada: string; saida: string }> = [];
       if (e.horarioContratualId) {
         const h = (await tx.select().from(pontoHorarioContratual)
           .where(eq(pontoHorarioContratual.id, e.horarioContratualId)).limit(1))[0];
         if (h) {
+          horarioPares = h.pares;
           const dia = diaDaSemanaLocal(dataStr ?? new Date().toISOString().slice(0, 10), fuso);
           if (h.diasSemana.includes(dia)) {
-            // CLT Art. 71: jornada ≤ 6h = sem intervalo = 1 par (entrada+saída)
             const jornadaDia = h.jornadaPorDia?.[String(dia)] ?? h.durJornadaMin;
             const nPares = jornadaDia > 0 && jornadaDia <= 360 && h.pares.length > 1
               ? 1 : h.pares.length;
@@ -157,6 +158,7 @@ export class MarcacaoService {
       return {
         nome: e.nome,
         esperadas,
+        horarioPares,
         local,
         marcacoes: efetivas.map((m) => ({
           nsr: m.nsr != null ? Number(m.nsr) : null,

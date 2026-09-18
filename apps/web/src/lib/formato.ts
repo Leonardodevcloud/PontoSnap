@@ -43,6 +43,55 @@ export function minutosParaHhMm(min: number): string {
  * Saída/Retorno do descanso. Sábado com 2 marcações vira Entrada/Saída,
  * sem inventar descanso que não existiu.
  */
+/**
+ * Rótulo inteligente: identifica o tipo pela HORA da batida comparando
+ * com os pares da escala (ex.: [{entrada:'08:00',saida:'12:00'},{entrada:'13:00',saida:'17:00'}]).
+ * Encontra o slot mais próximo em minutos e usa o rótulo dele.
+ * Fallback pra posição se não tiver pares.
+ */
+export function rotuloMarcacaoPorHora(
+  horaBatida: string | Date,
+  pares: Array<{ entrada: string; saida: string }>,
+  indiceFallback: number,
+  totalFallback: number,
+): string {
+  if (!pares || pares.length === 0) return rotuloMarcacao(indiceFallback, totalFallback);
+
+  // Converte a batida pra minutos desde meia-noite
+  const dt = typeof horaBatida === 'string' ? new Date(horaBatida) : horaBatida;
+  
+  // Ajuste pro fuso -03 (se o dt é UTC, soma -3h = subtrai 180min)
+  // Na prática, o dt já vem com fuso no ISO, então getHours() local funciona
+  const batMinLocal = dt.getHours() * 60 + dt.getMinutes();
+
+  // Monta lista de slots esperados com rótulo
+  const slots: Array<{ min: number; rotulo: string }> = [];
+  for (let i = 0; i < pares.length; i++) {
+    const p = pares[i]!;
+    const [eh, em] = p.entrada.split(':').map(Number);
+    const [sh, sm] = p.saida.split(':').map(Number);
+    if (i === 0) {
+      slots.push({ min: (eh ?? 0) * 60 + (em ?? 0), rotulo: 'Entrada' });
+    } else {
+      slots.push({ min: (eh ?? 0) * 60 + (em ?? 0), rotulo: 'Volta do almoço' });
+    }
+    if (i === pares.length - 1) {
+      slots.push({ min: (sh ?? 0) * 60 + (sm ?? 0), rotulo: 'Saída' });
+    } else {
+      slots.push({ min: (sh ?? 0) * 60 + (sm ?? 0), rotulo: 'Saída para o almoço' });
+    }
+  }
+
+  // Encontra o slot mais próximo
+  let melhor = slots[0]!;
+  let menorDiff = Math.abs(batMinLocal - melhor.min);
+  for (const s of slots) {
+    const diff = Math.abs(batMinLocal - s.min);
+    if (diff < menorDiff) { menorDiff = diff; melhor = s; }
+  }
+  return melhor.rotulo;
+}
+
 export function rotuloMarcacao(i: number, total: number): string {
   if (i === 0) return 'Entrada';
   // Batida além do previsto (ex.: voltou pra hora extra): alterna simples.
