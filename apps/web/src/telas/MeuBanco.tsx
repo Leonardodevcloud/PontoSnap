@@ -51,6 +51,13 @@ export function MeuBanco() {
 
   const s = dados.saldo;
   const acordo = dados.tipoAcordo === 'COLETIVO' ? 'Acordo coletivo' : 'Acordo individual';
+  const temEstimativa = (dados as any).saldoEstimadoMesMin !== undefined;
+  const saldoEstimado = (dados as any).saldoEstimadoMesMin as number ?? 0;
+  const compEstimada = (dados as any).competenciaEstimada as string ?? '';
+
+  // Se o banco oficial tá zerado mas tem estimativa, mostra a estimativa
+  const saldoExibido = s.saldoMin === 0 && temEstimativa ? saldoEstimado : s.saldoMin;
+  const ehEstimativa = s.saldoMin === 0 && temEstimativa && saldoEstimado !== 0;
 
   return (
     <div className="appshell">
@@ -58,8 +65,9 @@ export function MeuBanco() {
       <div className={css.s}>{acordo} · compensar em até {dados.prazoMeses} meses</div>
 
       <div className={css.resumo}>
-        <div className={css.rL}>Saldo acumulado</div>
-        <div className={`${css.rV} ${s.saldoMin < 0 ? css.rVneg : ''}`}>{comSinal(s.saldoMin)}</div>
+        <div className={css.rL}>Saldo {ehEstimativa ? `estimado (${compEstimada})` : 'acumulado'}</div>
+        <div className={`${css.rV} ${saldoExibido < 0 ? css.rVneg : ''}`}>{comSinal(saldoExibido)}</div>
+        {ehEstimativa && <div className={css.estAviso}>Estimativa em tempo real — o saldo oficial entra quando o RH fechar o mês.</div>}
         <div className={css.mini}>
           <div>
             <div className={css.mL}>Creditado</div>

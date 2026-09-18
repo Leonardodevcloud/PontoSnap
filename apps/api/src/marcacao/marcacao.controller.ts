@@ -78,7 +78,25 @@ export class MarcacaoController {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
     const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-    return this.banco.saldo(u.tenantId, empregadoId, hoje);
+    const resp = await this.banco.saldo(u.tenantId, empregadoId, hoje);
+
+    // Saldo estimado em tempo real: soma dos saldos diários da competência corrente
+    // mesmo sem o RH ter fechado o mês. Dá visibilidade pro funcionário.
+    if (resp.ativo) {
+      try {
+        const comp = hoje.slice(0, 7);
+        const [a2, m2] = comp.split('-').map(Number);
+        const ultimo = new Date(Date.UTC(a2!, m2!, 0)).getUTCDate();
+        const inicio = `${comp}-01`;
+        const fim = `${comp}-${String(ultimo).padStart(2, '0')}`;
+        const feriados = await this.banco['tratamento'].listarFeriados(u.tenantId, inicio, fim);
+        const ap = await this.banco['tratamento'].apurarPeriodoCLT(
+          u.tenantId, empregadoId, inicio, fim, feriados.map((f: { data: string }) => f.data));
+        const saldoMesMin = ap.resultado.dias.reduce((s: number, d: { saldoMin: number }) => s + d.saldoMin, 0);
+        return { ...resp, saldoEstimadoMesMin: saldoMesMin, competenciaEstimada: comp };
+      } catch { /* ignora erro, retorna sem estimativa */ }
+    }
+    return resp;
   }
 
   /**
