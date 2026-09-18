@@ -92,17 +92,30 @@ export function BaterPonto() {
   const proxima = rotuloProxima(marcs.length, esperadas);
   const excedente = esperadas > 0 && marcs.length >= esperadas;
 
+  // Seletor de tipo: aparece após o long-press, antes de enviar
+  const [escolhendoTipo, setEscolhendoTipo] = useState(false);
+  const [dadosPendentes, setDadosPendentes] = useState<{ obs?: string; qtdAntes: number } | null>(null);
+
   const posicao = geo?.estado === 'ok' ? geo.posicao : null;
   const { fora } = foraDoRaio(dados?.local ?? null, posicao);
   const semLocalizacao = geo != null && geo.estado !== 'ok';
-  // Só pedimos contexto quando ele ajuda o RH. Empresa sem endereço nunca vê isso.
   const pedirObs = (fora || (semLocalizacao && !!dados?.local)) && !!dados?.local;
 
-  async function bater() {
+  // Fase 1: long-press completa → abre seletor de tipo
+  function iniciarBatida() {
     setErro(null);
-    setBatendo(true);
     const qtdAntes = marcs.length;
     const obs = pedirObs ? [motivo, detalhe.trim()].filter(Boolean).join(' — ') : undefined;
+    setDadosPendentes({ obs, qtdAntes });
+    setEscolhendoTipo(true);
+  }
+
+  // Fase 2: funcionário escolhe o tipo → envia
+  async function confirmarTipo(tipoEscolhido: string) {
+    setEscolhendoTipo(false);
+    if (!dadosPendentes) return;
+    setBatendo(true);
+    const { obs } = dadosPendentes;
     const agora = new Date();
     try {
       // Sem rede: guarda a batida com a hora do aparelho e segue a vida.
@@ -115,7 +128,7 @@ export function BaterPonto() {
         observacao: obs, dtAparelho: agora.toISOString(), declaradoOffline: false,
       });
       setDetalhe('');
-      setConfirmada({ batida, tipo: rotuloProxima(qtdAntes, esperadas), obs });
+      setConfirmada({ batida, tipo: tipoEscolhido, obs });
       void carregar();
     } catch {
       // Rede falhou (offline ou caiu no meio): enfileira.
@@ -128,7 +141,7 @@ export function BaterPonto() {
       setNaFila(await contar());
       setConfirmada({
         batida: { nsr: 0, dtMarcacao: agora.toISOString(), coletor: 2 } as unknown as Batida,
-        tipo: rotuloProxima(qtdAntes, esperadas), obs, offline: true,
+        tipo: tipoEscolhido, obs, offline: true,
       });
     } finally {
       setBatendo(false);
@@ -140,7 +153,7 @@ export function BaterPonto() {
   function passo() {
     const p = Math.min(1, (performance.now() - inicio.current) / DUR_SEGURAR);
     setProgresso(p);
-    if (p >= 1) { raf.current = null; estourarNoBotao(); void bater(); return; }
+    if (p >= 1) { raf.current = null; estourarNoBotao(); iniciarBatida(); return; }
     raf.current = requestAnimationFrame(passo);
   }
   function aoSegurar(e: React.PointerEvent) {
@@ -178,6 +191,27 @@ export function BaterPonto() {
         <div className={css.espaco} />
         <Botao variante="lime" onClick={() => navegar('/espelho')}>Ver espelho do dia</Botao>
         <Botao variante="ghost" onClick={() => setConfirmada(null)}>Voltar</Botao>
+      </div>
+    );
+  }
+
+  // ----- Seletor de tipo de marcação -----
+  if (escolhendoTipo) {
+    const tipos = esperadas <= 2
+      ? [['Entrada', 'E'], ['Saída', 'S']]
+      : [['Entrada', 'E'], ['Saída (almoço)', 'S'], ['Retorno (almoço)', 'E'], ['Saída', 'S']];
+    return (
+      <div className={`appshell ${css.tipoTela}`}>
+        <div className={css.tipoTit}>Qual marcação?</div>
+        <div className={css.tipoSub}>Selecione o tipo antes de registrar.</div>
+        <div className={css.tipoGrid}>
+          {tipos.map(([label]) => (
+            <button key={label} className={css.tipoBtn} onClick={() => void confirmarTipo(label!)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <button className={css.tipoCancelar} onClick={() => { setEscolhendoTipo(false); setProgresso(0); }}>Cancelar</button>
       </div>
     );
   }

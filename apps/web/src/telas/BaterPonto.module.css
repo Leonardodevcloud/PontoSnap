@@ -130,3 +130,20 @@
 @media (prefers-reduced-motion:reduce){
   .segurando, .check, .bateu, .bateuSub{ animation:none; }
 }
+
+/* Seletor de tipo de marcação */
+.tipoTela{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; padding:24px; }
+.tipoTit{ font-family:var(--ff-display); font-weight:600; font-size:24px; color:var(--ink); margin-bottom:6px; }
+.tipoSub{ font-size:14px; color:var(--ash); margin-bottom:24px; }
+.tipoGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; max-width:340px; }
+.tipoBtn{
+  background:var(--white); border:2px solid rgba(var(--ink-rgb),.12); border-radius:16px;
+  padding:18px 12px; font-family:var(--ff-body); font-weight:700; font-size:15px;
+  color:var(--ink); cursor:pointer; transition:border-color .15s, background .15s;
+  text-align:center;
+}
+.tipoBtn:active{ background:var(--peach); border-color:var(--coral); }
+.tipoCancelar{
+  margin-top:20px; background:none; border:none; color:var(--ash);
+  font-size:14px; text-decoration:underline; cursor:pointer;
+}
