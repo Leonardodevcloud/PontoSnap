@@ -280,11 +280,6 @@ export class TratamentoService {
         ? 1 : (hor?.pares?.length ?? 0);
       const esperadas = paresEfetivos * 2;
 
-      // Verificar se o dia é feriado
-      const feriadoDia = (await tx.select({ id: pontoFeriado.id }).from(pontoFeriado)
-        .where(and(eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.data, dataStr))).limit(1))[0];
-      const ehFeriadoHoje = !!feriadoDia;
-
       const local = t?.latitude && t?.longitude
         ? { latitude: Number(t.latitude), longitude: Number(t.longitude), raioMetros: t.raioMetros }
         : null;
@@ -311,19 +306,7 @@ export class TratamentoService {
         }),
         // Batidas incluídas por ajuste aprovado (não existem no AFD original).
         incluidas: aj.inclusoes.map((i) => ({ dtMarcacao: i.dtMarcacao, tpMarc: i.tpMarc, motivo: i.motivo })),
-        resumo: (() => {
-          // Feriado ou dia fora da escala: jornada esperada = 0 (sem falta/atraso).
-          const ehDomingo = dowEsp === 0;
-          const uteisDia = hor?.diasSemana ?? [1, 2, 3, 4, 5];
-          const ehDiaUtil = uteisDia.includes(dowEsp);
-          // Verificar feriado direto no banco (síncrono — já estamos dentro da tx)
-          const jornadaEfetiva = ehFeriadoHoje || ehDomingo || !ehDiaUtil ? 0 : jornadaDiaEsp;
-          return apurarJornada(efetivas.map((m) => m.dtMarcacao), jornadaEfetiva);
-        })(),
-        /** Indicadores extras pro frontend */
-        ehFeriado: ehFeriadoHoje,
-        ehDomingo: dowEsp === 0,
-        ehFolga: !(hor?.diasSemana ?? [1, 2, 3, 4, 5]).includes(dowEsp),
+        resumo: apurarJornada(efetivas.map((m) => m.dtMarcacao), dur),
       };
     });
   }
@@ -504,11 +487,7 @@ export class TratamentoService {
       // feriados do banco (calendário do cliente) + os passados por parâmetro
       const feriadosBanco = await tx.select({ data: pontoFeriado.data }).from(pontoFeriado).where(and(
         eq(pontoFeriado.tenantId, tenantId), gte(pontoFeriado.data, inicioStr), lte(pontoFeriado.data, fimStr)));
-      // Normaliza: date() do Drizzle pode devolver string 'YYYY-MM-DD' ou Date
-      const feriadoSet = new Set<string>([
-        ...feriados,
-        ...feriadosBanco.map((f) => typeof f.data === 'string' ? f.data.slice(0, 10) : (f.data as unknown as Date).toISOString().slice(0, 10)),
-      ]);
+      const feriadoSet = new Set<string>([...feriados, ...feriadosBanco.map((f) => f.data)]);
 
       // agrupa as batidas EFETIVAS (com ajustes aprovados) por dia local
       const porDia = new Map<string, Date[]>();

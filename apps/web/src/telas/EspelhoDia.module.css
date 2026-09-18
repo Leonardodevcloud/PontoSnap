@@ -68,4 +68,3 @@
 .pedNo{ background:var(--erro-bg); border-color:rgba(255,107,74,.3); }
 .tagInc{ font-family:var(--ff-mono); font-size:10px; color:var(--ink); background:var(--lime); padding:2px 7px; border-radius:6px; }
 .pedObs{ display:block; font-size:12px; color:var(--ash); margin-top:4px; font-style:italic; }
-.tipoAuto{ font-size:13px; color:var(--ash); font-style:italic; white-space:nowrap; }
