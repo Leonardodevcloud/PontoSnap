@@ -85,3 +85,12 @@
 .slotClicavel{ cursor:pointer; }
 .slotClicavel:hover{ background:var(--peach); }
 .slotSelecionado{ border-color:var(--coral) !important; background:var(--aviso-bg) !important; }
+
+/* Filtros de status */
+.filtros{ display:flex; gap:6px; margin:10px 0 14px; flex-wrap:wrap; }
+.filtroBtn{
+  background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.12); border-radius:var(--r-pill);
+  padding:6px 14px; font-family:var(--ff-body); font-size:12.5px; font-weight:600;
+  color:var(--ash); cursor:pointer; transition:all .15s;
+}
+.filtroOn{ background:var(--ink); color:var(--cream); border-color:var(--ink); }

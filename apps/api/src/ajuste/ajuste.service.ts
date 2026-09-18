@@ -268,4 +268,35 @@ export class AjusteService {
       return { ok: true };
     });
   }
+
+  /** Todos os ajustes do tenant, com filtro de status opcional. */
+  async listarTodos(tenantId: string, status?: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const filtros = [eq(pontoAjuste.tenantId, tenantId)];
+      if (status && ['EM_ANALISE', 'APROVADO', 'RECUSADO', 'REVOGADO'].includes(status)) {
+        filtros.push(eq(pontoAjuste.status, status as any));
+      }
+      const linhas = await tx.select({
+        id: pontoAjuste.id, tipo: pontoAjuste.tipo, data: pontoAjuste.data,
+        dtMarcacao: pontoAjuste.dtMarcacao, tpMarc: pontoAjuste.tpMarc, marcacaoId: pontoAjuste.marcacaoId,
+        observacao: pontoAjuste.observacao, criadoEm: pontoAjuste.criadoEm,
+        empregadoId: pontoAjuste.empregadoId, nome: empregado.nome,
+        status: pontoAjuste.status, decididoPor: pontoAjuste.decididoPor,
+        motivoDecisao: pontoAjuste.motivoDecisao, decididoEm: pontoAjuste.decididoEm,
+        origem: pontoAjuste.origem,
+      }).from(pontoAjuste)
+        .innerJoin(empregado, eq(empregado.id, pontoAjuste.empregadoId))
+        .where(and(...filtros))
+        .orderBy(desc(pontoAjuste.criadoEm))
+        .limit(200);
+
+      const comHora = await Promise.all(linhas.map(async (l) => {
+        if (l.tipo !== 'DESCONSIDERAR' || !l.marcacaoId) return { ...l, horaAlvo: null as Date | null };
+        const m = (await tx.select({ dt: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
+          .where(eq(pontoMarcacao.id, l.marcacaoId)).limit(1))[0];
+        return { ...l, horaAlvo: m?.dt ?? null };
+      }));
+      return comHora;
+    });
+  }
 }

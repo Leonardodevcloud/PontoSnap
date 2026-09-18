@@ -41,6 +41,13 @@ export class AjusteController {
     return this.ajustes.pendentes(this.tenant(u));
   }
 
+  /** RH: todos os ajustes com filtro de status opcional. */
+  @Get('todos')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  todos(@UsuarioAtual() u: PayloadAcesso, @Query('status') status?: string) {
+    return this.ajustes.listarTodos(this.tenant(u), status || undefined);
+  }
+
   /** RH: histórico de um funcionário. */
   @Get('empregado/:id')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)

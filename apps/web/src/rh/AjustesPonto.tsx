@@ -15,6 +15,10 @@ interface Pedido {
   observacao: string;
   criadoEm: string;
   empregadoId: string;
+  status?: string;
+  decididoPor?: string | null;
+  motivoDecisao?: string | null;
+  origem?: string;
   nome: string;
 }
 interface Batida { id: string; dtMarcacao: string; nsr: number | null }
@@ -53,10 +57,12 @@ export default function AjustesPonto() {
   const [params, setParams] = useSearchParams();
   const [lancando, setLancando] = useState(false);
 
+  const [filtroStatus, setFiltroStatus] = useState('EM_ANALISE');
+
   const carregar = useCallback(async () => {
     setErro(null);
     try {
-      const pend = await api.get<Pedido[]>('/ajustes/pendentes');
+      const pend = await api.get<Pedido[]>(`/ajustes/todos?status=${filtroStatus}`);
       setLista(pend);
       const mapa: Record<string, Batida[]> = {};
       await Promise.all(pend.map(async (p) => {
@@ -65,7 +71,7 @@ export default function AjustesPonto() {
       }));
       setBatidas(mapa);
     } catch (e) { setErro((e as Error).message); }
-  }, []);
+  }, [filtroStatus]);
   useEffect(() => { void carregar(); }, [carregar]);
   // Veio da gaveta da Apuração (com funcionário e dia): já abre o lançamento.
   useEffect(() => {
@@ -98,6 +104,14 @@ export default function AjustesPonto() {
         <div>
           <h1 className={css.h}>Ajustes de ponto</h1>
           <p className={css.sub}>Pedidos dos funcionários. Nada muda na apuração até você decidir — e a batida original nunca é apagada.</p>
+          <div className={css.filtros}>
+            {(['EM_ANALISE', 'APROVADO', 'RECUSADO', 'REVOGADO'] as const).map((s) => (
+              <button key={s} className={`${css.filtroBtn} ${filtroStatus === s ? css.filtroOn : ''}`}
+                onClick={() => setFiltroStatus(s)}>
+                {s === 'EM_ANALISE' ? 'Pendentes' : s === 'APROVADO' ? 'Aprovados' : s === 'RECUSADO' ? 'Recusados' : 'Revogados'}
+              </button>
+            ))}
+          </div>
         </div>
         <button className={css.novoBtn} onClick={() => setLancando(true)}>+ Lançar ajuste</button>
       </div>
