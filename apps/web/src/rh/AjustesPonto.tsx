@@ -290,11 +290,18 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
     if ((tipo === 'DESCONSIDERAR' || tipo === 'CORRECAO') && !alvo) { setErro('Escolha qual batida.'); return; }
     setErro(null); setEnviando(true);
     try {
-      await api.post('/ajustes/lancar', {
-        empregadoId, tipo, data,
-        ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : tipo === 'CORRECAO' ? { hora, tpMarc, marcacaoId: alvo } : { marcacaoId: alvo }),
-        observacao: obs.trim(),
-      });
+      // Se é DESCONSIDERAR e a batida selecionada é de ajuste (nsr == null),
+      // revoga o ajuste em vez de criar DESCONSIDERAR (não existe em ponto_marcacao)
+      const batidaSelecionada = alvo ? batidas.find((b) => b.id === alvo) : null;
+      if (tipo === 'DESCONSIDERAR' && batidaSelecionada && batidaSelecionada.nsr == null) {
+        await api.del(`/ajustes/${alvo}`);
+      } else {
+        await api.post('/ajustes/lancar', {
+          empregadoId, tipo, data,
+          ...(tipo === 'INCLUSAO' ? { hora, tpMarc } : tipo === 'CORRECAO' ? { hora, tpMarc, marcacaoId: alvo } : { marcacaoId: alvo }),
+          observacao: obs.trim(),
+        });
+      }
       onPronto();
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
   }
@@ -370,8 +377,8 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
                 {batidas.map((b) => (
                   <button key={b.id} className={`${css.batB} ${alvo === b.id ? css.batOn : ''}`}
                     onClick={() => setAlvo(b.id)} 
-                    title={b.nsr == null ? 'Batida de ajuste' : ''}>
-                    {hhmm(b.dtMarcacao)}
+                    title={b.nsr == null ? 'Batida de ajuste — será revogada' : ''}>
+                    {hhmm(b.dtMarcacao)}{b.nsr == null ? ' ✎' : ''}
                   </button>
                 ))}
               </div>
