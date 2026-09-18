@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, Delete } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { AjusteService } from './ajuste.service';
 import { SolicitarAjusteDto, DecidirAjusteDto } from './dto/ajuste.dto';
@@ -52,6 +52,11 @@ export class AjusteController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   decidir(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DecidirAjusteDto) {
     return this.ajustes.decidir(this.tenant(u), id, dto.aprovar, dto.motivo ?? null, u.email ?? 'RH');
+  }
+
+  @Delete(':id')
+  revogar(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.ajustes.revogar(this.tenant(u), id, u.email ?? 'RH');
   }
 
   /** RH lança o ajuste direto (já aprovado) — ex.: tirar batida a mais. */

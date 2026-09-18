@@ -234,4 +234,38 @@ export class AjusteService {
       return { batidas, pares: paresEfetivos, esperadas: paresEfetivos.length * 2 };
     });
   }
+
+  /**
+   * Revoga um ajuste aprovado (MASTER/RH desfaz a aprovação).
+   * Muda o status pra REVOGADO — o ajuste sai da apuração.
+   */
+  async revogar(tenantId: string, id: string, quem: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const aj = (await tx.select().from(pontoAjuste)
+        .where(and(eq(pontoAjuste.id, id), eq(pontoAjuste.tenantId, tenantId))).limit(1))[0];
+      if (!aj) throw new NotFoundException('Ajuste não encontrado');
+      if (aj.status !== 'APROVADO') throw new BadRequestException('Só é possível revogar ajustes aprovados.');
+
+      // Revoga este
+      await tx.update(pontoAjuste).set({
+        status: 'REVOGADO', motivoDecisao: `Revogado por ${quem}`, decididoEm: new Date(),
+      }).where(eq(pontoAjuste.id, id));
+
+      // Se era parte de uma CORRECAO (par com mesma observação "Correção:..."),
+      // revoga o par inteiro
+      if (aj.observacao?.startsWith('Correção:')) {
+        await tx.update(pontoAjuste).set({
+          status: 'REVOGADO', motivoDecisao: `Revogado por ${quem} (par)`, decididoEm: new Date(),
+        }).where(and(
+          eq(pontoAjuste.tenantId, tenantId),
+          eq(pontoAjuste.empregadoId, aj.empregadoId),
+          eq(pontoAjuste.data, aj.data),
+          eq(pontoAjuste.status, 'APROVADO'),
+          eq(pontoAjuste.observacao, aj.observacao!),
+        ));
+      }
+
+      return { ok: true };
+    });
+  }
 }

@@ -4,7 +4,7 @@ import { empregado } from './empregado';
 import { pontoMarcacao } from './marcacao';
 
 export type TipoAjuste = 'INCLUSAO' | 'DESCONSIDERAR';
-export type StatusAjuste = 'EM_ANALISE' | 'APROVADO' | 'RECUSADO';
+export type StatusAjuste = 'EM_ANALISE' | 'APROVADO' | 'RECUSADO' | 'REVOGADO';
 
 /**
  * Pedido de ajuste de ponto. Nunca altera a marcação original — quando

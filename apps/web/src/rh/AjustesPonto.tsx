@@ -355,8 +355,8 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
               <div className={css.batidas}>
                 {batidas.map((b) => (
                   <button key={b.id} className={`${css.batB} ${alvo === b.id ? css.batOn : ''}`}
-                    onClick={() => setAlvo(b.id)} disabled={b.nsr == null}
-                    title={b.nsr == null ? 'Batida incluída por ajuste — remova pelo pedido de origem' : ''}>
+                    onClick={() => setAlvo(b.id)} 
+                    title={b.nsr == null ? 'Batida de ajuste' : ''}>
                     {hhmm(b.dtMarcacao)}
                   </button>
                 ))}

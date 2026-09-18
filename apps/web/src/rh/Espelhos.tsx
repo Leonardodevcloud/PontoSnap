@@ -55,9 +55,9 @@ export function Espelhos() {
             <div className={css.tHead}>Batidas de {esp.nome.split(' ')[0]}</div>
             {(() => {
               // Unifica originais + incluídas por ajuste, ordenadas por hora
-              const todas: Array<{ dt: string | Date; nsr?: number; offline?: boolean; fora?: boolean; obs?: string | null; defSeg?: number | null; lat?: number | null; desc?: boolean; origem: 'O' | 'A' }> = [];
+              const todas: Array<{ dt: string | Date; nsr?: number; offline?: boolean; fora?: boolean; obs?: string | null; defSeg?: number | null; lat?: number | null; desc?: boolean; origem: 'O' | 'A'; ajusteId?: string }> = [];
               for (const m of esp.marcacoes) todas.push({ dt: m.dtMarcacao, nsr: m.nsr, offline: m.offline, fora: m.fora, obs: m.observacao, defSeg: m.defasagemSeg, lat: m.latitude, desc: m.desconsiderada, origem: 'O' });
-              for (const inc of (esp.incluidas ?? [])) todas.push({ dt: inc.dtMarcacao, origem: 'A' });
+              for (const inc of (esp.incluidas ?? [])) todas.push({ dt: inc.dtMarcacao, origem: 'A', ajusteId: (inc as any).ajusteId });
               todas.sort((a, b) => new Date(a.dt).getTime() - new Date(b.dt).getTime());
               const ativas = todas.filter((t) => !t.desc);
               if (todas.length === 0) return <div className={css.vazio}>Nenhuma batida nesse dia.</div>;
@@ -69,7 +69,14 @@ export function Espelhos() {
                     <span className={`${css.dot} ${t.desc ? css.desc : idx % 2 === 0 ? css.e : css.s}`} />
                     <span>
                       <span className={css.k}>{rotulo}</span>
-                      {t.origem === 'A' && <span className={css.ajTag}>Ajuste</span>}
+                      {t.origem === 'A' && <>
+                      <span className={css.ajTag}>Ajuste</span>
+                      <button className={css.revogarBtn} onClick={async (ev) => {
+                        ev.stopPropagation();
+                        if (!confirm('Revogar este ajuste? A batida será removida da apuração.')) return;
+                        try { await api.del(`/ajustes/${(t as any).ajusteId}`); window.location.reload(); } catch (e) { alert((e as Error).message); }
+                      }}>revogar</button>
+                    </>}
                       {t.desc && <span className={css.descTag}>Desconsiderada</span>}
                     </span>
                     <span className={css.t}>{fmtHora(String(t.dt))}</span>

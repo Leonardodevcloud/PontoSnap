@@ -62,3 +62,4 @@
 .riscado{ opacity:.5; }
 .riscado .t{ text-decoration:line-through; }
 .desc{ background:var(--ash) !important; }
+.revogarBtn{ background:none; border:none; color:var(--coral); font-size:10px; font-family:var(--ff-mono); cursor:pointer; text-decoration:underline; margin-left:4px; padding:0; }

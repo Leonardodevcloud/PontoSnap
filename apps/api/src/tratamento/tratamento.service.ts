@@ -306,7 +306,7 @@ export class TratamentoService {
           };
         }),
         // Batidas incluídas por ajuste aprovado (não existem no AFD original).
-        incluidas: aj.inclusoes.map((i) => ({ dtMarcacao: i.dtMarcacao, tpMarc: i.tpMarc, motivo: i.motivo })),
+        incluidas: aj.inclusoes.map((i) => ({ ajusteId: i.id, dtMarcacao: i.dtMarcacao, tpMarc: i.tpMarc, motivo: i.motivo })),
         resumo: apurarJornada(efetivas.map((m) => m.dtMarcacao), dur),
       };
     });
