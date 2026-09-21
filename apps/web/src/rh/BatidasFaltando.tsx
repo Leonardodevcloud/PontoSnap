@@ -42,10 +42,10 @@ export function BatidasFaltando() {
 
   function abrirAjuste(grupo: Grupo, dia: DiaFalt) {
     // Pré-preenche com o horário do slot que tá faltando
-    const faltando = dia.pares.flatMap((p, i) => {
+    const faltando = (dia.pares ?? []).flatMap((p, i) => {
       const slots = [
         { h: p.entrada, label: i === 0 ? 'Entrada' : 'Retorno (almoço)' },
-        { h: p.saida, label: i === dia.pares.length - 1 ? 'Saída' : 'Saída (almoço)' },
+        { h: p.saida, label: i === (dia.pares ?? []).length - 1 ? 'Saída' : 'Saída (almoço)' },
       ];
       return slots;
     });
@@ -137,13 +137,13 @@ export function BatidasFaltando() {
             <p className={css.modalNome}>{ajuste.grupo.nome}</p>
             <p className={css.modalSub}>
               {dow(ajuste.dia.data)}, {fmtDia(ajuste.dia.data)}
-              {ajuste.dia.pares.length > 0 && ` · ${ajuste.dia.pares.map((p) => `${p.entrada}–${p.saida}`).join(' / ')}`}
+              {(ajuste.dia.pares ?? []).length > 0 && ` · ${(ajuste.dia.pares ?? []).map((p) => `${p.entrada}–${p.saida}`).join(' / ')}`}
             </p>
 
             <div className={css.slots}>
-              {ajuste.dia.pares.flatMap((p, pi) => [
+              {(ajuste.dia.pares ?? []).flatMap((p, pi) => [
                 { h: p.entrada, lb: pi === 0 ? 'Entrada' : 'Retorno' },
-                { h: p.saida, lb: pi === ajuste.dia.pares.length - 1 ? 'Saída' : 'Almoço' },
+                { h: p.saida, lb: pi === (ajuste.dia.pares ?? []).length - 1 ? 'Saída' : 'Almoço' },
               ]).map((s, i) => {
                 const bat = ajuste.dia.batidas[i];
                 return (
