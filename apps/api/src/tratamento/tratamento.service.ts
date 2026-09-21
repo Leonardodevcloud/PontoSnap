@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException, Optional } from '@nestjs/common';
 import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
@@ -25,7 +25,7 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 export class TratamentoService {
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly push?: PushService,
+    @Optional() private readonly push?: PushService,
   ) {}
 
   /** Fuso vigente do tenant (offset "-0300"). Rege limites de dia e apuração. */

@@ -38,6 +38,25 @@ export class NotificacaoController {
     return { key: this.push.vapidPublicKey };
   }
 
+  /** Teste de push: envia pro próprio usuário logado. */
+  @Get('teste')
+  async teste(@UsuarioAtual() u: PayloadAcesso) {
+    const tenantId = this.exigirTenant(u);
+    const enviados = await this.push.enviarParaUsuario(tenantId, u.sub, {
+      titulo: '🧪 Teste PontoSnap',
+      corpo: 'Se você está vendo isso, as notificações push estão funcionando!',
+      url: '/',
+      tag: 'teste-push',
+    });
+    return {
+      ok: enviados > 0,
+      enviados,
+      configurado: !!this.push.vapidPublicKey,
+      usuarioId: u.sub,
+      tenantId,
+    };
+  }
+
   // ── Push subscription ──
 
   @Post('subscription')
