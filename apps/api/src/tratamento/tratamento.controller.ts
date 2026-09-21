@@ -62,6 +62,20 @@ export class TratamentoController {
   @Get('painel') painel(@UsuarioAtual() u: PayloadAcesso) {
     return this.tratamento.painel(this.tenant(u));
   }
+
+  /** Lista expandida de dias com batidas faltando, agrupada por funcionário. */
+  @Get('batidas-faltando')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  batidasFaltando(@UsuarioAtual() u: PayloadAcesso) {
+    return this.tratamento.batidasFaltando(this.tenant(u));
+  }
+
+  /** Envia push notification pros funcionários com batidas faltando. */
+  @Post('batidas-faltando/notificar')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  async notificarFaltando(@UsuarioAtual() u: PayloadAcesso) {
+    return this.tratamento.notificarBatidasFaltando(this.tenant(u));
+  }
   @Get('relatorio-competencia/pdf') async relatorioPdf(
     @UsuarioAtual() u: PayloadAcesso, @Query('inicio') inicio?: string, @Query('fim') fim?: string,
   ) {

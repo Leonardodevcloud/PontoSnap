@@ -29,6 +29,7 @@ import { Atestados } from './rh/Atestados';
 import { Afastamentos } from './rh/Afastamentos';
 import Perfis from './rh/Perfis';
 import AjustesPonto from './rh/AjustesPonto';
+import { BatidasFaltando } from './rh/BatidasFaltando';
 import { Auditoria } from './rh/Auditoria';
 import { Dispositivos } from './rh/Dispositivos';
 import { LayoutMaster } from './master/LayoutMaster';
@@ -112,6 +113,7 @@ export function App() {
         <Route path="afastamentos" element={<Afastamentos />} />
         <Route path="regras" element={<Perfis />} />
         <Route path="ajustes" element={<AjustesPonto />} />
+        <Route path="batidas-faltando" element={<BatidasFaltando />} />
         <Route path="auditoria" element={<Auditoria />} />
         <Route path="dispositivos" element={<Dispositivos />} />
         <Route path="assinatura" element={<Assinatura />} />

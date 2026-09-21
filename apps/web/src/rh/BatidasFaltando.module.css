@@ -1,0 +1,45 @@
+.voltar{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ash);cursor:pointer;margin-bottom:10px;background:none;border:none;font:inherit}
+.voltar:hover{color:var(--ink)}
+.topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.h{font-family:var(--ff-display);font-weight:600;font-size:24px}
+.sub{font-size:14px;color:var(--ash);line-height:1.45;margin-top:2px}
+
+.notifBtn{
+  background:var(--ink);color:var(--cream);border:none;border-radius:var(--r-pill);
+  padding:10px 18px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;
+}
+.notifBtn:disabled{opacity:.5;cursor:not-allowed}
+
+.msgOk{background:var(--ok-bg);color:var(--ok-text);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-weight:600;font-size:13px}
+
+.statBar{
+  display:flex;align-items:center;gap:10px;
+  background:var(--aviso-bg);border-radius:12px;
+  padding:10px 14px;margin-bottom:14px;
+}
+.statNum{font-family:var(--ff-display);font-weight:700;font-size:26px;color:var(--coral)}
+.statTxt{font-size:13px;color:var(--ink)}
+
+.vazio{text-align:center;padding:40px;font-size:15px;color:var(--ash)}
+
+.grupo{border:1px solid rgba(var(--ink-rgb),.08);border-radius:14px;margin-bottom:8px;overflow:hidden}
+.grupoHead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(var(--ink-rgb),.02)}
+.grupoNome{font-weight:700;font-size:14px}
+.grupoBadge{font-family:var(--ff-mono);font-size:11px;background:var(--coral);color:var(--white);padding:2px 8px;border-radius:var(--r-pill);font-weight:600}
+
+.diaRow{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid rgba(var(--ink-rgb),.06)}
+.diaRow:hover{background:rgba(var(--ink-rgb),.02)}
+.diaData{font-family:var(--ff-mono);font-size:13px;font-weight:600;min-width:56px;color:var(--ink)}
+.diaData small{display:block;font-size:10px;color:var(--ash);font-weight:400;text-transform:uppercase}
+.diaBatidas{flex:1;display:flex;gap:4px;flex-wrap:wrap}
+
+.chip{font-family:var(--ff-mono);font-size:10.5px;padding:2px 7px;border-radius:5px;display:inline-block}
+.chip_ok{background:var(--ok-bg);color:var(--ok-text)}
+.chip_miss{background:var(--erro-bg);color:var(--coral);font-weight:600}
+.chip_open{background:var(--aviso-bg);color:#B7791F}
+
+.diaAcao{
+  background:var(--ink);color:var(--cream);border:none;border-radius:var(--r-pill);
+  padding:5px 12px;font:inherit;font-weight:700;font-size:11.5px;cursor:pointer;white-space:nowrap;
+}
+.diaAcao:hover{opacity:.9}

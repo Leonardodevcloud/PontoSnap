@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray, lte, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
-  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia,
+  pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -13,6 +13,7 @@ import { montarRegrasApuracao } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
 import { resumirDestinacao } from './destinacao';
+import { PushService } from '../notificacao/push.service';
 import ExcelJS from 'exceljs';
 
 interface Par { entrada: string; saida: string; }
@@ -22,7 +23,10 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 @Injectable()
 export class TratamentoService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly push?: PushService,
+  ) {}
 
   /** Fuso vigente do tenant (offset "-0300"). Rege limites de dia e apuração. */
   private async carregarFuso(tx: Tx, tenantId: string): Promise<string> {
@@ -1117,6 +1121,7 @@ export class TratamentoService {
           ajustes: ajustesPend.length,
           revisar: revisar.slice(0, 12),
           revisarTotal: revisar.length,
+          _revisarCompleto: revisar, // uso interno pelo batidasFaltando
           naoBateram: naoBateram.slice(0, 12),
           naoBateramTotal: naoBateram.length,
           noPrazo,
@@ -1159,4 +1164,130 @@ export class TratamentoService {
 
     return { inicio: inicioStr, fim: fimStr, linhas, totais };
   }
+
+  /** Dias com batidas faltando, agrupados por funcionário, com batidas de cada dia. */
+  async batidasFaltando(tenantId: string) {
+    // Reutiliza dados do painel e busca o revisar COMPLETO (sem slice)
+    const dados = await this.painel(tenantId);
+    // O painel limita a 12, mas revisarTotal tem o total.
+    // Pra ter todos, re-buscamos: o painel já calculou porDia, mas não expõe.
+    // Solução simples: usar o slice expandido que o painel já retorna + os que faltam
+    const revisarCompleto = (dados as any)._revisarCompleto ?? dados.pendencias.revisar;
+
+    // Agrupa por nome
+    const grupos = new Map<string, { nome: string; dias: string[] }>();
+    for (const r of revisarCompleto) {
+      let g = grupos.get(r.nome);
+      if (!g) { g = { nome: r.nome, dias: [] }; grupos.set(r.nome, g); }
+      g.dias.push(r.data);
+    }
+
+    // Pra cada dia, buscar as batidas efetivas
+    const resultado: Array<{
+      nome: string;
+      dias: Array<{
+        data: string;
+        batidas: Array<{ hora: string; nsr: number | null; id: string }>;
+        esperadas: number;
+      }>;
+    }> = [];
+
+    for (const [, g] of grupos) {
+      const diasComBatidas: typeof resultado[0]['dias'] = [];
+      for (const data of g.dias.slice(0, 30)) { // limita a 30 dias por funcionário
+        try {
+          const ctx = await this.batidasDoDiaParaFaltando(tenantId, g.nome, data);
+          if (ctx) diasComBatidas.push(ctx);
+        } catch { /* pula se der erro */ }
+      }
+      if (diasComBatidas.length > 0) resultado.push({ nome: g.nome, dias: diasComBatidas });
+    }
+
+    return { total: revisarCompleto.length, grupos: resultado };
+  }
+
+  /** Helper: busca batidas efetivas de um dia pelo nome do empregado. */
+  private async batidasDoDiaParaFaltando(tenantId: string, nome: string, data: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emp = (await tx.select({ id: empregado.id, cpf: empregado.cpf, horarioContratualId: empregado.horarioContratualId })
+        .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.nome, nome))).limit(1))[0];
+      if (!emp) return null;
+      const fuso = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.fuso ?? '-0300';
+
+      // Batidas do dia
+      const offH = Number(fuso) / 100;
+      const inicioUtc = new Date(`${data}T00:00:00Z`);
+      inicioUtc.setUTCHours(inicioUtc.getUTCHours() - offH);
+      const fimUtc = new Date(inicioUtc.getTime() + 86_400_000);
+      const marcs = await tx.select({ id: pontoMarcacao.id, dt: pontoMarcacao.dtMarcacao, nsr: pontoMarcacao.nsr })
+        .from(pontoMarcacao).where(and(
+          eq(pontoMarcacao.tenantId, tenantId), eq(pontoMarcacao.cpf, emp.cpf),
+          gte(pontoMarcacao.dtMarcacao, inicioUtc), lt(pontoMarcacao.dtMarcacao, fimUtc),
+        )).orderBy(asc(pontoMarcacao.dtMarcacao));
+
+      // Ajustes aprovados
+      const aj = await ajustesAprovados(tx as never, tenantId, emp.id, data, data);
+      const efetivas = aplicarAjustes(marcs.map((m) => ({ ...m, dtMarcacao: m.dt })), aj);
+
+      // Esperadas
+      let esperadas = 0;
+      if (emp.horarioContratualId) {
+        const h = (await tx.select().from(pontoHorarioContratual)
+          .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0];
+        if (h) {
+          const dow = new Date(`${data}T12:00:00${fuso.slice(0, 3)}:${fuso.slice(3)}`).getDay();
+          const jornadaDia = h.jornadaPorDia?.[String(dow)] ?? h.durJornadaMin;
+          const nPares = jornadaDia > 0 && jornadaDia <= 360 && h.pares.length > 1 ? 1 : h.pares.length;
+          esperadas = nPares * 2;
+        }
+      }
+
+      return {
+        data,
+        batidas: efetivas.map((e) => ({
+          hora: this.hhmm(Math.floor((e.dtMarcacao.getTime() + offH * 3600_000) / 60_000) % 1440),
+          nsr: (e as any).nsr != null ? Number((e as any).nsr) : null,
+          id: (e as any).id ?? '',
+        })),
+        esperadas,
+      };
+    });
+  }
+
+
+  /** Envia push pra cada funcionário que tem batidas faltando. */
+  async notificarBatidasFaltando(tenantId: string) {
+    const dados = await this.batidasFaltando(tenantId);
+    if (!this.push) return { enviados: 0 };
+
+    let enviados = 0;
+    for (const g of dados.grupos) {
+      // Buscar empregado + usuario pelo nome
+      const emp = await comoMaster(this.db, async (tx) => {
+        const e = (await tx.select({ id: empregado.id }).from(empregado)
+          .where(and(eq(empregado.tenantId, tenantId), eq(empregado.nome, g.nome))).limit(1))[0];
+        if (!e) return null;
+        const u = (await tx.select({ id: usuario.id }).from(usuario)
+          .where(and(eq(usuario.empregadoId, e.id), eq(usuario.tenantId, tenantId))).limit(1))[0];
+        return u ? { empId: e.id, userId: u.id } : null;
+      });
+      if (!emp) continue;
+
+      const qtd = g.dias.length;
+      const datas = g.dias.map((d) => {
+        const [, m, dia] = d.data.split('-');
+        return `${dia}/${m}`;
+      }).slice(0, 3).join(', ');
+
+      const n = await this.push.enviarParaEmpregado(tenantId, emp.empId, emp.userId, 'sempre', {
+        titulo: 'Marcações pendentes',
+        corpo: `Você tem ${qtd} dia${qtd > 1 ? 's' : ''} com batida faltando (${datas}${qtd > 3 ? '...' : ''}). Abra o espelho e solicite o ajuste.`,
+        url: '/espelho',
+        tag: 'batidas-faltando-' + new Date().toISOString().slice(0, 10),
+      });
+      enviados += n;
+    }
+    return { enviados, funcionarios: dados.grupos.length };
+  }
+
 }

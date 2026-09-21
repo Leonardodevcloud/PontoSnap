@@ -66,7 +66,7 @@ export function PainelRH() {
             </Link>
           )}
           {p.pendencias.revisarTotal > 0 && (
-            <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendInfo}`}>
+            <Link to="/rh/batidas-faltando" className={`${css.pendCard} ${css.pendInfo}`}>
               <span className={css.pendN}>{p.pendencias.revisarTotal}</span>
               <span className={css.pendT}>
                 {p.pendencias.revisarTotal === 1 ? 'dia com batida faltando' : 'dias com batida faltando'}
