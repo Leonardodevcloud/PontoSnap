@@ -1185,22 +1185,25 @@ export class TratamentoService {
     // Pra cada dia, buscar as batidas efetivas
     const resultado: Array<{
       nome: string;
+      empregadoId: string;
       dias: Array<{
         data: string;
         batidas: Array<{ hora: string; nsr: number | null; id: string }>;
         esperadas: number;
+        pares: Array<{ entrada: string; saida: string }>;
       }>;
     }> = [];
 
     for (const [, g] of grupos) {
       const diasComBatidas: typeof resultado[0]['dias'] = [];
-      for (const data of g.dias.slice(0, 30)) { // limita a 30 dias por funcionário
+      let empId = '';
+      for (const data of g.dias.slice(0, 30)) {
         try {
           const ctx = await this.batidasDoDiaParaFaltando(tenantId, g.nome, data);
-          if (ctx) diasComBatidas.push(ctx);
+          if (ctx) { diasComBatidas.push(ctx); if (ctx.empregadoId) empId = ctx.empregadoId; }
         } catch { /* pula se der erro */ }
       }
-      if (diasComBatidas.length > 0) resultado.push({ nome: g.nome, dias: diasComBatidas });
+      if (diasComBatidas.length > 0) resultado.push({ nome: g.nome, empregadoId: empId, dias: diasComBatidas });
     }
 
     return { total: revisarCompleto.length, grupos: resultado };
@@ -1229,27 +1232,32 @@ export class TratamentoService {
       const aj = await ajustesAprovados(tx as never, tenantId, emp.id, data, data);
       const efetivas = aplicarAjustes(marcs.map((m) => ({ ...m, dtMarcacao: m.dt })), aj);
 
-      // Esperadas
+      // Esperadas + pares efetivos
       let esperadas = 0;
+      let jornadaDia = 0;
+      let paresEfetivos: Array<{ entrada: string; saida: string }> = [];
       if (emp.horarioContratualId) {
         const h = (await tx.select().from(pontoHorarioContratual)
           .where(eq(pontoHorarioContratual.id, emp.horarioContratualId)).limit(1))[0];
         if (h) {
           const dow = new Date(`${data}T12:00:00${fuso.slice(0, 3)}:${fuso.slice(3)}`).getDay();
-          const jornadaDia = h.jornadaPorDia?.[String(dow)] ?? h.durJornadaMin;
+          jornadaDia = h.jornadaPorDia?.[String(dow)] ?? h.durJornadaMin;
           const nPares = jornadaDia > 0 && jornadaDia <= 360 && h.pares.length > 1 ? 1 : h.pares.length;
           esperadas = nPares * 2;
+          paresEfetivos = nPares === 1 ? [h.pares[0]!] : h.pares;
         }
       }
 
       return {
         data,
+        empregadoId: emp.id,
         batidas: efetivas.map((e) => ({
           hora: this.hhmm(Math.floor((e.dtMarcacao.getTime() + offH * 3600_000) / 60_000) % 1440),
           nsr: (e as any).nsr != null ? Number((e as any).nsr) : null,
           id: (e as any).id ?? '',
         })),
         esperadas,
+        pares: paresEfetivos,
       };
     });
   }
