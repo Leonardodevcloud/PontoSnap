@@ -49,47 +49,29 @@ export function minutosParaHhMm(min: number): string {
  * Encontra o slot mais próximo em minutos e usa o rótulo dele.
  * Fallback pra posição se não tiver pares.
  */
+/**
+ * Rótulo da marcação baseado na POSIÇÃO no dia e nos pares da escala.
+ * Posição 0 = Entrada, 1 = Saída almoço, 2 = Retorno almoço, 3 = Saída.
+ * Se não tem pares, usa lógica par/ímpar.
+ */
 export function rotuloMarcacaoPorHora(
-  horaBatida: string | Date,
+  _horaBatida: string | Date,
   pares: Array<{ entrada: string; saida: string }>,
-  indiceFallback: number,
-  totalFallback: number,
+  indice: number,
+  total: number,
 ): string {
-  if (!pares || pares.length === 0) return rotuloMarcacao(indiceFallback, totalFallback);
-
-  // Converte a batida pra minutos desde meia-noite
-  const dt = typeof horaBatida === 'string' ? new Date(horaBatida) : horaBatida;
-  
-  // Ajuste pro fuso -03 (se o dt é UTC, soma -3h = subtrai 180min)
-  // Na prática, o dt já vem com fuso no ISO, então getHours() local funciona
-  const batMinLocal = dt.getHours() * 60 + dt.getMinutes();
-
-  // Monta lista de slots esperados com rótulo
-  const slots: Array<{ min: number; rotulo: string }> = [];
-  for (let i = 0; i < pares.length; i++) {
-    const p = pares[i]!;
-    const [eh, em] = p.entrada.split(':').map(Number);
-    const [sh, sm] = p.saida.split(':').map(Number);
-    if (i === 0) {
-      slots.push({ min: (eh ?? 0) * 60 + (em ?? 0), rotulo: 'Entrada' });
-    } else {
-      slots.push({ min: (eh ?? 0) * 60 + (em ?? 0), rotulo: 'Volta do almoço' });
+  // Monta rótulos na ordem dos pares da escala
+  if (pares && pares.length > 0) {
+    const labels: string[] = [];
+    for (let i = 0; i < pares.length; i++) {
+      labels.push(i === 0 ? 'Entrada' : 'Volta do almoço');
+      labels.push(i === pares.length - 1 ? 'Saída' : 'Saída para o almoço');
     }
-    if (i === pares.length - 1) {
-      slots.push({ min: (sh ?? 0) * 60 + (sm ?? 0), rotulo: 'Saída' });
-    } else {
-      slots.push({ min: (sh ?? 0) * 60 + (sm ?? 0), rotulo: 'Saída para o almoço' });
-    }
+    if (indice < labels.length) return labels[indice]!;
+    // Além do esperado: alterna
+    return indice % 2 === 0 ? 'Entrada' : 'Saída';
   }
-
-  // Encontra o slot mais próximo
-  let melhor = slots[0]!;
-  let menorDiff = Math.abs(batMinLocal - melhor.min);
-  for (const s of slots) {
-    const diff = Math.abs(batMinLocal - s.min);
-    if (diff < menorDiff) { menorDiff = diff; melhor = s; }
-  }
-  return melhor.rotulo;
+  return rotuloMarcacao(indice, total);
 }
 
 export function rotuloMarcacao(i: number, total: number): string {
