@@ -188,7 +188,8 @@ export default function AjustesPonto() {
               </p>
             )}
 
-            {recusando === p.id ? (
+            {filtroStatus === 'EM_ANALISE' && (
+            recusando === p.id ? (
               <div className={css.recusa}>
                 <input className={css.inp} autoFocus placeholder="Por que está recusando? (o funcionário vai ver)"
                   value={motivo} onChange={(e) => setMotivo(e.target.value)} />
@@ -203,6 +204,22 @@ export default function AjustesPonto() {
                   {enviando === p.id ? 'Aprovando…' : 'Aprovar'}
                 </button>
                 <button className={css.no} onClick={() => { setRecusando(p.id); setMotivo(''); }}>Recusar</button>
+              </div>
+            )
+            )}
+            {filtroStatus === 'APROVADO' && (
+              <div className={css.acoes}>
+                <span style={{ fontSize: 12, color: 'var(--ok-text)', fontWeight: 700 }}>✓ Aprovado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
+              </div>
+            )}
+            {filtroStatus === 'RECUSADO' && (
+              <div className={css.acoes}>
+                <span style={{ fontSize: 12, color: 'var(--coral)', fontWeight: 700 }}>✗ Recusado{p.motivoDecisao ? ` — ${p.motivoDecisao}` : ''}</span>
+              </div>
+            )}
+            {filtroStatus === 'REVOGADO' && (
+              <div className={css.acoes}>
+                <span style={{ fontSize: 12, color: 'var(--ash)', fontWeight: 700 }}>Revogado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
               </div>
             )}
             </div>
