@@ -384,6 +384,10 @@ export class TratamentoService {
   }
 
   /** Próximo dia de uma data YYYY-MM-DD, sem escorregar de fuso. */
+  private static ultimoDiaDoMes(comp: string): string {
+    const [a, m] = comp.split('-').map(Number);
+    return `${comp}-${String(new Date(Date.UTC(a!, m!, 0)).getUTCDate()).padStart(2, '0')}`;
+  }
   private static somarDias(dataStr: string, dias: number): string {
     const d = new Date(`${dataStr}T12:00:00Z`);
     d.setUTCDate(d.getUTCDate() + dias);
@@ -717,12 +721,26 @@ export class TratamentoService {
     } as const;
     const apuradoMin = resultado.dias.flatMap((d) => movimentosBancoDoDia(d, opc)).reduce((s, m) => s + m.minutos, 0);
 
-    const fechada = (await tx.select({ id: pontoBancoFechamento.id }).from(pontoBancoFechamento).where(and(
+    const ehMesInteiro = inicioStr.endsWith('-01') && fimStr === TratamentoService.ultimoDiaDoMes(competencia);
+    let fechada = ehMesInteiro && (await tx.select({ id: pontoBancoFechamento.id }).from(pontoBancoFechamento).where(and(
       eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
       eq(pontoBancoFechamento.competencia, competencia),
     )).limit(1)).length > 0;
 
-    // Mês fechado: vale o que está lançado. Em andamento: vale a apuração de agora.
+    // Fechamento diferente da apuração de hoje (escala mudou, feriado novo,
+    // regra editada, lançamento antigo feito com o motor anterior…): reabre
+    // na hora. A próxima sincronização refaz o mês; até lá a tela mostra a
+    // apuração atual, que é a verdade.
+    let refeito = false;
+    if (fechada && lancadoMin !== apuradoMin) {
+      await tx.delete(pontoBancoFechamento).where(and(
+        eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
+        eq(pontoBancoFechamento.competencia, competencia)));
+      fechada = false;
+      refeito = true;
+    }
+
+    // Mês fechado: vale o que está lançado. Em andamento (ou reaberto): a apuração de agora.
     const saldoMesMin = fechada ? lancadoMin : apuradoMin;
     return {
       ativo: true as const,
@@ -731,8 +749,8 @@ export class TratamentoService {
       saldoMesMin,
       avulsoMin,
       saldoAcumuladoMin: saldoAnteriorMin + saldoMesMin + avulsoMin,
-      /** Fechado com valor diferente do que a apuração dá hoje → refazer o mês. */
-      desatualizado: fechada && lancadoMin !== apuradoMin,
+      /** Estava fechado com valor diferente e foi reaberto agora — refaz sozinho. */
+      desatualizado: refeito,
     };
   }
 

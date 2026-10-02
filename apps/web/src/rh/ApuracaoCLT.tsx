@@ -98,7 +98,13 @@ export function ApuracaoCLT() {
       // Fecha no banco os meses anteriores ainda pendentes (idempotente e
       // barato quando não há nada) — assim o "saldo anterior" está certo.
       await api.post(`/banco/sincronizar?empregadoId=${empregadoId}`, {}).catch(() => {});
-      setAp(await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`));
+      let r = await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+      if (r.banco?.desatualizado) {
+        // A apuração reabriu um mês fechado com valor velho: refaz agora e relê.
+        await api.post(`/banco/sincronizar?empregadoId=${empregadoId}`, {}).catch(() => {});
+        r = await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+      }
+      setAp(r);
     } catch (e) { setErro((e as Error).message); setAp(null); }
     finally { setCarregando(false); }
   }, [empregadoId, mes]);
@@ -294,8 +300,8 @@ export function ApuracaoCLT() {
               </div>
               {ap!.banco.desatualizado && (
                 <div className={css.destAviso}>
-                  <span>O fechamento deste mês está diferente da apuração de hoje (algo mudou depois de fechar).</span>
-                  <Botao variante="ghost" onClick={refazerMes} disabled={refazendo}>{refazendo ? 'Refazendo…' : 'Refazer fechamento'}</Botao>
+                  <span>Este mês estava fechado com outro valor (algo mudou depois). Foi reaberto e será refeito sozinho — ou refaça agora.</span>
+                  <Botao variante="ghost" onClick={refazerMes} disabled={refazendo}>{refazendo ? 'Refazendo…' : 'Refazer agora'}</Botao>
                 </div>
               )}
               <p className={css.destNota}>

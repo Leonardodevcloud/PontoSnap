@@ -215,7 +215,12 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
       try {
         const { inicio, fim } = faixaDoMes(mes);
         await api.post(`/banco/sincronizar?empregadoId=${empregadoId}`, {}).catch(() => {});
-        const r = await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+        let r = await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+        if (r.banco?.desatualizado) {
+          // A apuração reabriu um mês fechado com valor velho: refaz agora e relê.
+          await api.post(`/banco/sincronizar?empregadoId=${empregadoId}`, {}).catch(() => {});
+          r = await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`);
+        }
         if (vivo) setAp(r);
       } catch (e) { if (vivo) onErro((e as Error).message); }
       finally { if (vivo) setCarregando(false); }
@@ -307,7 +312,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 <div className={css.bLinha}><span>{rotuloMes(mes).split(' de ')[0]} {ap.banco.fechada ? '(fechado)' : 'até agora (em andamento)'}</span><span className={`${css.bM} ${ap.banco.saldoMesMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.saldoMesMin)}</span></div>
                 {ap.banco.avulsoMin !== 0 && <div className={css.bLinha}><span>Folgas, pagamentos e ajustes</span><span className={`${css.bM} ${ap.banco.avulsoMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.avulsoMin)}</span></div>}
                 <div className={`${css.bLinha} ${css.bTotal}`}><span>Saldo acumulado</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
-                {ap.banco.desatualizado && <div className={css.bAviso}>O fechamento deste mês está diferente da apuração de hoje. Refaça em <Link to="/rh/banco">Banco de horas</Link>.</div>}
+                {ap.banco.desatualizado && <div className={css.bAviso}>Este mês estava fechado com outro valor e foi reaberto: o banco é refeito sozinho na próxima consulta.</div>}
                 <div className={css.bNota}>Os meses fecham sozinhos no dia 1º. Ajuste aprovado ou atestado abonado refazem o mês.</div>
               </div>
             ) : (

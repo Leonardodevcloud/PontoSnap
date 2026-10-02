@@ -2,7 +2,7 @@ import 'reflect-metadata';
 process.env.APP_CRYPTO_KEY = Buffer.alloc(32, 9).toString('base64');
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { schema, comoMaster, comTenant, tenant, empregado, usuario, pontoRep, pontoHorarioContratual, pontoMarcacao, pontoBancoFechamento, pontoAjuste } from '@ponto/db';
 import { BancoService } from '../src/banco/banco.service';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
@@ -154,6 +154,16 @@ async function main() {
   const s5 = await banco.saldo(t.id, emp.id, '2026-10-01');
   ok(s5.fechamentos.some((f) => f.competencia === '2026-09'), 'no dia 1 do mês seguinte, setembro fecha sozinho');
   ok(s5.saldo!.saldoMin === 120 && s5.mesCorrente?.estimadoMin === 0, `oficial absorveu setembro: +120, outubro zerado (${s5.saldo!.saldoMin}/${s5.mesCorrente?.estimadoMin})`);
+
+  // ---------- 6b. Fechamento antigo com valor errado se reabre sozinho ----------
+  // Simula um lançamento feito pelo motor antigo: altera um movimento de agosto na mão.
+  await comTenant(db, t.id, (tx) => tx.execute(sql`UPDATE ponto_banco_mov SET minutos = minutos - 100 WHERE empregado_id = ${emp.id} AND competencia = '2026-08' AND minutos > 0`));
+  const apAgoVelho = await trat.apurarPeriodoCLT(t.id, emp.id, '2026-08-01', '2026-08-31', []);
+  ok(apAgoVelho.banco!.desatualizado === true && apAgoVelho.banco!.fechada === false && apAgoVelho.banco!.saldoMesMin === -30,
+    `apuração detecta fechamento desatualizado, reabre e mostra o valor certo (${apAgoVelho.banco!.saldoMesMin})`);
+  await banco.saldo(t.id, emp.id, '2026-10-01');
+  const apAgoNovo = await trat.apurarPeriodoCLT(t.id, emp.id, '2026-08-01', '2026-08-31', []);
+  ok(apAgoNovo.banco!.fechada && !apAgoNovo.banco!.desatualizado, 'próxima consulta refez agosto e ele volta a estar fechado e em dia');
 
   // ---------- 7. Visão de todos (tela do RH) ----------
   const res = await banco.resumoFuncionarios(t.id, '2026-10-01');
