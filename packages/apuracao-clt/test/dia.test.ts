@@ -40,10 +40,19 @@ describe('apuração diária', () => {
     expect(r.extras[0]).toMatchObject({ min: 240, adicionalPct: 100 });
   });
 
-  it('trabalho a menos que a jornada gera falta', () => {
+  it('trabalho a menos que a jornada (sem janela) é atraso, com saldo negativo e sem falta', () => {
     const r = apurarDia(base({ marcacoes: [d('2026-07-13', '08:00'), d('2026-07-13', '12:00'), d('2026-07-13', '13:00'), d('2026-07-13', '16:00')] }), REGRAS_CLT_PADRAO);
     expect(r.minutosTrabalhados).toBe(420);
-    expect(r.faltaMin).toBe(60);
+    expect(r.atrasoMin).toBe(60);
+    expect(r.saldoMin).toBe(-60);
+    expect(r.faltaMin).toBe(0);
+  });
+
+  it('dia esperado sem nenhuma batida é falta de dia inteiro, fora do saldo', () => {
+    const r = apurarDia(base({ marcacoes: [] }), REGRAS_CLT_PADRAO);
+    expect(r.faltaMin).toBe(480);
+    expect(r.saldoMin).toBe(0);
+    expect(r.atrasoMin).toBe(0);
   });
 
   it('interjornada abaixo de 11h é sinalizada e indenizada', () => {

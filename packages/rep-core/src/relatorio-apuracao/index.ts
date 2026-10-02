@@ -24,6 +24,13 @@ export interface DadosRelatorioApuracao {
     extra50Min: number; extra100Min: number; noturnoLegalMin: number;
     faltaMin: number; atrasoMin: number; saldoMin: number; bancoMin: number; reflexoDsrMin: number; dsrPerdidoSemanas: number;
   };
+  /** Banco de horas no contexto do período (só quando o funcionário tem banco). */
+  banco?: {
+    saldoAnteriorMin: number;
+    saldoMesMin: number;
+    saldoAcumuladoMin: number;
+    fechada: boolean;
+  };
   dias: DiaRelatorio[];
   valores?: {
     valorHoraCentavos: number;
@@ -96,6 +103,13 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
       ['Reflexo DSR ~', hhmm(d.totais.reflexoDsrMin), false],
       ['DSR perdido', `${d.totais.dsrPerdidoSemanas} sem`, d.totais.dsrPerdidoSemanas > 0],
     ];
+    if (d.banco) {
+      cards.push(
+        ['Banco: saldo anterior', hhmm(d.banco.saldoAnteriorMin), false],
+        [d.banco.fechada ? 'Banco: este mês' : 'Banco: este mês (parcial)', hhmm(d.banco.saldoMesMin), false],
+        ['Banco: acumulado', hhmm(d.banco.saldoAcumuladoMin), d.banco.saldoAcumuladoMin < 0],
+      );
+    }
     const cw = (W - 3 * 8) / 4;
     cards.forEach(([k, v, destaque], i) => {
       const col = i % 4, row = Math.floor(i / 4);

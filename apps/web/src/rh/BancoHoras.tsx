@@ -107,7 +107,22 @@ export function BancoHoras() {
     finally { setSalvando(false); }
   }
 
+  const [sincronizando, setSincronizando] = useState(false);
+  const [sincMsg, setSincMsg] = useState<string | null>(null);
+  async function sincronizarAgora() {
+    setErro(null); setSincMsg(null); setSincronizando(true);
+    try {
+      const r = await api.post<{ funcionarios: number; fechadas: number }>('/banco/sincronizar', {});
+      setSincMsg(r.fechadas === 0
+        ? `Tudo em dia: nenhum mês pendente (${r.funcionarios} funcionário${r.funcionarios === 1 ? '' : 's'} com banco).`
+        : `${r.fechadas} fechamento${r.fechadas === 1 ? '' : 's'} feito${r.fechadas === 1 ? '' : 's'} agora.`);
+      await Promise.all([carregarHistorico(), carregarBanco(sel)]);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setSincronizando(false); }
+  }
+
   async function lancarLote() {
+    if (!confirm(`Refazer ${fmtComp(comp)} para todos os funcionários com banco? O que esse mês tinha lançado será recalculado.`)) return;
     setErro(null); setResultado(null); setLancando(true);
     try {
       const r = await api.post<LoteResultado>('/banco/lancar-lote', { competencia: comp });
@@ -297,67 +312,67 @@ export function BancoHoras() {
 
       {cfg?.ativo && (
         <>
-          {/* ---------- LANÇAR COMPETÊNCIA ---------- */}
+          {/* ---------- FECHAMENTO AUTOMÁTICO ---------- */}
           <div className={css.bloco}>
-            <div className={css.blocoH}>Lançar competência</div>
+            <div className={css.blocoH}>Fechamento dos meses</div>
+            <p className={css.dica} style={{ marginTop: 0 }}>
+              <strong>Automático.</strong> Todo mês encerrado é levado ao banco sozinho (na virada do mês e
+              sempre que alguém consulta um saldo). Ajuste de ponto aprovado, atestado abonado, afastamento
+              ou folga num mês já fechado fazem o mês ser refeito. Você não precisa lançar nada.
+            </p>
             <div className={css.lote}>
-              <label className={css.campoMes}>
-                <span className={css.mesLb}>Competência</span>
-                <input className={css.mes} type="month" value={comp} max={maxMes}
-                  onChange={(e) => e.target.value && setComp(e.target.value)} />
-              </label>
-              {modoLancar === 'lote' ? (
-                <>
-                  <Botao variante="lime" onClick={lancarLote} disabled={lancando}>
-                    {lancando ? 'Lançando…' : 'Lançar para todos os ativos'}
-                  </Botao>
-                  <button className={css.linkish} onClick={() => setModoLancar('individual')}>Um funcionário…</button>
-                </>
-              ) : (
-                <>
-                  <select className={css.select} value={selLancar} onChange={(e) => setSelLancar(e.target.value)}>
-                    <option value="">Escolha o funcionário…</option>
-                    {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                  </select>
-                  <Botao variante="lime" onClick={lancarIndividual} disabled={lancando || !selLancar}>
-                    {lancando ? 'Lançando…' : 'Lançar'}
-                  </Botao>
-                  <button className={css.linkish} onClick={() => setModoLancar('lote')}>Todos</button>
-                </>
-              )}
+              <Botao variante="lime" onClick={sincronizarAgora} disabled={sincronizando}>
+                {sincronizando ? 'Verificando…' : 'Verificar pendências agora'}
+              </Botao>
+              <button className={css.linkish} onClick={() => setModoLancar(modoLancar === 'lote' ? 'individual' : 'lote')}>
+                {modoLancar === 'lote' ? 'Refazer um mês…' : 'Fechar'}
+              </button>
             </div>
+            {sincMsg && <p className={css.ok} style={{ marginTop: 10 }}>{sincMsg}</p>}
+
+            {modoLancar === 'individual' && (
+              <div className={css.lote} style={{ marginTop: 12 }}>
+                <label className={css.campoMes}>
+                  <span className={css.mesLb}>Competência</span>
+                  <input className={css.mes} type="month" value={comp} max={maxMes}
+                    onChange={(e) => e.target.value && setComp(e.target.value)} />
+                </label>
+                <select className={css.select} value={selLancar} onChange={(e) => setSelLancar(e.target.value)}>
+                  <option value="">Todos os funcionários</option>
+                  {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                </select>
+                <Botao variante="ghost" onClick={selLancar ? lancarIndividual : lancarLote} disabled={lancando}>
+                  {lancando ? 'Refazendo…' : 'Refazer mês'}
+                </Botao>
+              </div>
+            )}
 
             {resultado && (
               <div className={css.result}>
                 <span className={css.resultIc}>✓</span>
                 <div>
-                  <b>{fmtComp(resultado.competencia)} lançado para {resultado.funcionarios} {resultado.funcionarios === 1 ? 'funcionário' : 'funcionários'}.</b>{' '}
-                  Saldo do mês somou <b className={css.mono}>{comSinal(resultado.totalMin)}</b> ao banco.
+                  <b>{fmtComp(resultado.competencia)} refeito para {resultado.funcionarios} {resultado.funcionarios === 1 ? 'funcionário' : 'funcionários'}.</b>{' '}
+                  Saldo do mês no banco: <b className={css.mono}>{comSinal(resultado.totalMin)}</b>.
                 </div>
               </div>
             )}
-
-            <p className={css.dica}>
-              Leva o saldo de cada dia apurado do mês para o banco. Rodar de novo o mesmo mês
-              <strong> substitui</strong> o que aquele mês tinha lançado — pagamentos e ajustes manuais não são tocados.
-            </p>
           </div>
 
           {/* ---------- HISTÓRICO ---------- */}
           <div className={css.bloco}>
-            <div className={css.blocoH}>Competências lançadas</div>
-            {historico.length === 0 && <p className={css.vazio}>Nenhuma competência lançada ainda.</p>}
+            <div className={css.blocoH}>Meses fechados</div>
+            {historico.length === 0 && <p className={css.vazio}>Nenhum mês fechado ainda — o primeiro fecha na virada do mês.</p>}
             {historico.length > 0 && (
               <div className={css.hist}>
                 <div className={`${css.hrow} ${css.hhead}`}>
-                  <span>Competência</span><span>Funcionários</span><span>Total</span><span>Lançado em</span><span />
+                  <span>Competência</span><span>Funcionários</span><span>Total</span><span>Fechado em</span><span />
                 </div>
                 {historico.map((h) => {
                   const aberto = expandido === h.competencia;
                   return (
                     <div key={h.competencia}>
                       <div className={css.hrow} onClick={() => setExpandido(aberto ? null : h.competencia)}>
-                        <span className={css.hcomp}>{fmtComp(h.competencia)}</span>
+                        <span className={css.hcomp}>{fmtComp(h.competencia)} {h.automatico ? <em className={css.hauto}>auto</em> : <em className={css.hauto}>manual</em>}</span>
                         <span className={css.mono}>{h.funcionarios}</span>
                         <span className={`${css.mono} ${h.totalMin >= 0 ? css.pos : css.neg}`}>{comSinal(h.totalMin)}</span>
                         <span className={css.mono}>{fmtDataHora(h.lancadoEm)}</span>
@@ -474,7 +489,15 @@ export function BancoHoras() {
             {s && (
               <>
                 <div className={css.cards}>
-                  <div className={css.card}><div className={css.cL}>Saldo</div><div className={css.cV}>{comSinal(s.saldoMin)}</div></div>
+                  <div className={css.card}>
+                    <div className={css.cL}>Saldo atual</div>
+                    <div className={css.cV}>{comSinal(banco!.saldoProjetadoMin ?? s.saldoMin)}</div>
+                    {banco!.mesCorrente && (
+                      <div className={css.cSub}>
+                        fechados <b className={css.mono}>{comSinal(s.saldoMin)}</b> · mês atual <b className={css.mono}>{comSinal(banco!.mesCorrente.estimadoMin)}</b>
+                      </div>
+                    )}
+                  </div>
                   <div className={css.card}><div className={css.cL}>Vence em 30 dias</div><div className={css.cV}>{s.aVencerMin > 0 ? minutosParaHhMm(s.aVencerMin) : '—'}</div></div>
                   <div className={`${css.card} ${s.vencidoMin > 0 ? css.cardAlerta : ''}`}><div className={css.cL}>Vencido</div><div className={css.cV}>{s.vencidoMin > 0 ? minutosParaHhMm(s.vencidoMin) : '—'}</div></div>
                 </div>
@@ -494,7 +517,7 @@ export function BancoHoras() {
                 {banco!.extrato.map((m, i) => (
                   <div key={`${m.data}-${i}`} className={css.ext}>
                     <span className={css.extD}>{fmtData(m.data)}</span>
-                    <span className={css.extE}>{m.descricao || m.tipo}</span>
+                    <span className={css.extE}>{m.descricao || m.tipo}{m.competencia && <em className={css.extTag}>fechamento {m.competencia}</em>}</span>
                     <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
                     {m.id && (
                       <button className={css.extRemover} title="Remover este lançamento"

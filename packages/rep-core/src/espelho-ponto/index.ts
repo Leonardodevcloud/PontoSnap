@@ -46,6 +46,10 @@ export interface DadosEspelho {
     horasNormaisEsperadas: string;
     diurno?: string;
     saldoBanco?: string;
+    /** Banco de horas: anterior + mês = acumulado (só quando há banco). */
+    bancoSaldoAnterior?: string;
+    bancoSaldoMes?: string;
+    bancoSaldoAcumulado?: string;
   };
   /** Concordância eletrônica do funcionário — imprime o carimbo de assinatura digital. */
   assinaturaEletronica?: {
@@ -242,6 +246,15 @@ export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
     d.totais.saldoBanco ? `Saldo do banco: ${d.totais.saldoBanco}` : '',
   ].filter(Boolean).join('       ');
   doc.text(tot, 34, y + 13, { width: larguraUtil });
+  if (d.totais.bancoSaldoAcumulado != null) {
+    const banco = [
+      `Banco de horas — saldo anterior: ${d.totais.bancoSaldoAnterior ?? '0h00'}`,
+      `este mês: ${d.totais.bancoSaldoMes ?? '0h00'}`,
+      `acumulado: ${d.totais.bancoSaldoAcumulado}`,
+    ].join('       ');
+    doc.text(banco, 34, y + 24, { width: larguraUtil });
+    y += 11;
+  }
 
   // ---- Concordância + assinaturas ----
   y += 44;

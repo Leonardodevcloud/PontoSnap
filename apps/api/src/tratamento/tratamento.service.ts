@@ -2,17 +2,18 @@ import { Inject, Injectable, NotFoundException, ConflictException, Optional } fr
 import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
+  pontoBancoMov, pontoBancoFechamento,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
-import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
+import { apurarPeriodo, valorizarPeriodo, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
-import { montarRegrasApuracao } from './montar-regras';
+import { montarRegrasApuracao, type ItensResolvidos } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
-import { resumirDestinacao } from './destinacao';
+import { resumirDestinacao, movimentosBancoDoDia } from './destinacao';
 import { PushService } from '../notificacao/push.service';
 import ExcelJS from 'exceljs';
 
@@ -447,9 +448,12 @@ export class TratamentoService {
       // Regras por item: escolha do funcionário → padrão do tipo → CLT.
       const itens = await resolverItens(tx as never, tenantId, emp.perfilRegraId);
       const regras = montarRegrasApuracao(itens);
+      const tBanco = (await tx.select({ tipo: tenant.bancoTipoAcordo, prazo: tenant.bancoPrazoMeses })
+        .from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const tipoEmpresa = tBanco?.tipo ?? 'NENHUM';
       const bancoAtivo = itens.banco?.bancoModo === 'ATIVO' ? true
         : itens.banco?.bancoModo === 'INATIVO' ? false
-        : ((await tx.select({ tipo: tenant.bancoTipoAcordo }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.tipo ?? 'NENHUM') !== 'NENHUM';
+        : tipoEmpresa !== 'NENHUM';
 
       // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
       //  1 (DSR) e 4 (folga compensatória) marcam o dia como descanso;
@@ -610,6 +614,14 @@ export class TratamentoService {
         bancoAtivo,
       });
 
+      // Banco de horas no contexto do período: saldo que veio de antes, o que
+      // este período leva pro banco e o acumulado. É a linha "saldo anterior +
+      // mês = acumulado" que faltava nas telas — sem ela parecia que as horas
+      // não passavam de um mês pro outro.
+      const banco = bancoAtivo
+        ? await this.resumoBancoDoPeriodo(tx, tenantId, empregadoId, inicioStr, fimStr, itens, tipoEmpresa, tBanco?.prazo ?? null, resultado)
+        : null;
+
       // Batidas de cada dia com a origem: o RH precisa ver o dia inteiro,
       // inclusive a que foi desconsiderada (que continua no AFD) e a que
       // entrou por ajuste aprovado.
@@ -635,7 +647,7 @@ export class TratamentoService {
       return {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
-        afastamentos, destinacao, batidas,
+        afastamentos, destinacao, batidas, banco,
         /** Batidas previstas pelo horário contratual (2 por par). */
         esperadas: (horario?.pares?.length ?? 0) * 2,
         horarioPares: horario?.pares ?? [],
@@ -644,6 +656,67 @@ export class TratamentoService {
       };
     });
   }
+  /**
+   * Resumo do banco de horas pro período apurado. Calculado direto do extrato
+   * (função pura calcularBanco) pra não depender do BancoService — que depende
+   * deste serviço. A sincronização dos meses fica a cargo do BancoService/cron;
+   * aqui só lemos o que já está lançado.
+   */
+  private async resumoBancoDoPeriodo(
+    tx: Tx, tenantId: string, empregadoId: string, inicioStr: string, fimStr: string,
+    itens: ItensResolvidos, tipoEmpresa: string, prazoEmpresa: number | null,
+    resultado: ReturnType<typeof apurarPeriodo>,
+  ) {
+    const PRAZO_PADRAO: Record<string, number> = { INDIVIDUAL: 6, COLETIVO: 12 };
+    const cfgBanco = itens.banco;
+    const tipo = cfgBanco?.bancoTipoAcordo ?? (tipoEmpresa === 'NENHUM' ? 'INDIVIDUAL' : tipoEmpresa);
+    const prazoMeses = cfgBanco?.bancoPrazoMeses ?? prazoEmpresa ?? PRAZO_PADRAO[tipo] ?? 6;
+    const formaCalculo = (cfgBanco?.formaCalculo ?? 'BANCO_HORAS') as 'BANCO_HORAS' | 'INTRA_MES';
+
+    const movs = await tx.select().from(pontoBancoMov).where(and(
+      eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, empregadoId),
+    )).orderBy(asc(pontoBancoMov.data));
+
+    const corte = TratamentoService.somarDias(inicioStr, -1);
+    const competencia = inicioStr.slice(0, 7);
+    const anteriores = movs.filter((m) => m.data <= corte);
+    const saldoAnteriorMin = formaCalculo === 'INTRA_MES'
+      ? 0
+      : calcularBanco(anteriores.map((m) => ({ data: m.data, minutos: m.minutos, tipo: m.tipo as never })), prazoMeses, corte).saldoMin;
+
+    const noPeriodo = movs.filter((m) => m.data >= inicioStr && m.data <= fimStr);
+    const lancadoMin = noPeriodo.filter((m) => m.competencia != null).reduce((s, m) => s + m.minutos, 0);
+    // Folgas, pagamentos e ajustes do RH no período: não vêm da apuração, mas
+    // mexem no saldo e precisam entrar no acumulado.
+    const avulsoMin = noPeriodo.filter((m) => m.competencia == null).reduce((s, m) => s + m.minutos, 0);
+
+    // O que a apuração de agora levaria pro banco (mesma regra do fechamento).
+    const opc = {
+      destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
+      destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
+      bancoAtivo: true,
+    } as const;
+    const apuradoMin = resultado.dias.flatMap((d) => movimentosBancoDoDia(d, opc)).reduce((s, m) => s + m.minutos, 0);
+
+    const fechada = (await tx.select({ id: pontoBancoFechamento.id }).from(pontoBancoFechamento).where(and(
+      eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
+      eq(pontoBancoFechamento.competencia, competencia),
+    )).limit(1)).length > 0;
+
+    // Mês fechado: vale o que está lançado. Em andamento: vale a apuração de agora.
+    const saldoMesMin = fechada ? lancadoMin : apuradoMin;
+    return {
+      ativo: true as const,
+      formaCalculo, prazoMeses, competencia, fechada,
+      saldoAnteriorMin,
+      saldoMesMin,
+      avulsoMin,
+      saldoAcumuladoMin: saldoAnteriorMin + saldoMesMin + avulsoMin,
+      /** Fechado com valor diferente do que a apuração dá hoje → refazer o mês. */
+      desatualizado: fechada && lancadoMin !== apuradoMin,
+    };
+  }
+
   private hhmm(min: number): string {
     const a = Math.abs(min);
     return `${min < 0 ? '-' : ''}${Math.floor(a / 60)}h${String(a % 60).padStart(2, '0')}`;
@@ -691,6 +764,10 @@ export class TratamentoService {
         noturnoLegalMin: r.totalNoturnoLegalMin, faltaMin: r.totalFaltaMin, atrasoMin: r.totalAtrasoMin, saldoMin: r.saldoPeriodoMin,
         bancoMin: r.bancoDeHorasMin, reflexoDsrMin: r.reflexoDsrMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
       },
+      banco: ap.banco ? {
+        saldoAnteriorMin: ap.banco.saldoAnteriorMin, saldoMesMin: ap.banco.saldoMesMin + ap.banco.avulsoMin,
+        saldoAcumuladoMin: ap.banco.saldoAcumuladoMin, fechada: ap.banco.fechada,
+      } : undefined,
       dias,
     });
 
@@ -791,12 +868,23 @@ export class TratamentoService {
     const c = await this.conteudoEspelho(tenantId, empregadoId, inicioStr, fimStr);
     const emp0 = { nome: c.nome, matricula: c.matricula };
 
+    // Resumo do banco entra SÓ no PDF, fora do conteúdo assinado: o hash da
+    // assinatura é do conteudoEspelho, e o saldo acumulado muda com folgas e
+    // pagamentos posteriores — não pode invalidar uma assinatura já feita.
+    const apBanco = (await this.apurarPeriodoCLT(tenantId, empregadoId, inicioStr, fimStr)).banco;
+    const totais = apBanco ? {
+      ...c.totais,
+      bancoSaldoAnterior: this.hhmm(apBanco.saldoAnteriorMin),
+      bancoSaldoMes: this.hhmm(apBanco.saldoMesMin + apBanco.avulsoMin),
+      bancoSaldoAcumulado: this.hhmm(apBanco.saldoAcumuladoMin),
+    } : c.totais;
+
     const buffer = await gerarEspelhoPontoPdf({
       empresa: c.empresa, cnpj: c.cnpj, endereco: c.endereco,
       nome: c.nome, matricula: c.matricula, cpf: c.cpf,
       competenciaInicio: inicioStr, competenciaFim: fimStr, fuso: c.fuso,
       linhas: c.linhas,
-      totais: c.totais,
+      totais,
       assinaturaEletronica: assinatura ?? null,
     });
 

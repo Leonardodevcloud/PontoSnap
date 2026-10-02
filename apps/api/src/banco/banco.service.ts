@@ -1,21 +1,70 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
-import { pontoBancoMov, pontoAusencia, pontoHorarioContratual, tenant, empregado, pontoPerfilRegra, comTenant, type Db } from '@ponto/db';
-import { calcularBanco, type MovimentoBanco, type TipoMovBanco } from '@ponto/apuracao-clt';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, asc, eq, min, sql } from 'drizzle-orm';
+import {
+  pontoBancoMov, pontoBancoFechamento, pontoAusencia, pontoHorarioContratual, pontoMarcacao,
+  tenant, empregado, pontoPerfilRegra, comTenant, comoMaster, type Db,
+} from '@ponto/db';
+import { calcularBanco, type MovimentoBanco, type TipoMovBanco, type SaldoBanco } from '@ponto/apuracao-clt';
 import { movimentosBancoDoDia, type DestinoFalta, type DestinoAtraso } from '../tratamento/destinacao';
 import { resolverItens } from '../tratamento/resolver-itens';
 import type { ItensResolvidos } from '../tratamento/montar-regras';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
+import { competenciaDe, reabrirCompetencia } from './fechamento';
 
 /** Prazos-base da CLT. Acordo coletivo pode dispor outro — por isso é editável. */
 const PRAZO_PADRAO: Record<string, number> = { INDIVIDUAL: 6, COLETIVO: 12 };
 
+/** Quantos meses pra trás a sincronização automática vai, no máximo. */
+const LIMITE_MESES_SINCRONIZACAO = 36;
+
 export type TipoAcordo = 'NENHUM' | 'INDIVIDUAL' | 'COLETIVO';
 export type FormaCalculo = 'BANCO_HORAS' | 'INTRA_MES';
 
+export interface MesCorrente {
+  competencia: string;
+  /** Saldo do mês em andamento, calculado agora, do jeito que o fechamento vai lançar. */
+  estimadoMin: number;
+}
+
+export interface SaldoResp {
+  ativo: boolean;
+  tipoAcordo: TipoAcordo;
+  prazoMeses: number | null;
+  formaCalculo: FormaCalculo;
+  saldo: SaldoBanco | null;
+  extrato: (MovimentoBanco & { id: string; competencia?: string | null })[];
+  /** Mês em andamento (ainda não fechado). Null quando o banco está inativo. */
+  mesCorrente: MesCorrente | null;
+  /** Saldo oficial + mês em andamento: o número que a pessoa quer ver. */
+  saldoProjetadoMin: number | null;
+  /** Competências fechadas pra este funcionário (mais recente primeiro). */
+  fechamentos: { competencia: string; totalMin: number; fechadoEm: Date; origem: string }[];
+}
+
+/** Soma meses a uma competência YYYY-MM. */
+function somarMesesComp(comp: string, n: number): string {
+  const [a, m] = comp.split('-').map(Number);
+  const d = new Date(Date.UTC(a!, m! - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Último dia (YYYY-MM-DD) de uma competência. */
+function ultimoDiaDe(comp: string): string {
+  const [a, m] = comp.split('-').map(Number);
+  return `${comp}-${String(new Date(Date.UTC(a!, m!, 0)).getUTCDate()).padStart(2, '0')}`;
+}
+
+/** Data local YYYY-MM-DD de um instante, num fuso "-0300". */
+function diaLocal(instante: Date, fuso: string): string {
+  const off = Number(fuso) / 100;
+  return new Date(instante.getTime() + off * 3600_000).toISOString().slice(0, 10);
+}
+
 @Injectable()
 export class BancoService {
+  private readonly log = new Logger(BancoService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly tratamento: TratamentoService,
@@ -55,13 +104,13 @@ export class BancoService {
   }
 
   /** Extrato cru, para auditoria e para o cálculo. */
-  private async extrato(tenantId: string, empregadoId: string): Promise<(MovimentoBanco & { id: string })[]> {
+  private async extrato(tenantId: string, empregadoId: string): Promise<(MovimentoBanco & { id: string; competencia: string | null })[]> {
     return comTenant(this.db, tenantId, async (tx) => {
       const linhas = await tx.select().from(pontoBancoMov).where(and(
         eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, empregadoId),
-      )).orderBy(asc(pontoBancoMov.data));
+      )).orderBy(asc(pontoBancoMov.data), asc(pontoBancoMov.criadoEm));
       return linhas.map((l) => ({
-        id: l.id,
+        id: l.id, competencia: l.competencia,
         data: l.data, minutos: l.minutos,
         tipo: l.tipo as TipoMovBanco, descricao: l.descricao ?? undefined,
       }));
@@ -71,8 +120,9 @@ export class BancoService {
   /**
    * Remove um lançamento manual do banco (folga, ajuste, saldo de abertura).
    * Se for uma folga compensatória, remove também a ausência (tipo 4) daquele
-   * dia — os dois foram criados juntos. Lançamentos de fechamento de competência
-   * não saem por aqui (são refeitos ao relançar o mês).
+   * dia — os dois foram criados juntos — e reabre a competência, porque sem a
+   * folga aquele dia volta a ser apurado como falta.
+   * Lançamentos de fechamento não saem por aqui (são refeitos ao refazer o mês).
    */
   async removerMovimento(tenantId: string, movimentoId: string) {
     return comTenant(this.db, tenantId, async (tx) => {
@@ -80,45 +130,112 @@ export class BancoService {
         .where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId))).limit(1))[0];
       if (!mov) throw new NotFoundException('Lançamento não encontrado');
       if (mov.competencia) {
-        throw new BadRequestException('Este lançamento veio do fechamento de um mês. Para desfazer, relance a competência.');
+        throw new BadRequestException('Este lançamento veio do fechamento de um mês. Para desfazer, refaça a competência.');
       }
-      // Se é folga compensatória, tira também a ausência do mesmo dia.
       if (mov.descricao === 'Folga compensatória') {
         await tx.delete(pontoAusencia).where(and(
           eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, mov.empregadoId),
           eq(pontoAusencia.data, mov.data), eq(pontoAusencia.tipo, 4)));
+        await reabrirCompetencia(tx as never, tenantId, mov.empregadoId, competenciaDe(mov.data));
       }
       await tx.delete(pontoBancoMov).where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId)));
       return { removido: true };
     });
   }
 
-  /** Saldo fechado + extrato, do jeito que a tela precisa. */
-  async saldo(tenantId: string, empregadoId: string, hoje: string) {
+  /**
+   * Saldo fechado + extrato + mês em andamento, do jeito que a tela precisa.
+   * Antes de calcular, sincroniza: todo mês já encerrado e ainda não fechado
+   * é fechado aqui — é isso que dispensa qualquer ação manual do RH.
+   */
+  async saldo(tenantId: string, empregadoId: string, hoje: string): Promise<SaldoResp> {
     const cfg = await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo || cfg.prazoMeses == null) {
-      return { ativo: false as const, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, saldo: null, extrato: [], formaCalculo: cfg.formaCalculo };
+      return {
+        ativo: false, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, formaCalculo: cfg.formaCalculo,
+        saldo: null, extrato: [], mesCorrente: null, saldoProjetadoMin: null, fechamentos: [],
+      };
     }
+
+    await this.sincronizar(tenantId, empregadoId, hoje, cfg);
+
     let movs = await this.extrato(tenantId, empregadoId);
+    const compAtual = competenciaDe(hoje);
     // Intra-mês: compensa só dentro do mês corrente — não carrega saldo entre meses.
     if (cfg.formaCalculo === 'INTRA_MES') {
-      const mes = hoje.slice(0, 7);
-      movs = movs.filter((m) => m.data.slice(0, 7) === mes);
+      movs = movs.filter((m) => competenciaDe(m.data) === compAtual);
     }
+    const saldo = calcularBanco(movs, cfg.prazoMeses, hoje);
+
+    // Mês em andamento: o que a apuração de hoje lançaria, descontando o que
+    // por acaso já foi lançado pra esta competência (refazer manual, p.ex.).
+    const estimadoBruto = await this.saldoApuradoDaCompetencia(tenantId, empregadoId, compAtual, cfg);
+    const jaLancado = movs.filter((m) => m.competencia === compAtual).reduce((s, m) => s + m.minutos, 0);
+    const mesCorrente: MesCorrente = { competencia: compAtual, estimadoMin: estimadoBruto - jaLancado };
+
+    const fechamentos = await comTenant(this.db, tenantId, (tx) =>
+      tx.select({
+        competencia: pontoBancoFechamento.competencia, totalMin: pontoBancoFechamento.totalMin,
+        fechadoEm: pontoBancoFechamento.fechadoEm, origem: pontoBancoFechamento.origem,
+      }).from(pontoBancoFechamento).where(and(
+        eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
+      )).orderBy(sql`${pontoBancoFechamento.competencia} desc`));
+
     return {
-      ativo: true as const,
+      ativo: true,
       tipoAcordo: cfg.tipoAcordo,
       prazoMeses: cfg.formaCalculo === 'INTRA_MES' ? 1 : cfg.prazoMeses,
       formaCalculo: cfg.formaCalculo,
-      saldo: calcularBanco(movs, cfg.prazoMeses, hoje),
+      saldo,
       extrato: [...movs].reverse(), // o mais recente primeiro, como extrato de banco
+      mesCorrente,
+      saldoProjetadoMin: saldo.saldoMin + mesCorrente.estimadoMin,
+      fechamentos,
     };
+  }
+
+  /**
+   * Saldo do banco em uma data de corte (fim de um mês, p.ex.), pra tela de
+   * apuração mostrar "saldo anterior + mês = acumulado". Sincroniza até lá.
+   * Devolve null se o funcionário não tem banco.
+   */
+  async saldoAte(tenantId: string, empregadoId: string, dataCorte: string, hoje: string): Promise<number | null> {
+    const cfg = await this.configBanco(tenantId, empregadoId);
+    if (!cfg.ativo || cfg.prazoMeses == null) return null;
+    if (cfg.formaCalculo === 'INTRA_MES') return 0; // não carrega nada entre meses
+    await this.sincronizar(tenantId, empregadoId, hoje, cfg);
+    const movs = (await this.extrato(tenantId, empregadoId)).filter((m) => m.data <= dataCorte);
+    return calcularBanco(movs, cfg.prazoMeses, dataCorte).saldoMin;
   }
 
   /**
    * Config de banco QUE VALE pro funcionário, montada a partir dos itens (BANCO
    * e DESTINACAO). Se o item de banco herda (ou não há), usa a empresa.
    */
+  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; formaCalculo: FormaCalculo }> {
+    const empresa = await this.obterConfig(tenantId);
+    const itens = await comTenant(this.db, tenantId, async (tx) => {
+      const emp = (await tx.select({ perfilRegraId: empregado.perfilRegraId })
+        .from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      return emp ? resolverItens(tx as never, tenantId, emp.perfilRegraId) : ({} as ItensResolvidos);
+    });
+    const banco = itens.banco;
+    const destinacaoFaltas = itens.destinacao?.destinacaoFaltas ?? 'DESCONTA';
+    const destinacaoAtrasos = itens.destinacao?.destinacaoAtrasos ?? 'BANCO';
+    const formaCalculo = banco?.formaCalculo ?? 'BANCO_HORAS';
+    if (banco && banco.bancoModo !== 'HERDA') {
+      const ativo = banco.bancoModo === 'ATIVO';
+      const tipo = (banco.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
+      return {
+        ativo,
+        tipoAcordo: ativo ? tipo : 'NENHUM',
+        prazoMeses: ativo ? (banco.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
+        destinacaoFaltas, destinacaoAtrasos, formaCalculo,
+      };
+    }
+    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo }; // HERDA
+  }
+
   /**
    * Quantos funcionários seguem o padrão da empresa e quantos têm regra própria
    * de banco. A tela precisa disso pra não passar a ideia de que o acordo da
@@ -147,30 +264,6 @@ export class BancoService {
     });
   }
 
-  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; formaCalculo: FormaCalculo }> {
-    const empresa = await this.obterConfig(tenantId);
-    const itens = await comTenant(this.db, tenantId, async (tx) => {
-      const emp = (await tx.select({ perfilRegraId: empregado.perfilRegraId })
-        .from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
-      return emp ? resolverItens(tx as never, tenantId, emp.perfilRegraId) : ({} as ItensResolvidos);
-    });
-    const banco = itens.banco;
-    const destinacaoFaltas = itens.destinacao?.destinacaoFaltas ?? 'DESCONTA';
-    const destinacaoAtrasos = itens.destinacao?.destinacaoAtrasos ?? 'BANCO';
-    const formaCalculo = banco?.formaCalculo ?? 'BANCO_HORAS';
-    if (banco && banco.bancoModo !== 'HERDA') {
-      const ativo = banco.bancoModo === 'ATIVO';
-      const tipo = (banco.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
-      return {
-        ativo,
-        tipoAcordo: ativo ? tipo : 'NENHUM',
-        prazoMeses: ativo ? (banco.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
-        destinacaoFaltas, destinacaoAtrasos, formaCalculo,
-      };
-    }
-    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo }; // HERDA
-  }
-
   /** Movimento avulso do RH: pagamento de saldo vencido, ajuste justificado. */
   async lancarMovimento(tenantId: string, p: {
     empregadoId: string; data: string; minutos: number;
@@ -194,33 +287,55 @@ export class BancoService {
     });
   }
 
+  /** Movimentos que a apuração de uma competência geraria, segundo a regra do funcionário. */
+  private async movimentosDaCompetencia(
+    tenantId: string, empregadoId: string, competencia: string,
+    cfg: { destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso },
+  ) {
+    const inicio = `${competencia}-01`;
+    const fim = ultimoDiaDe(competencia);
+    const feriados = await this.tratamento.listarFeriados(tenantId, inicio, fim);
+    const ap = await this.tratamento.apurarPeriodoCLT(
+      tenantId, empregadoId, inicio, fim, feriados.map((f) => f.data));
+    const opc = { destinacaoFaltas: cfg.destinacaoFaltas, destinacaoAtrasos: cfg.destinacaoAtrasos, bancoAtivo: true };
+    return ap.resultado.dias.flatMap((d) =>
+      movimentosBancoDoDia(d, opc).map((mv) => ({
+        tenantId, empregadoId, data: d.data, minutos: mv.minutos,
+        tipo: mv.tipo as 'CREDITO' | 'DEBITO', descricao: mv.descricao, competencia,
+      })));
+  }
+
+  /** Soma do que a competência lançaria hoje (pra estimativa do mês corrente). */
+  private async saldoApuradoDaCompetencia(
+    tenantId: string, empregadoId: string, competencia: string,
+    cfg: { destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso },
+  ): Promise<number> {
+    try {
+      const movs = await this.movimentosDaCompetencia(tenantId, empregadoId, competencia, cfg);
+      return movs.reduce((s, m) => s + m.minutos, 0);
+    } catch (e) {
+      // Sem REP/horário configurado a apuração falha; a estimativa é opcional.
+      this.log.warn(`Estimativa do mês ${competencia} falhou: ${(e as Error).message}`);
+      return 0;
+    }
+  }
+
   /**
-   * Lança no banco o saldo de cada dia de uma competência já apurada.
+   * Lança no banco o saldo de cada dia de uma competência já apurada e marca
+   * a competência como fechada.
    *
    * Idempotente: relançar a mesma competência apaga o que foi lançado por ela
    * antes. Só mexe no que veio da apuração — pagamento e ajuste do RH não são
    * tocados, porque não pertencem à competência.
    */
-  async lancarCompetencia(tenantId: string, empregadoId: string, competencia: string) {
+  async lancarCompetencia(
+    tenantId: string, empregadoId: string, competencia: string, origem: 'AUTO' | 'MANUAL' = 'MANUAL',
+  ) {
     const cfg = await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
     if (!/^\d{4}-\d{2}$/.test(competencia)) throw new BadRequestException('Competência deve ser YYYY-MM');
 
-    const [a, m] = competencia.split('-').map(Number);
-    const ultimo = new Date(Date.UTC(a!, m!, 0)).getUTCDate();
-    const inicio = `${competencia}-01`;
-    const fim = `${competencia}-${String(ultimo).padStart(2, '0')}`;
-
-    const feriados = await this.tratamento.listarFeriados(tenantId, inicio, fim);
-    const ap = await this.tratamento.apurarPeriodoCLT(
-      tenantId, empregadoId, inicio, fim, feriados.map((f) => f.data));
-
-    const opc = { destinacaoFaltas: cfg.destinacaoFaltas, destinacaoAtrasos: cfg.destinacaoAtrasos, bancoAtivo: true };
-    const novos = ap.resultado.dias.flatMap((d) =>
-      movimentosBancoDoDia(d, opc).map((mv) => ({
-        tenantId, empregadoId, data: d.data, minutos: mv.minutos,
-        tipo: mv.tipo as 'CREDITO' | 'DEBITO', descricao: mv.descricao, competencia,
-      })));
+    const novos = await this.movimentosDaCompetencia(tenantId, empregadoId, competencia, cfg);
 
     return comTenant(this.db, tenantId, async (tx) => {
       await tx.delete(pontoBancoMov).where(and(
@@ -230,13 +345,121 @@ export class BancoService {
       ));
       if (novos.length > 0) await tx.insert(pontoBancoMov).values(novos);
       const totalMin = novos.reduce((s, n) => s + n.minutos, 0);
+      await tx.insert(pontoBancoFechamento).values({
+        tenantId, empregadoId, competencia, totalMin, lancamentos: novos.length, origem,
+      }).onConflictDoUpdate({
+        target: [pontoBancoFechamento.tenantId, pontoBancoFechamento.empregadoId, pontoBancoFechamento.competencia],
+        set: { totalMin, lancamentos: novos.length, origem, fechadoEm: new Date() },
+      });
       return { competencia, lancados: novos.length, totalMin };
     });
   }
 
   /**
-   * Lança uma competência para TODOS os funcionários ativos de uma vez.
-   * Reaproveita o lançamento individual (idempotente), então relançar o mês
+   * Primeira competência que faz sentido fechar pro funcionário: o mês da
+   * data de início do ponto, ou da primeira batida, o que vier primeiro.
+   * Null = não tem nada pra fechar ainda.
+   */
+  private async primeiraCompetencia(tenantId: string, empregadoId: string): Promise<string | null> {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emp = (await tx.select({ cpf: empregado.cpf, dataInicioPonto: empregado.dataInicioPonto })
+        .from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!emp) return null;
+      const t = (await tx.select({ fuso: tenant.fuso }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const fuso = t?.fuso ?? '-0300';
+      const primeira = (await tx.select({ dt: min(pontoMarcacao.dtMarcacao) }).from(pontoMarcacao)
+        .where(and(eq(pontoMarcacao.tenantId, tenantId), eq(pontoMarcacao.cpf, emp.cpf))))[0]?.dt;
+      const candidatos: string[] = [];
+      if (primeira) candidatos.push(diaLocal(primeira, fuso));
+      if (emp.dataInicioPonto) candidatos.push(emp.dataInicioPonto);
+      if (candidatos.length === 0) return null;
+      // Data de início do ponto manda: antes dela a apuração ignora os dias.
+      const inicio = emp.dataInicioPonto && (!primeira || emp.dataInicioPonto >= diaLocal(primeira, fuso))
+        ? emp.dataInicioPonto
+        : candidatos.sort()[0]!;
+      return competenciaDe(inicio);
+    });
+  }
+
+  /**
+   * Fecha automaticamente toda competência já encerrada (anterior ao mês de
+   * `hoje`) que ainda não tem fechamento. É chamada em toda consulta de saldo
+   * e pelo cron — por isso precisa ser barata quando não há nada a fazer:
+   * uma consulta na tabela de fechamentos e pronto.
+   */
+  async sincronizar(
+    tenantId: string, empregadoId: string, hoje: string,
+    cfgPronta?: { ativo: boolean; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso },
+  ): Promise<{ fechadas: string[] }> {
+    const cfg = cfgPronta ?? await this.configBanco(tenantId, empregadoId);
+    if (!cfg.ativo) return { fechadas: [] };
+
+    const primeira = await this.primeiraCompetencia(tenantId, empregadoId);
+    if (!primeira) return { fechadas: [] };
+
+    const compAtual = competenciaDe(hoje);
+    const ultimaFechavel = somarMesesComp(compAtual, -1);
+    if (primeira > ultimaFechavel) return { fechadas: [] };
+
+    const jaFechadas = new Set((await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ competencia: pontoBancoFechamento.competencia }).from(pontoBancoFechamento).where(and(
+        eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
+      )))).map((f) => f.competencia));
+
+    const pendentes: string[] = [];
+    let comp = primeira > somarMesesComp(ultimaFechavel, -LIMITE_MESES_SINCRONIZACAO)
+      ? primeira : somarMesesComp(ultimaFechavel, -LIMITE_MESES_SINCRONIZACAO);
+    while (comp <= ultimaFechavel) {
+      if (!jaFechadas.has(comp)) pendentes.push(comp);
+      comp = somarMesesComp(comp, 1);
+    }
+
+    const fechadas: string[] = [];
+    for (const c of pendentes) {
+      try {
+        await this.lancarCompetencia(tenantId, empregadoId, c, 'AUTO');
+        fechadas.push(c);
+      } catch (e) {
+        // Um mês que não dá pra apurar (sem REP, p.ex.) não pode travar os outros.
+        this.log.warn(`Fechamento automático ${c} do empregado ${empregadoId} falhou: ${(e as Error).message}`);
+      }
+    }
+    return { fechadas };
+  }
+
+  /** Sincroniza todos os funcionários ativos com banco de um tenant (cron). */
+  async sincronizarTenant(tenantId: string, hoje: string): Promise<{ funcionarios: number; fechadas: number }> {
+    const ativos = await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ id: empregado.id }).from(empregado)
+        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true))));
+    let funcionarios = 0, fechadas = 0;
+    for (const e of ativos) {
+      const cfg = await this.configBanco(tenantId, e.id);
+      if (!cfg.ativo) continue;
+      funcionarios++;
+      fechadas += (await this.sincronizar(tenantId, e.id, hoje, cfg)).fechadas.length;
+    }
+    return { funcionarios, fechadas };
+  }
+
+  /** Sincroniza todos os tenants (cron). Cada um no seu fuso. */
+  async sincronizarTodos(): Promise<void> {
+    const tenants = await comoMaster(this.db, (tx) =>
+      tx.select({ id: tenant.id, fuso: tenant.fuso, tipo: tenant.bancoTipoAcordo }).from(tenant));
+    for (const t of tenants) {
+      const hoje = diaLocal(new Date(), t.fuso ?? '-0300');
+      try {
+        const r = await this.sincronizarTenant(t.id, hoje);
+        if (r.fechadas > 0) this.log.log(`Tenant ${t.id}: ${r.fechadas} competência(s) fechada(s) automaticamente`);
+      } catch (e) {
+        this.log.error(`Sincronização do tenant ${t.id} falhou: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  /**
+   * Refaz uma competência para TODOS os funcionários ativos de uma vez.
+   * Reaproveita o lançamento individual (idempotente), então refazer o mês
    * substitui só o que veio da apuração — pagamentos e ajustes ficam intactos.
    */
   async lancarCompetenciaLote(tenantId: string, competencia: string) {
@@ -254,7 +477,7 @@ export class BancoService {
       const cfg = await this.configBanco(tenantId, e.id);
       if (!cfg.ativo) continue;
       comBanco++;
-      const r = await this.lancarCompetencia(tenantId, e.id, competencia);
+      const r = await this.lancarCompetencia(tenantId, e.id, competencia, 'MANUAL');
       porFuncionario.push({ empregadoId: e.id, nome: e.nome, minutos: r.totalMin });
     }
     if (comBanco === 0) throw new BadRequestException('Nenhum funcionário tem banco de horas ativo nesta empresa');
@@ -263,32 +486,27 @@ export class BancoService {
   }
 
   /**
-   * Histórico de competências já lançadas, derivado do extrato (a coluna
-   * `competencia` marca cada movimento que veio de um lançamento). Agrupa por
-   * competência com total, nº de funcionários, data do lançamento e detalhe.
+   * Histórico de competências fechadas, agrupado por competência com total,
+   * nº de funcionários, data do fechamento e detalhe. Antes de listar,
+   * sincroniza a empresa inteira — assim a tela do RH já mostra os meses
+   * fechados sem ninguém ter pedido.
    */
-  async historicoCompetencias(tenantId: string) {
+  async historicoCompetencias(tenantId: string, hoje: string) {
+    await this.sincronizarTenant(tenantId, hoje);
     return comTenant(this.db, tenantId, async (tx) => {
-      const movs = await tx.select({
-        competencia: pontoBancoMov.competencia,
-        empregadoId: pontoBancoMov.empregadoId,
-        minutos: pontoBancoMov.minutos,
-        criadoEm: pontoBancoMov.criadoEm,
-      }).from(pontoBancoMov).where(and(
-        eq(pontoBancoMov.tenantId, tenantId),
-        isNotNull(pontoBancoMov.competencia),
-      ));
+      const fechs = await tx.select().from(pontoBancoFechamento)
+        .where(eq(pontoBancoFechamento.tenantId, tenantId));
 
       const nomes = new Map((await tx.select({ id: empregado.id, nome: empregado.nome })
         .from(empregado).where(eq(empregado.tenantId, tenantId))).map((e) => [e.id, e.nome] as const));
 
-      const porComp = new Map<string, { lancadoEm: Date; func: Map<string, number> }>();
-      for (const m of movs) {
-        const comp = m.competencia!;
-        const g = porComp.get(comp) ?? { lancadoEm: m.criadoEm, func: new Map<string, number>() };
-        g.func.set(m.empregadoId, (g.func.get(m.empregadoId) ?? 0) + m.minutos);
-        if (m.criadoEm > g.lancadoEm) g.lancadoEm = m.criadoEm;
-        porComp.set(comp, g);
+      const porComp = new Map<string, { lancadoEm: Date; auto: number; func: Map<string, number> }>();
+      for (const f of fechs) {
+        const g = porComp.get(f.competencia) ?? { lancadoEm: f.fechadoEm, auto: 0, func: new Map<string, number>() };
+        g.func.set(f.empregadoId, f.totalMin);
+        if (f.origem === 'AUTO') g.auto++;
+        if (f.fechadoEm > g.lancadoEm) g.lancadoEm = f.fechadoEm;
+        porComp.set(f.competencia, g);
       }
 
       return [...porComp.entries()]
@@ -302,6 +520,7 @@ export class BancoService {
             funcionarios: g.func.size,
             totalMin: porFuncionario.reduce((s, f) => s + f.minutos, 0),
             lancadoEm: g.lancadoEm,
+            automatico: g.auto === g.func.size,
             porFuncionario,
           };
         });
@@ -315,6 +534,7 @@ export class BancoService {
    *    contar como falta;
    *  - lança um débito no banco no valor da jornada daquele dia.
    * Sem os dois, ou o dia viraria falta, ou o saldo nunca baixaria.
+   * Se o mês da folga já estava fechado, reabre — o dia era falta e deixou de ser.
    */
   async registrarFolga(tenantId: string, empregadoId: string, data: string, minutosManual?: number | null) {
     const cfg = await this.configBanco(tenantId, empregadoId);
@@ -349,6 +569,7 @@ export class BancoService {
         tenantId, empregadoId, data, minutos: -minutos, tipo: 'DEBITO',
         descricao: 'Folga compensatória',
       }).returning();
+      await reabrirCompetencia(tx as never, tenantId, empregadoId, competenciaDe(data));
       return { data, minutos, movimento: mov };
     });
   }

@@ -59,6 +59,10 @@
 .destBadge{ font-family:var(--ff-mono); font-size:11px; padding:2px 9px; border-radius:6px; margin-left:8px; }
 .destDesc{ background:var(--erro-bg); color:var(--coral-dark); }
 .destBanco{ background:var(--lime); color:var(--ink); }
+.destTotal{ font-weight:700; border-top:1px solid rgba(var(--ink-rgb),.14) !important; margin-top:4px; padding-top:12px; }
+.destTotal .mono{ font-size:15px; }
+.neg{ color:var(--coral-dark); }
+.destAviso{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border-radius:10px; background:#fff0ec; border:1px solid var(--coral); font-size:13px; }
 .destNota{ font-size:12px; color:var(--ash); margin:10px 0 0; }
 
 /* ===== Gaveta lateral: detalhe do dia ===== */

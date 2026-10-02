@@ -4,6 +4,7 @@ import { pontoDocumento, empregado, usuario, comTenant, type Db } from '@ponto/d
 import { DB } from '../database/database.module';
 import { CriptoService } from '../common/cripto.service';
 import { EmailService } from '../email/email.service';
+import { reabrirIntervalo } from '../banco/fechamento';
 import { emailAtestadoRecebido } from '../email/templates';
 
 const fmtDataBR = (d: string) => { const [a, m, dia] = d.split('-'); return `${dia}/${m}/${a}`; };
@@ -132,6 +133,8 @@ export class DocumentoService {
         analisadoPor: p.abonar ? analistaId : null,
         analisadoEm: p.abonar ? new Date() : null,
       }).returning(CAMPOS);
+      // Já entrou abonado → muda a apuração → refaz os meses no banco de horas.
+      if (p.abonar) await reabrirIntervalo(tx as never, tenantId, p.empregadoId, p.dataInicio, p.dataFim);
       return doc;
     });
   }
@@ -189,7 +192,10 @@ export class DocumentoService {
       throw new BadRequestException('Recusa precisa de motivo — o funcionário tem que saber o que corrigir');
     }
     return comTenant(this.db, tenantId, async (tx) => {
-      const atual = (await tx.select({ status: pontoDocumento.status }).from(pontoDocumento)
+      const atual = (await tx.select({
+        status: pontoDocumento.status, empregadoId: pontoDocumento.empregadoId,
+        dataInicio: pontoDocumento.dataInicio, dataFim: pontoDocumento.dataFim,
+      }).from(pontoDocumento)
         .where(and(eq(pontoDocumento.id, id), eq(pontoDocumento.tenantId, tenantId))).limit(1))[0];
       if (!atual) throw new NotFoundException('Documento não encontrado');
 
@@ -198,6 +204,12 @@ export class DocumentoService {
         motivoRecusa: p.status === 'RECUSADO' ? p.motivoRecusa!.trim() : null,
         analisadoEm: new Date(), analisadoPor: usuarioId,
       }).where(eq(pontoDocumento.id, id)).returning(CAMPOS);
+
+      // Abonar (ou deixar de abonar) muda a apuração dos dias do documento →
+      // os meses tocados são refeitos no banco de horas.
+      if (atual.status !== p.status) {
+        await reabrirIntervalo(tx as never, tenantId, atual.empregadoId, atual.dataInicio, atual.dataFim);
+      }
       return doc;
     });
   }

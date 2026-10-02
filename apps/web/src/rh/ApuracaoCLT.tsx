@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { Link } from 'react-router-dom';
 import { minutosParaHhMm, reaisDeCentavos, rotuloMarcacao } from '../lib/formato';
@@ -25,6 +25,7 @@ const ROTULO_DESTINO: Record<string, string> = {
   TOLERA: 'tolerado', PAGA: 'pago como extra',
 };
 const ehBanco = (d: string) => d === 'BANCO';
+const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
 
 export function ApuracaoCLT() {
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
@@ -42,15 +43,29 @@ export function ApuracaoCLT() {
       .catch((e) => setErro((e as Error).message));
   }, []);
 
-  useEffect(() => {
+  const carregar = useCallback(async () => {
     if (!empregadoId) return;
     const { inicio, fim } = faixaDoMes(mes);
     setCarregando(true); setErro(null);
-    api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`)
-      .then(setAp)
-      .catch((e) => { setErro((e as Error).message); setAp(null); })
-      .finally(() => setCarregando(false));
+    try {
+      // Fecha no banco os meses anteriores ainda pendentes (idempotente e
+      // barato quando não há nada) — assim o "saldo anterior" está certo.
+      await api.post(`/banco/sincronizar?empregadoId=${empregadoId}`, {}).catch(() => {});
+      setAp(await api.get<ApuracaoResp>(`/tratamento/apuracao?empregadoId=${empregadoId}&inicio=${inicio}&fim=${fim}`));
+    } catch (e) { setErro((e as Error).message); setAp(null); }
+    finally { setCarregando(false); }
   }, [empregadoId, mes]);
+  useEffect(() => { void carregar(); }, [carregar]);
+
+  const [refazendo, setRefazendo] = useState(false);
+  async function refazerMes() {
+    setRefazendo(true); setErro(null);
+    try {
+      await api.post('/banco/lancar-competencia', { empregadoId, competencia: mes });
+      await carregar();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setRefazendo(false); }
+  }
 
   async function baixarPdf() {
     const { inicio, fim } = faixaDoMes(mes);
@@ -142,6 +157,49 @@ export function ApuracaoCLT() {
                 </div>
               )}
               <p className={css.destNota}>O sistema calcula e sinaliza — o desconto real é aplicado pela folha.</p>
+            </div>
+          )}
+
+          {ap!.banco && (
+            <div className={css.destinacao}>
+              <h3>Banco de horas — de onde vem o saldo</h3>
+              {ap!.banco.formaCalculo === 'INTRA_MES' ? (
+                <p className={css.destNota} style={{ marginTop: 0 }}>
+                  Regra <strong>intra-mês</strong>: compensa só dentro do mês. Nada passa de um mês pro outro.
+                </p>
+              ) : (
+                <div className={css.destLinha}>
+                  <span>Saldo que veio dos meses anteriores</span>
+                  <span className={`${css.mono} ${ap!.banco.saldoAnteriorMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.saldoAnteriorMin)}</span>
+                </div>
+              )}
+              <div className={css.destLinha}>
+                <span>
+                  Este mês {ap!.banco.fechada
+                    ? <span className={`${css.destBadge} ${css.destBanco}`}>fechado no banco</span>
+                    : <span className={`${css.destBadge} ${css.destDesc}`}>em andamento — fecha sozinho no dia 1</span>}
+                </span>
+                <span className={`${css.mono} ${ap!.banco.saldoMesMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.saldoMesMin)}</span>
+              </div>
+              {ap!.banco.avulsoMin !== 0 && (
+                <div className={css.destLinha}>
+                  <span>Folgas, pagamentos e ajustes do RH no mês</span>
+                  <span className={`${css.mono} ${ap!.banco.avulsoMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.avulsoMin)}</span>
+                </div>
+              )}
+              <div className={`${css.destLinha} ${css.destTotal}`}>
+                <span>Saldo acumulado ao fim do mês</span>
+                <span className={`${css.mono} ${ap!.banco.saldoAcumuladoMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.saldoAcumuladoMin)}</span>
+              </div>
+              {ap!.banco.desatualizado && (
+                <div className={css.destAviso}>
+                  <span>O fechamento deste mês está diferente da apuração de hoje (algo mudou depois de fechar).</span>
+                  <Botao variante="ghost" onClick={refazerMes} disabled={refazendo}>{refazendo ? 'Refazendo…' : 'Refazer fechamento'}</Botao>
+                </div>
+              )}
+              <p className={css.destNota}>
+                Os meses fecham automaticamente. Extrato completo em <Link to="/rh/banco">Banco de horas</Link>.
+              </p>
             </div>
           )}
 

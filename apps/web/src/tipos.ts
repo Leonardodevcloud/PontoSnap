@@ -262,6 +262,8 @@ export interface ApuracaoResp {
   afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
   /** Pra onde vão faltas/atrasos/extras, segundo a regra do funcionário. */
   destinacao?: Destinacao;
+  /** Banco de horas no contexto do período: anterior + mês = acumulado. Null = sem banco. */
+  banco?: BancoPeriodo | null;
   /** Batidas de cada dia (chave = YYYY-MM-DD) com a origem de cada uma. */
   batidas?: Record<string, BatidaDia[]>;
   /** Batidas previstas pelo horário contratual (2 por par). */
@@ -320,20 +322,51 @@ export interface SaldoBanco {
   lotes: LoteBanco[];
 }
 
+export interface BancoPeriodo {
+  ativo: true;
+  formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
+  prazoMeses: number;
+  competencia: string;
+  /** O mês já foi fechado no banco (lançado). */
+  fechada: boolean;
+  saldoAnteriorMin: number;
+  /** O que o mês leva pro banco (fechado: o lançado; em andamento: a apuração de agora). */
+  saldoMesMin: number;
+  /** Folgas, pagamentos e ajustes do RH dentro do período. */
+  avulsoMin: number;
+  saldoAcumuladoMin: number;
+  /** Fechado com valor diferente do que a apuração dá hoje → refazer o mês. */
+  desatualizado: boolean;
+}
+
 export interface MovimentoBanco {
   id?: string;
   data: string;
   minutos: number;
   tipo: 'CREDITO' | 'DEBITO' | 'PAGAMENTO' | 'AJUSTE';
   descricao?: string;
+  competencia?: string | null;
+}
+
+export interface FechamentoBanco {
+  competencia: string;
+  totalMin: number;
+  fechadoEm: string;
+  origem: 'AUTO' | 'MANUAL';
 }
 
 export interface BancoResp {
   ativo: boolean;
   tipoAcordo: TipoAcordoBanco;
   prazoMeses: number | null;
+  formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
   saldo: SaldoBanco | null;
   extrato: MovimentoBanco[];
+  /** Mês em andamento, ainda não fechado. */
+  mesCorrente: { competencia: string; estimadoMin: number } | null;
+  /** Saldo oficial + mês em andamento. */
+  saldoProjetadoMin: number | null;
+  fechamentos: FechamentoBanco[];
 }
 
 export interface ConfigBanco {
@@ -348,6 +381,8 @@ export interface CompetenciaLancada {
   funcionarios: number;
   totalMin: number;
   lancadoEm: string;
+  /** true quando todos os fechamentos da competência foram automáticos. */
+  automatico: boolean;
   porFuncionario: CompetenciaFunc[];
 }
 export interface LoteResultado {

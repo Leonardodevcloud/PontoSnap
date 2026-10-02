@@ -21,6 +21,12 @@
 .mini > div{ flex:1; }
 .mL{ font-size:9.5px; opacity:.62; text-transform:uppercase; letter-spacing:.06em; font-family:var(--ff-mono); }
 .mV{ font-family:var(--ff-mono); font-size:14px; margin-top:2px; }
+.banco{ border-top:1px solid rgba(255,248,238,.14); padding-top:10px; margin-top:10px; }
+.bLinha{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:12.5px; padding:3px 0; opacity:.88; }
+.bLinha span:last-child{ font-family:var(--ff-mono); }
+.bTotal{ opacity:1; font-weight:700; border-top:1px solid rgba(255,248,238,.14); margin-top:4px; padding-top:7px; }
+.bTotal span:last-child{ color:var(--lime); font-size:15px; }
+.bNeg{ color:var(--coral) !important; }
 
 .dia{
   width:100%; display:grid; grid-template-columns:36px 1fr auto; gap:10px; align-items:center; text-align:left;

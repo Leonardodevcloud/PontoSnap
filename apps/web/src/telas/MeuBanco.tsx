@@ -51,23 +51,34 @@ export function MeuBanco() {
 
   const s = dados.saldo;
   const acordo = dados.tipoAcordo === 'COLETIVO' ? 'Acordo coletivo' : 'Acordo individual';
-  const temEstimativa = (dados as any).saldoEstimadoMesMin !== undefined;
-  const saldoEstimado = (dados as any).saldoEstimadoMesMin as number ?? 0;
-  const compEstimada = (dados as any).competenciaEstimada as string ?? '';
+  const intraMes = dados.formaCalculo === 'INTRA_MES';
 
-  // Se o banco oficial tá zerado mas tem estimativa, mostra a estimativa
-  const saldoExibido = s.saldoMin === 0 && temEstimativa ? saldoEstimado : s.saldoMin;
-  const ehEstimativa = s.saldoMin === 0 && temEstimativa && saldoEstimado !== 0;
+  // Saldo oficial (meses fechados) + o mês em andamento = o que a pessoa
+  // realmente tem. Antes a tela só mostrava o mês corrente se o oficial
+  // fosse zero, e parecia que as horas sumiam depois do primeiro fechamento.
+  const mesCorrente = dados.mesCorrente;
+  const projetado = dados.saldoProjetadoMin ?? s.saldoMin;
+  const rotuloMes = mesCorrente
+    ? new Date(`${mesCorrente.competencia}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'long' })
+    : '';
 
   return (
     <div className="appshell">
       <div className={css.h}>Banco de horas</div>
-      <div className={css.s}>{acordo} · compensar em até {dados.prazoMeses} meses</div>
+      <div className={css.s}>
+        {acordo} · {intraMes ? 'compensa dentro do mês' : `compensar em até ${dados.prazoMeses} meses`}
+      </div>
 
       <div className={css.resumo}>
-        <div className={css.rL}>Saldo {ehEstimativa ? `estimado (${compEstimada})` : 'acumulado'}</div>
-        <div className={`${css.rV} ${saldoExibido < 0 ? css.rVneg : ''}`}>{comSinal(saldoExibido)}</div>
-        {ehEstimativa && <div className={css.estAviso}>Estimativa em tempo real — o saldo oficial entra quando o RH fechar o mês.</div>}
+        <div className={css.rL}>Saldo atual</div>
+        <div className={`${css.rV} ${projetado < 0 ? css.rVneg : ''}`}>{comSinal(projetado)}</div>
+        {mesCorrente && (
+          <div className={css.estAviso}>
+            {intraMes ? 'Só este mês' : 'Meses fechados'}: <b>{comSinal(s.saldoMin)}</b>
+            {' · '}{rotuloMes} até agora: <b>{comSinal(mesCorrente.estimadoMin)}</b>
+            {!intraMes && ' — o mês fecha sozinho no dia 1.'}
+          </div>
+        )}
         <div className={css.mini}>
           <div>
             <div className={css.mL}>Creditado</div>
@@ -121,7 +132,7 @@ export function MeuBanco() {
         <div key={`${m.data}-${i}`} className={css.ext}>
           <div>
             <div className={css.extE}>{m.descricao || ROTULO[m.tipo] || m.tipo}</div>
-            <div className={css.extD}>{fmtData(m.data)}</div>
+            <div className={css.extD}>{fmtData(m.data)}{m.competencia ? ' · fechamento do mês' : ''}</div>
           </div>
           <div className={`${css.extV} ${m.minutos > 0 ? css.pos : css.neg}`}>{comSinal(m.minutos)}</div>
         </div>

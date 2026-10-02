@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, gte, lte, ne } from 'drizzle-orm';
 import { pontoAfastamento, empregado, comTenant, type Db } from '@ponto/db';
+import { reabrirIntervalo } from '../banco/fechamento';
 import { DB } from '../database/database.module';
 
 export const TIPOS = ['FERIAS', 'INSS', 'MATERNIDADE', 'PATERNIDADE', 'SUSPENSAO', 'OUTRO'] as const;
@@ -50,6 +51,8 @@ export class AfastamentoService {
         observacao: p.observacao?.trim() || null,
         criadoPor: usuarioId,
       }).returning();
+      // Afastamento tira os dias da apuração → refaz os meses no banco de horas.
+      await reabrirIntervalo(tx as never, tenantId, p.empregadoId, p.dataInicio, p.dataFim);
       return a;
     });
   }
@@ -79,6 +82,8 @@ export class AfastamentoService {
       const [a] = await tx.delete(pontoAfastamento).where(and(
         eq(pontoAfastamento.id, id), eq(pontoAfastamento.tenantId, tenantId))).returning();
       if (!a) throw new NotFoundException('Afastamento não encontrado');
+      // Os dias voltam a ser esperados → refaz os meses no banco de horas.
+      await reabrirIntervalo(tx as never, tenantId, a.empregadoId, a.dataInicio, a.dataFim);
       return { removido: true };
     });
   }
