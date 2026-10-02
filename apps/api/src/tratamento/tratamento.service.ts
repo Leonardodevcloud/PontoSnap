@@ -36,12 +36,12 @@ export class TratamentoService {
   }
 
   // ---- Horário contratual ----
-  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null }) {
+  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean }) {
     return comTenant(this.db, tenantId, async (tx) =>
       (await tx.insert(pontoHorarioContratual).values({
         tenantId, codigo: dto.codigo, durJornadaMin: dto.durJornadaMin, pares: dto.pares,
         diasSemana: dto.diasSemana ?? [1, 2, 3, 4, 5], regime: dto.regime ?? 'normal',
-        jornadaPorDia: dto.jornadaPorDia ?? null,
+        jornadaPorDia: dto.jornadaPorDia ?? null, flexivel: dto.flexivel ?? false,
       }).returning())[0]);
   }
 
@@ -50,7 +50,7 @@ export class TratamentoService {
    * Recalcula a apuração de todos que a usam — por isso é para CORREÇÃO, não
    * para mudança real de jornada (essa usa mudarEscalaComVigencia).
    */
-  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null }) {
+  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean }) {
     return comTenant(this.db, tenantId, async (tx) => {
       const set: Record<string, unknown> = {};
       if (dto.codigo !== undefined) set.codigo = dto.codigo;
@@ -59,10 +59,25 @@ export class TratamentoService {
       if (dto.diasSemana !== undefined) set.diasSemana = dto.diasSemana;
       if (dto.regime !== undefined) set.regime = dto.regime;
       if (dto.jornadaPorDia !== undefined) set.jornadaPorDia = dto.jornadaPorDia;
+      if (dto.flexivel !== undefined) set.flexivel = dto.flexivel;
       const rows = await tx.update(pontoHorarioContratual).set(set)
         .where(and(eq(pontoHorarioContratual.id, id), eq(pontoHorarioContratual.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Escala não encontrada');
-      return rows[0];
+
+      // Mudou a regra da escala → a apuração de quem usa ela muda, inclusive
+      // no passado. O banco de horas desses funcionários é reaberto inteiro e
+      // refeito na próxima consulta (ou pelo cron). Só a marca de fechamento
+      // sai; os movimentos ficam até serem substituídos.
+      const usuarios = new Set<string>();
+      for (const e of await tx.select({ id: empregado.id }).from(empregado)
+        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.horarioContratualId, id)))) usuarios.add(e.id);
+      for (const v of await tx.select({ empregadoId: empregadoEscalaVigencia.empregadoId }).from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.tenantId, tenantId), eq(empregadoEscalaVigencia.horarioContratualId, id)))) usuarios.add(v.empregadoId);
+      for (const empId of usuarios) {
+        await tx.delete(pontoBancoFechamento).where(and(
+          eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empId)));
+      }
+      return { ...rows[0], funcionariosRecalculados: usuarios.size };
     });
   }
 
@@ -547,7 +562,8 @@ export class TratamentoService {
             ehFeriado: feriadoSet.has(data),
             ehDescanso: (escalaSet.size > 0 ? !trabalhaHoje : false) || descansoPorAusencia.has(data),
             regime: 'r12x36',
-            janelaPrevista: horario?.pares,
+            // Contrato de horas: sem janela — vale só a carga do dia.
+            janelaPrevista: horario?.flexivel ? undefined : horario?.pares,
             // Atestado de dia inteiro abate a jornada daquele dia — é isso que
             // impede o dia de virar falta na apuração.
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
@@ -587,7 +603,8 @@ export class TratamentoService {
             jornadaContratadaMin: jornada,
             ehDomingo, ehFeriado, ehDescanso,
             regime: 'normal',
-            janelaPrevista: (ehUtil && !jornadaCustomizada) ? escDia?.pares : undefined,
+            // Contrato de horas (flexível): sem janela — só a carga do dia conta.
+            janelaPrevista: (ehUtil && !jornadaCustomizada && !escDia?.flexivel) ? escDia?.pares : undefined,
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -653,6 +670,8 @@ export class TratamentoService {
         horarioPares: horario?.pares ?? [],
         horarioDurMin: horario?.durJornadaMin ?? 0,
         jornadaPorDia: horario?.jornadaPorDia ?? null,
+        /** Contrato de horas: a jornada é só a carga, sem horário fixo. */
+        horarioFlexivel: horario?.flexivel ?? false,
       };
     });
   }
@@ -803,7 +822,10 @@ export class TratamentoService {
       const iso = new Date(d.getTime() + offsetMin(fuso) * 60000).toISOString();
       return iso.slice(11, 16);
     };
-    const paresEsperados = (ap.horarioPares ?? []).map((p) => `${p.entrada}-${p.saida}`).join(' ');
+    // Contrato de horas: o espelho mostra a carga, não um horário que não existe.
+    const paresEsperados = ap.horarioFlexivel
+      ? `${hhmm(ap.horarioDurMin)} livre`
+      : (ap.horarioPares ?? []).map((p) => `${p.entrada}-${p.saida}`).join(' ');
 
     const afastPorDia = new Map<string, string>();
     for (const a of ap.afastamentos ?? []) {

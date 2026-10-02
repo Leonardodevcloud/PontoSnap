@@ -190,6 +190,8 @@ export interface Horario {
   diasSemana: number[];
   regime: string;
   jornadaPorDia?: Record<string, number> | null;
+  /** Contrato de horas: só a carga do dia conta, sem horário fixo. */
+  flexivel?: boolean;
   criadoEm?: string;
 }
 
@@ -271,6 +273,7 @@ export interface ApuracaoResp {
   horarioPares?: { entrada: string; saida: string }[];
   horarioDurMin?: number;
   jornadaPorDia?: Record<string, number> | null;
+  horarioFlexivel?: boolean;
 }
 
 export interface BatidaDia {
