@@ -125,6 +125,26 @@ const fmtDoc = (d: string) => {
   return d ?? '';
 };
 
+/** "0800-1200 1300-1700" → "08:00-12:00 13:00-17:00". Texto livre ("8h00 livre") passa intacto. */
+function formatarJornadaEsperada(v: string): string {
+  if (!v) return '—';
+  return v.replace(/\b(\d{2})(\d{2})\b/g, '$1:$2');
+}
+
+/** "8h01" → 481 · "" → 0 · "-0h30" → -30. É o formato que as linhas do espelho usam. */
+function minutosDeHhmm(v: string | undefined): number {
+  const m = /^(-?)(\d+)h(\d{2})$/.exec((v ?? '').trim());
+  if (!m) return 0;
+  const n = Number(m[2]) * 60 + Number(m[3]);
+  return m[1] === '-' ? -n : n;
+}
+
+function hhmmDeMinutos(min: number): string {
+  if (min === 0) return '';
+  const a = Math.abs(min);
+  return `${min < 0 ? '-' : ''}${Math.floor(a / 60)}h${String(a % 60).padStart(2, '0')}`;
+}
+
 export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } });
   const chunks: Buffer[] = [];
@@ -212,7 +232,7 @@ export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
     const valores: Record<string, string> = {
       data: `${fmtData(l.data).slice(0, 5)} ${diaSemana(l.data, d.fuso)}`,
       tipoDia: l.tipoDia,
-      jornadaEsperada: l.jornadaEsperada || '—',
+      jornadaEsperada: formatarJornadaEsperada(l.jornadaEsperada),
       marcacoesOriginais: l.marcacoesOriginais || '—',
       jornadaRealizada: l.jornadaRealizada || '—',
       horasRealizadas: l.horasRealizadas || '',
@@ -230,6 +250,38 @@ export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
       x += c.w;
     }
     doc.moveTo(34, y + h).lineTo(34 + larguraUtil, y + h).strokeColor(LINHA).lineWidth(0.4).stroke();
+    y += h;
+  }
+
+  // ---- Linha consolidando cada coluna ----
+  if (d.linhas.length > 0) {
+    const h = 16;
+    if (y + h > doc.page.height - 90) {
+      doc.addPage({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } });
+      y = 40;
+      y = desenharCabecalho(y);
+    }
+    const soma = (k: keyof LinhaEspelho) => hhmmDeMinutos(d.linhas.reduce((acc, l) => acc + minutosDeHhmm(l[k] as string), 0));
+    const totais: Record<string, string> = {
+      data: 'Total', tipoDia: '',
+      jornadaEsperada: `${d.linhas.filter((l) => l.tipoDia === 'TRAB').length} dia(s) trab.`,
+      marcacoesOriginais: '', jornadaRealizada: '',
+      horasRealizadas: soma('horasRealizadas'),
+      horasPositivas: soma('horasPositivas'),
+      atrasosFaltas: soma('atrasosFaltas'),
+      horaNoturna: soma('horaNoturna'),
+      compensadasDebito: soma('compensadasDebito'),
+      compensadasCredito: soma('compensadasCredito'),
+      eventos: '',
+    };
+    doc.rect(34, y, larguraUtil, h).fill(CAB_BG);
+    let x = 34;
+    doc.font('Helvetica-Bold').fontSize(7).fillColor(TINTA);
+    for (const c of cols) {
+      doc.text(totais[c.k as string] ?? '', x + 3, y + 4, { width: c.w - 6, align: c.al ?? 'left' });
+      x += c.w;
+    }
+    doc.moveTo(34, y + h).lineTo(34 + larguraUtil, y + h).strokeColor(TINTA).lineWidth(0.6).stroke();
     y += h;
   }
 
