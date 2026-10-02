@@ -568,7 +568,11 @@ export function BancoHoras() {
 
 /* ---------------- Visão de todos os funcionários ---------------- */
 
-const fmtComp2 = (c: string) => new Date(`${c}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+/** "2026-09" → "set/2026" (sem o "de 26", que parece dia). */
+const fmtComp2 = (c: string) => {
+  const mes = new Date(`${c}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  return `${mes}/${c.slice(0, 4)}`;
+};
 
 function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpresa, onAbrir }: {
   resumo: ResumoBanco | null; carregando: boolean; busca: string; setBusca: (v: string) => void;
