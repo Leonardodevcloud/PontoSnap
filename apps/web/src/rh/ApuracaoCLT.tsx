@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { minutosParaHhMm, reaisDeCentavos, rotuloMarcacao } from '../lib/formato';
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
-import type { ApuracaoResp, Empregado, ResultadoDiaCLT, BatidaDia } from '../tipos';
+import type { ApuracaoResp, Empregado, ResultadoDiaCLT, BatidaDia, RelatorioCompetencia } from '../tipos';
+import { TabelaCompetencia, type FiltroApuracao } from './TabelaCompetencia';
+import vt from './VisaoTodos.module.css';
 import css from './ApuracaoCLT.module.css';
 
 const mesAtual = () => new Date().toISOString().slice(0, 7);
@@ -28,10 +30,25 @@ const ehBanco = (d: string) => d === 'BANCO';
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
 
 export function ApuracaoCLT() {
+  // Visão e seleção vivem na URL (?emp=&mes=): dá pra voltar e pra chegar
+  // aqui a partir da tela de Espelhos já no funcionário certo.
+  const [params, setParams] = useSearchParams();
+  const mes = params.get('mes') ?? mesAtual();
+  const empregadoId = params.get('emp') ?? '';
+  const visao: 'todos' | 'um' = empregadoId ? 'um' : 'todos';
+  const ir = useCallback((p: { mes?: string; emp?: string | null }) => {
+    setParams((atual) => {
+      const n = new URLSearchParams(atual);
+      if (p.mes !== undefined) n.set('mes', p.mes);
+      if (p.emp !== undefined) { if (p.emp) n.set('emp', p.emp); else n.delete('emp'); }
+      return n;
+    });
+  }, [setParams]);
+  const setMes = (m: string) => ir({ mes: m });
+  const setEmpregadoId = (id: string) => ir({ emp: id });
+
   const [diaAberto, setDiaAberto] = useState<string | null>(null);
   const [emps, setEmps] = useState<Empregado[]>([]);
-  const [empregadoId, setEmpregadoId] = useState('');
-  const [mes, setMes] = useState(mesAtual());
   const [ap, setAp] = useState<ApuracaoResp | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -39,12 +56,42 @@ export function ApuracaoCLT() {
 
   useEffect(() => {
     api.get<Empregado[]>('/empregados')
-      .then((l) => { const a = l.filter((e) => e.ativo); setEmps(a); if (a[0]) setEmpregadoId(a[0].id); })
+      .then((l) => setEmps(l.filter((e) => e.ativo)))
       .catch((e) => setErro((e as Error).message));
   }, []);
 
+  // ---- Visão "todos" ----
+  const [rel, setRel] = useState<RelatorioCompetencia | null>(null);
+  const [relCarregando, setRelCarregando] = useState(false);
+  const [filtro, setFiltro] = useState<FiltroApuracao>('todos');
+  const [baixandoRel, setBaixandoRel] = useState<'pdf' | 'xlsx' | null>(null);
+  useEffect(() => {
+    if (visao !== 'todos') return;
+    let vivo = true;
+    (async () => {
+      setRelCarregando(true); setErro(null);
+      try {
+        const { inicio, fim } = faixaDoMes(mes);
+        await api.post('/banco/sincronizar', {}).catch(() => {});
+        const r = await api.get<RelatorioCompetencia>(`/tratamento/relatorio-competencia?inicio=${inicio}&fim=${fim}`);
+        if (vivo) setRel(r);
+      } catch (e) { if (vivo) { setErro((e as Error).message); setRel(null); } }
+      finally { if (vivo) setRelCarregando(false); }
+    })();
+    return () => { vivo = false; };
+  }, [visao, mes]);
+  async function baixarRel(tipo: 'pdf' | 'xlsx') {
+    const { inicio, fim } = faixaDoMes(mes);
+    setBaixandoRel(tipo);
+    try {
+      const blob = await api.baixar(`/tratamento/relatorio-competencia/${tipo}?inicio=${inicio}&fim=${fim}`);
+      salvarBlob(blob, `competencia_${mes}.${tipo}`);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setBaixandoRel(null); }
+  }
+
   const carregar = useCallback(async () => {
-    if (!empregadoId) return;
+    if (!empregadoId) { setAp(null); return; }
     const { inicio, fim } = faixaDoMes(mes);
     setCarregando(true); setErro(null);
     try {
@@ -96,10 +143,16 @@ export function ApuracaoCLT() {
   return (
     <div>
       <div className={css.head}>
-        <div><h2>Apuração CLT</h2><p>Fechamento de competência pelo motor de regras</p></div>
+        <div><h2>Apuração CLT</h2><p>Fechamento da competência pelo motor de regras: extras, noturno, faltas, atrasos, banco e valores.</p></div>
         <div className={css.acoesPdf}>
-          <Botao variante="ghost" className={css.pdfBtn} onClick={() => setLoteAberto(true)}>Apuração em lote</Botao>
-          {ap && (
+          <Botao variante="ghost" className={css.pdfBtn} onClick={() => setLoteAberto(true)}>Apuração em lote (ZIP)</Botao>
+          {visao === 'todos' && (
+            <>
+              <Botao variante="ghost" className={css.pdfBtn} onClick={() => baixarRel('xlsx')} disabled={baixandoRel !== null}>{baixandoRel === 'xlsx' ? 'Gerando…' : 'Planilha (XLSX)'}</Botao>
+              <Botao variante="coral" className={css.pdfBtn} onClick={() => baixarRel('pdf')} disabled={baixandoRel !== null}>{baixandoRel === 'pdf' ? 'Gerando…' : 'Relatório da competência (PDF)'}</Botao>
+            </>
+          )}
+          {visao === 'um' && ap && (
             <>
               <Botao variante="ghost" className={css.pdfBtn} onClick={baixarEspelho} disabled={baixandoEspelho}>{baixandoEspelho ? 'Gerando…' : 'Espelho de ponto'}</Botao>
               <Botao variante="coral" className={css.pdfBtn} onClick={baixarPdf} disabled={baixando}>{baixando ? 'Gerando…' : 'Apuração (PDF)'}</Botao>
@@ -109,23 +162,71 @@ export function ApuracaoCLT() {
       </div>
 
       <div className={css.controles}>
-        <label className={css.sel}>
-          <span className={css.lb}>Funcionário</span>
-          <select value={empregadoId} onChange={(e) => setEmpregadoId(e.target.value)}>
-            {emps.length === 0 && <option value="">— nenhum funcionário —</option>}
-            {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-          </select>
-        </label>
+        <div className={css.sel}>
+          <span className={css.lb}>Visão</span>
+          <div className={vt.seg} role="tablist">
+            <button role="tab" aria-selected={visao === 'todos'} className={visao === 'todos' ? vt.segOn : ''} onClick={() => ir({ emp: null })}>Todos os funcionários</button>
+            <button role="tab" aria-selected={visao === 'um'} className={visao === 'um' ? vt.segOn : ''} onClick={() => ir({ emp: empregadoId || emps[0]?.id || null })}>Um funcionário</button>
+          </div>
+        </div>
         <label className={css.sel}>
           <span className={css.lb}>Competência</span>
-          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
+          <input type="month" value={mes} max={mesAtual()} onChange={(e) => e.target.value && setMes(e.target.value)} />
         </label>
+        {visao === 'um' && (
+          <label className={css.sel}>
+            <span className={css.lb}>Funcionário</span>
+            <select value={empregadoId} onChange={(e) => setEmpregadoId(e.target.value)}>
+              {emps.length === 0 && <option value="">— nenhum funcionário —</option>}
+              {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+            </select>
+          </label>
+        )}
+        {visao === 'todos' && (
+          <div className={css.sel}>
+            <span className={css.lb}>Mostrar</span>
+            <div className={vt.seg}>
+              {([['todos', 'Todos'], ['extras', 'Com extras'], ['faltas', 'Com faltas/atrasos'], ['sinais', 'Com sinais']] as [FiltroApuracao, string][]).map(([k, t]) => (
+                <button key={k} className={filtro === k ? vt.segOn : ''} onClick={() => setFiltro(k)}>{t}</button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
-      {carregando && <p className={css.carregando}>Apurando…</p>}
 
-      {r && !carregando && (
+      {visao === 'todos' && (
+        <>
+          {relCarregando && !rel && <p className={css.carregando}>Apurando todos os funcionários…</p>}
+          {rel && (
+            <>
+              <div className={vt.kpis}>
+                <div className={vt.kpi}><div className={vt.kpiK}>Apurados</div><div className={vt.kpiV}>{rel.linhas.length}</div><div className={vt.kpiS}>de {emps.length} ativos</div></div>
+                <div className={`${vt.kpi} ${rel.totais.extra50Min > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extra 50%</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.extra50Min)}</div></div>
+                <div className={vt.kpi}><div className={vt.kpiK}>Extra 100%</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.extra100Min)}</div><div className={vt.kpiS}>domingo/feriado</div></div>
+                <div className={vt.kpi}><div className={vt.kpiK}>Noturno (legal)</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.noturnoMin)}</div></div>
+                <div className={`${vt.kpi} ${rel.totais.faltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.faltaMin)}</div><div className={vt.kpiS}>{rel.linhas.filter((l) => l.faltaMin > 0).length} funcionário{rel.linhas.filter((l) => l.faltaMin > 0).length === 1 ? '' : 's'}</div></div>
+                <div className={`${vt.kpi} ${rel.totais.atrasoMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.atrasoMin)}</div><div className={vt.kpiS}>{rel.linhas.filter((l) => l.atrasoMin > 0).length} funcionário{rel.linhas.filter((l) => l.atrasoMin > 0).length === 1 ? '' : 's'}</div></div>
+                {rel.totais.comBanco > 0 && <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Banco · acumulado</div><div className={vt.kpiV}>{comSinal(rel.totais.bancoAcumuladoMin)}</div><div className={vt.kpiS}>anterior {comSinal(rel.totais.bancoAnteriorMin)} · mês {comSinal(rel.totais.saldoMesMin)}</div></div>}
+                <div className={vt.kpi}><div className={vt.kpiK}>Extras em R$</div><div className={vt.kpiV}>{reaisDeCentavos(rel.totais.extrasCentavos + rel.totais.adicionalNoturnoCentavos)}</div><div className={vt.kpiS}>(−) descontos {reaisDeCentavos(rel.totais.descontosCentavos)}</div></div>
+              </div>
+              <TabelaCompetencia rel={rel} modo="apuracao" filtro={filtro} onAbrir={(id) => ir({ emp: id })} />
+              <div className={vt.legenda}>
+                <span>Clique na linha pra abrir a apuração completa.</span>
+                <span>Faltas e atrasos com destinação <strong>banco</strong> não aparecem em descontos (vão pro saldo). O desconto real é aplicado pela folha.</span>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {visao === 'um' && carregando && <p className={css.carregando}>Apurando…</p>}
+      {visao === 'um' && ap && (
+        <div className={vt.crumb}><button onClick={() => ir({ emp: null })}>← Todos os funcionários</button><span>/</span><span>{ap.nome}</span><span>/</span><span>{new Date(`${mes}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span></div>
+      )}
+
+      {visao === 'um' && r && !carregando && (
         <>
           <div className={css.cards}>
             <Card k="Trabalhado" v={minutosParaHhMm(r.totalTrabalhadoMin)} />

@@ -535,3 +535,82 @@ export interface EmpresaAcesso {
   razaoSocial: string;
   cnpj: string;
 }
+
+// ---- Relatório da competência (todos os funcionários) ----
+
+export interface SinaisCompetencia {
+  impar: number;
+  intervalo: number;
+  interjornada: number;
+  faltaDias: string[];
+  emAbertoHoje: boolean;
+}
+
+export interface LinhaCompetencia {
+  empregadoId: string;
+  nome: string;
+  matricula: string | null;
+  temSalario: boolean;
+  regime: string;
+  horarioDurMin: number;
+  trabalhadoMin: number;
+  contratadoMin: number;
+  extrasMin: number;
+  extra50Min: number;
+  extra100Min: number;
+  faltaMin: number;
+  atrasoMin: number;
+  noturnoMin: number;
+  saldoMesMin: number;
+  dsrPerdidoSemanas: number;
+  extrasCentavos: number;
+  adicionalNoturnoCentavos: number;
+  descontosCentavos: number;
+  liquidoProventosCentavos: number;
+  banco: BancoPeriodo | null;
+  destinacao?: Destinacao;
+  sinais: SinaisCompetencia;
+  afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
+  assinada: boolean;
+}
+
+export interface RelatorioCompetencia {
+  inicio: string;
+  fim: string;
+  competencia: string;
+  hoje: string;
+  linhas: LinhaCompetencia[];
+  totais: {
+    trabalhadoMin: number; contratadoMin: number; extrasMin: number; extra50Min: number; extra100Min: number;
+    faltaMin: number; atrasoMin: number; noturnoMin: number; saldoMesMin: number;
+    bancoAnteriorMin: number; bancoAcumuladoMin: number; comBanco: number;
+    extrasCentavos: number; adicionalNoturnoCentavos: number; descontosCentavos: number; liquidoProventosCentavos: number;
+    assinadas: number; pendencias: number;
+  };
+}
+
+// ---- Banco de horas: visão de todos ----
+
+export type LinhaResumoBanco =
+  | { empregadoId: string; nome: string; matricula: string | null; ativo: false; tipoAcordo: TipoAcordoBanco; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' }
+  | {
+      empregadoId: string; nome: string; matricula: string | null; ativo: true;
+      tipoAcordo: TipoAcordoBanco; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; prazoMeses: number | null;
+      saldoMin: number; mesCorrenteMin: number; projetadoMin: number;
+      creditadoMin: number; compensadoMin: number; pagoMin: number;
+      devedorMin: number; vencidoMin: number; aVencerMin: number; proximoVencimento: string | null;
+      ultimoMovimento: { data: string; minutos: number; descricao: string } | null;
+      fechamentos: number; ultimoFechamento: string | null;
+    };
+
+export interface ResumoBanco {
+  hoje: string;
+  competencia: string;
+  linhas: LinhaResumoBanco[];
+  totais: {
+    funcionarios: number; comBanco: number;
+    saldoMin: number; mesCorrenteMin: number; projetadoMin: number;
+    vencidoMin: number; aVencerMin: number; devedorMin: number;
+    comVencido: number; comAVencer: number; devendo: number;
+  };
+}

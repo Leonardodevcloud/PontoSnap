@@ -155,6 +155,13 @@ async function main() {
   ok(s5.fechamentos.some((f) => f.competencia === '2026-09'), 'no dia 1 do mês seguinte, setembro fecha sozinho');
   ok(s5.saldo!.saldoMin === 120 && s5.mesCorrente?.estimadoMin === 0, `oficial absorveu setembro: +120, outubro zerado (${s5.saldo!.saldoMin}/${s5.mesCorrente?.estimadoMin})`);
 
+  // ---------- 7. Visão de todos (tela do RH) ----------
+  const res = await banco.resumoFuncionarios(t.id, '2026-10-01');
+  const lc = res.linhas.find((l) => l.empregadoId === emp.id);
+  ok(res.totais.funcionarios === 1 && res.totais.comBanco === 1, `resumo lista 1 funcionário com banco (${res.totais.funcionarios}/${res.totais.comBanco})`);
+  ok(!!lc && lc.ativo && lc.saldoMin === 120 && lc.projetadoMin === 120 && lc.ultimoFechamento === '2026-09',
+    `resumo: Carla fechado +120, projetado +120, último fechamento 2026-09`);
+
   console.log(falhas === 0 ? '\n>>> BANCO AUTOMÁTICO OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();
   process.exit(falhas === 0 ? 0 : 1);

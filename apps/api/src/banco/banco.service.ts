@@ -427,6 +427,53 @@ export class BancoService {
     return { fechadas };
   }
 
+  /**
+   * Visão de todos os funcionários ativos: saldo oficial, mês em andamento,
+   * projetado, vencimentos e devedor de cada um. Sincroniza no caminho (cada
+   * saldo() já fecha o que estiver pendente). Quem não tem banco vem com
+   * ativo=false, pra tela listar e explicar.
+   */
+  async resumoFuncionarios(tenantId: string, hoje: string) {
+    const ativos = await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ id: empregado.id, nome: empregado.nome, matricula: empregado.matricula, dataInicioPonto: empregado.dataInicioPonto })
+        .from(empregado)
+        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)))
+        .orderBy(asc(empregado.nome)));
+    const linhas = [];
+    for (const e of ativos) {
+      const r = await this.saldo(tenantId, e.id, hoje);
+      if (!r.ativo || !r.saldo) {
+        linhas.push({ empregadoId: e.id, nome: e.nome, matricula: e.matricula, ativo: false as const, tipoAcordo: r.tipoAcordo, formaCalculo: r.formaCalculo });
+        continue;
+      }
+      const ultimo = r.extrato[0];
+      linhas.push({
+        empregadoId: e.id, nome: e.nome, matricula: e.matricula, ativo: true as const,
+        tipoAcordo: r.tipoAcordo, formaCalculo: r.formaCalculo, prazoMeses: r.prazoMeses,
+        saldoMin: r.saldo.saldoMin, mesCorrenteMin: r.mesCorrente?.estimadoMin ?? 0, projetadoMin: r.saldoProjetadoMin ?? r.saldo.saldoMin,
+        creditadoMin: r.saldo.creditadoMin, compensadoMin: r.saldo.compensadoMin, pagoMin: r.saldo.pagoMin,
+        devedorMin: r.saldo.devedorMin, vencidoMin: r.saldo.vencidoMin, aVencerMin: r.saldo.aVencerMin, proximoVencimento: r.saldo.proximoVencimento,
+        ultimoMovimento: ultimo ? { data: ultimo.data, minutos: ultimo.minutos, descricao: ultimo.descricao ?? ultimo.tipo } : null,
+        fechamentos: r.fechamentos.length,
+        ultimoFechamento: r.fechamentos[0]?.competencia ?? null,
+      });
+    }
+    const comBanco = linhas.filter((l) => l.ativo);
+    const soma = (f: (l: (typeof comBanco)[number] & { ativo: true }) => number) =>
+      comBanco.reduce((s, l) => s + f(l as never), 0);
+    return {
+      hoje, competencia: competenciaDe(hoje), linhas,
+      totais: {
+        funcionarios: linhas.length, comBanco: comBanco.length,
+        saldoMin: soma((l) => l.saldoMin), mesCorrenteMin: soma((l) => l.mesCorrenteMin), projetadoMin: soma((l) => l.projetadoMin),
+        vencidoMin: soma((l) => l.vencidoMin), aVencerMin: soma((l) => l.aVencerMin), devedorMin: soma((l) => l.devedorMin),
+        comVencido: comBanco.filter((l) => (l as { vencidoMin?: number }).vencidoMin! > 0).length,
+        comAVencer: comBanco.filter((l) => (l as { aVencerMin?: number }).aVencerMin! > 0).length,
+        devendo: comBanco.filter((l) => (l as { projetadoMin?: number }).projetadoMin! < 0).length,
+      },
+    };
+  }
+
   /** Sincroniza todos os funcionários ativos com banco de um tenant (cron). */
   async sincronizarTenant(tenantId: string, hoje: string): Promise<{ funcionarios: number; fechadas: number }> {
     const ativos = await comTenant(this.db, tenantId, (tx) =>

@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException, ConflictException, Optional } fr
 import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
-  pontoBancoMov, pontoBancoFechamento,
+  pontoBancoMov, pontoBancoFechamento, espelhoAssinatura,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
@@ -1222,35 +1222,78 @@ export class TratamentoService {
   }
 
   /** Relatório consolidado da competência: uma linha por funcionário + totais. */
-  async relatorioCompetencia(tenantId: string, inicioStr: string, fimStr: string) {
+  async relatorioCompetencia(tenantId: string, inicioStr: string, fimStr: string, hojeStr?: string) {
     const emps = await comTenant(this.db, tenantId, (tx) =>
       tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)))
         .orderBy(asc(empregado.nome)));
 
+    // Quem já assinou o espelho desta competência (só faz sentido se o
+    // período for um mês inteiro, que é o caso das telas).
+    const competencia = inicioStr.slice(0, 7);
+    const assinadas = new Set((await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ empregadoId: espelhoAssinatura.empregadoId }).from(espelhoAssinatura).where(and(
+        eq(espelhoAssinatura.tenantId, tenantId), eq(espelhoAssinatura.competencia, competencia))))).map((a) => a.empregadoId));
+    const hoje = hojeStr ?? this.diaLocalISO(new Date(), await comTenant(this.db, tenantId, (tx) => this.carregarFuso(tx, tenantId)));
+
     const linhas = [];
     for (const e of emps) {
-      const ap = await this.apurarPeriodoCLT(tenantId, e.id, inicioStr, fimStr);
+      // Funcionário que ainda não entrou no ponto neste período: fica de fora.
+      if (e.dataInicioPonto && e.dataInicioPonto > fimStr) continue;
+      let ap: Awaited<ReturnType<TratamentoService['apurarPeriodoCLT']>>;
+      try { ap = await this.apurarPeriodoCLT(tenantId, e.id, inicioStr, fimStr); }
+      catch { continue; } // sem REP/escala — não derruba o relatório dos outros
       const r = ap.resultado;
       const v = ap.valores;
+      const dias = r.dias;
+      const sinais = {
+        impar: dias.filter((d) => d.paresIncompletos).length,
+        intervalo: dias.filter((d) => d.penalidadeIntervaloMin > 0).length,
+        interjornada: dias.filter((d) => d.violacaoInterjornada).length,
+        /** Dias esperados sem nenhuma batida (falta de dia inteiro). */
+        faltaDias: dias.filter((d) => d.faltaMin > 0 && d.minutosTrabalhados === 0).map((d) => d.data),
+        /** Batida em aberto HOJE — provavelmente ainda vai bater a saída. */
+        emAbertoHoje: dias.some((d) => d.data === hoje && d.paresIncompletos),
+      };
       linhas.push({
         empregadoId: e.id, nome: e.nome, matricula: e.matricula, temSalario: !!v,
-        trabalhadoMin: r.totalTrabalhadoMin, extrasMin: r.totalExtrasMin, faltaMin: r.totalFaltaMin,
-        atrasoMin: r.totalAtrasoMin, noturnoMin: r.totalNoturnoLegalMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
+        regime: ap.regras, horarioDurMin: ap.horarioDurMin,
+        trabalhadoMin: r.totalTrabalhadoMin, contratadoMin: r.totalContratadoMin,
+        extrasMin: r.totalExtrasMin, extra50Min: r.extrasPorAdicional['50'] ?? 0, extra100Min: r.extrasPorAdicional['100'] ?? 0,
+        faltaMin: r.totalFaltaMin, atrasoMin: r.totalAtrasoMin, noturnoMin: r.totalNoturnoLegalMin,
+        saldoMesMin: r.saldoPeriodoMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
         extrasCentavos: v?.extrasCentavos ?? 0, adicionalNoturnoCentavos: v?.adicionalNoturnoCentavos ?? 0,
+        descontosCentavos: v ? v.descontoFaltasCentavos + v.descontoAtrasosCentavos + v.descontoDsrPerdidoCentavos : 0,
         liquidoProventosCentavos: v?.liquidoProventosCentavos ?? 0,
+        banco: ap.banco,
+        destinacao: ap.destinacao,
+        sinais,
+        afastamentos: ap.afastamentos,
+        assinada: assinadas.has(e.id),
       });
     }
 
     const totais = linhas.reduce((a, l) => ({
-      trabalhadoMin: a.trabalhadoMin + l.trabalhadoMin, extrasMin: a.extrasMin + l.extrasMin,
+      trabalhadoMin: a.trabalhadoMin + l.trabalhadoMin, contratadoMin: a.contratadoMin + l.contratadoMin,
+      extrasMin: a.extrasMin + l.extrasMin, extra50Min: a.extra50Min + l.extra50Min, extra100Min: a.extra100Min + l.extra100Min,
       faltaMin: a.faltaMin + l.faltaMin, atrasoMin: a.atrasoMin + l.atrasoMin, noturnoMin: a.noturnoMin + l.noturnoMin,
+      saldoMesMin: a.saldoMesMin + l.saldoMesMin,
+      bancoAnteriorMin: a.bancoAnteriorMin + (l.banco?.saldoAnteriorMin ?? 0),
+      bancoAcumuladoMin: a.bancoAcumuladoMin + (l.banco?.saldoAcumuladoMin ?? 0),
+      comBanco: a.comBanco + (l.banco ? 1 : 0),
       extrasCentavos: a.extrasCentavos + l.extrasCentavos,
       adicionalNoturnoCentavos: a.adicionalNoturnoCentavos + l.adicionalNoturnoCentavos,
+      descontosCentavos: a.descontosCentavos + l.descontosCentavos,
       liquidoProventosCentavos: a.liquidoProventosCentavos + l.liquidoProventosCentavos,
-    }), { trabalhadoMin: 0, extrasMin: 0, faltaMin: 0, atrasoMin: 0, noturnoMin: 0, extrasCentavos: 0, adicionalNoturnoCentavos: 0, liquidoProventosCentavos: 0 });
+      assinadas: a.assinadas + (l.assinada ? 1 : 0),
+      pendencias: a.pendencias + (l.sinais.emAbertoHoje ? 1 : 0) + l.sinais.faltaDias.length,
+    }), {
+      trabalhadoMin: 0, contratadoMin: 0, extrasMin: 0, extra50Min: 0, extra100Min: 0, faltaMin: 0, atrasoMin: 0, noturnoMin: 0,
+      saldoMesMin: 0, bancoAnteriorMin: 0, bancoAcumuladoMin: 0, comBanco: 0,
+      extrasCentavos: 0, adicionalNoturnoCentavos: 0, descontosCentavos: 0, liquidoProventosCentavos: 0, assinadas: 0, pendencias: 0,
+    });
 
-    return { inicio: inicioStr, fim: fimStr, linhas, totais };
+    return { inicio: inicioStr, fim: fimStr, competencia, hoje, linhas, totais };
   }
 
   /** Dias com batidas faltando, agrupados por funcionário, com batidas de cada dia. */

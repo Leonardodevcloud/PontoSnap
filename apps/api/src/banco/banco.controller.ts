@@ -38,6 +38,13 @@ export class BancoController {
     return this.banco.definirConfig(this.tenant(u), dto);
   }
 
+  /** Banco de todos os funcionários ativos, de uma vez (sincroniza no caminho). */
+  @Get('resumo')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  resumo(@UsuarioAtual() u: PayloadAcesso, @Query('hoje') hoje?: string) {
+    return this.banco.resumoFuncionarios(this.tenant(u), hoje ?? new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
+  }
+
   @Get('extrato')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   extrato(
