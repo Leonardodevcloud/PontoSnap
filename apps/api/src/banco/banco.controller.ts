@@ -38,13 +38,6 @@ export class BancoController {
     return this.banco.definirConfig(this.tenant(u), dto);
   }
 
-  /** Banco de todos os funcionários ativos, de uma vez (sincroniza no caminho). */
-  @Get('resumo')
-  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
-  resumo(@UsuarioAtual() u: PayloadAcesso, @Query('hoje') hoje?: string) {
-    return this.banco.resumoFuncionarios(this.tenant(u), hoje ?? new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
-  }
-
   @Get('extrato')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   extrato(
@@ -62,42 +55,24 @@ export class BancoController {
     return this.banco.lancarMovimento(this.tenant(u), dto);
   }
 
-  /**
-   * Refaz (relança) uma competência de um funcionário. O fechamento é
-   * automático; isto é a saída manual pra quando o RH quer forçar o recálculo.
-   */
   @Post('lancar-competencia')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   lancar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LancarCompetenciaDto) {
-    return this.banco.lancarCompetencia(this.tenant(u), dto.empregadoId, dto.competencia, 'MANUAL');
+    return this.banco.lancarCompetencia(this.tenant(u), dto.empregadoId, dto.competencia);
   }
 
-  /** Refaz a competência para todos os funcionários ativos de uma vez. */
+  /** Lança a competência para todos os funcionários ativos de uma vez. */
   @Post('lancar-lote')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   lancarLote(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LancarLoteDto) {
     return this.banco.lancarCompetenciaLote(this.tenant(u), dto.competencia);
   }
 
-  /** Fecha agora tudo que estiver pendente na empresa (o cron faria sozinho). */
-  @Post('sincronizar')
-  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
-  sincronizar(
-    @UsuarioAtual() u: PayloadAcesso,
-    @Query('hoje') hoje?: string,
-    @Query('empregadoId') empregadoId?: string,
-  ) {
-    const dia = hoje ?? new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
-    return empregadoId
-      ? this.banco.sincronizar(this.tenant(u), empregadoId, dia)
-      : this.banco.sincronizarTenant(this.tenant(u), dia);
-  }
-
-  /** Histórico de competências fechadas (agrupado, com detalhe por funcionário). Sincroniza antes. */
+  /** Histórico de competências já lançadas (agrupado, com detalhe por funcionário). */
   @Get('competencias')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
-  competencias(@UsuarioAtual() u: PayloadAcesso, @Query('hoje') hoje?: string) {
-    return this.banco.historicoCompetencias(this.tenant(u), hoje ?? new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
+  competencias(@UsuarioAtual() u: PayloadAcesso) {
+    return this.banco.historicoCompetencias(this.tenant(u));
   }
 
   /** Registra uma folga compensatória: debita o banco e não conta como falta. */

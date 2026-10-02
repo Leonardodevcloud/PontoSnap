@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { hojeSP, minutosParaHhMm } from '../lib/formato';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import type {
   BancoResp, ConfigBanco, Empregado, TipoAcordoBanco,
-  CompetenciaLancada, LoteResultado, ResumoBanco, LinhaResumoBanco,
+  CompetenciaLancada, LoteResultado,
 } from '../tipos';
 import css from './BancoHoras.module.css';
-import vt from './VisaoTodos.module.css';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
 const fmtDataHora = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
@@ -41,25 +40,8 @@ export function BancoHoras() {
   const [historico, setHistorico] = useState<CompetenciaLancada[]>([]);
   const [expandido, setExpandido] = useState<string | null>(null);
 
-  // Funcionário selecionado vive na URL (?emp=): sem ele, a aba mostra a
-  // tabela de todos; com ele, o detalhe (ações + extrato).
-  const [params, setParams] = useSearchParams();
-  const sel = params.get('emp') ?? '';
-  const setSel = useCallback((id: string) => {
-    setParams((atual) => { const n = new URLSearchParams(atual); if (id) n.set('emp', id); else n.delete('emp'); return n; });
-  }, [setParams]);
+  const [sel, setSel] = useState('');
   const [banco, setBanco] = useState<BancoResp | null>(null);
-
-  // Visão de todos
-  const [resumo, setResumo] = useState<ResumoBanco | null>(null);
-  const [resumoCarregando, setResumoCarregando] = useState(false);
-  const [busca, setBusca] = useState('');
-  const carregarResumo = useCallback(async () => {
-    setResumoCarregando(true);
-    try { setResumo(await api.get<ResumoBanco>(`/banco/resumo?hoje=${hojeSP()}`)); }
-    catch (e) { setErro((e as Error).message); }
-    finally { setResumoCarregando(false); }
-  }, []);
 
   // Folga compensatória
   const [folgaData, setFolgaData] = useState(hojeSP());
@@ -112,7 +94,6 @@ export function BancoHoras() {
     catch (e) { setErro((e as Error).message); }
   }, []);
   useEffect(() => { void carregarBanco(sel); }, [carregarBanco, sel]);
-  useEffect(() => { if (aba === 'funcionario' && !sel) void carregarResumo(); }, [aba, sel, carregarResumo]);
 
   async function salvarCfg() {
     setErro(null); setSalvando(true);
@@ -126,22 +107,7 @@ export function BancoHoras() {
     finally { setSalvando(false); }
   }
 
-  const [sincronizando, setSincronizando] = useState(false);
-  const [sincMsg, setSincMsg] = useState<string | null>(null);
-  async function sincronizarAgora() {
-    setErro(null); setSincMsg(null); setSincronizando(true);
-    try {
-      const r = await api.post<{ funcionarios: number; fechadas: number }>('/banco/sincronizar', {});
-      setSincMsg(r.fechadas === 0
-        ? `Tudo em dia: nenhum mês pendente (${r.funcionarios} funcionário${r.funcionarios === 1 ? '' : 's'} com banco).`
-        : `${r.fechadas} fechamento${r.fechadas === 1 ? '' : 's'} feito${r.fechadas === 1 ? '' : 's'} agora.`);
-      await Promise.all([carregarHistorico(), carregarBanco(sel)]);
-    } catch (e) { setErro((e as Error).message); }
-    finally { setSincronizando(false); }
-  }
-
   async function lancarLote() {
-    if (!confirm(`Refazer ${fmtComp(comp)} para todos os funcionários com banco? O que esse mês tinha lançado será recalculado.`)) return;
     setErro(null); setResultado(null); setLancando(true);
     try {
       const r = await api.post<LoteResultado>('/banco/lancar-lote', { competencia: comp });
@@ -239,7 +205,7 @@ export function BancoHoras() {
   const maxMes = hojeSP().slice(0, 7);
 
   return (
-    <div className={`${css.tela} ${aba === 'funcionario' && !sel ? css.telaLarga : ''}`}>
+    <div className={css.tela}>
       <h2 className={css.h}>Banco de horas</h2>
       <p className={css.sub}>
         Só existe com acordo. Sem ele, a hora extra é paga na folha — e é isso que a lei manda.
@@ -331,67 +297,67 @@ export function BancoHoras() {
 
       {cfg?.ativo && (
         <>
-          {/* ---------- FECHAMENTO AUTOMÁTICO ---------- */}
+          {/* ---------- LANÇAR COMPETÊNCIA ---------- */}
           <div className={css.bloco}>
-            <div className={css.blocoH}>Fechamento dos meses</div>
-            <p className={css.dica} style={{ marginTop: 0 }}>
-              <strong>Automático.</strong> Todo mês encerrado é levado ao banco sozinho (na virada do mês e
-              sempre que alguém consulta um saldo). Ajuste de ponto aprovado, atestado abonado, afastamento
-              ou folga num mês já fechado fazem o mês ser refeito. Você não precisa lançar nada.
-            </p>
+            <div className={css.blocoH}>Lançar competência</div>
             <div className={css.lote}>
-              <Botao variante="lime" onClick={sincronizarAgora} disabled={sincronizando}>
-                {sincronizando ? 'Verificando…' : 'Verificar pendências agora'}
-              </Botao>
-              <button className={css.linkish} onClick={() => setModoLancar(modoLancar === 'lote' ? 'individual' : 'lote')}>
-                {modoLancar === 'lote' ? 'Refazer um mês…' : 'Fechar'}
-              </button>
+              <label className={css.campoMes}>
+                <span className={css.mesLb}>Competência</span>
+                <input className={css.mes} type="month" value={comp} max={maxMes}
+                  onChange={(e) => e.target.value && setComp(e.target.value)} />
+              </label>
+              {modoLancar === 'lote' ? (
+                <>
+                  <Botao variante="lime" onClick={lancarLote} disabled={lancando}>
+                    {lancando ? 'Lançando…' : 'Lançar para todos os ativos'}
+                  </Botao>
+                  <button className={css.linkish} onClick={() => setModoLancar('individual')}>Um funcionário…</button>
+                </>
+              ) : (
+                <>
+                  <select className={css.select} value={selLancar} onChange={(e) => setSelLancar(e.target.value)}>
+                    <option value="">Escolha o funcionário…</option>
+                    {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                  </select>
+                  <Botao variante="lime" onClick={lancarIndividual} disabled={lancando || !selLancar}>
+                    {lancando ? 'Lançando…' : 'Lançar'}
+                  </Botao>
+                  <button className={css.linkish} onClick={() => setModoLancar('lote')}>Todos</button>
+                </>
+              )}
             </div>
-            {sincMsg && <p className={css.ok} style={{ marginTop: 10 }}>{sincMsg}</p>}
-
-            {modoLancar === 'individual' && (
-              <div className={css.lote} style={{ marginTop: 12 }}>
-                <label className={css.campoMes}>
-                  <span className={css.mesLb}>Competência</span>
-                  <input className={css.mes} type="month" value={comp} max={maxMes}
-                    onChange={(e) => e.target.value && setComp(e.target.value)} />
-                </label>
-                <select className={css.select} value={selLancar} onChange={(e) => setSelLancar(e.target.value)}>
-                  <option value="">Todos os funcionários</option>
-                  {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                </select>
-                <Botao variante="ghost" onClick={selLancar ? lancarIndividual : lancarLote} disabled={lancando}>
-                  {lancando ? 'Refazendo…' : 'Refazer mês'}
-                </Botao>
-              </div>
-            )}
 
             {resultado && (
               <div className={css.result}>
                 <span className={css.resultIc}>✓</span>
                 <div>
-                  <b>{fmtComp(resultado.competencia)} refeito para {resultado.funcionarios} {resultado.funcionarios === 1 ? 'funcionário' : 'funcionários'}.</b>{' '}
-                  Saldo do mês no banco: <b className={css.mono}>{comSinal(resultado.totalMin)}</b>.
+                  <b>{fmtComp(resultado.competencia)} lançado para {resultado.funcionarios} {resultado.funcionarios === 1 ? 'funcionário' : 'funcionários'}.</b>{' '}
+                  Saldo do mês somou <b className={css.mono}>{comSinal(resultado.totalMin)}</b> ao banco.
                 </div>
               </div>
             )}
+
+            <p className={css.dica}>
+              Leva o saldo de cada dia apurado do mês para o banco. Rodar de novo o mesmo mês
+              <strong> substitui</strong> o que aquele mês tinha lançado — pagamentos e ajustes manuais não são tocados.
+            </p>
           </div>
 
           {/* ---------- HISTÓRICO ---------- */}
           <div className={css.bloco}>
-            <div className={css.blocoH}>Meses fechados</div>
-            {historico.length === 0 && <p className={css.vazio}>Nenhum mês fechado ainda — o primeiro fecha na virada do mês.</p>}
+            <div className={css.blocoH}>Competências lançadas</div>
+            {historico.length === 0 && <p className={css.vazio}>Nenhuma competência lançada ainda.</p>}
             {historico.length > 0 && (
               <div className={css.hist}>
                 <div className={`${css.hrow} ${css.hhead}`}>
-                  <span>Competência</span><span>Funcionários</span><span>Total</span><span>Fechado em</span><span />
+                  <span>Competência</span><span>Funcionários</span><span>Total</span><span>Lançado em</span><span />
                 </div>
                 {historico.map((h) => {
                   const aberto = expandido === h.competencia;
                   return (
                     <div key={h.competencia}>
                       <div className={css.hrow} onClick={() => setExpandido(aberto ? null : h.competencia)}>
-                        <span className={css.hcomp}>{fmtComp(h.competencia)} {h.automatico ? <em className={css.hauto}>auto</em> : <em className={css.hauto}>manual</em>}</span>
+                        <span className={css.hcomp}>{fmtComp(h.competencia)}</span>
                         <span className={css.mono}>{h.funcionarios}</span>
                         <span className={`${css.mono} ${h.totalMin >= 0 ? css.pos : css.neg}`}>{comSinal(h.totalMin)}</span>
                         <span className={css.mono}>{fmtDataHora(h.lancadoEm)}</span>
@@ -420,17 +386,9 @@ export function BancoHoras() {
       )}
       </>}
 
-      {aba === 'funcionario' && !sel && (
-        <TodosFuncionarios resumo={resumo} carregando={resumoCarregando} busca={busca} setBusca={setBusca}
-          semBancoEmpresa={!!cfg && !cfg.ativo} onAbrir={setSel} />
-      )}
-
-      {aba === 'funcionario' && sel && (
+      {aba === 'funcionario' && (
           <div className={css.bloco}>
-            <div className={vt.crumb} style={{ marginBottom: 8 }}>
-              <button onClick={() => setSel('')}>← Todos os funcionários</button><span>/</span>
-              <span>{emps.find((e) => e.id === sel)?.nome ?? '…'}</span>
-            </div>
+            <div className={css.blocoH}>Saldo por funcionário</div>
             {cfg && !cfg.ativo && (
               <p className={css.dica} style={{ marginTop: 0 }}>
                 O banco de horas está <strong>desativado</strong> para a empresa. Ative o acordo na aba
@@ -516,15 +474,7 @@ export function BancoHoras() {
             {s && (
               <>
                 <div className={css.cards}>
-                  <div className={css.card}>
-                    <div className={css.cL}>Saldo atual</div>
-                    <div className={css.cV}>{comSinal(banco!.saldoProjetadoMin ?? s.saldoMin)}</div>
-                    {banco!.mesCorrente && (
-                      <div className={css.cSub}>
-                        fechados <b className={css.mono}>{comSinal(s.saldoMin)}</b> · mês atual <b className={css.mono}>{comSinal(banco!.mesCorrente.estimadoMin)}</b>
-                      </div>
-                    )}
-                  </div>
+                  <div className={css.card}><div className={css.cL}>Saldo</div><div className={css.cV}>{comSinal(s.saldoMin)}</div></div>
                   <div className={css.card}><div className={css.cL}>Vence em 30 dias</div><div className={css.cV}>{s.aVencerMin > 0 ? minutosParaHhMm(s.aVencerMin) : '—'}</div></div>
                   <div className={`${css.card} ${s.vencidoMin > 0 ? css.cardAlerta : ''}`}><div className={css.cL}>Vencido</div><div className={css.cV}>{s.vencidoMin > 0 ? minutosParaHhMm(s.vencidoMin) : '—'}</div></div>
                 </div>
@@ -544,18 +494,15 @@ export function BancoHoras() {
                 {banco!.extrato.map((m, i) => (
                   <div key={`${m.data}-${i}`} className={css.ext}>
                     <span className={css.extD}>{fmtData(m.data)}</span>
-                    <span className={css.extE}>{m.descricao || m.tipo}{m.competencia && <em className={css.extTag}>fechamento {m.competencia}</em>}</span>
+                    <span className={css.extE}>{m.descricao || m.tipo}</span>
                     <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
-                    <span className={css.extAcao}>
-                      {/* Só lançamento avulso sai daqui; o de fechamento é refeito junto com o mês. */}
-                      {m.id && !m.competencia && (
-                        <button className={css.extRemover} title="Remover este lançamento"
-                          disabled={removendo === m.id}
-                          onClick={() => removerMovimento(m.id!, m.descricao || m.tipo)}>
-                          {removendo === m.id ? '…' : '×'}
-                        </button>
-                      )}
-                    </span>
+                    {m.id && (
+                      <button className={css.extRemover} title="Remover este lançamento"
+                        disabled={removendo === m.id}
+                        onClick={() => removerMovimento(m.id!, m.descricao || m.tipo)}>
+                        {removendo === m.id ? '…' : '×'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </>
@@ -563,126 +510,5 @@ export function BancoHoras() {
           </div>
       )}
     </div>
-  );
-}
-
-/* ---------------- Visão de todos os funcionários ---------------- */
-
-const fmtComp2 = (c: string) => new Date(`${c}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
-
-function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpresa, onAbrir }: {
-  resumo: ResumoBanco | null; carregando: boolean; busca: string; setBusca: (v: string) => void;
-  semBancoEmpresa: boolean; onAbrir: (id: string) => void;
-}) {
-  const [ord, setOrd] = useState<{ k: string; asc: boolean }>({ k: 'nome', asc: true });
-  const t = resumo?.totais;
-  const q = busca.trim().toLowerCase();
-  const valor = (l: LinhaResumoBanco, k: string): number | string => {
-    if (k === 'nome') return l.nome;
-    if (!l.ativo) return -1e9;
-    return (l as Record<string, unknown>)[k] as number ?? 0;
-  };
-  const linhas = (resumo?.linhas ?? [])
-    .filter((l) => !q || l.nome.toLowerCase().includes(q) || (l.matricula ?? '').toLowerCase().includes(q))
-    .sort((a, b) => {
-      const va = valor(a, ord.k), vb = valor(b, ord.k);
-      const r = typeof va === 'string' && typeof vb === 'string' ? va.localeCompare(vb, 'pt-BR') : Number(va) - Number(vb);
-      return ord.asc ? r : -r;
-    });
-  const clicar = (k: string) => setOrd((o) => (o.k === k ? { k, asc: !o.asc } : { k, asc: k === 'nome' }));
-  const Th = ({ k, t, n }: { k: string; t: string; n?: boolean }) => (
-    <th className={`${n ? vt.n : ''} ${ord.k === k ? vt.ord : ''}`} onClick={() => clicar(k)} title="Ordenar">{t}{ord.k === k ? (ord.asc ? ' ▴' : ' ▾') : ''}</th>
-  );
-  const sinal = (m: number) => (m > 0 ? vt.pos : m < 0 ? vt.neg : vt.mute);
-  const mesNome = resumo ? new Date(`${resumo.competencia}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'long' }) : 'mês atual';
-
-  return (
-    <>
-      {semBancoEmpresa && (
-        <p className={css.dica} style={{ marginTop: 0 }}>
-          O banco de horas está <strong>desativado</strong> para a empresa. Só aparecem com saldo os funcionários que têm uma regra própria de banco.
-        </p>
-      )}
-      <div className={css.linha} style={{ marginBottom: 14 }}>
-        <input className={vt.busca} placeholder="Buscar por nome ou matrícula" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar funcionário" />
-      </div>
-
-      {carregando && !resumo && <p className={css.vazio}>Calculando o banco de todo mundo…</p>}
-
-      {resumo && t && (
-        <>
-          <div className={vt.kpis}>
-            <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Saldo total · projetado</div><div className={vt.kpiV}>{comSinal(t.projetadoMin)}</div><div className={vt.kpiS}>fechados {comSinal(t.saldoMin)} · {mesNome} {comSinal(t.mesCorrenteMin)}</div></div>
-            <div className={vt.kpi}><div className={vt.kpiK}>Com banco</div><div className={vt.kpiV}>{t.comBanco} / {t.funcionarios}</div><div className={vt.kpiS}>funcionários ativos</div></div>
-            <div className={`${vt.kpi} ${t.comVencido > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Vencido</div><div className={vt.kpiV}>{t.vencidoMin > 0 ? minutosParaHhMm(t.vencidoMin) : '—'}</div><div className={vt.kpiS}>{t.comVencido > 0 ? `${t.comVencido} funcionário${t.comVencido === 1 ? '' : 's'} — pagar na folha` : 'nada a pagar'}</div></div>
-            <div className={`${vt.kpi} ${t.comAVencer > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Vence em 30 dias</div><div className={vt.kpiV}>{t.aVencerMin > 0 ? minutosParaHhMm(t.aVencerMin) : '—'}</div><div className={vt.kpiS}>{t.comAVencer > 0 ? `${t.comAVencer} funcionário${t.comAVencer === 1 ? '' : 's'} — dar folga` : 'nenhum'}</div></div>
-            <div className={`${vt.kpi} ${t.devendo > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Devendo horas</div><div className={vt.kpiV}>{t.devendo}</div><div className={vt.kpiS}>com saldo negativo</div></div>
-          </div>
-
-          <div className={vt.tab}>
-            <div className={vt.scroll}>
-              <table className={vt.table} style={{ minWidth: 760 }}>
-                <thead><tr>
-                  <Th k="nome" t="Funcionário" />
-                  <Th k="saldoMin" t="Fechado" n />
-                  <Th k="mesCorrenteMin" t={mesNome} n />
-                  <Th k="projetadoMin" t="Saldo atual" n />
-                  <Th k="aVencerMin" t="Vence em 30d" n />
-                  <Th k="vencidoMin" t="Vencido" n />
-                  <th>Situação</th>
-                </tr></thead>
-                <tbody>
-                  {linhas.length === 0 && <tr><td colSpan={7}><div className={vt.vazio}>{resumo.linhas.length === 0 ? 'Nenhum funcionário ativo.' : 'Ninguém bate com a busca.'}</div></td></tr>}
-                  {linhas.map((l) => (
-                    <tr key={l.empregadoId} className={vt.row} tabIndex={0} role="button"
-                      onClick={() => onAbrir(l.empregadoId)}
-                      onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(l.empregadoId); } }}>
-                      <td><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? (l.formaCalculo === 'INTRA_MES' ? 'intra-mês' : `${l.tipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'} · ${l.prazoMeses}m`) : 'sem banco'}</small></span></td>
-                      {l.ativo ? (
-                        <>
-                          <td className={`${vt.n} ${sinal(l.saldoMin)}`}>{comSinal(l.saldoMin)}</td>
-                          <td className={`${vt.n} ${sinal(l.mesCorrenteMin)}`}>{comSinal(l.mesCorrenteMin)}</td>
-                          <td className={`${vt.n} ${sinal(l.projetadoMin)}`}><b>{comSinal(l.projetadoMin)}</b></td>
-                          <td className={`${vt.n} ${l.aVencerMin > 0 ? '' : vt.mute}`}>{l.aVencerMin > 0 ? minutosParaHhMm(l.aVencerMin) : '—'}</td>
-                          <td className={`${vt.n} ${l.vencidoMin > 0 ? vt.neg : vt.mute}`}>{l.vencidoMin > 0 ? minutosParaHhMm(l.vencidoMin) : '—'}</td>
-                          <td>
-                            {l.vencidoMin > 0 && <span className={`${vt.pill} ${vt.pillErr}`}>pagar na folha</span>}
-                            {l.vencidoMin === 0 && l.aVencerMin > 0 && l.proximoVencimento && <span className={`${vt.pill} ${vt.pillWarn}`}>vence {fmtData(l.proximoVencimento)}</span>}
-                            {l.projetadoMin < 0 && <span className={`${vt.pill} ${vt.pillWarn}`}>devendo</span>}
-                            {l.ultimoFechamento && <span className={`${vt.pill} ${vt.pillMute}`}>fechado até {fmtComp2(l.ultimoFechamento)}</span>}
-                            {!l.ultimoFechamento && <span className={`${vt.pill} ${vt.pillMute}`}>sem mês fechado</span>}
-                            {l.vencidoMin === 0 && l.aVencerMin === 0 && l.projetadoMin >= 0 && <span className={`${vt.pill} ${vt.pillOk}`}>em dia</span>}
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className={`${vt.n} ${vt.mute}`} colSpan={5}>extra paga na folha (sem acordo de banco)</td>
-                          <td><span className={`${vt.pill} ${vt.pillMute}`}>sem banco</span></td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-                {t.comBanco > 1 && !q && (
-                  <tfoot><tr className={vt.tot}>
-                    <td>Total · {t.comBanco} com banco</td>
-                    <td className={vt.n}>{comSinal(t.saldoMin)}</td>
-                    <td className={vt.n}>{comSinal(t.mesCorrenteMin)}</td>
-                    <td className={vt.n}>{comSinal(t.projetadoMin)}</td>
-                    <td className={vt.n}>{t.aVencerMin > 0 ? minutosParaHhMm(t.aVencerMin) : '—'}</td>
-                    <td className={vt.n}>{t.vencidoMin > 0 ? minutosParaHhMm(t.vencidoMin) : '—'}</td>
-                    <td />
-                  </tr></tfoot>
-                )}
-              </table>
-            </div>
-          </div>
-          <div className={vt.legenda}>
-            <span>Clique no funcionário pra registrar folga, lançar saldo de abertura, pagar vencido e ver o extrato.</span>
-            <span>Fechado = meses já fechados · {mesNome} = em andamento, fecha sozinho no dia 1 · Saldo atual = os dois somados.</span>
-          </div>
-        </>
-      )}
-    </>
   );
 }

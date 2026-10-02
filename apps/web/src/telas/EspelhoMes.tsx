@@ -100,31 +100,6 @@ export function EspelhoMes() {
                 <div className={css.mV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '0'}</div>
               </div>
             </div>
-
-            {/* Banco de horas: a conta inteira, pra ninguém achar que o saldo
-                "some" na virada do mês. */}
-            {dados?.banco && dados.banco.formaCalculo !== 'INTRA_MES' && (
-              <div className={css.banco}>
-                <div className={css.bLinha}>
-                  <span>Veio dos meses anteriores</span>
-                  <span className={dados.banco.saldoAnteriorMin < 0 ? css.bNeg : ''}>{comSinal(dados.banco.saldoAnteriorMin)}</span>
-                </div>
-                <div className={css.bLinha}>
-                  <span>{dados.banco.fechada ? 'Este mês (fechado)' : 'Este mês (até agora)'}</span>
-                  <span className={dados.banco.saldoMesMin < 0 ? css.bNeg : ''}>{comSinal(dados.banco.saldoMesMin)}</span>
-                </div>
-                {dados.banco.avulsoMin !== 0 && (
-                  <div className={css.bLinha}>
-                    <span>Folgas, pagamentos e ajustes</span>
-                    <span className={dados.banco.avulsoMin < 0 ? css.bNeg : ''}>{comSinal(dados.banco.avulsoMin)}</span>
-                  </div>
-                )}
-                <div className={`${css.bLinha} ${css.bTotal}`}>
-                  <span>Saldo acumulado no banco</span>
-                  <span className={dados.banco.saldoAcumuladoMin < 0 ? css.bNeg : ''}>{comSinal(dados.banco.saldoAcumuladoMin)}</span>
-                </div>
-              </div>
-            )}
           </div>
 
           {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}

@@ -26,10 +26,6 @@ export function Escalas() {
   // Jornada por dia: quando ligado, cada dia pode ter uma carga horária própria.
   const [porDiaLigado, setPorDiaLigado] = useState(false);
   const [jornadaDia, setJornadaDia] = useState<Record<number, string>>({}); // dia(0-6) -> "HH:MM"
-  // Contrato de horas: a carga é digitada direto; os horários viram referência.
-  const [flexivel, setFlexivel] = useState(false);
-  const [cargaFlex, setCargaFlex] = useState('08:00');
-  const [recalculados, setRecalculados] = useState<number | null>(null);
 
   function editar(h: Horario) {
     setEditandoId(h.id);
@@ -37,8 +33,6 @@ export function Escalas() {
     setDias(h.diasSemana);
     setPares(h.pares.map((p) => ({ entrada: `${p.entrada.slice(0, 2)}:${p.entrada.slice(2)}`, saida: `${p.saida.slice(0, 2)}:${p.saida.slice(2)}` })));
     setRegime(h.regime);
-    setFlexivel(!!h.flexivel);
-    setCargaFlex(minParaHhmm(h.durJornadaMin));
     if (h.jornadaPorDia && Object.keys(h.jornadaPorDia).length > 0) {
       setPorDiaLigado(true);
       const jd: Record<number, string> = {};
@@ -52,7 +46,7 @@ export function Escalas() {
   function cancelarEdicao() {
     setEditandoId(null); setCodigo(''); setDias([1, 2, 3, 4, 5]);
     setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
-    setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00');
+    setPorDiaLigado(false); setJornadaDia({});
   }
   async function excluir(h: Horario) {
     if (!confirm(`Excluir a escala "${h.codigo}"? Só é possível se nenhum funcionário estiver usando.`)) return;
@@ -67,9 +61,7 @@ export function Escalas() {
   }
   useEffect(() => { void carregar(); }, []);
 
-  const durPares = pares.reduce((acc, p) => acc + Math.max(0, hhmmParaMin(p.saida) - hhmmParaMin(p.entrada)), 0);
-  // Flexível: a carga vem do campo próprio; fixo: é a soma dos períodos.
-  const durTotal = flexivel ? hhmmParaMin(cargaFlex || '00:00') : durPares;
+  const durTotal = pares.reduce((acc, p) => acc + Math.max(0, hhmmParaMin(p.saida) - hhmmParaMin(p.entrada)), 0);
 
   function toggleDia(n: number) {
     setDias((d) => (d.includes(n) ? d.filter((x) => x !== n) : [...d, n]).sort());
@@ -79,25 +71,21 @@ export function Escalas() {
   }
 
   async function salvar() {
-    setErro(null); setSalvando(true); setRecalculados(null);
+    setErro(null); setSalvando(true);
     try {
-      // No flexível os períodos são opcionais: só entram os preenchidos.
-      const paresAfd = pares
-        .filter((p) => !flexivel || (p.entrada && p.saida))
-        .map((p) => ({ entrada: p.entrada.replace(':', ''), saida: p.saida.replace(':', '') }));
+      const paresAfd = pares.map((p) => ({ entrada: p.entrada.replace(':', ''), saida: p.saida.replace(':', '') }));
       // Monta jornadaPorDia só com os dias marcados, quando o modo está ligado.
       const jornadaPorDia = porDiaLigado
         ? Object.fromEntries(dias.map((d) => [String(d), hhmmParaMin(jornadaDia[d] ?? minParaHhmm(durTotal))]))
         : null;
-      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime, jornadaPorDia, flexivel };
+      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime, jornadaPorDia };
       if (editandoId) {
-        const r = await api.patch<{ funcionariosRecalculados?: number }>(`/tratamento/horarios/${editandoId}`, corpo);
-        if (r?.funcionariosRecalculados) setRecalculados(r.funcionariosRecalculados);
+        await api.patch(`/tratamento/horarios/${editandoId}`, corpo);
       } else {
         await api.post('/tratamento/horarios', corpo);
       }
       setEditandoId(null);
-      setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal'); setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00');
+      setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal'); setPorDiaLigado(false); setJornadaDia({});
       void carregar();
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
@@ -132,34 +120,9 @@ export function Escalas() {
           </select>
         </div>
 
-        <div className={css.porDiaBox}>
-          <label className={css.porDiaToggle}>
-            <input type="checkbox" checked={flexivel} onChange={(e) => setFlexivel(e.target.checked)} />
-            <span>
-              <strong>Contrato de horas (horário flexível)</strong> — o funcionário tem uma carga por dia, não um horário de entrada e saída.
-              Quem chega mais tarde e sai mais tarde cumpriu a jornada: <strong>extra só acima da carga, atraso só abaixo</strong>.
-              Vale também para os meses já apurados.
-            </span>
-          </label>
-          {flexivel && (
-            <div className={css.porDiaGrade}>
-              <div className={css.porDiaLinha}>
-                <span className={css.porDiaNome}>Carga/dia</span>
-                <input type="time" className={css.porDiaInput} value={cargaFlex} onChange={(e) => setCargaFlex(e.target.value)} />
-                <span className={css.porDiaUn}>de trabalho</span>
-              </div>
-              <p className={css.hint}>Tolerância, intervalo (Art. 71), interjornada e adicional noturno continuam valendo — só a janela de horário deixa de contar.</p>
-            </div>
-          )}
-        </div>
-
         <div className={css.bloco}>
-          <span className={css.lb}>{flexivel ? 'Horário de referência (opcional)' : 'Horários de trabalho'}</span>
-          <p className={css.hint}>
-            {flexivel
-              ? 'No contrato de horas isto não gera atraso nem extra. Serve só para lembretes de batida e para o espelho. Pode deixar em branco.'
-              : 'Cada linha é um período de trabalho. Use duas para separar manhã e tarde com o almoço no meio — ex.: 08:00→12:00 e 13:00→17:00.'}
-          </p>
+          <span className={css.lb}>Horários de trabalho</span>
+          <p className={css.hint}>Cada linha é um período de trabalho. Use duas para separar manhã e tarde com o almoço no meio — ex.: 08:00→12:00 e 13:00→17:00.</p>
           {pares.map((p, i) => (
             <div key={i} className={css.par}>
               <input type="time" value={p.entrada} onChange={(e) => setPar(i, 'entrada', e.target.value)} />
@@ -196,11 +159,6 @@ export function Escalas() {
         </div>
 
         {erro && <p className={css.erro}>{erro}</p>}
-        {recalculados != null && (
-          <p className={css.hint} style={{ color: 'var(--ok-text)', fontWeight: 700 }}>
-            Escala salva. {recalculados} funcionário{recalculados === 1 ? '' : 's'} {recalculados === 1 ? 'terá' : 'terão'} a apuração e o banco de horas refeitos com a nova regra (acontece sozinho, na próxima consulta).
-          </p>
-        )}
         <Botao variante="coral" className={css.salvar} onClick={salvar} disabled={salvando || !codigo || dias.length === 0 || durTotal === 0}>
           {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Criar escala'}
         </Botao>
@@ -219,7 +177,7 @@ export function Escalas() {
             <span className={css.cod}>{h.codigo}</span>
             <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
             <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
-            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}{h.flexivel ? ' · flexível' : ''}</span>
+            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}</span>
             <span className={css.acoes}>
               <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
               <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>

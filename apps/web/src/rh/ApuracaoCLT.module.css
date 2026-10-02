@@ -1,5 +1,5 @@
 .head{ margin-bottom:20px; display:flex; align-items:flex-end; justify-content:space-between; gap:20px; }
-.pdfBtn{ width:auto; white-space:nowrap; }
+.pdfBtn{ width:auto; }
 .head h2{ font-size:28px; }
 .head p{ margin:6px 0 0; color:var(--ash); font-size:14.5px; }
 .controles{ display:flex; gap:14px; margin-bottom:22px; flex-wrap:wrap; }
@@ -59,10 +59,6 @@
 .destBadge{ font-family:var(--ff-mono); font-size:11px; padding:2px 9px; border-radius:6px; margin-left:8px; }
 .destDesc{ background:var(--erro-bg); color:var(--coral-dark); }
 .destBanco{ background:var(--lime); color:var(--ink); }
-.destTotal{ font-weight:700; border-top:1px solid rgba(var(--ink-rgb),.14) !important; margin-top:4px; padding-top:12px; }
-.destTotal .mono{ font-size:15px; }
-.neg{ color:var(--coral-dark); }
-.destAviso{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border-radius:10px; background:#fff0ec; border:1px solid var(--coral); font-size:13px; }
 .destNota{ font-size:12px; color:var(--ash); margin:10px 0 0; }
 
 /* ===== Gaveta lateral: detalhe do dia ===== */
@@ -100,7 +96,7 @@
 .gBtn{ background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:800; cursor:pointer; text-decoration:none; }
 .gBtn2{ background:transparent; color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:800; cursor:pointer; text-decoration:none; }
 
-.acoesPdf{ display:flex; gap:9px; flex-wrap:wrap; justify-content:flex-end; }
+.acoesPdf{ display:flex; gap:9px; }
 
 /* Modal de apuração em lote */
 .loteOverlay { position: fixed; inset: 0; background: rgba(var(--ink-rgb),.35); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }

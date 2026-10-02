@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { schema, comoMaster, comTenant, tenant, empregado, pontoRep, pontoBancoMov, pontoBancoFechamento } from '@ponto/db';
+import { schema, comoMaster, comTenant, tenant, empregado, pontoRep, pontoBancoMov } from '@ponto/db';
 import { BancoService } from '../src/banco/banco.service';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
 
@@ -34,15 +34,8 @@ async function main() {
     // movimento avulso (sem competência) — NÃO deve aparecer no histórico
     { tenantId: t.id, empregadoId: e1.id, data: '2026-06-20', minutos: -50, tipo: 'PAGAMENTO', competencia: null },
   ]));
-  // ...e as marcas de fechamento (é delas que o histórico sai agora).
-  await comTenant(db, t.id, (tx) => tx.insert(pontoBancoFechamento).values([
-    { tenantId: t.id, empregadoId: e1.id, competencia: '2026-06', totalMin: 180, lancamentos: 2, origem: 'MANUAL' },
-    { tenantId: t.id, empregadoId: e2.id, competencia: '2026-06', totalMin: -30, lancamentos: 1, origem: 'MANUAL' },
-    { tenantId: t.id, empregadoId: e1.id, competencia: '2026-05', totalMin: 200, lancamentos: 1, origem: 'MANUAL' },
-  ]));
 
-  // Sem batida nenhuma, a sincronização não tem de onde partir — não fecha nada.
-  const hist = await banco.historicoCompetencias(t.id, '2026-07-15');
+  const hist = await banco.historicoCompetencias(t.id);
   ok(hist.length === 2, `histórico tem 2 competências (tem ${hist.length})`);
   ok(hist[0]!.competencia === '2026-06' && hist[1]!.competencia === '2026-05', 'ordenado da mais recente para a mais antiga');
 
@@ -70,9 +63,6 @@ async function main() {
   // Idempotência: relançar não duplica (sem batidas, continua 0 e não quebra).
   const lote2 = await banco.lancarCompetenciaLote(t.id, '2026-07');
   ok(lote2.funcionarios === 2, 'relançar o lote é idempotente e não quebra');
-  const hist2 = await banco.historicoCompetencias(t.id, '2026-08-15');
-  const jul = hist2.find((h) => h.competencia === '2026-07');
-  ok(!!jul && jul.funcionarios === 2 && jul.automatico === false, 'lote manual aparece no histórico como MANUAL (uma marca por funcionário)');
 
   console.log(falhas === 0 ? '\n>>> BANCO LOTE/HISTÓRICO OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
   await client.end();

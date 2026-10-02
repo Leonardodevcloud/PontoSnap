@@ -6,7 +6,6 @@ import { ajustesAprovados } from '../tratamento/ajustes';
 import { DB } from '../database/database.module';
 import { EmailService } from '../email/email.service';
 import { emailAjusteDecidido } from '../email/templates';
-import { competenciaDe, reabrirCompetencia } from '../banco/fechamento';
 import { PushService } from '../notificacao/push.service';
 
 export interface NovoAjuste {
@@ -108,7 +107,6 @@ export class AjusteService {
           status: statusFinal, decididoPor,
           decididoEm: origem === 'RH' ? new Date() : null,
         }).returning();
-        if (origem === 'RH') await reabrirCompetencia(tx as never, tenantId, dto.empregadoId, competenciaDe(dto.data));
         return a;
       }
 
@@ -122,8 +120,6 @@ export class AjusteService {
         decididoPor: origem === 'RH' ? 'RH' : null,
         decididoEm: origem === 'RH' ? new Date() : null,
       }).returning();
-      // Lançamento do RH já vale na apuração → refaz o mês no banco de horas.
-      if (origem === 'RH') await reabrirCompetencia(tx as never, tenantId, dto.empregadoId, competenciaDe(dto.data));
       return a;
     });
   }
@@ -174,10 +170,6 @@ export class AjusteService {
         motivoDecisao: motivo?.trim() ?? null,
         decididoPor: quem.slice(0, 160), decididoEm: new Date(),
       }).where(and(eq(pontoAjuste.id, id), eq(pontoAjuste.tenantId, tenantId))).returning();
-
-      // Ajuste aprovado muda a apuração daquele dia → o mês precisa ser
-      // refeito no banco de horas (a sincronização faz isso na próxima consulta).
-      if (aprovar) await reabrirCompetencia(tx as never, tenantId, atual.empregadoId, competenciaDe(atual.data));
 
       // Notificar o funcionário via push (fire-and-forget)
       if (a) {
@@ -272,9 +264,6 @@ export class AjusteService {
           eq(pontoAjuste.observacao, aj.observacao!),
         ));
       }
-
-      // O dia volta a ser apurado sem o ajuste → o mês precisa ser refeito no banco.
-      await reabrirCompetencia(tx as never, tenantId, aj.empregadoId, competenciaDe(aj.data));
 
       return { ok: true };
     });

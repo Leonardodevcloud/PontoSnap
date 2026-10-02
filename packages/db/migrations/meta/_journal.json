@@ -253,20 +253,6 @@
       "when": 1784601700000,
       "tag": "0035_notificacao_push",
       "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1784601800000,
-      "tag": "0036_banco_fechamento",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1784601900000,
-      "tag": "0037_horario_flexivel",
-      "breakpoints": true
     }
   ]
 }

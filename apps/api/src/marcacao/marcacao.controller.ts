@@ -65,10 +65,6 @@ export class MarcacaoController {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     if (!inicio || !fim) throw new BadRequestException('Informe inicio e fim (YYYY-MM-DD)');
     const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
-    // Garante que os meses anteriores já estão no banco antes de mostrar o
-    // "saldo anterior" do espelho.
-    const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-    await this.banco.sincronizar(u.tenantId, empregadoId, hoje);
     const feriados = await this.tratamento.listarFeriados(u.tenantId);
     return this.tratamento.apurarPeriodoCLT(
       u.tenantId, empregadoId, inicio, fim,
@@ -76,17 +72,31 @@ export class MarcacaoController {
     );
   }
 
-  /**
-   * O próprio banco de horas. Vazio e inativo quando a empresa não tem acordo.
-   * O serviço fecha sozinho os meses pendentes e devolve, além do saldo
-   * oficial, o mês em andamento e o saldo projetado.
-   */
+  /** O próprio banco de horas. Vazio e inativo quando a empresa não tem acordo. */
   @Get('meu-banco')
   async meuBanco(@UsuarioAtual() u: PayloadAcesso) {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
     const hoje = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-    return this.banco.saldo(u.tenantId, empregadoId, hoje);
+    const resp = await this.banco.saldo(u.tenantId, empregadoId, hoje);
+
+    // Saldo estimado em tempo real: soma dos saldos diários da competência corrente
+    // mesmo sem o RH ter fechado o mês. Dá visibilidade pro funcionário.
+    if (resp.ativo) {
+      try {
+        const comp = hoje.slice(0, 7);
+        const [a2, m2] = comp.split('-').map(Number);
+        const ultimo = new Date(Date.UTC(a2!, m2!, 0)).getUTCDate();
+        const inicio = `${comp}-01`;
+        const fim = `${comp}-${String(ultimo).padStart(2, '0')}`;
+        const feriados = await this.banco['tratamento'].listarFeriados(u.tenantId, inicio, fim);
+        const ap = await this.banco['tratamento'].apurarPeriodoCLT(
+          u.tenantId, empregadoId, inicio, fim, feriados.map((f: { data: string }) => f.data));
+        const saldoMesMin = ap.resultado.dias.reduce((s: number, d: { saldoMin: number }) => s + d.saldoMin, 0);
+        return { ...resp, saldoEstimadoMesMin: saldoMesMin, competenciaEstimada: comp };
+      } catch { /* ignora erro, retorna sem estimativa */ }
+    }
+    return resp;
   }
 
   /**

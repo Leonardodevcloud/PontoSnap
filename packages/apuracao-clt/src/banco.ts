@@ -77,13 +77,10 @@ export function calcularBanco(
   const lotes: LoteBanco[] = [];
   let creditadoMin = 0, compensadoMin = 0, pagoMin = 0, devedorMin = 0;
 
-  /**
-   * Consome `minutos` dos lotes em `ordemLotes` (já filtrados/ordenados).
-   * Devolve o que não coube em lote nenhum.
-   */
-  function consumirDe(ordemLotes: LoteBanco[], minutos: number): number {
+  /** Consome dos lotes mais velhos. Devolve o que não coube em lote nenhum. */
+  function consumir(minutos: number): number {
     let falta = minutos;
-    for (const lote of ordemLotes) {
+    for (const lote of lotes) {
       if (falta <= 0) break;
       const tira = Math.min(lote.minutosRestantes, falta);
       lote.minutosRestantes -= tira;
@@ -111,23 +108,10 @@ export function calcularBanco(
       }
     } else if (mov.minutos < 0) {
       const querTirar = -mov.minutos;
-      // Vencimento é avaliado NA DATA DO MOVIMENTO, não em "hoje": um lote que
-      // já tinha vencido quando a folga foi tirada não pode ser compensado
-      // por ela (Art. 59 §§ 2º–5º: o que venceu vira hora extra paga).
-      const vivosNaData = lotes.filter((l) => l.minutosRestantes > 0 && l.venceEm >= mov.data);
-      const vencidosNaData = lotes.filter((l) => l.minutosRestantes > 0 && l.venceEm < mov.data);
-      let sobrou: number;
-      if (mov.tipo === 'PAGAMENTO') {
-        pagoMin += querTirar;
-        // Pagamento quita primeiro o que já venceu (é pra isso que ele existe),
-        // depois o mais velho ainda vivo.
-        sobrou = consumirDe([...vencidosNaData, ...vivosNaData], querTirar);
-      } else {
-        compensadoMin += querTirar;
-        // Folga/ajuste/débito: só compensa lote ainda dentro do prazo, FIFO.
-        sobrou = consumirDe(vivosNaData, querTirar);
-      }
-      // Compensou (ou pagou) mais do que tinha: vira dívida do empregado.
+      if (mov.tipo === 'PAGAMENTO') pagoMin += querTirar;
+      else compensadoMin += querTirar;
+      const sobrou = consumir(querTirar);
+      // Compensou mais do que tinha: vira dívida do empregado.
       if (sobrou > 0) devedorMin += sobrou;
     }
   }

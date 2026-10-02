@@ -190,8 +190,6 @@ export interface Horario {
   diasSemana: number[];
   regime: string;
   jornadaPorDia?: Record<string, number> | null;
-  /** Contrato de horas: só a carga do dia conta, sem horário fixo. */
-  flexivel?: boolean;
   criadoEm?: string;
 }
 
@@ -264,8 +262,6 @@ export interface ApuracaoResp {
   afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
   /** Pra onde vão faltas/atrasos/extras, segundo a regra do funcionário. */
   destinacao?: Destinacao;
-  /** Banco de horas no contexto do período: anterior + mês = acumulado. Null = sem banco. */
-  banco?: BancoPeriodo | null;
   /** Batidas de cada dia (chave = YYYY-MM-DD) com a origem de cada uma. */
   batidas?: Record<string, BatidaDia[]>;
   /** Batidas previstas pelo horário contratual (2 por par). */
@@ -273,7 +269,6 @@ export interface ApuracaoResp {
   horarioPares?: { entrada: string; saida: string }[];
   horarioDurMin?: number;
   jornadaPorDia?: Record<string, number> | null;
-  horarioFlexivel?: boolean;
 }
 
 export interface BatidaDia {
@@ -325,51 +320,20 @@ export interface SaldoBanco {
   lotes: LoteBanco[];
 }
 
-export interface BancoPeriodo {
-  ativo: true;
-  formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
-  prazoMeses: number;
-  competencia: string;
-  /** O mês já foi fechado no banco (lançado). */
-  fechada: boolean;
-  saldoAnteriorMin: number;
-  /** O que o mês leva pro banco (fechado: o lançado; em andamento: a apuração de agora). */
-  saldoMesMin: number;
-  /** Folgas, pagamentos e ajustes do RH dentro do período. */
-  avulsoMin: number;
-  saldoAcumuladoMin: number;
-  /** Fechado com valor diferente do que a apuração dá hoje → refazer o mês. */
-  desatualizado: boolean;
-}
-
 export interface MovimentoBanco {
   id?: string;
   data: string;
   minutos: number;
   tipo: 'CREDITO' | 'DEBITO' | 'PAGAMENTO' | 'AJUSTE';
   descricao?: string;
-  competencia?: string | null;
-}
-
-export interface FechamentoBanco {
-  competencia: string;
-  totalMin: number;
-  fechadoEm: string;
-  origem: 'AUTO' | 'MANUAL';
 }
 
 export interface BancoResp {
   ativo: boolean;
   tipoAcordo: TipoAcordoBanco;
   prazoMeses: number | null;
-  formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
   saldo: SaldoBanco | null;
   extrato: MovimentoBanco[];
-  /** Mês em andamento, ainda não fechado. */
-  mesCorrente: { competencia: string; estimadoMin: number } | null;
-  /** Saldo oficial + mês em andamento. */
-  saldoProjetadoMin: number | null;
-  fechamentos: FechamentoBanco[];
 }
 
 export interface ConfigBanco {
@@ -384,8 +348,6 @@ export interface CompetenciaLancada {
   funcionarios: number;
   totalMin: number;
   lancadoEm: string;
-  /** true quando todos os fechamentos da competência foram automáticos. */
-  automatico: boolean;
   porFuncionario: CompetenciaFunc[];
 }
 export interface LoteResultado {
@@ -537,83 +499,4 @@ export interface EmpresaAcesso {
   perfil: 'ADMIN_CLIENTE' | 'RH';
   razaoSocial: string;
   cnpj: string;
-}
-
-// ---- Relatório da competência (todos os funcionários) ----
-
-export interface SinaisCompetencia {
-  impar: number;
-  intervalo: number;
-  interjornada: number;
-  faltaDias: string[];
-  emAbertoHoje: boolean;
-}
-
-export interface LinhaCompetencia {
-  empregadoId: string;
-  nome: string;
-  matricula: string | null;
-  temSalario: boolean;
-  regime: string;
-  horarioDurMin: number;
-  trabalhadoMin: number;
-  contratadoMin: number;
-  extrasMin: number;
-  extra50Min: number;
-  extra100Min: number;
-  faltaMin: number;
-  atrasoMin: number;
-  noturnoMin: number;
-  saldoMesMin: number;
-  dsrPerdidoSemanas: number;
-  extrasCentavos: number;
-  adicionalNoturnoCentavos: number;
-  descontosCentavos: number;
-  liquidoProventosCentavos: number;
-  banco: BancoPeriodo | null;
-  destinacao?: Destinacao;
-  sinais: SinaisCompetencia;
-  afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
-  assinada: boolean;
-}
-
-export interface RelatorioCompetencia {
-  inicio: string;
-  fim: string;
-  competencia: string;
-  hoje: string;
-  linhas: LinhaCompetencia[];
-  totais: {
-    trabalhadoMin: number; contratadoMin: number; extrasMin: number; extra50Min: number; extra100Min: number;
-    faltaMin: number; atrasoMin: number; noturnoMin: number; saldoMesMin: number;
-    bancoAnteriorMin: number; bancoAcumuladoMin: number; comBanco: number;
-    extrasCentavos: number; adicionalNoturnoCentavos: number; descontosCentavos: number; liquidoProventosCentavos: number;
-    assinadas: number; pendencias: number;
-  };
-}
-
-// ---- Banco de horas: visão de todos ----
-
-export type LinhaResumoBanco =
-  | { empregadoId: string; nome: string; matricula: string | null; ativo: false; tipoAcordo: TipoAcordoBanco; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' }
-  | {
-      empregadoId: string; nome: string; matricula: string | null; ativo: true;
-      tipoAcordo: TipoAcordoBanco; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; prazoMeses: number | null;
-      saldoMin: number; mesCorrenteMin: number; projetadoMin: number;
-      creditadoMin: number; compensadoMin: number; pagoMin: number;
-      devedorMin: number; vencidoMin: number; aVencerMin: number; proximoVencimento: string | null;
-      ultimoMovimento: { data: string; minutos: number; descricao: string } | null;
-      fechamentos: number; ultimoFechamento: string | null;
-    };
-
-export interface ResumoBanco {
-  hoje: string;
-  competencia: string;
-  linhas: LinhaResumoBanco[];
-  totais: {
-    funcionarios: number; comBanco: number;
-    saldoMin: number; mesCorrenteMin: number; projetadoMin: number;
-    vencidoMin: number; aVencerMin: number; devedorMin: number;
-    comVencido: number; comAVencer: number; devendo: number;
-  };
 }

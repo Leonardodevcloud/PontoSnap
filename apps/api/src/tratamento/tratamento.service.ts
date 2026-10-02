@@ -2,18 +2,17 @@ import { Inject, Injectable, NotFoundException, ConflictException, Optional } fr
 import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
-  pontoBancoMov, pontoBancoFechamento, espelhoAssinatura,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
-import { apurarPeriodo, valorizarPeriodo, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
+import { apurarPeriodo, valorizarPeriodo, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
-import { montarRegrasApuracao, type ItensResolvidos } from './montar-regras';
+import { montarRegrasApuracao } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
-import { resumirDestinacao, movimentosBancoDoDia } from './destinacao';
+import { resumirDestinacao } from './destinacao';
 import { PushService } from '../notificacao/push.service';
 import ExcelJS from 'exceljs';
 
@@ -36,12 +35,12 @@ export class TratamentoService {
   }
 
   // ---- Horário contratual ----
-  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean }) {
+  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null }) {
     return comTenant(this.db, tenantId, async (tx) =>
       (await tx.insert(pontoHorarioContratual).values({
         tenantId, codigo: dto.codigo, durJornadaMin: dto.durJornadaMin, pares: dto.pares,
         diasSemana: dto.diasSemana ?? [1, 2, 3, 4, 5], regime: dto.regime ?? 'normal',
-        jornadaPorDia: dto.jornadaPorDia ?? null, flexivel: dto.flexivel ?? false,
+        jornadaPorDia: dto.jornadaPorDia ?? null,
       }).returning())[0]);
   }
 
@@ -50,7 +49,7 @@ export class TratamentoService {
    * Recalcula a apuração de todos que a usam — por isso é para CORREÇÃO, não
    * para mudança real de jornada (essa usa mudarEscalaComVigencia).
    */
-  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean }) {
+  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null }) {
     return comTenant(this.db, tenantId, async (tx) => {
       const set: Record<string, unknown> = {};
       if (dto.codigo !== undefined) set.codigo = dto.codigo;
@@ -59,25 +58,10 @@ export class TratamentoService {
       if (dto.diasSemana !== undefined) set.diasSemana = dto.diasSemana;
       if (dto.regime !== undefined) set.regime = dto.regime;
       if (dto.jornadaPorDia !== undefined) set.jornadaPorDia = dto.jornadaPorDia;
-      if (dto.flexivel !== undefined) set.flexivel = dto.flexivel;
       const rows = await tx.update(pontoHorarioContratual).set(set)
         .where(and(eq(pontoHorarioContratual.id, id), eq(pontoHorarioContratual.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Escala não encontrada');
-
-      // Mudou a regra da escala → a apuração de quem usa ela muda, inclusive
-      // no passado. O banco de horas desses funcionários é reaberto inteiro e
-      // refeito na próxima consulta (ou pelo cron). Só a marca de fechamento
-      // sai; os movimentos ficam até serem substituídos.
-      const usuarios = new Set<string>();
-      for (const e of await tx.select({ id: empregado.id }).from(empregado)
-        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.horarioContratualId, id)))) usuarios.add(e.id);
-      for (const v of await tx.select({ empregadoId: empregadoEscalaVigencia.empregadoId }).from(empregadoEscalaVigencia)
-        .where(and(eq(empregadoEscalaVigencia.tenantId, tenantId), eq(empregadoEscalaVigencia.horarioContratualId, id)))) usuarios.add(v.empregadoId);
-      for (const empId of usuarios) {
-        await tx.delete(pontoBancoFechamento).where(and(
-          eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empId)));
-      }
-      return { ...rows[0], funcionariosRecalculados: usuarios.size };
+      return rows[0];
     });
   }
 
@@ -384,10 +368,6 @@ export class TratamentoService {
   }
 
   /** Próximo dia de uma data YYYY-MM-DD, sem escorregar de fuso. */
-  private static ultimoDiaDoMes(comp: string): string {
-    const [a, m] = comp.split('-').map(Number);
-    return `${comp}-${String(new Date(Date.UTC(a!, m!, 0)).getUTCDate()).padStart(2, '0')}`;
-  }
   private static somarDias(dataStr: string, dias: number): string {
     const d = new Date(`${dataStr}T12:00:00Z`);
     d.setUTCDate(d.getUTCDate() + dias);
@@ -467,12 +447,9 @@ export class TratamentoService {
       // Regras por item: escolha do funcionário → padrão do tipo → CLT.
       const itens = await resolverItens(tx as never, tenantId, emp.perfilRegraId);
       const regras = montarRegrasApuracao(itens);
-      const tBanco = (await tx.select({ tipo: tenant.bancoTipoAcordo, prazo: tenant.bancoPrazoMeses })
-        .from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
-      const tipoEmpresa = tBanco?.tipo ?? 'NENHUM';
       const bancoAtivo = itens.banco?.bancoModo === 'ATIVO' ? true
         : itens.banco?.bancoModo === 'INATIVO' ? false
-        : tipoEmpresa !== 'NENHUM';
+        : ((await tx.select({ tipo: tenant.bancoTipoAcordo }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]?.tipo ?? 'NENHUM') !== 'NENHUM';
 
       // Registro 07 do AEJ. Os quatro códigos NÃO abonam jornada:
       //  1 (DSR) e 4 (folga compensatória) marcam o dia como descanso;
@@ -566,8 +543,7 @@ export class TratamentoService {
             ehFeriado: feriadoSet.has(data),
             ehDescanso: (escalaSet.size > 0 ? !trabalhaHoje : false) || descansoPorAusencia.has(data),
             regime: 'r12x36',
-            // Contrato de horas: sem janela — vale só a carga do dia.
-            janelaPrevista: horario?.flexivel ? undefined : horario?.pares,
+            janelaPrevista: horario?.pares,
             // Atestado de dia inteiro abate a jornada daquele dia — é isso que
             // impede o dia de virar falta na apuração.
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
@@ -607,8 +583,7 @@ export class TratamentoService {
             jornadaContratadaMin: jornada,
             ehDomingo, ehFeriado, ehDescanso,
             regime: 'normal',
-            // Contrato de horas (flexível): sem janela — só a carga do dia conta.
-            janelaPrevista: (ehUtil && !jornadaCustomizada && !escDia?.flexivel) ? escDia?.pares : undefined,
+            janelaPrevista: (ehUtil && !jornadaCustomizada) ? escDia?.pares : undefined,
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -635,14 +610,6 @@ export class TratamentoService {
         bancoAtivo,
       });
 
-      // Banco de horas no contexto do período: saldo que veio de antes, o que
-      // este período leva pro banco e o acumulado. É a linha "saldo anterior +
-      // mês = acumulado" que faltava nas telas — sem ela parecia que as horas
-      // não passavam de um mês pro outro.
-      const banco = bancoAtivo
-        ? await this.resumoBancoDoPeriodo(tx, tenantId, empregadoId, inicioStr, fimStr, itens, tipoEmpresa, tBanco?.prazo ?? null, resultado)
-        : null;
-
       // Batidas de cada dia com a origem: o RH precisa ver o dia inteiro,
       // inclusive a que foi desconsiderada (que continua no AFD) e a que
       // entrou por ajuste aprovado.
@@ -668,92 +635,15 @@ export class TratamentoService {
       return {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
-        afastamentos, destinacao, batidas, banco,
+        afastamentos, destinacao, batidas,
         /** Batidas previstas pelo horário contratual (2 por par). */
         esperadas: (horario?.pares?.length ?? 0) * 2,
         horarioPares: horario?.pares ?? [],
         horarioDurMin: horario?.durJornadaMin ?? 0,
         jornadaPorDia: horario?.jornadaPorDia ?? null,
-        /** Contrato de horas: a jornada é só a carga, sem horário fixo. */
-        horarioFlexivel: horario?.flexivel ?? false,
       };
     });
   }
-  /**
-   * Resumo do banco de horas pro período apurado. Calculado direto do extrato
-   * (função pura calcularBanco) pra não depender do BancoService — que depende
-   * deste serviço. A sincronização dos meses fica a cargo do BancoService/cron;
-   * aqui só lemos o que já está lançado.
-   */
-  private async resumoBancoDoPeriodo(
-    tx: Tx, tenantId: string, empregadoId: string, inicioStr: string, fimStr: string,
-    itens: ItensResolvidos, tipoEmpresa: string, prazoEmpresa: number | null,
-    resultado: ReturnType<typeof apurarPeriodo>,
-  ) {
-    const PRAZO_PADRAO: Record<string, number> = { INDIVIDUAL: 6, COLETIVO: 12 };
-    const cfgBanco = itens.banco;
-    const tipo = cfgBanco?.bancoTipoAcordo ?? (tipoEmpresa === 'NENHUM' ? 'INDIVIDUAL' : tipoEmpresa);
-    const prazoMeses = cfgBanco?.bancoPrazoMeses ?? prazoEmpresa ?? PRAZO_PADRAO[tipo] ?? 6;
-    const formaCalculo = (cfgBanco?.formaCalculo ?? 'BANCO_HORAS') as 'BANCO_HORAS' | 'INTRA_MES';
-
-    const movs = await tx.select().from(pontoBancoMov).where(and(
-      eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, empregadoId),
-    )).orderBy(asc(pontoBancoMov.data));
-
-    const corte = TratamentoService.somarDias(inicioStr, -1);
-    const competencia = inicioStr.slice(0, 7);
-    const anteriores = movs.filter((m) => m.data <= corte);
-    const saldoAnteriorMin = formaCalculo === 'INTRA_MES'
-      ? 0
-      : calcularBanco(anteriores.map((m) => ({ data: m.data, minutos: m.minutos, tipo: m.tipo as never })), prazoMeses, corte).saldoMin;
-
-    const noPeriodo = movs.filter((m) => m.data >= inicioStr && m.data <= fimStr);
-    const lancadoMin = noPeriodo.filter((m) => m.competencia != null).reduce((s, m) => s + m.minutos, 0);
-    // Folgas, pagamentos e ajustes do RH no período: não vêm da apuração, mas
-    // mexem no saldo e precisam entrar no acumulado.
-    const avulsoMin = noPeriodo.filter((m) => m.competencia == null).reduce((s, m) => s + m.minutos, 0);
-
-    // O que a apuração de agora levaria pro banco (mesma regra do fechamento).
-    const opc = {
-      destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
-      destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
-      bancoAtivo: true,
-    } as const;
-    const apuradoMin = resultado.dias.flatMap((d) => movimentosBancoDoDia(d, opc)).reduce((s, m) => s + m.minutos, 0);
-
-    const ehMesInteiro = inicioStr.endsWith('-01') && fimStr === TratamentoService.ultimoDiaDoMes(competencia);
-    let fechada = ehMesInteiro && (await tx.select({ id: pontoBancoFechamento.id }).from(pontoBancoFechamento).where(and(
-      eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
-      eq(pontoBancoFechamento.competencia, competencia),
-    )).limit(1)).length > 0;
-
-    // Fechamento diferente da apuração de hoje (escala mudou, feriado novo,
-    // regra editada, lançamento antigo feito com o motor anterior…): reabre
-    // na hora. A próxima sincronização refaz o mês; até lá a tela mostra a
-    // apuração atual, que é a verdade.
-    let refeito = false;
-    if (fechada && lancadoMin !== apuradoMin) {
-      await tx.delete(pontoBancoFechamento).where(and(
-        eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
-        eq(pontoBancoFechamento.competencia, competencia)));
-      fechada = false;
-      refeito = true;
-    }
-
-    // Mês fechado: vale o que está lançado. Em andamento (ou reaberto): a apuração de agora.
-    const saldoMesMin = fechada ? lancadoMin : apuradoMin;
-    return {
-      ativo: true as const,
-      formaCalculo, prazoMeses, competencia, fechada,
-      saldoAnteriorMin,
-      saldoMesMin,
-      avulsoMin,
-      saldoAcumuladoMin: saldoAnteriorMin + saldoMesMin + avulsoMin,
-      /** Estava fechado com valor diferente e foi reaberto agora — refaz sozinho. */
-      desatualizado: refeito,
-    };
-  }
-
   private hhmm(min: number): string {
     const a = Math.abs(min);
     return `${min < 0 ? '-' : ''}${Math.floor(a / 60)}h${String(a % 60).padStart(2, '0')}`;
@@ -801,10 +691,6 @@ export class TratamentoService {
         noturnoLegalMin: r.totalNoturnoLegalMin, faltaMin: r.totalFaltaMin, atrasoMin: r.totalAtrasoMin, saldoMin: r.saldoPeriodoMin,
         bancoMin: r.bancoDeHorasMin, reflexoDsrMin: r.reflexoDsrMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
       },
-      banco: ap.banco ? {
-        saldoAnteriorMin: ap.banco.saldoAnteriorMin, saldoMesMin: ap.banco.saldoMesMin + ap.banco.avulsoMin,
-        saldoAcumuladoMin: ap.banco.saldoAcumuladoMin, fechada: ap.banco.fechada,
-      } : undefined,
       dias,
     });
 
@@ -840,10 +726,7 @@ export class TratamentoService {
       const iso = new Date(d.getTime() + offsetMin(fuso) * 60000).toISOString();
       return iso.slice(11, 16);
     };
-    // Contrato de horas: o espelho mostra a carga, não um horário que não existe.
-    const paresEsperados = ap.horarioFlexivel
-      ? `${hhmm(ap.horarioDurMin)} livre`
-      : (ap.horarioPares ?? []).map((p) => `${p.entrada}-${p.saida}`).join(' ');
+    const paresEsperados = (ap.horarioPares ?? []).map((p) => `${p.entrada}-${p.saida}`).join(' ');
 
     const afastPorDia = new Map<string, string>();
     for (const a of ap.afastamentos ?? []) {
@@ -908,23 +791,12 @@ export class TratamentoService {
     const c = await this.conteudoEspelho(tenantId, empregadoId, inicioStr, fimStr);
     const emp0 = { nome: c.nome, matricula: c.matricula };
 
-    // Resumo do banco entra SÓ no PDF, fora do conteúdo assinado: o hash da
-    // assinatura é do conteudoEspelho, e o saldo acumulado muda com folgas e
-    // pagamentos posteriores — não pode invalidar uma assinatura já feita.
-    const apBanco = (await this.apurarPeriodoCLT(tenantId, empregadoId, inicioStr, fimStr)).banco;
-    const totais = apBanco ? {
-      ...c.totais,
-      bancoSaldoAnterior: this.hhmm(apBanco.saldoAnteriorMin),
-      bancoSaldoMes: this.hhmm(apBanco.saldoMesMin + apBanco.avulsoMin),
-      bancoSaldoAcumulado: this.hhmm(apBanco.saldoAcumuladoMin),
-    } : c.totais;
-
     const buffer = await gerarEspelhoPontoPdf({
       empresa: c.empresa, cnpj: c.cnpj, endereco: c.endereco,
       nome: c.nome, matricula: c.matricula, cpf: c.cpf,
       competenciaInicio: inicioStr, competenciaFim: fimStr, fuso: c.fuso,
       linhas: c.linhas,
-      totais,
+      totais: c.totais,
       assinaturaEletronica: assinatura ?? null,
     });
 
@@ -1262,78 +1134,35 @@ export class TratamentoService {
   }
 
   /** Relatório consolidado da competência: uma linha por funcionário + totais. */
-  async relatorioCompetencia(tenantId: string, inicioStr: string, fimStr: string, hojeStr?: string) {
+  async relatorioCompetencia(tenantId: string, inicioStr: string, fimStr: string) {
     const emps = await comTenant(this.db, tenantId, (tx) =>
       tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)))
         .orderBy(asc(empregado.nome)));
 
-    // Quem já assinou o espelho desta competência (só faz sentido se o
-    // período for um mês inteiro, que é o caso das telas).
-    const competencia = inicioStr.slice(0, 7);
-    const assinadas = new Set((await comTenant(this.db, tenantId, (tx) =>
-      tx.select({ empregadoId: espelhoAssinatura.empregadoId }).from(espelhoAssinatura).where(and(
-        eq(espelhoAssinatura.tenantId, tenantId), eq(espelhoAssinatura.competencia, competencia))))).map((a) => a.empregadoId));
-    const hoje = hojeStr ?? this.diaLocalISO(new Date(), await comTenant(this.db, tenantId, (tx) => this.carregarFuso(tx, tenantId)));
-
     const linhas = [];
     for (const e of emps) {
-      // Funcionário que ainda não entrou no ponto neste período: fica de fora.
-      if (e.dataInicioPonto && e.dataInicioPonto > fimStr) continue;
-      let ap: Awaited<ReturnType<TratamentoService['apurarPeriodoCLT']>>;
-      try { ap = await this.apurarPeriodoCLT(tenantId, e.id, inicioStr, fimStr); }
-      catch { continue; } // sem REP/escala — não derruba o relatório dos outros
+      const ap = await this.apurarPeriodoCLT(tenantId, e.id, inicioStr, fimStr);
       const r = ap.resultado;
       const v = ap.valores;
-      const dias = r.dias;
-      const sinais = {
-        impar: dias.filter((d) => d.paresIncompletos).length,
-        intervalo: dias.filter((d) => d.penalidadeIntervaloMin > 0).length,
-        interjornada: dias.filter((d) => d.violacaoInterjornada).length,
-        /** Dias esperados sem nenhuma batida (falta de dia inteiro). */
-        faltaDias: dias.filter((d) => d.faltaMin > 0 && d.minutosTrabalhados === 0).map((d) => d.data),
-        /** Batida em aberto HOJE — provavelmente ainda vai bater a saída. */
-        emAbertoHoje: dias.some((d) => d.data === hoje && d.paresIncompletos),
-      };
       linhas.push({
         empregadoId: e.id, nome: e.nome, matricula: e.matricula, temSalario: !!v,
-        regime: ap.regras, horarioDurMin: ap.horarioDurMin,
-        trabalhadoMin: r.totalTrabalhadoMin, contratadoMin: r.totalContratadoMin,
-        extrasMin: r.totalExtrasMin, extra50Min: r.extrasPorAdicional['50'] ?? 0, extra100Min: r.extrasPorAdicional['100'] ?? 0,
-        faltaMin: r.totalFaltaMin, atrasoMin: r.totalAtrasoMin, noturnoMin: r.totalNoturnoLegalMin,
-        saldoMesMin: r.saldoPeriodoMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
+        trabalhadoMin: r.totalTrabalhadoMin, extrasMin: r.totalExtrasMin, faltaMin: r.totalFaltaMin,
+        atrasoMin: r.totalAtrasoMin, noturnoMin: r.totalNoturnoLegalMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
         extrasCentavos: v?.extrasCentavos ?? 0, adicionalNoturnoCentavos: v?.adicionalNoturnoCentavos ?? 0,
-        descontosCentavos: v ? v.descontoFaltasCentavos + v.descontoAtrasosCentavos + v.descontoDsrPerdidoCentavos : 0,
         liquidoProventosCentavos: v?.liquidoProventosCentavos ?? 0,
-        banco: ap.banco,
-        destinacao: ap.destinacao,
-        sinais,
-        afastamentos: ap.afastamentos,
-        assinada: assinadas.has(e.id),
       });
     }
 
     const totais = linhas.reduce((a, l) => ({
-      trabalhadoMin: a.trabalhadoMin + l.trabalhadoMin, contratadoMin: a.contratadoMin + l.contratadoMin,
-      extrasMin: a.extrasMin + l.extrasMin, extra50Min: a.extra50Min + l.extra50Min, extra100Min: a.extra100Min + l.extra100Min,
+      trabalhadoMin: a.trabalhadoMin + l.trabalhadoMin, extrasMin: a.extrasMin + l.extrasMin,
       faltaMin: a.faltaMin + l.faltaMin, atrasoMin: a.atrasoMin + l.atrasoMin, noturnoMin: a.noturnoMin + l.noturnoMin,
-      saldoMesMin: a.saldoMesMin + l.saldoMesMin,
-      bancoAnteriorMin: a.bancoAnteriorMin + (l.banco?.saldoAnteriorMin ?? 0),
-      bancoAcumuladoMin: a.bancoAcumuladoMin + (l.banco?.saldoAcumuladoMin ?? 0),
-      comBanco: a.comBanco + (l.banco ? 1 : 0),
       extrasCentavos: a.extrasCentavos + l.extrasCentavos,
       adicionalNoturnoCentavos: a.adicionalNoturnoCentavos + l.adicionalNoturnoCentavos,
-      descontosCentavos: a.descontosCentavos + l.descontosCentavos,
       liquidoProventosCentavos: a.liquidoProventosCentavos + l.liquidoProventosCentavos,
-      assinadas: a.assinadas + (l.assinada ? 1 : 0),
-      pendencias: a.pendencias + (l.sinais.emAbertoHoje ? 1 : 0) + l.sinais.faltaDias.length,
-    }), {
-      trabalhadoMin: 0, contratadoMin: 0, extrasMin: 0, extra50Min: 0, extra100Min: 0, faltaMin: 0, atrasoMin: 0, noturnoMin: 0,
-      saldoMesMin: 0, bancoAnteriorMin: 0, bancoAcumuladoMin: 0, comBanco: 0,
-      extrasCentavos: 0, adicionalNoturnoCentavos: 0, descontosCentavos: 0, liquidoProventosCentavos: 0, assinadas: 0, pendencias: 0,
-    });
+    }), { trabalhadoMin: 0, extrasMin: 0, faltaMin: 0, atrasoMin: 0, noturnoMin: 0, extrasCentavos: 0, adicionalNoturnoCentavos: 0, liquidoProventosCentavos: 0 });
 
-    return { inicio: inicioStr, fim: fimStr, competencia, hoje, linhas, totais };
+    return { inicio: inicioStr, fim: fimStr, linhas, totais };
   }
 
   /** Dias com batidas faltando, agrupados por funcionário, com batidas de cada dia. */

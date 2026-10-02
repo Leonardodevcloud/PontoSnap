@@ -123,39 +123,4 @@ describe('saldo do banco', () => {
     expect(r.vencidoMin).toBe(0);
     expect(r.proximoVencimento).toBe('2026-09-12');
   });
-
-  it('folga NÃO compensa lote que já tinha vencido na data da folga', () => {
-    // Crédito de janeiro (6 meses → vence 10/07). Folga em agosto: o lote já
-    // venceu, então a folga não pode consumi-lo — fica devendo, e o vencido
-    // continua a pagar.
-    const r = calcularBanco([
-      cred('2026-01-10', 120),
-      deb('2026-08-05', 120),
-    ], 6, '2026-08-10');
-    expect(r.vencidoMin).toBe(120);
-    expect(r.devedorMin).toBe(120);
-    expect(r.saldoMin).toBe(0);
-  });
-
-  it('pagamento quita primeiro o que venceu, e só depois o lote vivo', () => {
-    const r = calcularBanco([
-      cred('2026-01-10', 120),  // vence 10/07 → vencido em agosto
-      cred('2026-06-10', 90),   // vence 10/12 → vivo
-      { data: '2026-08-05', minutos: -120, tipo: 'PAGAMENTO', descricao: 'vencido pago' },
-    ], 6, '2026-08-10');
-    expect(r.vencidoMin).toBe(0);
-    expect(r.pagoMin).toBe(120);
-    expect(r.saldoMin).toBe(90);
-    expect(r.lotes[0]!.data).toBe('2026-06-10');
-  });
-
-  it('folga tirada ANTES do vencimento consome normalmente (FIFO)', () => {
-    const r = calcularBanco([
-      cred('2026-01-10', 120),
-      deb('2026-07-01', 120),   // 9 dias antes de vencer
-    ], 6, '2026-08-10');
-    expect(r.vencidoMin).toBe(0);
-    expect(r.devedorMin).toBe(0);
-    expect(r.saldoMin).toBe(0);
-  });
 });
