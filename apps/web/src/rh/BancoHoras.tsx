@@ -517,11 +517,11 @@ export function BancoHoras() {
               <>
                 <div className={css.cards}>
                   <div className={css.card}>
-                    <div className={css.cL}>Saldo atual</div>
-                    <div className={css.cV}>{comSinal(banco!.saldoProjetadoMin ?? s.saldoMin)}</div>
+                    <div className={css.cL}>Saldo (meses fechados)</div>
+                    <div className={css.cV}>{comSinal(s.saldoMin)}</div>
                     {banco!.mesCorrente && (
                       <div className={css.cSub}>
-                        fechados <b className={css.mono}>{comSinal(s.saldoMin)}</b> · mês atual <b className={css.mono}>{comSinal(banco!.mesCorrente.estimadoMin)}</b>
+                        mês atual <b className={css.mono}>{comSinal(banco!.mesCorrente.estimadoMin)}</b> · previsão ao fechar <b className={css.mono}>{comSinal(banco!.saldoProjetadoMin ?? s.saldoMin)}</b>
                       </div>
                     )}
                   </div>
@@ -616,7 +616,7 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
       {resumo && t && (
         <>
           <div className={vt.kpis}>
-            <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Saldo total · projetado</div><div className={vt.kpiV}>{comSinal(t.projetadoMin)}</div><div className={vt.kpiS}>fechados {comSinal(t.saldoMin)} · {mesNome} {comSinal(t.mesCorrenteMin)}</div></div>
+            <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Saldo do banco</div><div className={vt.kpiV}>{comSinal(t.saldoMin)}</div><div className={vt.kpiS}>meses fechados · previsão com {mesNome}: {comSinal(t.projetadoMin)}</div></div>
             <div className={vt.kpi}><div className={vt.kpiK}>Com banco</div><div className={vt.kpiV}>{t.comBanco} / {t.funcionarios}</div><div className={vt.kpiS}>funcionários ativos</div></div>
             <div className={`${vt.kpi} ${t.comVencido > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Vencido</div><div className={vt.kpiV}>{t.vencidoMin > 0 ? minutosParaHhMm(t.vencidoMin) : '—'}</div><div className={vt.kpiS}>{t.comVencido > 0 ? `${t.comVencido} funcionário${t.comVencido === 1 ? '' : 's'} — pagar na folha` : 'nada a pagar'}</div></div>
             <div className={`${vt.kpi} ${t.comAVencer > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Vence em 30 dias</div><div className={vt.kpiV}>{t.aVencerMin > 0 ? minutosParaHhMm(t.aVencerMin) : '—'}</div><div className={vt.kpiS}>{t.comAVencer > 0 ? `${t.comAVencer} funcionário${t.comAVencer === 1 ? '' : 's'} — dar folga` : 'nenhum'}</div></div>
@@ -628,9 +628,9 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
               <table className={vt.table} style={{ minWidth: 760 }}>
                 <thead><tr>
                   <Th k="nome" t="Funcionário" />
-                  <Th k="saldoMin" t="Fechado" n />
-                  <Th k="mesCorrenteMin" t={mesNome} n />
-                  <Th k="projetadoMin" t="Saldo atual" n />
+                  <Th k="saldoMin" t="Saldo" n />
+                  <Th k="mesCorrenteMin" t={`${mesNome} (em andamento)`} n />
+                  <Th k="projetadoMin" t="Previsão" n />
                   <Th k="aVencerMin" t="Vence em 30d" n />
                   <Th k="vencidoMin" t="Vencido" n />
                   <th>Situação</th>
@@ -644,18 +644,18 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
                       <td><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? (l.formaCalculo === 'INTRA_MES' ? 'intra-mês' : `${l.tipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'} · ${l.prazoMeses}m`) : 'sem banco'}</small></span></td>
                       {l.ativo ? (
                         <>
-                          <td className={`${vt.n} ${sinal(l.saldoMin)}`}>{comSinal(l.saldoMin)}</td>
+                          <td className={`${vt.n} ${sinal(l.saldoMin)}`}><b>{comSinal(l.saldoMin)}</b></td>
                           <td className={`${vt.n} ${sinal(l.mesCorrenteMin)}`}>{comSinal(l.mesCorrenteMin)}</td>
-                          <td className={`${vt.n} ${sinal(l.projetadoMin)}`}><b>{comSinal(l.projetadoMin)}</b></td>
+                          <td className={`${vt.n} ${sinal(l.projetadoMin)} ${vt.mute}`}>{comSinal(l.projetadoMin)}</td>
                           <td className={`${vt.n} ${l.aVencerMin > 0 ? '' : vt.mute}`}>{l.aVencerMin > 0 ? minutosParaHhMm(l.aVencerMin) : '—'}</td>
                           <td className={`${vt.n} ${l.vencidoMin > 0 ? vt.neg : vt.mute}`}>{l.vencidoMin > 0 ? minutosParaHhMm(l.vencidoMin) : '—'}</td>
                           <td>
                             {l.vencidoMin > 0 && <span className={`${vt.pill} ${vt.pillErr}`}>pagar na folha</span>}
                             {l.vencidoMin === 0 && l.aVencerMin > 0 && l.proximoVencimento && <span className={`${vt.pill} ${vt.pillWarn}`}>vence {fmtData(l.proximoVencimento)}</span>}
-                            {l.projetadoMin < 0 && <span className={`${vt.pill} ${vt.pillWarn}`}>devendo</span>}
+                            {l.saldoMin < 0 && <span className={`${vt.pill} ${vt.pillWarn}`}>devendo</span>}
                             {l.ultimoFechamento && <span className={`${vt.pill} ${vt.pillMute}`}>fechado até {fmtComp2(l.ultimoFechamento)}</span>}
                             {!l.ultimoFechamento && <span className={`${vt.pill} ${vt.pillMute}`}>sem mês fechado</span>}
-                            {l.vencidoMin === 0 && l.aVencerMin === 0 && l.projetadoMin >= 0 && <span className={`${vt.pill} ${vt.pillOk}`}>em dia</span>}
+                            {l.vencidoMin === 0 && l.aVencerMin === 0 && l.saldoMin >= 0 && <span className={`${vt.pill} ${vt.pillOk}`}>em dia</span>}
                           </td>
                         </>
                       ) : (
@@ -683,7 +683,7 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
           </div>
           <div className={vt.legenda}>
             <span>Clique no funcionário pra registrar folga, lançar saldo de abertura, pagar vencido e ver o extrato.</span>
-            <span>Fechado = meses já fechados · {mesNome} = em andamento, fecha sozinho no dia 1 · Saldo atual = os dois somados.</span>
+            <span>Saldo = só meses fechados. {mesNome} ainda está em andamento e fecha sozinho no dia 1 — até lá é previsão, não saldo.</span>
           </div>
         </>
       )}

@@ -296,7 +296,7 @@ export function ApuracaoCLT() {
                 </div>
               )}
               <div className={`${css.destLinha} ${css.destTotal}`}>
-                <span>Saldo acumulado ao fim do mês</span>
+                <span>{ap!.banco.fechada ? 'Saldo acumulado ao fim do mês' : 'Previsão ao fechar o mês (ainda não entrou no banco)'}</span>
                 <span className={`${css.mono} ${ap!.banco.saldoAcumuladoMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.saldoAcumuladoMin)}</span>
               </div>
               {ap!.banco.desatualizado && (

@@ -302,8 +302,10 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
           <div>
             {ap?.banco ? (
               <div className={css.banco}>
-                <div className={css.bK}>Banco de horas · saldo atual</div>
-                <div className={`${css.bBig} ${ap.banco.saldoAcumuladoMin < 0 ? css.bBigNeg : ''}`}>{comSinal(ap.banco.saldoAcumuladoMin)}</div>
+                <div className={css.bK}>Banco de horas · {ap.banco.fechada ? 'saldo ao fim do mês' : 'saldo (meses fechados)'}</div>
+                <div className={`${css.bBig} ${(ap.banco.fechada ? ap.banco.saldoAcumuladoMin : ap.banco.saldoAnteriorMin) < 0 ? css.bBigNeg : ''}`}>
+                  {comSinal(ap.banco.fechada ? ap.banco.saldoAcumuladoMin : ap.banco.saldoAnteriorMin)}
+                </div>
                 {ap.banco.formaCalculo === 'INTRA_MES' ? (
                   <div className={css.bAviso}>Regra intra-mês: compensa só dentro do mês, nada passa pro seguinte.</div>
                 ) : (
@@ -311,7 +313,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 )}
                 <div className={css.bLinha}><span>{rotuloMes(mes).split(' de ')[0]} {ap.banco.fechada ? '(fechado)' : 'até agora (em andamento)'}</span><span className={`${css.bM} ${ap.banco.saldoMesMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.saldoMesMin)}</span></div>
                 {ap.banco.avulsoMin !== 0 && <div className={css.bLinha}><span>Folgas, pagamentos e ajustes</span><span className={`${css.bM} ${ap.banco.avulsoMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.avulsoMin)}</span></div>}
-                <div className={`${css.bLinha} ${css.bTotal}`}><span>Saldo acumulado</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
+                <div className={`${css.bLinha} ${css.bTotal}`}><span>{ap.banco.fechada ? 'Saldo acumulado' : 'Previsão ao fechar o mês'}</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
                 {ap.banco.desatualizado && <div className={css.bAviso}>Este mês estava fechado com outro valor e foi reaberto: o banco é refeito sozinho na próxima consulta.</div>}
                 <div className={css.bNota}>Os meses fecham sozinhos no dia 1º. Ajuste aprovado ou atestado abonado refazem o mês.</div>
               </div>
