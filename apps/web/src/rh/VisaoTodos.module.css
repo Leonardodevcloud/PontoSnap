@@ -30,7 +30,8 @@
 .row:hover td{ background:var(--field-bg); }
 .row:focus-visible{ outline:2px solid var(--coral); outline-offset:-2px; }
 .tot td{ background:var(--thead-bg); font-weight:800; border-top:2px solid rgba(var(--ink-rgb),.15); }
-.nome{ font-weight:800; }
+.nome{ font-weight:800; white-space:nowrap; }
+.table td:first-child{ min-width:200px; }
 .nome small{ display:block; font-family:var(--ff-mono); font-size:10.5px; color:var(--ash); font-weight:400; }
 .pos{ color:var(--ok-text); }
 .neg{ color:var(--coral-dark); }

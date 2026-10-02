@@ -1,5 +1,5 @@
 .tela{ max-width:760px; }
-.telaLarga{ max-width:1120px; }
+.telaLarga{ max-width:none; }
 .h{ font-family:var(--ff-display); font-weight:600; font-size:26px; }
 .sub{ color:var(--ash); font-size:14.5px; margin:6px 0 20px; line-height:1.55; }
 
