@@ -46,6 +46,12 @@ export interface EntradaDia {
   saidaDiaAnterior?: Date;      // última saída do dia anterior (interjornada)
   janelaPrevista?: Array<{ entrada: string; saida: string }>; // horário previsto (HHMM) p/ apurar atraso/extra por marcação
   regime?: 'normal' | 'r12x36'; // 12x36: sem interjornada de 11h, feriado neutro (Art. 59-A)
+  /**
+   * Contrato de horas (escala flexível): só a carga do dia conta. Com banco de
+   * horas ativo, o que passa da carga é CRÉDITO de jornada (compensa os dias
+   * curtos), não hora extra com adicional.
+   */
+  jornadaFlexivel?: boolean;
 }
 
 export interface ExtraClassificada {

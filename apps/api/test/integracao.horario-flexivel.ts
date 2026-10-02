@@ -57,13 +57,22 @@ async function main() {
   const d14 = apFlex.resultado.dias.find((d) => d.data === '2026-07-14')!;
   ok(d13.minutosTrabalhados === 480 && d13.atrasoMin === 0 && d13.extrasTotalMin === 0 && d13.saldoMin === 0,
     `flexível 13/07: 8h fora do horário = jornada cumprida, sem atraso nem extra (trab=${d13.minutosTrabalhados} atraso=${d13.atrasoMin} extra=${d13.extrasTotalMin})`);
-  ok(d14.minutosTrabalhados === 540 && d14.extrasTotalMin === 60 && d14.atrasoMin === 0,
-    `flexível 14/07: 9h = 1h extra, sem atraso (trab=${d14.minutosTrabalhados} extra=${d14.extrasTotalMin} atraso=${d14.atrasoMin})`);
+  // Com banco ativo, a hora acima da carga é CRÉDITO de jornada: vai pro banco, não é extra.
+  ok(d14.minutosTrabalhados === 540 && d14.saldoMin === 60 && d14.extrasTotalMin === 0 && d14.atrasoMin === 0,
+    `flexível+banco 14/07: 9h = +1h de crédito, sem extra e sem atraso (trab=${d14.minutosTrabalhados} saldo=${d14.saldoMin} extra=${d14.extrasTotalMin})`);
+  ok(apFlex.resultado.totalExtrasMin === 0 && apFlex.resultado.saldoPeriodoMin === 60, `período: extras 0, saldo +60 (${apFlex.resultado.totalExtrasMin}/${apFlex.resultado.saldoPeriodoMin})`);
   ok(apFlex.horarioFlexivel === true, 'apuração informa que a escala é flexível');
 
   // Banco refeito sozinho na próxima consulta, já com a regra nova.
   const s = await banco.saldo(t.id, emp.id, '2026-08-05');
   ok(s.fechamentos.length === 1 && s.saldo!.saldoMin === 60, `banco refeito: julho = só a 1h extra de 14/07 (${s.saldo!.saldoMin})`);
+
+  // Sem banco (hora extra paga na folha), a hora acima da carga volta a ser extra.
+  await banco.definirConfig(t.id, { tipoAcordo: 'NENHUM' });
+  const apSemBanco = await trat.apurarPeriodoCLT(t.id, emp.id, '2026-07-14', '2026-07-14', []);
+  const d14sb = apSemBanco.resultado.dias[0]!;
+  ok(d14sb.extrasTotalMin === 60 && d14sb.extras[0]?.adicionalPct === 50, `flexível SEM banco: 9h = 1h extra a 50% (extra=${d14sb.extrasTotalMin})`);
+  await banco.definirConfig(t.id, { tipoAcordo: 'INDIVIDUAL', prazoMeses: 6 });
 
   // Espelho mostra a carga, não um horário.
   const esp = await trat.conteudoEspelho(t.id, emp.id, '2026-07-13', '2026-07-14');

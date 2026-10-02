@@ -1,4 +1,5 @@
 .tela{ max-width:760px; }
+.telaLarga{ max-width:none; }
 .h{ font-family:var(--ff-display); font-weight:600; font-size:26px; }
 .sub{ color:var(--ash); font-size:14.5px; margin:6px 0 20px; line-height:1.55; }
 
@@ -47,7 +48,7 @@
 .alerta > div{ flex:1; min-width:240px; }
 
 .ext{
-  display:grid; grid-template-columns:90px 1fr auto; gap:12px; align-items:center;
+  display:grid; grid-template-columns:90px 1fr auto 22px; gap:12px; align-items:center;
   padding:9px 0; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13.5px;
 }
 .extD{ font-family:var(--ff-mono); font-size:11.5px; color:var(--ash); }
@@ -155,3 +156,12 @@
 .extRemover { margin-left: 8px; border: none; background: transparent; color: var(--ash, #5C4F49); font-size: 15px; font-weight: 700; cursor: pointer; padding: 0 4px; border-radius: 6px; line-height: 1; }
 .extRemover:hover:not(:disabled) { background: #FFF3F0; color: var(--coral-d, #E4502F); }
 .extRemover:disabled { opacity: .5; cursor: default; }
+
+/* fechamento automático */
+.hauto{ font-style:normal; font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); margin-left:6px; }
+.cSub{ font-size:11.5px; color:var(--ash); margin-top:4px; }
+.cSub .mono{ font-size:11.5px; }
+.extTag{ display:block; font-style:normal; font-family:var(--ff-mono); font-size:10px; color:var(--ash); margin-top:1px; }
+
+.extAcao{ width:22px; text-align:center; }
+.extRemover{ margin-left:0 !important; }

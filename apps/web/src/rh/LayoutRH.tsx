@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { BannerCobranca } from './BannerCobranca';
 import { useAuth } from '../lib/auth';
 import { BotaoTema } from '../components/BotaoTema';
@@ -104,9 +104,13 @@ function SeletorEmpresa() {
   );
 }
 
+/** Telas com tabela de todos os funcionários: usam a largura inteira. */
+const LARGAS = ['/rh/apuracao', '/rh/espelhos', '/rh/banco'];
+
 export function LayoutRH() {
   const { sessao, sair } = useAuth();
   const navegar = useNavigate();
+  const rota = useLocation();
 
   return (
     <div className={css.app}>
@@ -136,7 +140,7 @@ export function LayoutRH() {
           <button className={css.sair} onClick={() => { sair(); navegar('/login', { replace: true }); }}>sair →</button>
         </div>
       </aside>
-      <main className={css.content}>
+      <main className={`${css.content} ${LARGAS.some((r) => rota.pathname.startsWith(r)) ? css.contentLarga : ''}`}>
         {sessao?.perfil === 'ADMIN_CLIENTE' && <BannerCobranca />}
         <Outlet />
       </main>

@@ -1,5 +1,5 @@
 import {
-  pgTable, uuid, varchar, char, smallint, integer, date, jsonb, timestamp,
+  pgTable, uuid, varchar, char, smallint, integer, date, jsonb, timestamp, boolean,
 } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 import { pontoRep } from './rep';
@@ -19,6 +19,13 @@ export const pontoHorarioContratual = pgTable('ponto_horario_contratual', {
   regime: varchar('regime', { length: 10 }).notNull().default('normal'),
   /** Mapa opcional {diaSemana(0-6): minutos}. Se presente, sobrepõe durJornadaMin naquele dia. */
   jornadaPorDia: jsonb('jornada_por_dia').$type<Record<string, number>>(),
+  /**
+   * Contrato de horas (horário flexível): só a CARGA do dia vale. O funcionário
+   * pode entrar e sair quando quiser; extra é o que passar da carga, atraso é
+   * o que faltar. Os pares viram só referência (lembretes, espelho), nunca
+   * base de atraso/extra.
+   */
+  flexivel: boolean('flexivel').notNull().default(false),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });
 

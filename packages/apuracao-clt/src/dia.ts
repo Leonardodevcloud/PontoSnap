@@ -92,16 +92,29 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
       if (atraso > 0) obs.push(`Atraso/saída antecipada: ${atraso}min (confronto com a jornada prevista).`);
       saldo = extra - atraso;
     }
+  } else if (trabalhado === 0) {
+    // Sem batida em dia esperado: falta de dia inteiro. Fica em faltaMin e
+    // FORA do saldoMin — mesma convenção do modo janela, pra que a destinação
+    // (DESCONTA/BANCO/ABONA) decida o que fazer com ela.
+    falta = esperado;
   } else {
     // fallback: apuração pelo total do dia, com tolerância no líquido (Súmula 366)
     const bruto = trabalhado - esperado;
     saldo = Math.abs(bruto) <= regras.toleranciaDiariaMin ? 0 : bruto;
-    if (saldo > 0) {
+    if (saldo > 0 && dia.jornadaFlexivel && regras.bancoDeHoras) {
+      // Contrato de horas com banco: o que passou da carga compensa os dias
+      // curtos pelo banco. Não é extra, não tem adicional, não vai pra folha.
+      obs.push(`Crédito de jornada: ${saldo}min acima da carga (contrato de horas, vai pro banco).`);
+    } else if (saldo > 0) {
       extras.push({ min: saldo, adicionalPct: pctDia, motivo: motivoExtra });
       extrasTotal += saldo;
       if (saldo > regras.extra.limiteDiarioMin) obs.push(`Extra diária acima do limite legal (${regras.extra.limiteDiarioMin}min).`);
     } else if (saldo < 0) {
-      falta = -saldo;
+      // Dia trabalhado com jornada curta é ATRASO/saída antecipada, não falta.
+      // Antes isto virava faltaMin junto com saldo negativo, e o banco de horas
+      // ignorava o débito (a destinação de faltas padrão é DESCONTA).
+      atrasoMin = -saldo;
+      obs.push(`Jornada incompleta: ${atrasoMin}min a menos que o contratado.`);
     }
   }
 
