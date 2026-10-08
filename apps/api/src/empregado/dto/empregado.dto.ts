@@ -29,6 +29,8 @@ export class DefinirHorarioDto {
 
 export class DefinirSalarioDto {
   @IsNumber() @Min(0) salarioMensal!: number;
+  /** YYYY-MM-DD a partir de quando vale. Obrigatório quando já existe salário. */
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) vigenteDesde?: string;
 }
 
 export class AcessoDto {

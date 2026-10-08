@@ -7,3 +7,4 @@ export * from './regras.js';
 export * from './valores.js';
 export * from './banco';
 export * from './cobranca';
+export * from './salario.js';

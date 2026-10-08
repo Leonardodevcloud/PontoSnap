@@ -1,4 +1,4 @@
-import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date } from 'drizzle-orm/pg-core';
+import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date, index } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 
 export const empregado = pgTable('empregado', {
@@ -22,4 +22,20 @@ export const empregado = pgTable('empregado', {
 }, (t) => [
   unique('uq_empregado_cpf').on(t.tenantId, t.cpf),
   unique('uq_empregado_matricula').on(t.tenantId, t.matricula),
+]);
+
+/**
+ * Histórico de salário com vigência (migration 0041). A apuração usa, em cada
+ * dia, o salário vigente naquele dia. empregado.salario_mensal = o mais recente.
+ */
+export const empregadoSalario = pgTable('empregado_salario', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
+  vigenteDesde: date('vigente_desde').notNull(),
+  salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }).notNull(),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique('uq_empregado_salario').on(t.tenantId, t.empregadoId, t.vigenteDesde),
+  index('idx_empregado_salario_emp').on(t.tenantId, t.empregadoId),
 ]);

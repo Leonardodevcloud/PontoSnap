@@ -288,6 +288,13 @@
       "when": 1784602200000,
       "tag": "0040_prestador_valor_vigencia",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1784602300000,
+      "tag": "0041_salario_vigencia",
+      "breakpoints": true
     }
   ]
 }

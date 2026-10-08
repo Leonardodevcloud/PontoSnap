@@ -2,13 +2,13 @@ import { Inject, Injectable, NotFoundException, ConflictException, Optional } fr
 import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
-  pontoBancoMov, pontoBancoFechamento, espelhoAssinatura,
+  pontoBancoMov, pontoBancoFechamento, espelhoAssinatura, empregadoSalario,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
 import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
-import { apurarPeriodo, valorizarPeriodo, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores } from '@ponto/apuracao-clt';
+import { apurarPeriodo, valorizarComSalarios, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
 import { montarRegrasApuracao, type ItensResolvidos } from './montar-regras';
 import { resolverItens } from './resolver-itens';
@@ -671,10 +671,16 @@ export class TratamentoService {
       // R$ desta folha segue a destinação: com banco, a extra vira crédito (não
       // é paga agora — senão a mesma hora contava duas vezes); falta/atraso que
       // vão pro banco ou são abonados/tolerados não viram desconto.
+      // Salário com vigência: cada dia vale pelo salário daquele dia (promoção
+      // no meio do mês fica proporcional). Sem histórico, usa o salário atual.
+      const histSal = await tx.select({ desde: empregadoSalario.vigenteDesde, valor: empregadoSalario.salarioMensal })
+        .from(empregadoSalario).where(and(eq(empregadoSalario.tenantId, tenantId), eq(empregadoSalario.empregadoId, empregadoId)));
+      const salarios: SalarioVigente[] = histSal.length
+        ? histSal.map((h) => ({ desde: h.desde, centavos: Math.round(Number(h.valor) * 100) }))
+        : emp.salarioMensal != null ? [{ desde: '0000-01-01', centavos: Math.round(Number(emp.salarioMensal) * 100) }] : [];
       let valores: ResultadoValores | null = null;
-      if (emp.salarioMensal != null) {
-        const salarioMensalCentavos = Math.round(Number(emp.salarioMensal) * 100);
-        valores = valorizarPeriodo(resultado, { salarioMensalCentavos, horasMensaisFolha: 220 }, regras, {
+      if (salarios.length) {
+        valores = valorizarComSalarios(resultado, salarios, 220, regras, {
           extrasNoBanco: bancoAtivo,
           descontaFaltas: destinacao.falta.destino === 'DESCONTA',
           descontaAtrasos: destinacao.atraso.destino === 'DESCONTA',
@@ -715,6 +721,8 @@ export class TratamentoService {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
         afastamentos, destinacao, batidas, banco,
+        /** Histórico de salário usado na valorização (vigência por data). */
+        salarios,
         /** Calendário da escala no período (inclui dias que ainda não chegaram). */
         diasEscala, diasUteis: diasUteisCal, diasPrevistos,
         /** Datas de feriado do período (calendário do cliente + parâmetro). */

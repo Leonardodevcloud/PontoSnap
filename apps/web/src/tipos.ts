@@ -649,7 +649,10 @@ export interface PessoalLinhaClt {
     /** Mês do benefício a partir do qual esse valor vale. */
     vigenteDesde: string | null;
   };
+  /** Salário do mês (proporcional se mudou no meio). */
   salarioCent: number | null;
+  /** Trechos do mês por salário (promoção/reajuste). 1 trecho = sem mudança. */
+  salarioPartes: { desde: string; ate: string; dias: number; salarioCent: number; valorCent: number }[];
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   /** Hora extra (sem indenização) e quanto dela foi pro banco de horas. */
   heMin: number; heNoBancoMin: number;

@@ -375,7 +375,7 @@ function TabelaFolha({ linhas, mes, onAbrir }: { linhas: PessoalLinhaClt[]; mes:
             <td className={vt.nome}>{l.nome}<small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
               {l.erro && <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro}>sem escala</span>}
               {l.salarioCent == null && <span className={`${vt.pill} ${vt.pillWarn}`}>sem salário</span>}</td>
-            <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}</td>
+            <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub} title={l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ')}>proporcional · mudou {fmtDia(l.salarioPartes[1]!.desde)}</small>}</td>
             <td className={vt.n}>{l.diasMes ? brl(l.valorDiaMesCent) : '—'}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
             <td className={vt.n}>{(() => {
               const x = textoExtras(l);
@@ -766,6 +766,15 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
           <span className={css.lb}>Valor do dia em {mesCurto(mes)}</span>
           <Linha2 cls={css.grande} k={`${l.diasMes} dias de trabalho`} v={l.salarioCent == null ? 'sem salário' : brl(l.valorDiaMesCent)} />
           <p className={css.formula}>{l.salarioCent == null ? 'Sem salário no cadastro.' : `${brl(l.salarioCent)} ÷ ${l.diasMes} (dias da escala neste mês, sem os feriados cadastrados)`}</p>
+          {l.salarioPartes.length > 1 && (
+            <div className={css.historico}>
+              <span className={css.lb}>Salário mudou neste mês — proporcional</span>
+              {l.salarioPartes.map((p) => (
+                <Linha2 key={p.desde} k={<span className={css.mute}>{fmtDia(p.desde)} a {fmtDia(p.ate)} · {brl(p.salarioCent)}</span>} v={brl(p.valorCent)} />
+              ))}
+              <p className={css.formula}>Base de 30 dias. Extras e faltas de cada dia usam o salário daquele dia.</p>
+            </div>
+          )}
           <Linha2 k={<span className={css.mute}>Base do desconto de falta (÷ 30)</span>} v={brl(l.valorDia30Cent)} />
           <Linha2 k={<span className={css.mute}>Valor-hora (÷ 220)</span>} v={brl(l.valorHoraCent)} />
           <Link className={css.link} to="/rh/funcionarios">O salário vem de Funcionários — editar lá</Link>

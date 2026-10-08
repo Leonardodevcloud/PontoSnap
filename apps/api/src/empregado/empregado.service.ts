@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { parseCsv, parseXlsx, type ErroLinha } from './importacao';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { empregado, pontoHorarioContratual, pontoPerfilRegra, usuario, empregadoEscalaVigencia, comTenant, comoMaster, type Db } from '@ponto/db';
+import { and, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
+import { empregado, empregadoSalario, pessoalFechamento, pontoHorarioContratual, pontoPerfilRegra, usuario, empregadoEscalaVigencia, comTenant, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { registrarEventoRep } from '../fiscal/evento-rep';
 import { EmailService } from '../email/email.service';
@@ -56,6 +56,9 @@ export class EmpregadoService {
         salarioMensal: p.salarioMensal != null ? String(p.salarioMensal) : null,
         dataInicioPonto: p.dataInicioPonto ?? null,
       }).returning();
+      if (p.salarioMensal != null) {
+        await tx.insert(empregadoSalario).values({ tenantId, empregadoId: rows[0]!.id, vigenteDesde: '2000-01-01', salarioMensal: String(p.salarioMensal) });
+      }
 
       // Registro 5 do AFD: inclusão de empregado no REP.
       await registrarEventoRep(tx as never, tenantId, {
@@ -234,12 +237,45 @@ export class EmpregadoService {
     });
   }
 
-  async definirSalario(tenantId: string, id: string, salarioMensal: number) {
-    const rows = await comTenant(this.db, tenantId, (tx) =>
-      tx.update(empregado).set({ salarioMensal: String(salarioMensal) })
-        .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning());
-    if (!rows[0]) throw new NotFoundException('Empregado não encontrado');
-    return this.semSegredos(rows[0]);
+  /**
+   * Novo salário a partir de uma data (promoção, reajuste). Os dias antes dela
+   * continuam com o salário antigo — o mês da mudança sai proporcional.
+   * Primeiro salário cadastrado vale "desde sempre" se a data não vier.
+   */
+  async definirSalario(tenantId: string, id: string, salarioMensal: number, vigenteDesde?: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const e = (await tx.select().from(empregado).where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!e) throw new NotFoundException('Empregado não encontrado');
+      const hist = await tx.select().from(empregadoSalario)
+        .where(and(eq(empregadoSalario.tenantId, tenantId), eq(empregadoSalario.empregadoId, id)));
+      if (!vigenteDesde && hist.length > 0) {
+        throw new BadRequestException('Informe a partir de quando o novo salário vale. Os dias anteriores continuam com o salário antigo.');
+      }
+      const desde = vigenteDesde ?? '2000-01-01';
+      // Mês já fechado na Gestão de pessoal não pode mudar por baixo.
+      const comp = desde.slice(0, 7);
+      const fechado = (await tx.select({ id: pessoalFechamento.id }).from(pessoalFechamento).where(and(
+        eq(pessoalFechamento.tenantId, tenantId), gte(pessoalFechamento.competencia, comp)))).length > 0;
+      if (fechado && vigenteDesde) {
+        throw new BadRequestException(`Já existe mês fechado a partir de ${comp} na Gestão de pessoal. Reabra-o ou escolha uma data depois dele.`);
+      }
+      const valor = String(salarioMensal);
+      await tx.insert(empregadoSalario).values({ tenantId, empregadoId: id, vigenteDesde: desde, salarioMensal: valor })
+        .onConflictDoUpdate({ target: [empregadoSalario.tenantId, empregadoSalario.empregadoId, empregadoSalario.vigenteDesde], set: { salarioMensal: valor } });
+      // "Salário atual" = o de vigência mais recente.
+      const todos = [...hist.filter((h) => h.vigenteDesde !== desde).map((h) => ({ d: h.vigenteDesde, v: h.salarioMensal })), { d: desde, v: valor }]
+        .sort((x, y) => x.d.localeCompare(y.d));
+      const rows = await tx.update(empregado).set({ salarioMensal: todos[todos.length - 1]!.v })
+        .where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
+      return this.semSegredos(rows[0]!);
+    });
+  }
+
+  /** Histórico de salário (mais recente primeiro). */
+  async historicoSalario(tenantId: string, id: string) {
+    return comTenant(this.db, tenantId, (tx) => tx.select({ vigenteDesde: empregadoSalario.vigenteDesde, salarioMensal: empregadoSalario.salarioMensal })
+      .from(empregadoSalario).where(and(eq(empregadoSalario.tenantId, tenantId), eq(empregadoSalario.empregadoId, id)))
+      .orderBy(desc(empregadoSalario.vigenteDesde)));
   }
 
   /**

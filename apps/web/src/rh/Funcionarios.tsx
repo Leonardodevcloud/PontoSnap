@@ -435,24 +435,53 @@ function ModalPerfil({ empregado, perfis, onFechar, onSalvo }: {
 }
 
 function ModalSalario({ empregado, onFechar, onSalvo }: { empregado: Empregado; onFechar: () => void; onSalvo: () => void }) {
-  const [salario, setSalario] = useState(empregado.salarioMensal ?? '');
+  type Hist = { vigenteDesde: string; salarioMensal: string };
+  const [hist, setHist] = useState<Hist[] | null>(null);
+  const [salario, setSalario] = useState('');
+  const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  const [desde, setDesde] = useState(`${hoje.slice(0, 7)}-01`);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  useEffect(() => {
+    api.get<Hist[]>(`/empregados/${empregado.id}/salarios`).then(setHist).catch(() => setHist([]));
+  }, [empregado.id]);
+  const primeiro = hist !== null && hist.length === 0;
+  const reais = (v: string | number) => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const dataBr = (iso: string) => iso <= '2000-01-01' ? 'o início' : `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+  const numero = Number(String(salario).replace(/\./g, '').replace(',', '.'));
 
   async function salvar() {
     setErro(null); setEnviando(true);
     try {
-      await api.patch(`/empregados/${empregado.id}/salario`, { salarioMensal: Number(String(salario).replace(',', '.')) });
+      await api.patch(`/empregados/${empregado.id}/salario`, { salarioMensal: numero, ...(primeiro ? {} : { vigenteDesde: desde }) });
       onSalvo();
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
   }
 
   return (
     <Modal titulo={`Salário de ${empregado.nome.split(' ')[0]}`} onFechar={onFechar}>
-      <Campo rotulo="Salário mensal" inputMode="decimal" value={String(salario)} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2200.00" />
-      <p className={css.aviso}>Usado para calcular extras, adicional noturno e descontos em R$ (divisor 220h).</p>
+      {hist && hist.length > 0 && (
+        <div className={css.aviso}>
+          {hist.map((h, i) => (
+            <div key={h.vigenteDesde}>{i === 0 ? <strong>Atual: </strong> : 'Antes: '}{reais(h.salarioMensal)} desde {dataBr(h.vigenteDesde)}</div>
+          ))}
+        </div>
+      )}
+      <Campo rotulo={primeiro ? 'Salário mensal' : 'Novo salário mensal'} inputMode="decimal" value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2.200,00" />
+      {!primeiro && (
+        <>
+          <Campo rotulo="Vale a partir de" type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          <p className={css.aviso}>
+            Os dias <strong>antes</strong> dessa data continuam com o salário antigo. Se for no meio do mês, o mês sai <strong>proporcional</strong> (base 30 dias),
+            e extras, faltas e valor do dia de cada dia usam o salário daquele dia. Pra mudar a jornada também, use <strong>Mudar escala</strong> com a mesma data.
+          </p>
+        </>
+      )}
+      {primeiro && <p className={css.aviso}>Usado para calcular extras, adicional noturno e descontos em R$ (divisor 220h).</p>}
       {erro && <p className={css.erroModal}>{erro}</p>}
-      <Botao variante="coral" onClick={salvar} disabled={enviando || !salario}>{enviando ? 'Salvando…' : 'Salvar salário'}</Botao>
+      <Botao variante="coral" onClick={salvar} disabled={enviando || !salario || !(numero > 0) || (!primeiro && !desde)}>
+        {enviando ? 'Salvando…' : primeiro ? 'Salvar salário' : `Salvar a partir de ${desde ? dataBr(desde) : '…'}`}
+      </Botao>
     </Modal>
   );
 }

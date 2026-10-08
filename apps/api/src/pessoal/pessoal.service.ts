@@ -5,6 +5,7 @@ import {
   pessoalDebito, pessoalFechamento, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
+import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import {
   calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, faixaDoMes, parcelaNoMes,
@@ -22,7 +23,10 @@ export interface LinhaClt {
    * vigenteDesde = mês do benefício a partir do qual esse valor vale.
    */
   config: ConfigBeneficio & { cargo: string | null; chavePix: string | null; origem: 'PADRAO' | 'PROPRIO' | 'NENHUM'; vigenteDesde: string | null };
+  /** Salário do MÊS (proporcional se mudou no meio). null = sem salário. */
   salarioCent: number | null;
+  /** Trechos do mês quando o salário mudou (promoção/reajuste); 1 trecho = sem mudança. */
+  salarioPartes: { desde: string; ate: string; dias: number; salarioCent: number; valorCent: number }[];
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   /** Hora extra de verdade (sem indenização), e quanto dela foi pro banco. */
   heMin: number; heNoBancoMin: number;
@@ -189,7 +193,9 @@ export class PessoalService {
       const ultimo = dados.configs.filter((c) => c.empregadoId === e.id).sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
       // A carga feita neste fechamento é do PRÓXIMO mês → vale o valor vigente nele.
       const config = { ...beneficioEm(e.id, prox), cargo: ultimo?.cargo ?? null, chavePix: ultimo?.chavePix ?? null };
-      const salarioCent = e.salarioMensal != null ? centavos(e.salarioMensal) : null;
+      let salarioCent: number | null = null;
+      let salarioPartes: LinhaClt['salarioPartes'] = [];
+      let salarioFimMesCent = 0;
 
       let erro: string | null = null;
       let diasUteis: string[] = [], diasPrevistos: string[] = [], diasEscala: string[] = [];
@@ -199,6 +205,9 @@ export class PessoalService {
       try {
         const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim, feriadosLista);
         diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala;
+        // Salário do mês com vigência: proporcional quando muda no meio.
+        const sm = salarioDoMes(ap.salarios, comp);
+        if (sm) { salarioCent = sm.totalCent; salarioPartes = sm.partes; salarioFimMesCent = salarioEm(ap.salarios, fim) ?? 0; }
         // Hora extra de verdade = total − indenização de intervalo/interjornada.
         indenizacaoMin = ap.resultado.dias.reduce((t, d) => t + d.extras.filter((x) => x.motivo.startsWith('indenização')).reduce((a, x) => a + x.min, 0), 0);
         heMin = Math.max(0, ap.resultado.totalExtrasMin - indenizacaoMin);
@@ -231,6 +240,7 @@ export class PessoalService {
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
 
+      if (salarioCent == null && e.salarioMensal != null) { salarioCent = centavos(e.salarioMensal); salarioFimMesCent = salarioCent; }
       const sal = salarioCent ?? 0;
       const diasMes = diasUteis.length;
       const debitosCent = debitosDe('CLT', e.id);
@@ -238,11 +248,12 @@ export class PessoalService {
       const custoBrutoCent = sal + proventosCent - descontosCent + ben.vrProxCent + ben.vtProxCent;
       const abatimentosCent = debitosCent + ben.acertoCent;
       clt.push({
-        empregadoId: e.id, nome: e.nome, matricula: e.matricula, config, salarioCent,
+        empregadoId: e.id, nome: e.nome, matricula: e.matricula, config, salarioCent, salarioPartes,
         diasMes,
         valorDiaMesCent: diasMes ? Math.round(sal / diasMes) : 0,
-        valorDia30Cent: Math.round(sal / 30),
-        valorHoraCent: Math.round(sal / 220),
+        // Base de falta e valor-hora: o salário vigente no fim do mês.
+        valorDia30Cent: Math.round(salarioFimMesCent / 30),
+        valorHoraCent: Math.round(salarioFimMesCent / 220),
         heMin, heNoBancoMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
         beneficios: { ...ben, diasProx: diasProxLista.length, diasProxLista, pagosEstimado: !pagosSnap },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,

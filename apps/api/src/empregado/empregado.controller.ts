@@ -82,7 +82,10 @@ export class EmpregadoController {
     return this.empregados.criarOuResetarAcesso(this.tenant(u), id, dto.email);
   }
   @Patch(':id/salario') salario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirSalarioDto) {
-    return this.empregados.definirSalario(this.tenant(u), id, dto.salarioMensal);
+    return this.empregados.definirSalario(this.tenant(u), id, dto.salarioMensal, dto.vigenteDesde);
+  }
+  @Get(':id/salarios') salarios(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.empregados.historicoSalario(this.tenant(u), id);
   }
   @Patch(':id/data-inicio-ponto') dataInicioPonto(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirDataInicioPontoDto) {
     return this.empregados.definirDataInicioPonto(this.tenant(u), id, dto.data ?? null);
