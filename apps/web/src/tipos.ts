@@ -133,6 +133,8 @@ export interface ResultadoDiaCLT {
   penalidadeInterjornadaMin: number;
   violacaoInterjornada: boolean;
   paresIncompletos: boolean;
+  /** Batida em aberto ou hoje em andamento: sem falta/atraso/extra até ser tratado. */
+  pendente?: boolean;
   observacoes: string[];
 }
 
@@ -150,6 +152,9 @@ export interface ResultadoPeriodoCLT {
   reflexoDsrMin: number;
   dsrPerdidoSemanas: number;
   diasComViolacao: string[];
+  diasPendentes?: string[];
+  /** Jornada esperada no mês inteiro (inclui os dias que ainda não chegaram). */
+  totalContratadoMesMin?: number;
 }
 
 export interface ValoresApuracao {
@@ -161,6 +166,8 @@ export interface ValoresApuracao {
   descontoAtrasosCentavos: number;
   descontoDsrPerdidoCentavos: number;
   liquidoProventosCentavos: number;
+  /** Extra que foi pro banco de horas (não é paga nesta folha). */
+  extrasNoBancoMin?: number;
 }
 
 export interface ApuracaoResp {
@@ -547,6 +554,7 @@ export interface SinaisCompetencia {
   interjornada: number;
   faltaDias: string[];
   emAbertoHoje: boolean;
+  pendentes?: number;
 }
 
 export interface LinhaCompetencia {
@@ -558,6 +566,10 @@ export interface LinhaCompetencia {
   horarioDurMin: number;
   trabalhadoMin: number;
   contratadoMin: number;
+  /** Jornada esperada no mês inteiro. */
+  contratadoMesMin?: number;
+  /** Extra que foi pro banco (não entra em R$). */
+  extrasNoBancoMin?: number;
   extrasMin: number;
   extra50Min: number;
   extra100Min: number;
@@ -584,7 +596,7 @@ export interface RelatorioCompetencia {
   hoje: string;
   linhas: LinhaCompetencia[];
   totais: {
-    trabalhadoMin: number; contratadoMin: number; extrasMin: number; extra50Min: number; extra100Min: number;
+    trabalhadoMin: number; contratadoMin: number; contratadoMesMin?: number; extrasMin: number; extra50Min: number; extra100Min: number;
     faltaMin: number; atrasoMin: number; noturnoMin: number; saldoMesMin: number;
     bancoAnteriorMin: number; bancoAcumuladoMin: number; comBanco: number;
     extrasCentavos: number; adicionalNoturnoCentavos: number; descontosCentavos: number; liquidoProventosCentavos: number;

@@ -40,10 +40,19 @@ describe('apuração diária', () => {
     expect(r.extras[0]).toMatchObject({ min: 240, adicionalPct: 100 });
   });
 
-  it('trabalho a menos que a jornada gera falta', () => {
+  it('trabalho a menos que a jornada (dia trabalhado) é atraso/saída antecipada, não falta', () => {
     const r = apurarDia(base({ marcacoes: [d('2026-07-13', '08:00'), d('2026-07-13', '12:00'), d('2026-07-13', '13:00'), d('2026-07-13', '16:00')] }), REGRAS_CLT_PADRAO);
     expect(r.minutosTrabalhados).toBe(420);
-    expect(r.faltaMin).toBe(60);
+    expect(r.faltaMin).toBe(0);
+    expect(r.atrasoMin).toBe(60);
+    expect(r.saldoMin).toBe(-60);
+  });
+
+  it('dia esperado sem nenhuma batida é falta de dia inteiro', () => {
+    const r = apurarDia(base({ marcacoes: [] }), REGRAS_CLT_PADRAO);
+    expect(r.faltaMin).toBe(480);
+    expect(r.faltaInjustificada).toBe(true);
+    expect(r.pendente).toBe(false);
   });
 
   it('interjornada abaixo de 11h é sinalizada e indenizada', () => {
@@ -55,6 +64,49 @@ describe('apuração diária', () => {
   it('número ímpar de batidas fica em aberto', () => {
     const r = apurarDia(base({ marcacoes: [d('2026-07-13', '08:00'), d('2026-07-13', '12:00'), d('2026-07-13', '13:00')] }), REGRAS_CLT_PADRAO);
     expect(r.paresIncompletos).toBe(true);
+  });
+
+  const janela = [{ entrada: '0800', saida: '1200' }, { entrada: '1300', saida: '1700' }];
+
+  it('batida em aberto NÃO vira atraso do período sem par (fica pendente)', () => {
+    // esqueceu a saída da tarde: antes a janela lia 4h de "saída antecipada"
+    const r = apurarDia(base({ janelaPrevista: janela, marcacoes: [d('2026-07-13', '08:00'), d('2026-07-13', '12:00'), d('2026-07-13', '13:00')] }), REGRAS_CLT_PADRAO);
+    expect(r.pendente).toBe(true);
+    expect(r.atrasoMin).toBe(0);
+    expect(r.faltaMin).toBe(0);
+    expect(r.saldoMin).toBe(0);
+    expect(r.minutosTrabalhados).toBe(240);
+  });
+
+  it('só uma batida num dia passado também fica pendente, não falta', () => {
+    const r = apurarDia(base({ janelaPrevista: janela, marcacoes: [d('2026-07-13', '08:00')] }), REGRAS_CLT_PADRAO);
+    expect(r.pendente).toBe(true);
+    expect(r.faltaMin).toBe(0);
+    expect(r.atrasoMin).toBe(0);
+  });
+
+  it('hoje em andamento sem batida não é falta', () => {
+    const r = apurarDia(base({ diaEmCurso: true, janelaPrevista: janela, marcacoes: [] }), REGRAS_CLT_PADRAO);
+    expect(r.pendente).toBe(true);
+    expect(r.faltaMin).toBe(0);
+  });
+
+  it('hoje em andamento, voltou do almoço: não lê a tarde como saída antecipada', () => {
+    const r = apurarDia(base({ diaEmCurso: true, janelaPrevista: janela, marcacoes: [d('2026-07-13', '08:00'), d('2026-07-13', '12:00')] }), REGRAS_CLT_PADRAO);
+    expect(r.pendente).toBe(true);
+    expect(r.atrasoMin).toBe(0);
+  });
+
+  it('hoje com todas as batidas previstas já apura normalmente', () => {
+    const r = apurarDia(base({ diaEmCurso: true, janelaPrevista: janela, marcacoes: [d('2026-07-13', '08:00'), d('2026-07-13', '12:00'), d('2026-07-13', '13:00'), d('2026-07-13', '18:00')] }), REGRAS_CLT_PADRAO);
+    expect(r.pendente).toBe(false);
+    expect(r.extrasTotalMin).toBe(60);
+  });
+
+  it('atraso real (par completo, entrada tardia) continua atraso', () => {
+    const r = apurarDia(base({ janelaPrevista: janela, marcacoes: [d('2026-07-13', '08:40'), d('2026-07-13', '12:00'), d('2026-07-13', '13:00'), d('2026-07-13', '17:00')] }), REGRAS_CLT_PADRAO);
+    expect(r.pendente).toBe(false);
+    expect(r.atrasoMin).toBe(40);
   });
 
   it('trabalho em folga que não é domingo/feriado (sábado) sai a 50% e não gera falta', () => {

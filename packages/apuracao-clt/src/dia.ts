@@ -28,10 +28,29 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
 
   const r12x36 = dia.regime === 'r12x36';
 
+  // esperado do dia. No 12x36, domingo/feriado são dias normais da escala (Art. 59-A).
+  const descanso = r12x36 ? !!dia.ehDescanso : (!!dia.ehDomingo || !!dia.ehFeriado || !!dia.ehDescanso);
+  const premium = !r12x36 && (!!dia.ehDomingo || !!dia.ehFeriado); // 100% só em domingo/feriado (fora do 12x36)
+  const esperado = descanso ? 0 : Math.max(0, dia.jornadaContratadaMin - (dia.ausenciaAbonadaMin ?? 0));
+
+  // Dia PENDENTE — o motor não tem como saber o que aconteceu, então não chuta:
+  //  - batida em aberto (ímpar): faltou bater entrada ou saída. Sem o par,
+  //    a janela leria o resto do dia como "saída antecipada" e um esquecimento
+  //    viraria horas de atraso. Fica pendente até o RH tratar (ajuste).
+  //  - hoje, ainda incompleto: o expediente não acabou. Sem batida não é
+  //    falta e sem a saída não é atraso — fecha quando o dia terminar
+  //    (ou antes, se as batidas previstas já estiverem todas lá).
+  const janelaN = dia.janelaPrevista?.length ?? 0;
+  const emCursoIncompleto = !!dia.diaEmCurso && !descanso && (
+    trabalhado === 0 || (janelaN > 0 ? pares.length < janelaN : trabalhado < esperado));
+  const pendente = paresIncompletos || emCursoIncompleto;
+  if (emCursoIncompleto && !paresIncompletos) obs.push('Dia em andamento — apura quando as batidas do dia estiverem completas.');
+  if (paresIncompletos) obs.push('Dia pendente: sem falta/atraso/extra até a batida que falta ser tratada.');
+
   // penalidade de intervalo por faixa (Art. 71: >6h→60min; 4–6h→15min)
   let penIntervalo = 0;
   const faixa = [...regras.intervalo.faixas].sort((a, b) => b.acimaMin - a.acimaMin).find((f) => trabalhado > f.acimaMin);
-  if (regras.intervalo.penalidade && faixa && pares.length > 0 && intervalo < faixa.minimoMin) {
+  if (!pendente && regras.intervalo.penalidade && faixa && pares.length > 0 && intervalo < faixa.minimoMin) {
     penIntervalo = faixa.minimoMin - intervalo;
     obs.push(`Intervalo insuficiente (${intervalo}min de ${faixa.minimoMin}): ${penIntervalo}min indenizáveis +50% (Art. 71 §4º).`);
   }
@@ -48,10 +67,6 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
     }
   }
 
-  // esperado do dia. No 12x36, domingo/feriado são dias normais da escala (Art. 59-A).
-  const descanso = r12x36 ? !!dia.ehDescanso : (!!dia.ehDomingo || !!dia.ehFeriado || !!dia.ehDescanso);
-  const premium = !r12x36 && (!!dia.ehDomingo || !!dia.ehFeriado); // 100% só em domingo/feriado (fora do 12x36)
-  const esperado = descanso ? 0 : Math.max(0, dia.jornadaContratadaMin - (dia.ausenciaAbonadaMin ?? 0));
   const pctDia = premium ? regras.extra.domingoFeriadoPct : regras.extra.diaUtilPct;
   const motivoExtra = premium ? 'extra em domingo/feriado' : dia.ehDescanso ? 'extra em folga' : 'hora extra';
 
@@ -64,7 +79,9 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
   const usaJanela = !descanso && !!dia.janelaPrevista && janelaMesmoDia(dia.janelaPrevista)
     && pares.every(([e, s]) => minutosDoDia(s) >= minutosDoDia(e)); // sem virada de dia
 
-  if (descanso) {
+  if (pendente) {
+    // nada a classificar: trabalhado e noturno aparecem, saldo fica zerado
+  } else if (descanso) {
     // trabalho em dia de descanso: tudo é extra (tolerância no total)
     const bruto = trabalhado;
     if (bruto > regras.toleranciaDiariaMin) {
@@ -144,6 +161,7 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
     penalidadeInterjornadaMin: penInter,
     violacaoInterjornada: violInter,
     paresIncompletos,
+    pendente,
     observacoes: obs,
   };
 }

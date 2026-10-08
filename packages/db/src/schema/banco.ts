@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, date, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, date, timestamp, index, unique } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 import { empregado } from './empregado';
 
@@ -24,4 +24,26 @@ export const pontoBancoMov = pgTable('ponto_banco_mov', {
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   porEmpregado: index('idx_banco_mov_empregado').on(t.tenantId, t.empregadoId, t.data),
+}));
+
+/**
+ * Marca de fechamento do banco por competência (migration 0036). Um mês pode
+ * fechar com zero movimentos; sem esta marca não daria pra distinguir "não
+ * fechou" de "fechou zerado". O sistema fecha sozinho todo mês encerrado que
+ * ainda não tem linha aqui.
+ */
+export const pontoBancoFechamento = pgTable('ponto_banco_fechamento', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
+  /** YYYY-MM */
+  competencia: varchar('competencia', { length: 7 }).notNull(),
+  totalMin: integer('total_min').notNull().default(0),
+  lancamentos: integer('lancamentos').notNull().default(0),
+  /** AUTO (sincronização) | MANUAL (RH lançou) */
+  origem: varchar('origem', { length: 8 }).notNull().default('AUTO'),
+  fechadoEm: timestamp('fechado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  porEmpregado: index('idx_banco_fechamento_empregado').on(t.tenantId, t.empregadoId),
+  unico: unique('uq_banco_fechamento').on(t.tenantId, t.empregadoId, t.competencia),
 }));

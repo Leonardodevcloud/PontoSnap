@@ -32,7 +32,7 @@ export function Situacao({ l, hoje, modo }: { l: LinhaCompetencia; hoje: string;
     </span>);
   }
   const imparPassado = s.impar - (s.emAbertoHoje ? 1 : 0);
-  if (imparPassado > 0) pills.push(<span key="im" className={`${vt.pill} ${vt.pillErr}`}>faltou bater ×{imparPassado}</span>);
+  if (imparPassado > 0) pills.push(<span key="im" className={`${vt.pill} ${vt.pillErr}`} title="Dias com batida em aberto: ficam pendentes (sem falta/atraso) até o ajuste de ponto">faltou bater ×{imparPassado}</span>);
   if (modo === 'apuracao') {
     if (s.intervalo > 0) pills.push(<span key="in" className={`${vt.pill} ${vt.pillWarn}`}>interv. ×{s.intervalo}</span>);
     if (s.interjornada > 0) pills.push(<span key="ij" className={`${vt.pill} ${vt.pillWarn}`}>descanso &lt; 11h ×{s.interjornada}</span>);
@@ -64,7 +64,11 @@ function colunas(modo: ModoTabela, hoje: string): Col[] {
       <span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.regime === 'CLT_12x36' ? '12×36' : l.horarioDurMin ? `${Math.round(l.horarioDurMin / 60)}h/dia` : 'sem escala'}</small></span>
     ), tot: (r) => `Total · ${r.linhas.length} funcionário${r.linhas.length === 1 ? '' : 's'}` },
     { k: 'trab', t: 'Trab.', n: true, v: (l) => l.trabalhadoMin, cell: (l) => minutosParaHhMm(l.trabalhadoMin), tot: (r) => minutosParaHhMm(r.totais.trabalhadoMin) },
-    { k: 'contr', t: modo === 'espelho' ? 'Previsto' : 'Contr.', n: true, v: (l) => l.contratadoMin, cell: (l) => minutosParaHhMm(l.contratadoMin), tot: (r) => minutosParaHhMm(r.totais.contratadoMin) },
+    // Contratado do MÊS INTEIRO (o que a escala espera até o último dia). O
+    // apurado até hoje fica no tooltip — é a base do saldo.
+    { k: 'contr', t: modo === 'espelho' ? 'Previsto' : 'Contr.', n: true, v: (l) => l.contratadoMesMin ?? l.contratadoMin,
+      cell: (l) => <span title={`Mês inteiro · até hoje ${minutosParaHhMm(l.contratadoMin)}`}>{minutosParaHhMm(l.contratadoMesMin ?? l.contratadoMin)}</span>,
+      tot: (r) => minutosParaHhMm(r.totais.contratadoMesMin ?? r.totais.contratadoMin) },
   ];
   if (modo === 'espelho') {
     base.push(
@@ -88,7 +92,10 @@ function colunas(modo: ModoTabela, hoje: string): Col[] {
   base.push({ k: 'sit', t: modo === 'espelho' ? 'Situação' : 'Sinais', v: (l) => l.sinais.impar + l.sinais.faltaDias.length + l.sinais.intervalo, cell: (l) => <Situacao l={l} hoje={hoje} modo={modo} /> });
   if (modo === 'apuracao') {
     base.push(
-      { k: 'rext', t: 'Extras R$', n: true, v: (l) => l.extrasCentavos, cell: (l) => (l.temSalario ? (l.extrasCentavos > 0 ? reaisDeCentavos(l.extrasCentavos + l.adicionalNoturnoCentavos) : '—') : <span className={vt.mute} title="Sem salário cadastrado">—</span>), tot: (r) => reaisDeCentavos(r.totais.extrasCentavos + r.totais.adicionalNoturnoCentavos) },
+      { k: 'rext', t: 'Extras R$', n: true, v: (l) => l.extrasCentavos, cell: (l) => (!l.temSalario ? <span className={vt.mute} title="Sem salário cadastrado">—</span>
+        : (l.extrasCentavos + l.adicionalNoturnoCentavos) > 0 ? reaisDeCentavos(l.extrasCentavos + l.adicionalNoturnoCentavos)
+        : (l.extrasNoBancoMin ?? 0) > 0 ? <span className={vt.mute} title={`${minutosParaHhMm(l.extrasNoBancoMin!)} de extra foram pro banco de horas — não são pagas nesta folha`}>no banco</span>
+        : '—'), tot: (r) => reaisDeCentavos(r.totais.extrasCentavos + r.totais.adicionalNoturnoCentavos) },
       { k: 'rdesc', t: 'Descontos R$', n: true, v: (l) => l.descontosCentavos, cell: (l) => (l.descontosCentavos > 0 ? `−${reaisDeCentavos(l.descontosCentavos)}` : '—'), cls: (l) => (l.descontosCentavos > 0 ? vt.neg : vt.mute), tot: (r) => `−${reaisDeCentavos(r.totais.descontosCentavos)}` },
     );
   }

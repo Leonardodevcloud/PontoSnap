@@ -543,7 +543,9 @@ export class TratamentoService {
       // falta de dia inteiro — só dias estritamente passados geram falta.
       const hojeISO = this.diaLocalISO(new Date(), fuso);
       const naoChegou = (data: string) => data > hojeISO;
-      const foraDoPeriodoReal = (data: string) => antesDoInicio(data) || naoChegou(data);
+      // Jornada esperada dos dias que ainda vão acontecer no período — soma ao
+      // contratado apurado pra dar o contratado do mês inteiro.
+      let contratadoFuturoMin = 0;
 
       if (regime === 'r12x36') {
         // escala 12x36 vem do calendário de dias trabalhados. Com escala, faltas
@@ -557,11 +559,17 @@ export class TratamentoService {
           ...escalaSet, ...porDia.keys(), ...abonoPorData.keys(), ...abonoDiaInteiro,
         ]);
         for (const data of [...datas].sort()) {
-          if (foraDoPeriodoReal(data)) continue; // antes do início de uso do ponto
+          if (antesDoInicio(data)) continue; // antes do início de uso do ponto
           const trabalhaHoje = (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data))
             && !descansoPorAusencia.has(data);
           const jornada = trabalhaHoje ? durJornada : 0;
+          if (naoChegou(data)) {
+            // Dia futuro: não é apurado, mas entra no contratado do mês inteiro.
+            contratadoFuturoMin += abonoDiaInteiro.has(data) ? 0 : Math.max(0, jornada - (abonoPorData.get(data) ?? 0));
+            continue;
+          }
           dias.push({
+            diaEmCurso: data === hojeISO,
             data,
             marcacoes: porDia.get(data) ?? [],
             jornadaContratadaMin: jornada,
@@ -584,7 +592,7 @@ export class TratamentoService {
         while (cursor.getTime() <= ultimo.getTime()) {
           const data = this.diaLocalISO(cursor, fuso);
           // Antes do início de uso do ponto: dia não existe para a apuração.
-          if (foraDoPeriodoReal(data)) { cursor.setUTCDate(cursor.getUTCDate() + 1); continue; }
+          if (antesDoInicio(data)) { cursor.setUTCDate(cursor.getUTCDate() + 1); continue; }
           const dow = diaSemana(data);
           const escDia = escalaDoDia(data);
           // Jornada do dia: se a escala tem jornada_por_dia com valor para este
@@ -605,7 +613,15 @@ export class TratamentoService {
           // Nesse caso avalia só pela duração do dia (a janela fica de fora).
           const jornadaCustomizada = porDiaMap != null && porDiaMap[String(dow)] != null
             && porDiaMap[String(dow)] !== escDia?.durJornadaMin;
+          if (naoChegou(data)) {
+            // Dia que ainda não chegou: não vira falta (não é apurado), mas a
+            // jornada esperada dele entra no contratado do MÊS INTEIRO.
+            contratadoFuturoMin += abonoDiaInteiro.has(data) ? 0 : Math.max(0, jornada - (abonoPorData.get(data) ?? 0));
+            cursor.setUTCDate(cursor.getUTCDate() + 1);
+            continue;
+          }
           dias.push({
+            diaEmCurso: data === hojeISO,
             data,
             marcacoes: porDia.get(data) ?? [],
             jornadaContratadaMin: jornada,
@@ -621,6 +637,8 @@ export class TratamentoService {
       }
 
       const resultado = apurarPeriodo(dias, regras);
+      // Contratado do MÊS INTEIRO: o que já foi apurado + o que falta acontecer.
+      resultado.totalContratadoMesMin = resultado.totalContratadoMin + contratadoFuturoMin;
 
       // O motor é puro e não conhece "férias". O motivo vem junto do resultado
       // para a tela poder escrever Férias em vez de deixar o dia em branco.
@@ -628,17 +646,24 @@ export class TratamentoService {
         tipo: a.tipo, dataInicio: a.dataInicio, dataFim: a.dataFim, observacao: a.observacao,
       }));
 
-      let valores: ResultadoValores | null = null;
-      if (emp.salarioMensal != null) {
-        const salarioMensalCentavos = Math.round(Number(emp.salarioMensal) * 100);
-        valores = valorizarPeriodo(resultado, { salarioMensalCentavos, horasMensaisFolha: 220 }, regras);
-      }
-
       const destinacao = resumirDestinacao(resultado, {
         destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
         destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
         bancoAtivo,
       });
+
+      // R$ desta folha segue a destinação: com banco, a extra vira crédito (não
+      // é paga agora — senão a mesma hora contava duas vezes); falta/atraso que
+      // vão pro banco ou são abonados/tolerados não viram desconto.
+      let valores: ResultadoValores | null = null;
+      if (emp.salarioMensal != null) {
+        const salarioMensalCentavos = Math.round(Number(emp.salarioMensal) * 100);
+        valores = valorizarPeriodo(resultado, { salarioMensalCentavos, horasMensaisFolha: 220 }, regras, {
+          extrasNoBanco: bancoAtivo,
+          descontaFaltas: destinacao.falta.destino === 'DESCONTA',
+          descontaAtrasos: destinacao.atraso.destino === 'DESCONTA',
+        });
+      }
 
       // Banco de horas no contexto do período: saldo que veio de antes, o que
       // este período leva pro banco e o acumulado. É a linha "saldo anterior +
@@ -1293,6 +1318,8 @@ export class TratamentoService {
       const dias = r.dias;
       const sinais = {
         impar: dias.filter((d) => d.paresIncompletos).length,
+        /** Dias pendentes (batida em aberto/hoje em andamento): fora dos totais até serem tratados. */
+        pendentes: r.diasPendentes.length,
         intervalo: dias.filter((d) => d.penalidadeIntervaloMin > 0).length,
         interjornada: dias.filter((d) => d.violacaoInterjornada).length,
         /** Dias esperados sem nenhuma batida (falta de dia inteiro). */
@@ -1304,6 +1331,8 @@ export class TratamentoService {
         empregadoId: e.id, nome: e.nome, matricula: e.matricula, temSalario: !!v,
         regime: ap.regras, horarioDurMin: ap.horarioDurMin,
         trabalhadoMin: r.totalTrabalhadoMin, contratadoMin: r.totalContratadoMin,
+        contratadoMesMin: r.totalContratadoMesMin ?? r.totalContratadoMin,
+        extrasNoBancoMin: v?.extrasNoBancoMin ?? 0,
         extrasMin: r.totalExtrasMin, extra50Min: r.extrasPorAdicional['50'] ?? 0, extra100Min: r.extrasPorAdicional['100'] ?? 0,
         faltaMin: r.totalFaltaMin, atrasoMin: r.totalAtrasoMin, noturnoMin: r.totalNoturnoLegalMin,
         saldoMesMin: r.saldoPeriodoMin, dsrPerdidoSemanas: r.dsrPerdidoSemanas,
@@ -1320,6 +1349,7 @@ export class TratamentoService {
 
     const totais = linhas.reduce((a, l) => ({
       trabalhadoMin: a.trabalhadoMin + l.trabalhadoMin, contratadoMin: a.contratadoMin + l.contratadoMin,
+      contratadoMesMin: a.contratadoMesMin + l.contratadoMesMin,
       extrasMin: a.extrasMin + l.extrasMin, extra50Min: a.extra50Min + l.extra50Min, extra100Min: a.extra100Min + l.extra100Min,
       faltaMin: a.faltaMin + l.faltaMin, atrasoMin: a.atrasoMin + l.atrasoMin, noturnoMin: a.noturnoMin + l.noturnoMin,
       saldoMesMin: a.saldoMesMin + l.saldoMesMin,
@@ -1333,7 +1363,7 @@ export class TratamentoService {
       assinadas: a.assinadas + (l.assinada ? 1 : 0),
       pendencias: a.pendencias + (l.sinais.emAbertoHoje ? 1 : 0) + l.sinais.faltaDias.length,
     }), {
-      trabalhadoMin: 0, contratadoMin: 0, extrasMin: 0, extra50Min: 0, extra100Min: 0, faltaMin: 0, atrasoMin: 0, noturnoMin: 0,
+      trabalhadoMin: 0, contratadoMin: 0, contratadoMesMin: 0, extrasMin: 0, extra50Min: 0, extra100Min: 0, faltaMin: 0, atrasoMin: 0, noturnoMin: 0,
       saldoMesMin: 0, bancoAnteriorMin: 0, bancoAcumuladoMin: 0, comBanco: 0,
       extrasCentavos: 0, adicionalNoturnoCentavos: 0, descontosCentavos: 0, liquidoProventosCentavos: 0, assinadas: 0, pendencias: 0,
     });

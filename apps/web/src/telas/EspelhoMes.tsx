@@ -92,8 +92,8 @@ export function EspelhoMes() {
                 <div className={css.mV}>{minutosParaHhMm(r.totalTrabalhadoMin)}</div>
               </div>
               <div>
-                <div className={css.mL}>Previsto</div>
-                <div className={css.mV}>{minutosParaHhMm(r.totalContratadoMin)}</div>
+                <div className={css.mL}>Previsto no mês</div>
+                <div className={css.mV}>{minutosParaHhMm(r.totalContratadoMesMin ?? r.totalContratadoMin)}</div>
               </div>
               <div>
                 <div className={css.mL}>Faltas</div>

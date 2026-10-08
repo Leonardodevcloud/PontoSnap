@@ -41,7 +41,9 @@ export interface MovDia { minutos: number; tipo: 'CREDITO' | 'DEBITO'; descricao
  *   faltas for BANCO. É por isso que precisa ser tratada à parte.
  */
 export function movimentosBancoDoDia(dia: ResultadoDia, o: OpcoesDestinacao): MovDia[] {
-  if (dia.paresIncompletos) return [];
+  // Dia pendente (batida em aberto ou hoje em andamento): nada vai pro banco
+  // até o dia ser tratado/terminar.
+  if (dia.pendente || dia.paresIncompletos) return [];
   const movs: MovDia[] = [];
   if (dia.saldoMin > 0) {
     movs.push({ minutos: dia.saldoMin, tipo: 'CREDITO', descricao: 'Hora extra' });

@@ -52,6 +52,12 @@ export interface EntradaDia {
    * curtos), não hora extra com adicional.
    */
   jornadaFlexivel?: boolean;
+  /**
+   * Dia de HOJE, ainda em andamento. O funcionário pode não ter batido a
+   * saída (ou nem a entrada) porque o expediente não acabou — então o dia
+   * não gera falta nem atraso enquanto não terminar.
+   */
+  diaEmCurso?: boolean;
 }
 
 export interface ExtraClassificada {
@@ -80,6 +86,12 @@ export interface ResultadoDia {
   penalidadeInterjornadaMin: number;
   violacaoInterjornada: boolean;
   paresIncompletos: boolean;
+  /**
+   * Dia que o motor NÃO consegue fechar: batida em aberto (número ímpar) ou
+   * dia de hoje em andamento. Fica sem falta/atraso/extra até ser tratado
+   * (ajuste de ponto) ou até o dia terminar — o trabalhado aparece, o saldo não.
+   */
+  pendente: boolean;
   observacoes: string[];
 }
 
@@ -97,4 +109,12 @@ export interface ResultadoPeriodo {
   reflexoDsrMin: number;     // ESTIMATIVA do reflexo em DSR (semanal)
   dsrPerdidoSemanas: number; // semanas com falta injustificada (Lei 605/49)
   diasComViolacao: string[];
+  /** Dias pendentes (batida em aberto ou hoje em andamento) — fora dos totais de saldo. */
+  diasPendentes: string[];
+  /**
+   * Jornada esperada no MÊS INTEIRO (inclui os dias que ainda não chegaram).
+   * O motor só conhece os dias apurados; quem monta o período preenche. Se
+   * ausente, vale totalContratadoMin.
+   */
+  totalContratadoMesMin?: number;
 }

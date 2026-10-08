@@ -25,6 +25,8 @@ export interface DadosRelatorioApuracao {
     faltaMin: number; atrasoMin: number; saldoMin: number; bancoMin: number; reflexoDsrMin: number; dsrPerdidoSemanas: number;
   };
   dias: DiaRelatorio[];
+  /** Banco de horas no período (anterior + mês = acumulado). Ausente = sem banco. */
+  banco?: { saldoAnteriorMin: number; saldoMesMin: number; saldoAcumuladoMin: number; fechada: boolean };
   valores?: {
     valorHoraCentavos: number;
     extrasCentavos: number;
@@ -34,6 +36,7 @@ export interface DadosRelatorioApuracao {
     descontoAtrasosCentavos: number;
     descontoDsrPerdidoCentavos: number;
     liquidoProventosCentavos: number;
+    extrasNoBancoMin?: number;
   };
 }
 
@@ -153,6 +156,26 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
       y += 16;
     }
 
+    // banco de horas (quando ativo)
+    if (d.banco) {
+      const b = d.banco;
+      if (y > 700) { doc.addPage(); y = 48; }
+      y += 10;
+      doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Banco de horas', L, y);
+      y += 20;
+      const sinal = (m: number) => `${m > 0 ? '+' : ''}${hhmm(m)}`;
+      const linhaB = (rot: string, val: string, forte = false) => {
+        doc.fillColor(ASH).font('Helvetica').fontSize(9).text(rot, L, y, { width: 340 });
+        doc.fillColor(INK).font(forte ? 'Helvetica-Bold' : 'Helvetica').fontSize(forte ? 11 : 9)
+          .text(val, L, y, { width: W, align: 'right' });
+        doc.moveTo(L, y + 15).lineTo(R, y + 15).lineWidth(0.4).strokeColor(LINHA).stroke();
+        y += 18;
+      };
+      linhaB('Saldo dos meses anteriores', sinal(b.saldoAnteriorMin));
+      linhaB(b.fechada ? 'Este mês (fechado no banco)' : 'Este mês (em andamento)', sinal(b.saldoMesMin));
+      linhaB(b.fechada ? 'Saldo acumulado ao fim do mês' : 'Previsão ao fechar o mês', sinal(b.saldoAcumuladoMin), true);
+    }
+
     // valores em R$ (quando há salário)
     if (d.valores) {
       const v = d.valores;
@@ -168,7 +191,7 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
         y += 18;
       };
       linhaV(`Valor-hora (base salário / 220h)`, reais(v.valorHoraCentavos));
-      linhaV('Horas extras (base + adicional)', reais(v.extrasCentavos));
+      linhaV(v.extrasNoBancoMin ? 'Horas extras pagas (só indenizações — o resto foi pro banco)' : 'Horas extras (base + adicional)', reais(v.extrasCentavos));
       linhaV('Adicional noturno', reais(v.adicionalNoturnoCentavos));
       linhaV('Reflexo de DSR (estimativa)', reais(v.reflexoDsrCentavos));
       if (v.descontoFaltasCentavos) linhaV('(–) Faltas', `- ${reais(v.descontoFaltasCentavos)}`, false, true);

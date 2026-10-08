@@ -220,7 +220,7 @@ export function ApuracaoCLT() {
               <TabelaCompetencia rel={rel} modo="apuracao" filtro={filtro} onAbrir={(id) => ir({ emp: id })} />
               <div className={vt.legenda}>
                 <span>Clique na linha pra abrir a apuração completa.</span>
-                <span>Faltas e atrasos com destinação <strong>banco</strong> não aparecem em descontos (vão pro saldo). O desconto real é aplicado pela folha.</span>
+                <span>Com banco de horas, extra vai pro <strong>saldo</strong> e não entra em R$; faltas e atrasos com destinação banco também não viram desconto. Dia com batida em aberto fica <strong>pendente</strong> (sem falta/atraso) até o ajuste. O desconto real é aplicado pela folha.</span>
               </div>
             </>
           )}
@@ -236,7 +236,11 @@ export function ApuracaoCLT() {
         <>
           <div className={css.cards}>
             <Card k="Trabalhado" v={minutosParaHhMm(r.totalTrabalhadoMin)} />
-            <Card k="Contratado" v={minutosParaHhMm(r.totalContratadoMin)} />
+            <Card
+              k="Contratado no mês" v={minutosParaHhMm(r.totalContratadoMesMin ?? r.totalContratadoMin)}
+              nota={(r.totalContratadoMesMin ?? r.totalContratadoMin) !== r.totalContratadoMin ? `até hoje ${minutosParaHhMm(r.totalContratadoMin)}` : undefined}
+              dica="Jornada esperada no mês inteiro, pela escala (feriados, folgas e afastamentos já descontados). 'Até hoje' é o que já foi apurado."
+            />
             {ap!.horarioFlexivel && r.saldoPeriodoMin > 0 && <Card k="Crédito de jornada" v={`+${minutosParaHhMm(r.saldoPeriodoMin)}`} destaque dica="Contrato de horas: horas acima da carga compensam os dias curtos pelo banco. Não são extras." />}
             <Card k="Extra 50%" v={minutosParaHhMm(extra50)} destaque={extra50 > 0} />
             <Card k="Extra 100%" v={minutosParaHhMm(extra100)} destaque={extra100 > 0} />
@@ -340,7 +344,8 @@ export function ApuracaoCLT() {
                   <span className={`${css.mono} ${d.faltaMin ? css.faltaTxt : ''}`}>{d.faltaMin ? minutosParaHhMm(d.faltaMin) : '—'}</span>
                   <span className={css.sinais}>
                     {d.atrasoMin > 0 && <span className={`${css.tag} ${css.tagAtraso}`} title="Atraso na entrada ou saída antecipada">atraso {minutosParaHhMm(d.atrasoMin)}</span>}
-                    {d.paresIncompletos && <span className={css.tag} title="Número ímpar de batidas — alguém esqueceu de registrar a entrada ou a saída">faltou bater</span>}
+                    {d.paresIncompletos && <span className={css.tag} title="Número ímpar de batidas — esqueceu de registrar a entrada ou a saída. O dia fica pendente (sem falta, atraso ou extra) até o ajuste de ponto.">faltou bater · pendente</span>}
+                    {d.pendente && !d.paresIncompletos && <span className={css.tag} title="Dia de hoje ainda em andamento — apura quando as batidas do dia estiverem completas.">em andamento</span>}
                     {d.penalidadeIntervaloMin > 0 && <span className={css.tag} title="Intervalo (almoço) abaixo do mínimo legal — Art. 71 §4º">intervalo curto</span>}
                     {d.violacaoInterjornada && <span className={css.tag} title="Menos de 11h de descanso entre duas jornadas — Art. 66">descanso &lt; 11h</span>}
                   </span>
@@ -354,7 +359,10 @@ export function ApuracaoCLT() {
               <h3>Valores (R$)</h3>
               <div className={css.vLinhas}>
                 <VLinha k={`Valor-hora (salário / 220h)`} v={reaisDeCentavos(ap!.valores.valorHoraCentavos)} />
-                <VLinha k="Horas extras (base + adicional)" v={reaisDeCentavos(ap!.valores.extrasCentavos)} />
+                <VLinha
+                  k={ap!.valores.extrasNoBancoMin ? `Horas extras pagas — ${minutosParaHhMm(ap!.valores.extrasNoBancoMin)} foram pro banco, não entram aqui` : 'Horas extras (base + adicional)'}
+                  v={reaisDeCentavos(ap!.valores.extrasCentavos)}
+                />
                 <VLinha k="Adicional noturno" v={reaisDeCentavos(ap!.valores.adicionalNoturnoCentavos)} />
                 <VLinha k="Reflexo de DSR (estimativa)" v={reaisDeCentavos(ap!.valores.reflexoDsrCentavos)} />
                 {ap!.valores.descontoFaltasCentavos > 0 && <VLinha k="(–) Faltas" v={`- ${reaisDeCentavos(ap!.valores.descontoFaltasCentavos)}`} desc />}
@@ -502,13 +510,14 @@ function GavetaDia({ data, dia, batidas, esperadas, pares, nome, empregadoId, on
               <Caixa k="saldo do dia" v={`${dia.saldoMin > 0 ? '+' : ''}${minutosParaHhMm(Math.abs(dia.saldoMin))}`} bom={dia.saldoMin > 0} ruim={dia.saldoMin < 0} />
             </div>
 
-            {(dia.atrasoMin > 0 || dia.paresIncompletos || dia.penalidadeIntervaloMin > 0 || dia.violacaoInterjornada || dia.observacoes.length > 0) && (
+            {(dia.atrasoMin > 0 || dia.paresIncompletos || dia.pendente || dia.penalidadeIntervaloMin > 0 || dia.violacaoInterjornada || dia.observacoes.length > 0) && (
               <>
                 <div className={css.gSep} />
                 <span className={css.gSecLb}>Sinais</span>
                 <div className={css.gSinais}>
                   {dia.atrasoMin > 0 && <span className={`${css.tag} ${css.tagAtraso}`}>atraso {minutosParaHhMm(dia.atrasoMin)}</span>}
-                  {dia.paresIncompletos && <span className={css.tag}>faltou bater</span>}
+                  {dia.paresIncompletos && <span className={css.tag}>faltou bater · pendente</span>}
+                  {dia.pendente && !dia.paresIncompletos && <span className={css.tag}>em andamento</span>}
                   {dia.penalidadeIntervaloMin > 0 && <span className={css.tag}>intervalo curto</span>}
                   {dia.violacaoInterjornada && <span className={css.tag}>descanso &lt; 11h</span>}
                 </div>

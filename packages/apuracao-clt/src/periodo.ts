@@ -68,6 +68,7 @@ export function apurarPeriodo(dias: EntradaDia[], regras: RegrasApuracao): Resul
   const diasComViolacao = resultados
     .filter((r) => r.violacaoInterjornada || r.penalidadeIntervaloMin > 0 || r.paresIncompletos)
     .map((r) => r.data);
+  const diasPendentes = resultados.filter((r) => r.pendente).map((r) => r.data);
 
   return {
     dias: resultados,
@@ -83,5 +84,6 @@ export function apurarPeriodo(dias: EntradaDia[], regras: RegrasApuracao): Resul
     reflexoDsrMin: reflexoDsr,
     dsrPerdidoSemanas,
     diasComViolacao,
+    diasPendentes,
   };
 }
