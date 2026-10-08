@@ -49,14 +49,18 @@ const resumoBen = (c: { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vt
   if (c.vtTipo === 'FIXO') p.push(`combustível ${brl(c.vtValorCent)}/mês`);
   return p.length ? p.join(' · ') : 'sem benefício';
 };
-/** Horas extras: o que é pago em R$ e o que foi pro banco de horas, separados. */
-function textoExtras(l: PessoalLinhaClt): { valor: string | null; detalhe: string } {
+/**
+ * O que veio do ponto em R$, separado por natureza: hora extra paga, hora
+ * extra que foi pro banco (não é paga) e indenização de intervalo (Art. 71
+ * §4º — paga sempre, não é hora extra e não vai pro banco).
+ */
+function textoExtras(l: PessoalLinhaClt): { valor: string | null; detalhe: string; soBanco: boolean } {
   const pagasMin = Math.max(0, l.heMin - l.heNoBancoMin);
   const partes: string[] = [];
-  if (pagasMin > 0) partes.push(`${minutosParaHhMm(pagasMin)} pagas`);
+  if (pagasMin > 0) partes.push(`${minutosParaHhMm(pagasMin)} extra paga`);
   if (l.heNoBancoMin > 0) partes.push(`${minutosParaHhMm(l.heNoBancoMin)} no banco`);
-  if (l.proventosCent > 0 && pagasMin === 0) partes.unshift('indenização/noturno');
-  return { valor: l.proventosCent > 0 ? brl(l.proventosCent) : null, detalhe: partes.join(' · ') };
+  if (l.indenizacaoCent > 0) partes.push(`intervalo ${brl(l.indenizacaoCent)}`);
+  return { valor: l.proventosCent > 0 ? brl(l.proventosCent) : null, detalhe: partes.join(' · '), soBanco: l.proventosCent === 0 && l.heNoBancoMin > 0 };
 }
 
 /** Mesma conta do servidor (calcularMei), pra prévia ao vivo no painel. */
@@ -362,7 +366,7 @@ function TabelaFolha({ linhas, mes, onAbrir }: { linhas: PessoalLinhaClt[]; mes:
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
       <thead><tr><th>Colaborador</th><th className={vt.n}>Salário</th><th className={vt.n} title={`Salário ÷ dias de trabalho de ${mesCurto(mes)}`}>Valor do dia</th>
-        <th className={vt.n}>Horas extras</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido salário</th>
+        <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras e intervalo</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido salário</th>
         <th className={vt.n} title="Salário − descontos + extras + benefícios, sem tirar débitos">Custo bruto</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={9}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
@@ -376,7 +380,7 @@ function TabelaFolha({ linhas, mes, onAbrir }: { linhas: PessoalLinhaClt[]; mes:
             <td className={vt.n}>{(() => {
               const x = textoExtras(l);
               if (x.valor) return <><span className={vt.pos}>{x.valor}</span><small className={css.sub}>{x.detalhe}</small></>;
-              if (l.heNoBancoMin > 0) return <span className={`${vt.pill} ${vt.pillMute}`} title="Foram pro banco de horas: não são pagas nesta folha">{minutosParaHhMm(l.heNoBancoMin)} no banco</span>;
+              if (x.soBanco) return <span className={`${vt.pill} ${vt.pillMute}`} title="Foram pro banco de horas: não são pagas nesta folha">{minutosParaHhMm(l.heNoBancoMin)} no banco</span>;
               return '—';
             })()}</td>
             <td className={vt.n}>{l.descontosCent > 0 ? <><span className={vt.neg}>{brl(-l.descontosCent)}</span><small className={css.sub}>{l.faltasDias.length ? `${l.faltasDias.length} falta${l.faltasDias.length > 1 ? 's' : ''} · ponto` : 'atrasos · ponto'}</small></> : '—'}</td>
@@ -741,7 +745,6 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
   const ini = inicial();
   const mudou = JSON.stringify({ ...f, vig: '' }) !== JSON.stringify({ ...ini, vig: '' });
   const b = l.beneficios;
-  const he = textoExtras(l);
   async function salvar() {
     setSalvando(true); setErro(null);
     try {
@@ -770,8 +773,12 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
 
         <section className={css.bloco}>
           <span className={css.lb}>Do ponto</span>
-          <Linha2 k="Horas extras" v={he.valor ?? '—'} />
-          {he.detalhe && <p className={css.formula}>{he.detalhe}{l.heNoBancoMin ? ' — as do banco não são pagas nesta folha' : ''}</p>}
+          <Linha2 k="Horas extras" v={l.heMin === 0 ? '—' : l.heNoBancoMin >= l.heMin ? `${minutosParaHhMm(l.heMin)} · no banco` : brl(Math.max(0, l.proventosCent - l.indenizacaoCent))} />
+          {l.heNoBancoMin > 0 && <p className={css.formula}>{minutosParaHhMm(l.heNoBancoMin)} foram pro banco de horas — não são pagas nesta folha.</p>}
+          {l.indenizacaoCent > 0 && <>
+            <Linha2 k="Indenização de intervalo (Art. 71)" v={brl(l.indenizacaoCent)} />
+            <p className={css.formula}>{minutosParaHhMm(l.indenizacaoMin)} de almoço abaixo do mínimo legal, pagos com 50%. Não é hora extra: é indenização obrigatória e não pode ir pro banco. Os dias aparecem com "intervalo curto" na apuração.</p>
+          </>}
           <Linha2 k="Faltas" v={l.faltasDias.length ? l.faltasDias.map(fmtDia).join(', ') : '—'} cls={l.faltasDias.length ? css.neg : ''} />
           <Linha2 k="Descontos (falta, atraso, DSR)" v={l.descontosCent ? brl(-l.descontosCent) : '—'} cls={l.descontosCent ? css.neg : ''} />
           <Link className={css.link} to={`/rh/apuracao?emp=${l.empregadoId}&mes=${mes}`}>Abrir apuração do ponto</Link>

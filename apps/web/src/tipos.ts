@@ -168,6 +168,9 @@ export interface ValoresApuracao {
   liquidoProventosCentavos: number;
   /** Extra que foi pro banco de horas (não é paga nesta folha). */
   extrasNoBancoMin?: number;
+  /** Indenização de intervalo/interjornada — já incluída em extrasCentavos. */
+  indenizacaoMin?: number;
+  indenizacaoCentavos?: number;
 }
 
 export interface ApuracaoResp {
@@ -648,7 +651,11 @@ export interface PessoalLinhaClt {
   };
   salarioCent: number | null;
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
-  heMin: number; heNoBancoMin: number; proventosCent: number;
+  /** Hora extra (sem indenização) e quanto dela foi pro banco de horas. */
+  heMin: number; heNoBancoMin: number;
+  /** Indenização de intervalo/interjornada (Art. 71 §4º): sempre paga, não é hora extra. */
+  indenizacaoMin: number; indenizacaoCent: number;
+  proventosCent: number;
   faltasDias: string[]; descontosCent: number; debitosCent: number;
   beneficios: {
     diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;

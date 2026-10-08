@@ -18,6 +18,13 @@ export interface ResultadoValores {
   liquidoProventosCentavos: number;    // proventos - descontos (parcial, só o que a apuração toca)
   /** Minutos de extra que NÃO foram pagos porque foram pro banco de horas. */
   extrasNoBancoMin: number;
+  /**
+   * Indenização de intervalo/interjornada (Art. 71 §4º / Art. 66): JÁ ESTÁ
+   * dentro de extrasCentavos, separada aqui pra tela não chamar de hora extra.
+   * Não é jornada: não vai pro banco e não gera reflexo em DSR.
+   */
+  indenizacaoMin: number;
+  indenizacaoCentavos: number;
 }
 
 /**
@@ -71,6 +78,20 @@ export function valorizarPeriodo(
   }
   const pagasMin = Object.values(pagasPorAdicional).reduce((a, b) => a + b, 0);
 
+  // Indenização (intervalo suprimido, interjornada): sempre paga, nunca banco.
+  // Somado por adicional e arredondado uma vez — mesma conta das extras pagas,
+  // pra indenização nunca passar do total pago por diferença de centavo.
+  let indenizacaoMin = 0, indenizacaoCentavos = 0;
+  const indPorPct: Record<string, number> = {};
+  for (const d of r.dias) {
+    for (const e of d.extras) {
+      if (!ehIndenizacao(e.motivo)) continue;
+      indenizacaoMin += e.min;
+      indPorPct[String(e.adicionalPct)] = (indPorPct[String(e.adicionalPct)] ?? 0) + e.min;
+    }
+  }
+  for (const [pct, min] of Object.entries(indPorPct)) indenizacaoCentavos += Math.round(porMin(min, valorHora) * (1 + Number(pct) / 100));
+
   const extrasPorAdicionalCentavos: Record<string, number> = {};
   let extras = 0;
   for (const [pct, min] of Object.entries(pagasPorAdicional)) {
@@ -80,8 +101,10 @@ export function valorizarPeriodo(
   }
 
   const adicionalNoturno = Math.round(porMin(r.totalNoturnoLegalMin, valorHora) * (regras.noturno.adicionalPct / 100));
-  // Reflexo do DSR só sobre a extra que é paga (proporcional).
-  const reflexoMin = r.totalExtrasMin > 0 ? Math.round(r.reflexoDsrMin * (pagasMin / r.totalExtrasMin)) : 0;
+  // Reflexo do DSR só sobre HORA EXTRA paga (proporcional). Indenização de
+  // intervalo é verba indenizatória (Reforma 2017): não reflete em DSR.
+  const extraPagaMin = Math.max(0, pagasMin - indenizacaoMin);
+  const reflexoMin = r.totalExtrasMin > 0 ? Math.round(r.reflexoDsrMin * (extraPagaMin / r.totalExtrasMin)) : 0;
   const reflexoDsr = porMin(reflexoMin, valorHora);
   const descFaltas = descontaFaltas ? porMin(r.totalFaltaMin, valorHora) : 0;
   const descAtrasos = descontaAtrasos ? porMin(r.totalAtrasoMin, valorHora) : 0;
@@ -102,5 +125,7 @@ export function valorizarPeriodo(
     descontoDsrPerdidoCentavos: descDsrPerdido,
     liquidoProventosCentavos: liquido,
     extrasNoBancoMin,
+    indenizacaoMin,
+    indenizacaoCentavos,
   };
 }

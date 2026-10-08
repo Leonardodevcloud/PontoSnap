@@ -24,7 +24,12 @@ export interface LinhaClt {
   config: ConfigBeneficio & { cargo: string | null; chavePix: string | null; origem: 'PADRAO' | 'PROPRIO' | 'NENHUM'; vigenteDesde: string | null };
   salarioCent: number | null;
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
-  heMin: number; heNoBancoMin: number; proventosCent: number;
+  /** Hora extra de verdade (sem indenização), e quanto dela foi pro banco. */
+  heMin: number; heNoBancoMin: number;
+  /** Indenização de intervalo/interjornada: sempre paga, não é hora extra. */
+  indenizacaoMin: number; indenizacaoCent: number;
+  /** Tudo que é pago em R$ vindo do ponto: extras pagas + indenização + noturno + reflexo. */
+  proventosCent: number;
   faltasDias: string[]; descontosCent: number; debitosCent: number;
   beneficios: {
     diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;
@@ -182,15 +187,18 @@ export class PessoalService {
       let erro: string | null = null;
       let diasUteis: string[] = [], diasPrevistos: string[] = [], diasEscala: string[] = [];
       let diasProxLista: string[] = [];
-      let heMin = 0, heNoBancoMin = 0, proventosCent = 0, descontosCent = 0;
+      let heMin = 0, heNoBancoMin = 0, proventosCent = 0, descontosCent = 0, indenizacaoMin = 0, indenizacaoCent = 0;
       let faltasDias: string[] = [];
       try {
         const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim, feriadosLista);
         diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala;
-        heMin = ap.resultado.totalExtrasMin;
+        // Hora extra de verdade = total − indenização de intervalo/interjornada.
+        indenizacaoMin = ap.resultado.dias.reduce((t, d) => t + d.extras.filter((x) => x.motivo.startsWith('indenização')).reduce((a, x) => a + x.min, 0), 0);
+        heMin = Math.max(0, ap.resultado.totalExtrasMin - indenizacaoMin);
         faltasDias = ap.resultado.dias.filter((d) => d.faltaMin > 0 && d.minutosTrabalhados === 0).map((d) => d.data);
         if (ap.valores) {
           heNoBancoMin = ap.valores.extrasNoBancoMin;
+          indenizacaoCent = ap.valores.indenizacaoCentavos;
           proventosCent = ap.valores.extrasCentavos + ap.valores.adicionalNoturnoCentavos + ap.valores.reflexoDsrCentavos;
           descontosCent = ap.valores.descontoFaltasCentavos + ap.valores.descontoAtrasosCentavos + ap.valores.descontoDsrPerdidoCentavos;
         }
@@ -228,7 +236,7 @@ export class PessoalService {
         valorDiaMesCent: diasMes ? Math.round(sal / diasMes) : 0,
         valorDia30Cent: Math.round(sal / 30),
         valorHoraCent: Math.round(sal / 220),
-        heMin, heNoBancoMin, proventosCent, faltasDias, descontosCent, debitosCent,
+        heMin, heNoBancoMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
         beneficios: { ...ben, diasProx: diasProxLista.length, diasProxLista, pagosEstimado: !pagosSnap },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,
         liquidoPagarCent: liquidoSalarioCent + ben.cargaCent,

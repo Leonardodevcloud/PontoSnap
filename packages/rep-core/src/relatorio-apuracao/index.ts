@@ -37,6 +37,7 @@ export interface DadosRelatorioApuracao {
     descontoDsrPerdidoCentavos: number;
     liquidoProventosCentavos: number;
     extrasNoBancoMin?: number;
+    indenizacaoCentavos?: number;
   };
 }
 
@@ -191,7 +192,8 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
         y += 18;
       };
       linhaV(`Valor-hora (base salário / 220h)`, reais(v.valorHoraCentavos));
-      linhaV(v.extrasNoBancoMin ? 'Horas extras pagas (só indenizações — o resto foi pro banco)' : 'Horas extras (base + adicional)', reais(v.extrasCentavos));
+      linhaV(v.extrasNoBancoMin ? 'Horas extras pagas (o restante foi pro banco)' : 'Horas extras (base + adicional)', reais(v.extrasCentavos - (v.indenizacaoCentavos ?? 0)));
+      if (v.indenizacaoCentavos) linhaV('Indenização de intervalo (Art. 71)', reais(v.indenizacaoCentavos));
       linhaV('Adicional noturno', reais(v.adicionalNoturnoCentavos));
       linhaV('Reflexo de DSR (estimativa)', reais(v.reflexoDsrCentavos));
       if (v.descontoFaltasCentavos) linhaV('(–) Faltas', `- ${reais(v.descontoFaltasCentavos)}`, false, true);

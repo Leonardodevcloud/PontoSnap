@@ -361,8 +361,11 @@ export function ApuracaoCLT() {
                 <VLinha k={`Valor-hora (salário / 220h)`} v={reaisDeCentavos(ap!.valores.valorHoraCentavos)} />
                 <VLinha
                   k={ap!.valores.extrasNoBancoMin ? `Horas extras pagas — ${minutosParaHhMm(ap!.valores.extrasNoBancoMin)} foram pro banco, não entram aqui` : 'Horas extras (base + adicional)'}
-                  v={reaisDeCentavos(ap!.valores.extrasCentavos)}
+                  v={reaisDeCentavos(ap!.valores.extrasCentavos - (ap!.valores.indenizacaoCentavos ?? 0))}
                 />
+                {(ap!.valores.indenizacaoCentavos ?? 0) > 0 && (
+                  <VLinha k={`Indenização de intervalo (Art. 71) — ${minutosParaHhMm(ap!.valores.indenizacaoMin ?? 0)}, não vai pro banco`} v={reaisDeCentavos(ap!.valores.indenizacaoCentavos!)} />
+                )}
                 <VLinha k="Adicional noturno" v={reaisDeCentavos(ap!.valores.adicionalNoturnoCentavos)} />
                 <VLinha k="Reflexo de DSR (estimativa)" v={reaisDeCentavos(ap!.valores.reflexoDsrCentavos)} />
                 {ap!.valores.descontoFaltasCentavos > 0 && <VLinha k="(–) Faltas" v={`- ${reaisDeCentavos(ap!.valores.descontoFaltasCentavos)}`} desc />}

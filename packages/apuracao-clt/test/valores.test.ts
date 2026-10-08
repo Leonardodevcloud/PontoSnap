@@ -62,4 +62,26 @@ describe('valorização em R$', () => {
     expect(v.descontoAtrasosCentavos).toBe(0);
     expect(v.descontoDsrPerdidoCentavos).toBe(0);
   });
+
+  it('com banco, só a indenização de intervalo é paga — e ela não gera reflexo de DSR', () => {
+    const dia = (extras: Array<{ min: number; adicionalPct: number; motivo: string }>) => ({
+      data: '2026-07-13', marcacoes: [], minutosTrabalhados: 0, minutosContratados: 0, minutosNoturnosReais: 0,
+      minutosNoturnosLegais: 0, extras, extrasTotalMin: extras.reduce((a, e) => a + e.min, 0), faltaMin: 0,
+      faltaInjustificada: false, ehDescansoDia: false, atrasoMin: 0, saldoMin: 0, intervaloGozadoMin: 0,
+      penalidadeIntervaloMin: 0, penalidadeInterjornadaMin: 0, violacaoInterjornada: false, paresIncompletos: false,
+      pendente: false, observacoes: [],
+    });
+    const r = periodoBase({
+      dias: [dia([{ min: 120, adicionalPct: 50, motivo: 'hora extra' }, { min: 60, adicionalPct: 50, motivo: 'indenização de intervalo' }])],
+      totalExtrasMin: 180, extrasPorAdicional: { '50': 180 }, reflexoDsrMin: 36,
+    });
+    const v = valorizarPeriodo(r, p, REGRAS_CLT_PADRAO, { extrasNoBanco: true });
+    expect(v.extrasNoBancoMin).toBe(120);
+    expect(v.indenizacaoMin).toBe(60);
+    expect(v.indenizacaoCentavos).toBe(1500);
+    expect(v.extrasCentavos).toBe(1500);      // só a indenização
+    expect(v.reflexoDsrCentavos).toBe(0);     // indenização não reflete
+    const semBanco = valorizarPeriodo(r, p, REGRAS_CLT_PADRAO);
+    expect(semBanco.reflexoDsrCentavos).toBe(Math.round((Math.round(36 * 120 / 180) / 60) * 1000)); // só sobre as 2h de extra
+  });
 });
