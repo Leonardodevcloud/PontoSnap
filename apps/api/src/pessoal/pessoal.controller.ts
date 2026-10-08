@@ -6,7 +6,7 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PessoalService } from './pessoal.service';
-import { CompetenciaDto, ConfigCltDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
+import { CompetenciaDto, ConfigCltDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
 
 /** Gestão de Pessoal: benefícios, prestadores, débitos e fechamento do mês. Escopo = empresa ativa. */
 @Controller('pessoal')
@@ -27,6 +27,9 @@ export class PessoalController {
   }
   @Put('clt/:empregadoId/config') configClt(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: ConfigCltDto) {
     return this.pessoal.salvarConfigClt(this.tenant(u), id, dto);
+  }
+  @Put('padrao') padrao(@UsuarioAtual() u: PayloadAcesso, @Body() dto: PadraoDto) {
+    return this.pessoal.salvarPadrao(this.tenant(u), dto);
   }
   @Post('prestadores') criarPrestador(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CriarPrestadorDto) {
     return this.pessoal.criarPrestador(this.tenant(u), dto);

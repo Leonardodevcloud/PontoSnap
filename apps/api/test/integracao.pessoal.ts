@@ -51,7 +51,12 @@ async function main() {
     tenantId: t.id, repId: rep.id, nsr: nsr, cpf: ana.cpf, dtMarcacao: b, coletor: 1, hashRegistro: String(nsr++).padStart(64, '0'),
   }))));
 
-  await pes.salvarConfigClt(t.id, ana.id, { cargo: 'Auxiliar', vrDia: 25, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, chavePix: null });
+  await pes.salvarConfigClt(t.id, ana.id, { cargo: 'Auxiliar', vrDia: 25, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, chavePix: null, vigenteDesde: '2026-09' });
+  // Beto não tem valor próprio: segue o padrão da empresa.
+  const beto = (await comoMaster(db, (tx) => tx.insert(empregado).values({
+    tenantId: t.id, cpf: '40000000002', nome: 'Beto Padrão', horarioContratualId: hor.id, salarioMensal: '1800.00',
+  }).returning()))[0]!;
+  await pes.salvarPadrao(t.id, { vrDia: 20, cestaMensal: 0, vtTipo: 'DIA', vtValor: 8, vigenteDesde: '2026-09' });
 
   // ── setembro ──
   const set = await pes.competencia(t.id, '2026-09');
@@ -69,6 +74,10 @@ async function main() {
   ok(a.beneficios.acertoCent === 2 * 2500 + 2 * 1000, `acerto = 2 dias × (VR + VT) = R$ 70 (${a.beneficios.acertoCent})`);
   ok(a.beneficios.cargaCent === 21 * 3500 - 7000, `carga = R$ 735 − R$ 70 (${a.beneficios.cargaCent})`);
   ok(a.custoBrutoCent === 210000 + 0 - a.descontosCent + 21 * 3500, 'custo bruto não tira o acerto (já foi pago)');
+  ok(a.config.origem === 'PROPRIO', `Ana usa valor próprio (${a.config.origem})`);
+  const b = set.clt.find((c) => c.empregadoId === beto.id)!;
+  ok(b.config.origem === 'PADRAO' && b.config.vrDiaCent === 2000 && b.config.vtValorCent === 800, 'Beto, sem valor próprio, herda o padrão da empresa');
+  ok(set.padrao?.vrDiaCent === 2000, 'padrão vigente aparece na competência');
 
   // ── MEI ──
   const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60874544000104', funcao: 'Vendedor', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
@@ -95,12 +104,29 @@ async function main() {
   ok((await erroDe(() => pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 1 }))).includes('fechada'),
     'mês fechado não aceita lançamento');
 
+  // ── mudar valor não mexe no passado ──
+  ok((await erroDe(() => pes.salvarConfigClt(t.id, ana.id, { vrDia: 99, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-10' }))).includes('já foi feita'),
+    'não deixa mudar a carga de outubro depois que setembro fechou');
+  await pes.salvarConfigClt(t.id, ana.id, { vrDia: 30, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-11' });
+  await pes.salvarPadrao(t.id, { vrDia: 22, cestaMensal: 0, vtTipo: 'DIA', vtValor: 8, vigenteDesde: '2026-11' });
+  const setDepois = await pes.competencia(t.id, '2026-09');
+  ok(setDepois.clt.find((c) => c.empregadoId === ana.id)!.config.vrDiaCent === 2500, 'setembro fechado continua com VR R$ 25');
+
   // ── outubro: acerto parte do que setembro carregou (sem 12/10) ──
   await pes.excluir(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-11', escopo: 'DIANTE' });
   const out = await pes.competencia(t.id, '2026-10');
   const a2 = out.clt.find((c) => c.empregadoId === ana.id)!;
   ok(!a2.beneficios.pagosEstimado, 'outubro usa os dias que o fechamento de setembro gravou');
   ok(!a2.beneficios.naoUsados.some((x) => x.motivo === 'feriado'), 'feriado de 12/10 já não foi pago, então não volta como acerto');
+  ok(a2.config.vrDiaCent === 3000 && a2.beneficios.vrProxCent === a2.beneficios.diasProx * 3000, 'carga de novembro usa o VR novo (R$ 30, vigente desde novembro)');
+  const diasAcerto = a2.beneficios.naoUsados.length;
+  ok(a2.beneficios.acertoVrCent === diasAcerto * 2500, `acerto de outubro devolve pelo VR pago (R$ 25), não o novo (${a2.beneficios.acertoVrCent} / ${diasAcerto} dias)`);
+  ok(out.clt.find((c) => c.empregadoId === beto.id)!.config.vrDiaCent === 2200, 'padrão novo vale pra quem segue o padrão');
+  // volta a seguir o padrão a partir de dezembro
+  await pes.salvarConfigClt(t.id, ana.id, { vrDia: 0, cestaMensal: 0, vtTipo: 'NENHUM', vtValor: 0, vigenteDesde: '2026-12', usaPadrao: true });
+  const nov2 = await pes.competencia(t.id, '2026-11');
+  ok(nov2.clt.find((c) => c.empregadoId === ana.id)!.config.origem === 'PADRAO', 'Ana volta ao padrão a partir de dezembro');
+  ok((await pes.competencia(t.id, '2026-10')).clt.find((c) => c.empregadoId === ana.id)!.config.vrDiaCent === 3000, 'e novembro continua com o valor próprio dela');
   ok(out.mei.length === 1 && out.debitos.some((d) => d.parcelaAtual === 2), 'outubro: MEI segue e débito vira parcela 2/2');
   const nov = await pes.competencia(t.id, '2026-11');
   ok(nov.mei.length === 0 && nov.foraDoMes.some((f) => f.escopo === 'DIANTE'), 'desligado de novembro em diante');

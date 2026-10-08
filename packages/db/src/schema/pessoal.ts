@@ -17,8 +17,24 @@ export const pessoalCltConfig = pgTable('pessoal_clt_config', {
   vtTipo: varchar('vt_tipo', { length: 8 }).notNull().default('NENHUM'),
   vtValor: numeric('vt_valor', { precision: 10, scale: 2 }).notNull().default('0'),
   chavePix: varchar('chave_pix', { length: 120 }),
+  /** Competência (mês do benefício) a partir da qual esta linha vale. */
+  vigenteDesde: varchar('vigente_desde', { length: 7 }).notNull().default('2000-01'),
+  /** true = a partir daqui segue o padrão da empresa (pessoal_padrao). */
+  usaPadrao: boolean('usa_padrao').notNull().default(false),
   atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [unique('uq_pessoal_clt_config').on(t.tenantId, t.empregadoId)]);
+}, (t) => [unique('uq_pessoal_clt_config_vig').on(t.tenantId, t.empregadoId, t.vigenteDesde)]);
+
+/** Valor padrão de benefício da empresa, com vigência (migration 0039). */
+export const pessoalPadrao = pgTable('pessoal_padrao', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  vigenteDesde: varchar('vigente_desde', { length: 7 }).notNull(),
+  vrDia: numeric('vr_dia', { precision: 10, scale: 2 }).notNull().default('0'),
+  cestaMensal: numeric('cesta_mensal', { precision: 10, scale: 2 }).notNull().default('0'),
+  vtTipo: varchar('vt_tipo', { length: 8 }).notNull().default('NENHUM'),
+  vtValor: numeric('vt_valor', { precision: 10, scale: 2 }).notNull().default('0'),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique('uq_pessoal_padrao').on(t.tenantId, t.vigenteDesde)]);
 
 export const pessoalPrestador = pgTable('pessoal_prestador', {
   id: uuid('id').primaryKey().defaultRandom(),

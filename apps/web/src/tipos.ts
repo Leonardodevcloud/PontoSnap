@@ -639,7 +639,13 @@ export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
 
 export interface PessoalLinhaClt {
   empregadoId: string; nome: string; matricula: string | null;
-  config: { cargo: string | null; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number; chavePix: string | null };
+  config: {
+    cargo: string | null; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number; chavePix: string | null;
+    /** PADRAO = segue o padrão da empresa · PROPRIO = valor da pessoa · NENHUM = sem benefício */
+    origem: 'PADRAO' | 'PROPRIO' | 'NENHUM';
+    /** Mês do benefício a partir do qual esse valor vale. */
+    vigenteDesde: string | null;
+  };
   salarioCent: number | null;
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   heMin: number; heNoBancoMin: number; proventosCent: number;
@@ -681,5 +687,9 @@ export interface PessoalCompetencia {
   foraDoMes: { exclusaoId: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; escopo: 'MES' | 'DIANTE'; desde: string }[];
   totais: { pessoas: { clt: number; mei: number; motoristas: number }; brutoCent: number; abatimentosCent: number; liquidoCent: number; beneficiosCent: number };
   pendencias: { nfMei: number; nfMotorista: number; semSalario: number; semPonto: number };
+  /** Padrão da empresa vigente para a carga do próximo mês. */
+  padrao: PessoalPadrao | null;
+  padroes: PessoalPadrao[];
 }
+export interface PessoalPadrao { vigenteDesde: string; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number }
 export interface PessoalPessoa { pessoaTipo: PessoaTipo; pessoaId: string; nome: string }

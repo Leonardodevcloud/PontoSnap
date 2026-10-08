@@ -95,6 +95,12 @@ export interface EntradaBeneficio {
   /** Faltas (dia inteiro) do mês apurado, vindas do ponto. */
   faltas: Set<string>;
   feriados: Set<string>;
+  /**
+   * Valores que valiam quando o mês apurado foi pago. O acerto devolve o que
+   * foi pago, não o valor novo — se o VR subiu, o dia não usado volta pelo
+   * valor antigo. Ausente = mesmos valores da carga.
+   */
+  pagoCom?: { vrDiaCent: number; vtTipo: VtTipo; vtValorCent: number };
 }
 
 export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
@@ -129,11 +135,12 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
       motivo: (e.feriados.has(data) ? 'feriado' : e.faltas.has(data) ? 'falta' : 'afastamento') as MotivoNaoUso,
     }));
 
+  const pg = e.pagoCom ?? { vrDiaCent: e.vrDiaCent, vtTipo: e.vtTipo, vtValorCent: e.vtValorCent };
   const n = naoUsados.length;
-  const acertoVrCent = e.vrDiaCent > 0 ? n * e.vrDiaCent : 0;
+  const acertoVrCent = pg.vrDiaCent > 0 ? n * pg.vrDiaCent : 0;
   const semFeriado = naoUsados.filter((x) => x.motivo !== 'feriado').length;
-  const acertoVtCent = e.vtTipo === 'DIA' ? n * e.vtValorCent
-    : e.vtTipo === 'FIXO' ? Math.round((semFeriado * e.vtValorCent) / 30) : 0;
+  const acertoVtCent = pg.vtTipo === 'DIA' ? n * pg.vtValorCent
+    : pg.vtTipo === 'FIXO' ? Math.round((semFeriado * pg.vtValorCent) / 30) : 0;
   const acertoCent = acertoVrCent + acertoVtCent;
   return {
     vrProxCent, vtProxCent, naoUsados, acertoVrCent, acertoVtCent, acertoCent,

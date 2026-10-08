@@ -12,6 +12,18 @@ export class ConfigCltDto {
   @IsIn(['NENHUM', 'DIA', 'FIXO']) vtTipo!: 'NENHUM' | 'DIA' | 'FIXO';
   @Type(() => Number) @IsNumber() @Min(0) vtValor!: number;
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
+  /** Mês do benefício a partir do qual o valor vale (meses anteriores não mudam). */
+  @Matches(COMP) vigenteDesde!: string;
+  /** true = a partir de vigenteDesde segue o padrão da empresa. */
+  @IsOptional() @IsBoolean() usaPadrao?: boolean;
+}
+
+export class PadraoDto {
+  @Type(() => Number) @IsNumber() @Min(0) vrDia!: number;
+  @Type(() => Number) @IsNumber() @Min(0) cestaMensal!: number;
+  @IsIn(['NENHUM', 'DIA', 'FIXO']) vtTipo!: 'NENHUM' | 'DIA' | 'FIXO';
+  @Type(() => Number) @IsNumber() @Min(0) vtValor!: number;
+  @Matches(COMP) vigenteDesde!: string;
 }
 
 export class CriarPrestadorDto {

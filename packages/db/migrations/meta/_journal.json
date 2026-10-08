@@ -274,6 +274,13 @@
       "when": 1784602000000,
       "tag": "0038_gestao_pessoal",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1784602100000,
+      "tag": "0039_pessoal_vigencia",
+      "breakpoints": true
     }
   ]
 }

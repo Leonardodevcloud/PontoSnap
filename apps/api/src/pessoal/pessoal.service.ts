@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, lte } from 'drizzle-orm';
 import {
-  comTenant, empregado, pessoalCltConfig, pessoalPrestador, pessoalExclusao, pessoalLancamento,
+  comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
@@ -16,7 +16,12 @@ const reais = (c: number) => (c / 100).toFixed(2);
 
 export interface LinhaClt {
   empregadoId: string; nome: string; matricula: string | null;
-  config: { cargo: string | null; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number; chavePix: string | null };
+  /**
+   * Valores aplicados na carga do próximo mês. origem: PADRAO (segue o padrão
+   * da empresa), PROPRIO (valor da pessoa) ou NENHUM (sem benefício).
+   * vigenteDesde = mês do benefício a partir do qual esse valor vale.
+   */
+  config: ConfigBeneficio & { cargo: string | null; chavePix: string | null; origem: 'PADRAO' | 'PROPRIO' | 'NENHUM'; vigenteDesde: string | null };
   salarioCent: number | null;
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   heMin: number; heNoBancoMin: number; proventosCent: number;
@@ -32,6 +37,9 @@ export interface LinhaClt {
   /** Sem escala/REP: a apuração falhou e os números do ponto ficaram zerados. */
   erro: string | null;
 }
+export interface ConfigBeneficio { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number }
+export interface PadraoBeneficio extends ConfigBeneficio { vigenteDesde: string }
+
 export interface LancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
   nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
@@ -60,6 +68,10 @@ export interface CompetenciaPessoal {
   foraDoMes: { exclusaoId: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; escopo: 'MES' | 'DIANTE'; desde: string }[];
   totais: { pessoas: { clt: number; mei: number; motoristas: number }; brutoCent: number; abatimentosCent: number; liquidoCent: number; beneficiosCent: number };
   pendencias: { nfMei: number; nfMotorista: number; semSalario: number; semPonto: number };
+  /** Padrão da empresa que vale para a carga do próximo mês (null = não definido). */
+  padrao: PadraoBeneficio | null;
+  /** Histórico do padrão (mais recente primeiro). */
+  padroes: PadraoBeneficio[];
 }
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -104,6 +116,7 @@ export class PessoalService {
       const emps = await tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true))).orderBy(asc(empregado.nome));
       const configs = await tx.select().from(pessoalCltConfig).where(eq(pessoalCltConfig.tenantId, tenantId));
+      const padroesRows = await tx.select().from(pessoalPadrao).where(eq(pessoalPadrao.tenantId, tenantId));
       const prest = await tx.select().from(pessoalPrestador)
         .where(and(eq(pessoalPrestador.tenantId, tenantId), lte(pessoalPrestador.competenciaInicio, comp)))
         .orderBy(asc(pessoalPrestador.nome));
@@ -114,7 +127,7 @@ export class PessoalService {
       const debs = await tx.select().from(pessoalDebito)
         .where(and(eq(pessoalDebito.tenantId, tenantId), lte(pessoalDebito.competenciaInicio, comp)));
       const fechAnt = await this.fechamento(tx, tenantId, somarMeses(comp, -1));
-      return { emps, configs, prest, excl, lancs, debs, fechAnt };
+      return { emps, configs, padroesRows, prest, excl, lancs, debs, fechAnt };
     });
 
     // Quem está fora deste mês: exclusão do próprio mês, ou "daqui em diante" de um mês anterior.
@@ -136,6 +149,23 @@ export class PessoalService {
 
     const foraDoMes: CompetenciaPessoal['foraDoMes'] = [];
 
+    // ---------- valores de benefício com vigência ----------
+    const padroes: PadraoBeneficio[] = dados.padroesRows
+      .map((p) => ({ vigenteDesde: p.vigenteDesde, vrDiaCent: centavos(p.vrDia), cestaCent: centavos(p.cestaMensal), vtTipo: p.vtTipo as VtTipo, vtValorCent: centavos(p.vtValor) }))
+      .sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde));
+    const padraoEm = (c: string) => padroes.find((p) => p.vigenteDesde <= c) ?? null;
+    /** Valor que vale para o benefício do mês `c` (vigência: a linha mais recente ≤ c). */
+    const beneficioEm = (empId: string, c: string) => {
+      const proprio = dados.configs.filter((x) => x.empregadoId === empId && x.vigenteDesde <= c)
+        .sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
+      const pad = padraoEm(c);
+      if (proprio && !proprio.usaPadrao) {
+        return { origem: 'PROPRIO' as const, vigenteDesde: proprio.vigenteDesde, vrDiaCent: centavos(proprio.vrDia), cestaCent: centavos(proprio.cestaMensal), vtTipo: proprio.vtTipo as VtTipo, vtValorCent: centavos(proprio.vtValor) };
+      }
+      if (pad) return { origem: 'PADRAO' as const, ...pad, vigenteDesde: proprio && proprio.vigenteDesde > pad.vigenteDesde ? proprio.vigenteDesde : pad.vigenteDesde };
+      return { origem: 'NENHUM' as const, vigenteDesde: null, vrDiaCent: 0, cestaCent: 0, vtTipo: 'NENHUM' as VtTipo, vtValorCent: 0 };
+    };
+
     // ---------- CLT (base do ponto) ----------
     const clt: LinhaClt[] = [];
     for (const e of dados.emps) {
@@ -143,12 +173,10 @@ export class PessoalService {
       if (ex) { foraDoMes.push({ exclusaoId: ex.id, pessoaTipo: 'CLT', pessoaId: e.id, nome: e.nome, escopo: ex.escopo as 'MES' | 'DIANTE', desde: ex.competencia }); continue; }
       if (e.dataInicioPonto && e.dataInicioPonto > fim) continue; // ainda não começou
 
-      const cfg = dados.configs.find((c) => c.empregadoId === e.id);
-      const config = {
-        cargo: cfg?.cargo ?? null,
-        vrDiaCent: centavos(cfg?.vrDia), cestaCent: centavos(cfg?.cestaMensal),
-        vtTipo: (cfg?.vtTipo ?? 'NENHUM') as VtTipo, vtValorCent: centavos(cfg?.vtValor), chavePix: cfg?.chavePix ?? null,
-      };
+      // Cargo e Pix não têm vigência: vale o último informado.
+      const ultimo = dados.configs.filter((c) => c.empregadoId === e.id).sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
+      // A carga feita neste fechamento é do PRÓXIMO mês → vale o valor vigente nele.
+      const config = { ...beneficioEm(e.id, prox), cargo: ultimo?.cargo ?? null, chavePix: ultimo?.chavePix ?? null };
       const salarioCent = e.salarioMensal != null ? centavos(e.salarioMensal) : null;
 
       let erro: string | null = null;
@@ -175,12 +203,17 @@ export class PessoalService {
       // Dias pagos para este mês: o que a carga anterior registrou no fechamento.
       // Sem fechamento anterior (primeiro mês no sistema), estima pelo
       // calendário da escala sem descontar feriado — é o que se fazia à mão.
-      const pagosSnap = snapAnt?.clt.find((x) => x.empregadoId === e.id)?.beneficios.diasProxLista;
+      const linhaAnt = snapAnt?.clt.find((x) => x.empregadoId === e.id);
+      const pagosSnap = linhaAnt?.beneficios.diasProxLista;
       const pagos = pagosSnap ?? diasEscala;
+      // O acerto devolve pelo valor que FOI PAGO para este mês: o do fechamento
+      // anterior, ou (sem fechamento) o valor vigente neste mês.
+      const pagoCom = linhaAnt?.config ?? beneficioEm(e.id, comp);
       const ben = calcularBeneficio({
         vrDiaCent: config.vrDiaCent, cestaCent: config.cestaCent, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, pagos,
         previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados,
+        pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
 
       const sal = salarioCent ?? 0;
@@ -280,24 +313,58 @@ export class PessoalService {
         semSalario: clt.filter((c) => c.salarioCent == null).length,
         semPonto: clt.filter((c) => c.erro).length,
       },
+      padrao: padraoEm(prox),
+      padroes,
     };
   }
 
   // ======================= escrita =======================
 
+  /**
+   * A carga do benefício do mês V é calculada no fechamento de V−1. Se V−1 já
+   * fechou, a carga de V já saiu: um valor "a partir de V" chegaria tarde.
+   */
+  private async exigirVigenciaAberta(tenantId: string, vigenteDesde: string) {
+    this.validarComp(vigenteDesde);
+    const antes = somarMeses(vigenteDesde, -1);
+    const f = await comTenant(this.db, tenantId, (tx) => this.fechamento(tx, tenantId, antes));
+    if (f) {
+      throw new BadRequestException(`A carga de ${vigenteDesde} já foi feita no fechamento de ${antes}. Escolha a partir de ${somarMeses(vigenteDesde, 1)}.`);
+    }
+  }
+
+  /**
+   * Valor de benefício da pessoa a partir de um mês (vigência). Não altera os
+   * meses anteriores: eles continuam lendo a linha que valia na época.
+   * usaPadrao = true → a partir dali segue o padrão da empresa.
+   */
   async salvarConfigClt(tenantId: string, empregadoId: string, d: {
     cargo?: string | null; vrDia: number; cestaMensal: number; vtTipo: VtTipo; vtValor: number; chavePix?: string | null;
+    vigenteDesde: string; usaPadrao?: boolean;
   }) {
+    await this.exigirVigenciaAberta(tenantId, d.vigenteDesde);
     return comTenant(this.db, tenantId, async (tx) => {
       const e = (await tx.select({ id: empregado.id }).from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!e) throw new NotFoundException('Funcionário não encontrado');
       const v = {
         cargo: d.cargo?.trim() || null, vrDia: reais(centavos(d.vrDia)), cestaMensal: reais(centavos(d.cestaMensal)),
-        vtTipo: d.vtTipo, vtValor: reais(centavos(d.vtValor)), chavePix: d.chavePix?.trim() || null, atualizadoEm: new Date(),
+        vtTipo: d.vtTipo, vtValor: reais(centavos(d.vtValor)), chavePix: d.chavePix?.trim() || null,
+        usaPadrao: !!d.usaPadrao, atualizadoEm: new Date(),
       };
-      const [r] = await tx.insert(pessoalCltConfig).values({ tenantId, empregadoId, ...v })
-        .onConflictDoUpdate({ target: [pessoalCltConfig.tenantId, pessoalCltConfig.empregadoId], set: v }).returning();
+      const [r] = await tx.insert(pessoalCltConfig).values({ tenantId, empregadoId, vigenteDesde: d.vigenteDesde, ...v })
+        .onConflictDoUpdate({ target: [pessoalCltConfig.tenantId, pessoalCltConfig.empregadoId, pessoalCltConfig.vigenteDesde], set: v }).returning();
+      return r;
+    });
+  }
+
+  /** Padrão de benefício da empresa a partir de um mês (vigência). */
+  async salvarPadrao(tenantId: string, d: { vrDia: number; cestaMensal: number; vtTipo: VtTipo; vtValor: number; vigenteDesde: string }) {
+    await this.exigirVigenciaAberta(tenantId, d.vigenteDesde);
+    return comTenant(this.db, tenantId, async (tx) => {
+      const v = { vrDia: reais(centavos(d.vrDia)), cestaMensal: reais(centavos(d.cestaMensal)), vtTipo: d.vtTipo, vtValor: reais(centavos(d.vtTipo === 'NENHUM' ? 0 : d.vtValor)) };
+      const [r] = await tx.insert(pessoalPadrao).values({ tenantId, vigenteDesde: d.vigenteDesde, ...v })
+        .onConflictDoUpdate({ target: [pessoalPadrao.tenantId, pessoalPadrao.vigenteDesde], set: v }).returning();
       return r;
     });
   }

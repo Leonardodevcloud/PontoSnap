@@ -56,6 +56,11 @@ describe('benefícios com acerto do mês anterior', () => {
     expect(r.vtProxCent).toBe(10000);
     expect(r.acertoVtCent).toBe(333); // 1 falta × 100,00/30
   });
+  it('valor mudou: a carga usa o novo, o acerto devolve pelo valor que foi pago', () => {
+    const r = calcularBeneficio({ ...base, vrDiaCent: 3000, pagoCom: { vrDiaCent: 2500, vtTipo: 'DIA', vtValorCent: 1180 } });
+    expect(r.vrProxCent).toBe(19 * 3000);
+    expect(r.acertoVrCent).toBe(2 * 2500);
+  });
   it('cesta básica é mensal e não sofre acerto', () => {
     const r = calcularBeneficio({ ...base, cestaCent: 8000 });
     expect(r.vrProxCent).toBe(19 * 2500 + 8000);
