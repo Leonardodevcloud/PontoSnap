@@ -267,6 +267,13 @@
       "when": 1784601900000,
       "tag": "0037_horario_flexivel",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1784602000000,
+      "tag": "0038_gestao_pessoal",
+      "breakpoints": true
     }
   ]
 }

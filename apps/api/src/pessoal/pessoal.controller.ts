@@ -1,0 +1,60 @@
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Perfil } from '@ponto/shared';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Perfis } from '../common/decorators/roles.decorator';
+import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
+import type { PayloadAcesso } from '../auth/token';
+import { PessoalService } from './pessoal.service';
+import { CompetenciaDto, ConfigCltDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
+
+/** Gestão de Pessoal: benefícios, prestadores, débitos e fechamento do mês. Escopo = empresa ativa. */
+@Controller('pessoal')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+export class PessoalController {
+  constructor(private readonly pessoal: PessoalService) {}
+  private tenant(u: PayloadAcesso): string {
+    if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
+    return u.tenantId;
+  }
+
+  @Get('competencia') competencia(@UsuarioAtual() u: PayloadAcesso, @Query('comp') comp: string) {
+    return this.pessoal.competencia(this.tenant(u), comp);
+  }
+  @Get('pessoas') pessoas(@UsuarioAtual() u: PayloadAcesso) {
+    return this.pessoal.pessoas(this.tenant(u));
+  }
+  @Put('clt/:empregadoId/config') configClt(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: ConfigCltDto) {
+    return this.pessoal.salvarConfigClt(this.tenant(u), id, dto);
+  }
+  @Post('prestadores') criarPrestador(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CriarPrestadorDto) {
+    return this.pessoal.criarPrestador(this.tenant(u), dto);
+  }
+  @Patch('prestadores/:id') editarPrestador(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: EditarPrestadorDto) {
+    return this.pessoal.editarPrestador(this.tenant(u), id, dto);
+  }
+  @Put('lancamento') lancamento(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LancamentoDto) {
+    return this.pessoal.salvarLancamento(this.tenant(u), dto);
+  }
+  @Post('exclusoes') excluir(@UsuarioAtual() u: PayloadAcesso, @Body() dto: ExclusaoDto) {
+    return this.pessoal.excluir(this.tenant(u), dto);
+  }
+  @Delete('exclusoes/:id') desfazer(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.pessoal.desfazerExclusao(this.tenant(u), id);
+  }
+  @Post('debitos') criarDebito(@UsuarioAtual() u: PayloadAcesso, @Body() dto: DebitoDto) {
+    return this.pessoal.criarDebito(this.tenant(u), dto);
+  }
+  @Delete('debitos/:id') removerDebito(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.pessoal.removerDebito(this.tenant(u), id);
+  }
+  @Post('fechar') fechar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CompetenciaDto) {
+    return this.pessoal.fechar(this.tenant(u), dto.competencia);
+  }
+  /** Reabrir muda um mês já entregue: só o administrador. */
+  @Post('reabrir') @Perfis(Perfil.ADMIN_CLIENTE)
+  reabrir(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CompetenciaDto) {
+    return this.pessoal.reabrir(this.tenant(u), dto.competencia);
+  }
+}

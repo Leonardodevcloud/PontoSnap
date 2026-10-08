@@ -629,3 +629,57 @@ export interface ResumoBanco {
     comVencido: number; comAVencer: number; devendo: number;
   };
 }
+
+// ---- Gestão de Pessoal ----
+
+export type PessoaTipo = 'CLT' | 'MEI' | 'MOTORISTA';
+export type VtTipo = 'NENHUM' | 'DIA' | 'FIXO';
+export type BaseDias = 'SEG_SAB' | 'SEG_SEX';
+export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
+
+export interface PessoalLinhaClt {
+  empregadoId: string; nome: string; matricula: string | null;
+  config: { cargo: string | null; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number; chavePix: string | null };
+  salarioCent: number | null;
+  diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
+  heMin: number; heNoBancoMin: number; proventosCent: number;
+  faltasDias: string[]; descontosCent: number; debitosCent: number;
+  beneficios: {
+    diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;
+    vrProxCent: number; vtProxCent: number;
+    naoUsados: { data: string; motivo: MotivoNaoUso }[];
+    acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;
+  };
+  liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
+  observacao: string | null; erro: string | null;
+}
+export interface PessoalLancMei {
+  heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
+  nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
+}
+export interface PessoalLinhaMei {
+  id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  baseDias: BaseDias; diasMes: number; lanc: PessoalLancMei; debitosCent: number;
+  valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
+  brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
+}
+export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number }
+export interface PessoalLinhaMot {
+  id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: PessoalSemanaMot[];
+  totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
+}
+export interface PessoalDebito {
+  id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;
+  valorTotalCent: number; parcelas: number; competenciaInicio: string; parcelaAtual: number; parcelaCent: number;
+}
+export interface PessoalCompetencia {
+  competencia: string; proxima: string; fechado: boolean; fechadoEm: string | null;
+  feriados: string[];
+  clt: PessoalLinhaClt[]; mei: PessoalLinhaMei[]; motoristas: PessoalLinhaMot[]; debitos: PessoalDebito[];
+  semanas: { inicio: string; fim: string }[];
+  foraDoMes: { exclusaoId: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; escopo: 'MES' | 'DIANTE'; desde: string }[];
+  totais: { pessoas: { clt: number; mei: number; motoristas: number }; brutoCent: number; abatimentosCent: number; liquidoCent: number; beneficiosCent: number };
+  pendencias: { nfMei: number; nfMotorista: number; semSalario: number; semPonto: number };
+}
+export interface PessoalPessoa { pessoaTipo: PessoaTipo; pessoaId: string; nome: string }

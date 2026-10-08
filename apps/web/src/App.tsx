@@ -20,6 +20,7 @@ import { Funcionarios } from './rh/Funcionarios';
 import { Escalas } from './rh/Escalas';
 import { Espelhos } from './rh/Espelhos';
 import { ApuracaoCLT } from './rh/ApuracaoCLT';
+import { GestaoPessoal } from './rh/GestaoPessoal';
 import { Feriados } from './rh/Feriados';
 import { Fiscal } from './rh/Fiscal';
 import { Relatorios } from './rh/Relatorios';
@@ -104,6 +105,7 @@ export function App() {
         <Route path="escalas" element={<Escalas />} />
         <Route path="espelhos" element={<Espelhos />} />
         <Route path="apuracao" element={<ApuracaoCLT />} />
+        <Route path="pessoal" element={<GestaoPessoal />} />
         <Route path="relatorios" element={<Relatorios />} />
         <Route path="feriados" element={<Feriados />} />
         <Route path="fiscal" element={<Fiscal />} />

@@ -22,3 +22,4 @@ export * from './cobranca';
 export * from './dispositivo';
 export * from './job';
 export * from './notificacao';
+export * from './pessoal';

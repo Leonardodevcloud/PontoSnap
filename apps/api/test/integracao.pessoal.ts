@@ -1,0 +1,116 @@
+import 'reflect-metadata';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import { schema, comoMaster, tenant, empregado, pontoRep, pontoHorarioContratual, pontoMarcacao, pontoFeriado } from '@ponto/db';
+import { TratamentoService } from '../src/tratamento/tratamento.service';
+import { PessoalService } from '../src/pessoal/pessoal.service';
+import { diasDoMes, diaSemana } from '../src/pessoal/calculo';
+
+/**
+ * Gestão de Pessoal contra Postgres real:
+ *  - CLT vem do ponto (sem cadastro), valor do dia pelo mês, falta do ponto
+ *  - benefício de outubro carregado no fechamento de setembro, com acerto
+ *    (feriado pago + falta) — e outubro usa o que setembro gravou
+ *  - MEI bruto/líquido com meta paga
+ *  - tirar do mês não mexe nos outros meses; "daqui em diante" sim
+ *  - mês fechado não aceita edição
+ */
+const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
+const db = drizzle(client, { schema });
+const trat = new TratamentoService(db);
+const pes = new PessoalService(db, trat);
+
+let falhas = 0;
+const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };
+const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
+const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
+
+async function main() {
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000144', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000144', razaoSocial: 'PESSOAL LTDA',
+    numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
+  }).returning()))[0]!;
+  const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
+    tenantId: t.id, codigo: 'ADM', durJornadaMin: 480, diasSemana: [1, 2, 3, 4, 5], regime: 'normal',
+    pares: [{ entrada: '0800', saida: '1200' }, { entrada: '1300', saida: '1700' }],
+  }).returning()))[0]!;
+  await comoMaster(db, (tx) => tx.insert(pontoFeriado).values([
+    { tenantId: t.id, data: '2026-09-07', nome: 'Independência' },
+    { tenantId: t.id, data: '2026-10-12', nome: 'Nossa Senhora Aparecida' },
+  ] as never));
+  const ana = (await comoMaster(db, (tx) => tx.insert(empregado).values({
+    tenantId: t.id, cpf: '40000000001', nome: 'Ana CLT', horarioContratualId: hor.id, salarioMensal: '2100.00',
+  }).returning()))[0]!;
+
+  // Setembro: trabalhou todo dia útil, menos o feriado 07/09 e a falta de 15/09.
+  let nsr = 1;
+  const batidas = diasDoMes('2026-09').filter((d) => { const w = diaSemana(d); return w >= 1 && w <= 5 && d !== '2026-09-07' && d !== '2026-09-15'; })
+    .flatMap((d) => [em(d, '08:00'), em(d, '12:00'), em(d, '13:00'), em(d, '17:00')]);
+  await comoMaster(db, (tx) => tx.insert(pontoMarcacao).values(batidas.map((b) => ({
+    tenantId: t.id, repId: rep.id, nsr: nsr, cpf: ana.cpf, dtMarcacao: b, coletor: 1, hashRegistro: String(nsr++).padStart(64, '0'),
+  }))));
+
+  await pes.salvarConfigClt(t.id, ana.id, { cargo: 'Auxiliar', vrDia: 25, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, chavePix: null });
+
+  // ── setembro ──
+  const set = await pes.competencia(t.id, '2026-09');
+  const a = set.clt.find((c) => c.empregadoId === ana.id)!;
+  ok(!!a, 'CLT aparece sem cadastro no módulo (veio do ponto)');
+  ok(a.diasMes === 21, `valor do dia usa os dias úteis de setembro: 22 − feriado = 21 (${a.diasMes})`);
+  ok(a.valorDiaMesCent === 10000, `R$ 2.100 ÷ 21 = R$ 100,00 (${a.valorDiaMesCent})`);
+  ok(a.faltasDias.join() === '2026-09-15', `falta do ponto: 15/09 (${a.faltasDias.join()})`);
+  ok(a.descontosCent > 0, `falta descontada pela regra do ponto (${a.descontosCent})`);
+  ok(a.beneficios.pagosEstimado, 'primeiro mês: dias pagos estimados pelo calendário da escala');
+  ok(a.beneficios.naoUsados.map((x) => `${x.data}:${x.motivo}`).join() === '2026-09-07:feriado,2026-09-15:falta',
+    `acerto de setembro = feriado + falta (${a.beneficios.naoUsados.map((x) => x.motivo).join()})`);
+  ok(a.beneficios.diasProx === 21, `carga de outubro: 22 dias úteis − 12/10 = 21 (${a.beneficios.diasProx})`);
+  ok(a.beneficios.vrProxCent === 21 * 2500 && a.beneficios.vtProxCent === 21 * 1000, 'VR e VT de outubro por dia');
+  ok(a.beneficios.acertoCent === 2 * 2500 + 2 * 1000, `acerto = 2 dias × (VR + VT) = R$ 70 (${a.beneficios.acertoCent})`);
+  ok(a.beneficios.cargaCent === 21 * 3500 - 7000, `carga = R$ 735 − R$ 70 (${a.beneficios.cargaCent})`);
+  ok(a.custoBrutoCent === 210000 + 0 - a.descontosCent + 21 * 3500, 'custo bruto não tira o acerto (já foi pago)');
+
+  // ── MEI ──
+  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60874544000104', funcao: 'Vendedor', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
+  await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 500, metaPaga: true, metaPagaEm: '2026-09-05', faltas: 1 });
+  await pes.criarDebito(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, descricao: 'Notebook', valorTotal: 300, parcelas: 2, competenciaInicio: '2026-09' });
+  const set2 = await pes.competencia(t.id, '2026-09');
+  const m = set2.mei.find((x) => x.id === mei!.id)!;
+  // setembro seg–sáb = 26, − 07/09 = 25 dias → dia = 104,00
+  ok(m.diasMes === 25 && m.valorDiaCent === 10400, `MEI: 25 dias, dia R$ 104 (${m.diasMes} / ${m.valorDiaCent})`);
+  ok(m.brutoCent === 260000 - 10400 + 50000, `bruto (NF) = 2.600 − falta + meta (${m.brutoCent})`);
+  ok(m.liquidoCent === m.brutoCent - 15000 - 50000, `líquido = bruto − parcela 150 − meta já paga (${m.liquidoCent})`);
+  ok(set2.debitos.some((d) => d.descricao === 'Notebook' && d.parcelaAtual === 1), 'débito aparece como parcela 1/2');
+  ok(set2.pendencias.nfMei === 1, 'NF do MEI pendente sinalizada');
+
+  // ── tirar do mês ──
+  const ex = await pes.excluir(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-08', escopo: 'MES' });
+  ok((await pes.competencia(t.id, '2026-09')).mei.length === 1, 'tirar de agosto não mexe em setembro');
+  await pes.desfazerExclusao(t.id, ex!.id);
+
+  // ── fechar setembro ──
+  await pes.fechar(t.id, '2026-09');
+  const fech = await pes.competencia(t.id, '2026-09');
+  ok(fech.fechado, 'setembro fechado mostra o retrato');
+  ok((await erroDe(() => pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 1 }))).includes('fechada'),
+    'mês fechado não aceita lançamento');
+
+  // ── outubro: acerto parte do que setembro carregou (sem 12/10) ──
+  await pes.excluir(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-11', escopo: 'DIANTE' });
+  const out = await pes.competencia(t.id, '2026-10');
+  const a2 = out.clt.find((c) => c.empregadoId === ana.id)!;
+  ok(!a2.beneficios.pagosEstimado, 'outubro usa os dias que o fechamento de setembro gravou');
+  ok(!a2.beneficios.naoUsados.some((x) => x.motivo === 'feriado'), 'feriado de 12/10 já não foi pago, então não volta como acerto');
+  ok(out.mei.length === 1 && out.debitos.some((d) => d.parcelaAtual === 2), 'outubro: MEI segue e débito vira parcela 2/2');
+  const nov = await pes.competencia(t.id, '2026-11');
+  ok(nov.mei.length === 0 && nov.foraDoMes.some((f) => f.escopo === 'DIANTE'), 'desligado de novembro em diante');
+  ok((await pes.competencia(t.id, '2026-12')).mei.length === 0, '… e continua fora em dezembro');
+
+  ok((await erroDe(() => pes.reabrir(t.id, '2026-09'))) === '', 'reabrir setembro');
+  ok(!(await pes.competencia(t.id, '2026-09')).fechado, 'setembro volta a ser calculado ao vivo');
+
+  console.log(falhas === 0 ? '\n>>> PESSOAL OK <<<' : `\n>>> ${falhas} FALHA(S) <<<`);
+  await client.end();
+  process.exit(falhas === 0 ? 0 : 1);
+}
+main().catch((e) => { console.error(e); process.exit(1); });

@@ -546,6 +546,15 @@ export class TratamentoService {
       // Jornada esperada dos dias que ainda vão acontecer no período — soma ao
       // contratado apurado pra dar o contratado do mês inteiro.
       let contratadoFuturoMin = 0;
+      // Calendário do mês pela escala (passado + futuro), pra quem precisa
+      // contar dias: valor do dia, benefícios (VR/VT) por dia de trabalho.
+      //  diasEscala:   dias que a escala marca, ignorando feriado/folga/afastamento
+      //  diasUteisCal: diasEscala sem os feriados
+      //  diasPrevistos: dias em que a pessoa deve trabalhar mesmo (sem feriado,
+      //                 folga lançada, férias, afastamento ou atestado de dia inteiro)
+      const diasEscala: string[] = [];
+      const diasUteisCal: string[] = [];
+      const diasPrevistos: string[] = [];
 
       if (regime === 'r12x36') {
         // escala 12x36 vem do calendário de dias trabalhados. Com escala, faltas
@@ -563,6 +572,8 @@ export class TratamentoService {
           const trabalhaHoje = (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data))
             && !descansoPorAusencia.has(data);
           const jornada = trabalhaHoje ? durJornada : 0;
+          if (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data)) { diasEscala.push(data); diasUteisCal.push(data); }
+          if (trabalhaHoje && jornada > 0 && !abonoDiaInteiro.has(data)) diasPrevistos.push(data);
           if (naoChegou(data)) {
             // Dia futuro: não é apurado, mas entra no contratado do mês inteiro.
             contratadoFuturoMin += abonoDiaInteiro.has(data) ? 0 : Math.max(0, jornada - (abonoPorData.get(data) ?? 0));
@@ -613,6 +624,11 @@ export class TratamentoService {
           // Nesse caso avalia só pela duração do dia (a janela fica de fora).
           const jornadaCustomizada = porDiaMap != null && porDiaMap[String(dow)] != null
             && porDiaMap[String(dow)] !== escDia?.durJornadaMin;
+          if (uteisDia.includes(dow)) {
+            diasEscala.push(data);
+            if (!ehFeriado) diasUteisCal.push(data);
+          }
+          if (ehUtil && jornada > 0 && !abonoDiaInteiro.has(data)) diasPrevistos.push(data);
           if (naoChegou(data)) {
             // Dia que ainda não chegou: não vira falta (não é apurado), mas a
             // jornada esperada dele entra no contratado do MÊS INTEIRO.
@@ -699,6 +715,10 @@ export class TratamentoService {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
         afastamentos, destinacao, batidas, banco,
+        /** Calendário da escala no período (inclui dias que ainda não chegaram). */
+        diasEscala, diasUteis: diasUteisCal, diasPrevistos,
+        /** Datas de feriado do período (calendário do cliente + parâmetro). */
+        feriados: [...feriadoSet].filter((d) => d >= inicioStr && d <= fimStr).sort(),
         /** Batidas previstas pelo horário contratual (2 por par). */
         esperadas: (horario?.pares?.length ?? 0) * 2,
         horarioPares: horario?.pares ?? [],

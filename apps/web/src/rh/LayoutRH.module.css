@@ -15,7 +15,7 @@
 .who{ font-size:13.5px; font-weight:700; }
 .sair{ margin-top:12px; background:none; border:none; cursor:pointer; font-family:var(--ff-mono); font-size:12px; color:rgba(255,248,238,.6); padding:0; }
 .sair:hover{ color:var(--cream); }
-.content{ padding:34px 40px; max-width:1120px; }
+.content{ padding:34px 40px; max-width:1120px; min-width:0; } /* grid item: deixa tabelas largas rolarem dentro do próprio quadro */
 .contentLarga{ max-width:none; }
 
 /* Grupos do menu */

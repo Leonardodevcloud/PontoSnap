@@ -19,6 +19,12 @@ const GRUPOS: { titulo: string; itens: { to: string; rotulo: string; fim?: boole
     ],
   },
   {
+    titulo: 'Pessoal',
+    itens: [
+      { to: '/rh/pessoal', rotulo: 'Gestão de pessoal' },
+    ],
+  },
+  {
     titulo: 'Cadastro',
     itens: [
       { to: '/rh/funcionarios', rotulo: 'Funcionários' },
@@ -105,7 +111,7 @@ function SeletorEmpresa() {
 }
 
 /** Telas com tabela de todos os funcionários: usam a largura inteira. */
-const LARGAS = ['/rh/apuracao', '/rh/espelhos', '/rh/banco'];
+const LARGAS = ['/rh/apuracao', '/rh/espelhos', '/rh/banco', '/rh/pessoal'];
 
 export function LayoutRH() {
   const { sessao, sair } = useAuth();
