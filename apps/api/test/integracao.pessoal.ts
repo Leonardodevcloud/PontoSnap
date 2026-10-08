@@ -97,12 +97,26 @@ async function main() {
   ok((await pes.competencia(t.id, '2026-09')).mei.length === 1, 'tirar de agosto não mexe em setembro');
   await pes.desfazerExclusao(t.id, ex!.id);
 
+  // ── reajuste do contrato com vigência ──
+  ok((await erroDe(() => pes.editarPrestador(t.id, mei!.id, { valorMensal: 3120 }))).includes('a partir de'), 'reajuste sem "a partir de" é recusado');
+  await pes.editarPrestador(t.id, mei!.id, { valorMensal: 3120, vigenteDesde: '2026-11', nome: 'Igor MEI Lima' });
+  const vSet = (await pes.competencia(t.id, '2026-09')).mei.find((x) => x.id === mei!.id)!;
+  const vOut = (await pes.competencia(t.id, '2026-10')).mei.find((x) => x.id === mei!.id)!;
+  const vNov = (await pes.competencia(t.id, '2026-11')).mei.find((x) => x.id === mei!.id)!;
+  ok(vSet.valorCent === 260000 && vOut.valorCent === 260000, `setembro e outubro (abertos) continuam R$ 2.600 (${vSet.valorCent}/${vOut.valorCent})`);
+  ok(vNov.valorCent === 312000 && vNov.valorDesde === '2026-11', `novembro em diante: R$ 3.120 (${vNov.valorCent})`);
+  ok(vSet.nome === 'Igor MEI Lima', 'nome muda na hora (não é valor)');
+  ok(vNov.historicoValores.length === 2, 'histórico guarda os dois valores');
+  ok((await erroDe(() => pes.editarPrestador(t.id, mei!.id, { valorMensal: 1, vigenteDesde: '2026-08' }))).includes('começa em'), 'reajuste antes do início do contrato é recusado');
+
   // ── fechar setembro ──
   await pes.fechar(t.id, '2026-09');
   const fech = await pes.competencia(t.id, '2026-09');
   ok(fech.fechado, 'setembro fechado mostra o retrato');
   ok((await erroDe(() => pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 1 }))).includes('fechada'),
     'mês fechado não aceita lançamento');
+  ok((await erroDe(() => pes.editarPrestador(t.id, mei!.id, { valorMensal: 9999, vigenteDesde: '2026-09' }))).includes('fechada'),
+    'reajuste não entra em mês fechado');
 
   // ── mudar valor não mexe no passado ──
   ok((await erroDe(() => pes.salvarConfigClt(t.id, ana.id, { vrDia: 99, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-10' }))).includes('já foi feita'),

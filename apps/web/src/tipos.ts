@@ -672,6 +672,8 @@ export interface PessoalLancMei {
 }
 export interface PessoalLinhaMei {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
+  valorDesde: string; historicoValores: { vigenteDesde: string; valorCent: number; baseDias: BaseDias }[];
   baseDias: BaseDias; diasMes: number; lanc: PessoalLancMei; debitosCent: number;
   valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
   brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
@@ -679,6 +681,8 @@ export interface PessoalLinhaMei {
 export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number }
 export interface PessoalLinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
+  valorDesde: string; historicoValores: { vigenteDesde: string; valorCent: number; baseDias: BaseDias }[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: PessoalSemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
 }

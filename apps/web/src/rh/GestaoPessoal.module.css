@@ -158,3 +158,10 @@ tr:hover .chev{ color:var(--coral-dark); }
   .painel{ animation:entra .18s ease-out; }
   @keyframes entra{ from{ transform:translateX(24px); opacity:.6; } }
 }
+
+.btnContornoNeutro{ background:transparent; border:2px solid rgba(var(--ink-rgb),.18); color:var(--ink); font:inherit; font-weight:800; border-radius:var(--r-pill); padding:8px 16px; cursor:pointer; }
+.btnContornoNeutro:hover{ border-color:var(--ink); }
+.btnContornoNeutro:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.historico{ display:flex; flex-direction:column; gap:4px; padding:8px 10px; background:var(--field-bg); border-radius:10px; }
+.histAtual strong{ color:var(--ink); }
+.histAtual span{ font-weight:800; }

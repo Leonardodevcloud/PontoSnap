@@ -108,3 +108,14 @@ export const pessoalFechamento = pgTable('pessoal_fechamento', {
   fechadoEm: timestamp('fechado_em', { withTimezone: true }).notNull().defaultNow(),
   snapshot: jsonb('snapshot').notNull(),
 }, (t) => [unique('uq_pessoal_fechamento').on(t.tenantId, t.competencia)]);
+
+/** Valor do contrato do prestador com vigência (migration 0040). */
+export const pessoalPrestadorValor = pgTable('pessoal_prestador_valor', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  prestadorId: uuid('prestador_id').notNull().references(() => pessoalPrestador.id),
+  vigenteDesde: varchar('vigente_desde', { length: 7 }).notNull(),
+  valorMensal: numeric('valor_mensal', { precision: 12, scale: 2 }).notNull(),
+  baseDias: varchar('base_dias', { length: 8 }).notNull().default('SEG_SAB'),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique('uq_pessoal_prestador_valor').on(t.tenantId, t.prestadorId, t.vigenteDesde)]);

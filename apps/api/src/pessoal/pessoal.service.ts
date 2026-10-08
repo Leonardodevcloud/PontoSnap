@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, lte } from 'drizzle-orm';
 import {
-  comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestador, pessoalExclusao, pessoalLancamento,
+  comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
@@ -49,8 +49,13 @@ export interface LancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
   nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
 }
+/** Valor de contrato com vigência (o mês usa a linha mais recente ≤ ele). */
+export interface ValorContrato { vigenteDesde: string; valorCent: number; baseDias: BaseDias }
+
 export interface LinhaMei {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  /** Desde quando o valor deste mês vale + histórico de reajustes (mais recente primeiro). */
+  valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; lanc: LancMei; debitosCent: number;
   valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
   brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
@@ -58,6 +63,7 @@ export interface LinhaMei {
 export interface SemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number }
 export interface LinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: SemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
 }
@@ -122,6 +128,7 @@ export class PessoalService {
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true))).orderBy(asc(empregado.nome));
       const configs = await tx.select().from(pessoalCltConfig).where(eq(pessoalCltConfig.tenantId, tenantId));
       const padroesRows = await tx.select().from(pessoalPadrao).where(eq(pessoalPadrao.tenantId, tenantId));
+      const valoresRows = await tx.select().from(pessoalPrestadorValor).where(eq(pessoalPrestadorValor.tenantId, tenantId));
       const prest = await tx.select().from(pessoalPrestador)
         .where(and(eq(pessoalPrestador.tenantId, tenantId), lte(pessoalPrestador.competenciaInicio, comp)))
         .orderBy(asc(pessoalPrestador.nome));
@@ -132,7 +139,7 @@ export class PessoalService {
       const debs = await tx.select().from(pessoalDebito)
         .where(and(eq(pessoalDebito.tenantId, tenantId), lte(pessoalDebito.competenciaInicio, comp)));
       const fechAnt = await this.fechamento(tx, tenantId, somarMeses(comp, -1));
-      return { emps, configs, padroesRows, prest, excl, lancs, debs, fechAnt };
+      return { emps, configs, padroesRows, valoresRows, prest, excl, lancs, debs, fechAnt };
     });
 
     // Quem está fora deste mês: exclusão do próprio mês, ou "daqui em diante" de um mês anterior.
@@ -253,9 +260,16 @@ export class PessoalService {
       const tipo = p.tipo as PessoaTipo;
       const ex = exclusaoDe(tipo, p.id);
       if (ex) { foraDoMes.push({ exclusaoId: ex.id, pessoaTipo: tipo, pessoaId: p.id, nome: p.nome, escopo: ex.escopo as 'MES' | 'DIANTE', desde: ex.competencia }); continue; }
-      const base = p.baseDias as BaseDias;
+      // Valor do contrato vigente NESTE mês (reajuste não reescreve o passado).
+      const historicoValores: ValorContrato[] = dados.valoresRows.filter((v) => v.prestadorId === p.id)
+        .map((v) => ({ vigenteDesde: v.vigenteDesde, valorCent: centavos(v.valorMensal), baseDias: v.baseDias as BaseDias }))
+        .sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde));
+      const vig = historicoValores.find((v) => v.vigenteDesde <= comp)
+        ?? { vigenteDesde: p.competenciaInicio, valorCent: centavos(p.valorMensal), baseDias: p.baseDias as BaseDias };
+      const base = vig.baseDias;
       const diasMes = diasBase(comp, base, feriados).length;
-      const valorCent = centavos(p.valorMensal);
+      const valorCent = vig.valorCent;
+      const valorDesde = vig.vigenteDesde;
       const debitosCent = debitosDe(tipo, p.id);
 
       if (tipo === 'MEI') {
@@ -266,7 +280,7 @@ export class PessoalService {
           nfNumero: l?.nfNumero ?? null, nfData: l?.nfData ?? null, pago: l?.pago ?? false, observacao: l?.observacao ?? null,
         };
         const r = calcularMei({ valorCent, diasMes, heMin: lanc.heMin, faltas: lanc.faltas, feriadosTrab: lanc.feriadosTrab, metaCent: lanc.metaCent, metaPaga: lanc.metaPaga, debitosCent });
-        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, baseDias: base, diasMes, lanc, debitosCent, ...r });
+        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
       } else {
         const sem: SemanaMot[] = semanas.map((s) => {
           const l = lancDe('MOTORISTA', p.id, s.inicio);
@@ -280,7 +294,7 @@ export class PessoalService {
         const totalCent = Math.round((valorCent / Math.max(1, diasMes)) * sem.reduce((a, s) => a + s.dias, 0))
           + sem.reduce((a, s) => a + s.adicionalCent, 0);
         motoristas.push({
-          id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, baseDias: base, diasMes,
+          id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes,
           diariaCent: calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias: 1, adicionalCent: 0 }).diariaCent,
           semanas: sem, totalCent, debitosCent, liquidoCent: totalCent - debitosCent,
           observacao: lancDe('MOTORISTA', p.id)?.observacao ?? null,
@@ -388,24 +402,57 @@ export class PessoalService {
         valorMensal: reais(centavos(d.valorMensal)), baseDias: d.baseDias, chavePix: d.chavePix?.trim() || null,
         competenciaInicio: d.competenciaInicio,
       }).returning();
+      await tx.insert(pessoalPrestadorValor).values({
+        tenantId, prestadorId: r!.id, vigenteDesde: d.competenciaInicio,
+        valorMensal: reais(centavos(d.valorMensal)), baseDias: d.baseDias,
+      });
       return r;
     });
   }
 
+  /**
+   * Dados cadastrais (nome, CNPJ, função, Pix) mudam na hora. Valor e base de
+   * dias são REAJUSTE: exigem vigenteDesde e só valem daquele mês em diante —
+   * os meses anteriores continuam lendo o valor que valia na época.
+   */
   async editarPrestador(tenantId: string, id: string, d: Partial<{
     nome: string; documento: string | null; funcao: string | null; valorMensal: number; baseDias: BaseDias; chavePix: string | null;
+    vigenteDesde: string;
   }>) {
+    const reajuste = d.valorMensal !== undefined || d.baseDias !== undefined;
+    if (reajuste) {
+      if (!d.vigenteDesde) throw new BadRequestException('Informe a partir de qual mês o novo valor vale');
+      this.validarComp(d.vigenteDesde);
+      await this.exigirAberta(tenantId, d.vigenteDesde);
+    }
     return comTenant(this.db, tenantId, async (tx) => {
+      const p = (await tx.select().from(pessoalPrestador)
+        .where(and(eq(pessoalPrestador.id, id), eq(pessoalPrestador.tenantId, tenantId))).limit(1))[0];
+      if (!p) throw new NotFoundException('Prestador não encontrado');
       const set: Record<string, unknown> = {};
       if (d.nome !== undefined) set.nome = d.nome.trim();
       if (d.documento !== undefined) set.documento = d.documento?.trim() || null;
       if (d.funcao !== undefined) set.funcao = d.funcao?.trim() || null;
-      if (d.valorMensal !== undefined) set.valorMensal = reais(centavos(d.valorMensal));
-      if (d.baseDias !== undefined) set.baseDias = d.baseDias;
       if (d.chavePix !== undefined) set.chavePix = d.chavePix?.trim() || null;
+      if (reajuste) {
+        if (d.vigenteDesde! < p.competenciaInicio) {
+          throw new BadRequestException(`O contrato começa em ${p.competenciaInicio}. O reajuste não pode valer antes disso.`);
+        }
+        // Base do reajuste: o valor que valia no mês anterior (o que não for informado se mantém).
+        const vigentes = await tx.select().from(pessoalPrestadorValor).where(and(
+          eq(pessoalPrestadorValor.tenantId, tenantId), eq(pessoalPrestadorValor.prestadorId, id)));
+        const atual = vigentes.filter((v) => v.vigenteDesde <= d.vigenteDesde!).sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
+        const valorMensal = reais(centavos(d.valorMensal ?? Number(atual?.valorMensal ?? p.valorMensal)));
+        const baseDias = d.baseDias ?? atual?.baseDias ?? p.baseDias;
+        await tx.insert(pessoalPrestadorValor).values({ tenantId, prestadorId: id, vigenteDesde: d.vigenteDesde!, valorMensal, baseDias })
+          .onConflictDoUpdate({ target: [pessoalPrestadorValor.tenantId, pessoalPrestadorValor.prestadorId, pessoalPrestadorValor.vigenteDesde], set: { valorMensal, baseDias } });
+        // O cadastro guarda o valor mais recente (referência pra listagens).
+        const maisRecente = [...vigentes.map((v) => v.vigenteDesde), d.vigenteDesde!].sort().pop();
+        if (maisRecente === d.vigenteDesde) { set.valorMensal = valorMensal; set.baseDias = baseDias; }
+      }
+      if (Object.keys(set).length === 0) return p;
       const rows = await tx.update(pessoalPrestador).set(set)
         .where(and(eq(pessoalPrestador.id, id), eq(pessoalPrestador.tenantId, tenantId))).returning();
-      if (!rows[0]) throw new NotFoundException('Prestador não encontrado');
       return rows[0];
     });
   }

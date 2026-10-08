@@ -310,9 +310,9 @@ export function GestaoPessoal() {
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
           {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} onSalvo={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
-          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }}
+          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MEI', pessoaId: linhaMei.id, nome: linhaMei.nome })} />}
-          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }}
+          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MOTORISTA', pessoaId: linhaMot.id, nome: linhaMot.nome })} />}
           {painel.tipo === 'debito' && <PainelDebito mes={mes} onSalvo={async (desc) => { await recarregar(); fecharPainel(); avisar(`Débito "${desc}" adicionado.`); }} />}
         </PainelLateral>
@@ -838,35 +838,85 @@ function ZonaTirar({ nome, mes, onTirar }: { nome: string; mes: string; onTirar:
   );
 }
 
-function DadosContrato({ p, fechado, onSalvo }: { p: PessoalLinhaMei | PessoalLinhaMot; fechado: boolean; onSalvo: () => Promise<void> }) {
-  const [aberto, setAberto] = useState(false);
-  const [f, setF] = useState({ nome: p.nome, documento: p.documento ?? '', funcao: p.funcao ?? '', valorCent: p.valorCent, baseDias: p.baseDias, chavePix: p.chavePix ?? '' });
+function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void> }) {
+  const [aberto, setAberto] = useState<'' | 'dados' | 'reajuste'>('');
+  const [f, setF] = useState({ nome: p.nome, documento: p.documento ?? '', funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
+  const [r, setR] = useState({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes });
   const [erro, setErro] = useState<string | null>(null);
-  if (!aberto) return <button className={css.link} onClick={() => setAberto(true)}>Editar dados do contrato</button>;
+  const [salvando, setSalvando] = useState(false);
+  const motorista = 'semanas' in p;
+  const opcoesVig = [0, 1, 2, 3, 4, 5].map((n) => somarMes(mes, n));
+  async function enviar(corpo: Record<string, unknown>) {
+    setSalvando(true); setErro(null);
+    try { await api.patch(`/pessoal/prestadores/${p.id}`, corpo); setAberto(''); await onSalvo(); }
+    catch (e) { setErro((e as Error).message); }
+    finally { setSalvando(false); }
+  }
   return (
     <section className={css.bloco}>
-      <span className={css.lb}>Dados do contrato</span>
-      <CampoTexto id="c-nome" rotulo="Nome" valor={f.nome} onChange={(v) => setF({ ...f, nome: v })} />
-      <div className={css.grade2}>
-        <CampoTexto id="c-doc" rotulo={'semanas' in p ? 'Documento' : 'CNPJ'} valor={f.documento} onChange={(v) => setF({ ...f, documento: v })} />
-        <CampoTexto id="c-fun" rotulo={'semanas' in p ? 'Categoria' : 'Função'} valor={f.funcao} onChange={(v) => setF({ ...f, funcao: v })} />
-      </div>
-      <CampoReais id="c-val" rotulo="Valor mensal" valorCent={f.valorCent} onChange={(c) => setF({ ...f, valorCent: c })} />
-      <Alternar<BaseDias> rotulo="Dias que contam" valor={f.baseDias} onChange={(v) => setF({ ...f, baseDias: v })} opcoes={[['SEG_SAB', 'Segunda a sábado'], ['SEG_SEX', 'Segunda a sexta']]} />
-      <CampoTexto id="c-pix" rotulo="Chave Pix (opcional)" valor={f.chavePix} onChange={(v) => setF({ ...f, chavePix: v })} />
-      {erro && <p className={css.alerta}>{erro}</p>}
-      <div className={css.dAcoes}>
-        <button className={css.btnTexto} onClick={() => setAberto(false)}>Cancelar</button>
-        <Botao variante="lime" className={css.btnPri} disabled={fechado || !f.nome.trim()} onClick={async () => {
-          try { await api.patch(`/pessoal/prestadores/${p.id}`, { nome: f.nome, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100, baseDias: f.baseDias, chavePix: f.chavePix }); setAberto(false); await onSalvo(); }
-          catch (e) { setErro((e as Error).message); }
-        }}>Salvar contrato</Botao>
-      </div>
+      <span className={css.lb}>Contrato</span>
+      <Linha2 k={`Valor em ${mesCurto(mes)}`} v={brl(p.valorCent)} />
+      <p className={css.formula}>Vale desde {mesLongo(p.valorDesde)} · {p.baseDias === 'SEG_SAB' ? 'segunda a sábado' : 'segunda a sexta'}</p>
+      {p.historicoValores.length > 1 && (
+        <div className={css.historico}>
+          {p.historicoValores.map((h) => (
+            <Linha2 key={h.vigenteDesde} cls={h.vigenteDesde === p.valorDesde ? css.histAtual : ''}
+              k={<span className={css.mute}>desde {mesLongo(h.vigenteDesde)}</span>} v={brl(h.valorCent)} />
+          ))}
+        </div>
+      )}
+
+      {!fechado && aberto === '' && (
+        <div className={css.acoes}>
+          <button className={css.btnContornoNeutro} onClick={() => { setR({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes }); setAberto('reajuste'); }}>Reajustar valor</button>
+          <button className={css.link} onClick={() => { setF({ nome: p.nome, documento: p.documento ?? '', funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
+        </div>
+      )}
+
+      {aberto === 'reajuste' && (
+        <>
+          <CampoReais id="rj-val" rotulo="Novo valor mensal" valorCent={r.valorCent} onChange={(c) => setR({ ...r, valorCent: c })} />
+          <Alternar<BaseDias> rotulo="Dias que contam" valor={r.baseDias} onChange={(v) => setR({ ...r, baseDias: v })} opcoes={[['SEG_SAB', 'Segunda a sábado'], ['SEG_SEX', 'Segunda a sexta']]} />
+          <label className={css.campo} htmlFor="rj-vig">
+            <span>Vale a partir de</span>
+            <span className={css.input}><select id="rj-vig" value={r.vig} onChange={(e) => setR({ ...r, vig: e.target.value })}>
+              {opcoesVig.map((c) => <option key={c} value={c}>{mesLongo(c)}{c === mes ? ' — este fechamento' : ''}</option>)}
+            </select></span>
+            <small>Os meses anteriores continuam com {brl(p.valorCent)}, fechados ou não.</small>
+          </label>
+          {erro && <p className={css.alerta}>{erro}</p>}
+          <div className={css.dAcoes}>
+            <button className={css.btnTexto} onClick={() => { setAberto(''); setErro(null); }}>Cancelar</button>
+            <Botao variante="coral" className={css.btnPri} disabled={salvando || r.valorCent <= 0 || (r.valorCent === p.valorCent && r.baseDias === p.baseDias)}
+              onClick={() => enviar({ valorMensal: r.valorCent / 100, baseDias: r.baseDias, vigenteDesde: r.vig })}>
+              {salvando ? 'Salvando…' : `Reajustar a partir de ${mesCurto(r.vig)}`}
+            </Botao>
+          </div>
+        </>
+      )}
+
+      {aberto === 'dados' && (
+        <>
+          <CampoTexto id="c-nome" rotulo="Nome" valor={f.nome} onChange={(v) => setF({ ...f, nome: v })} />
+          <div className={css.grade2}>
+            <CampoTexto id="c-doc" rotulo={motorista ? 'Documento' : 'CNPJ'} valor={f.documento} onChange={(v) => setF({ ...f, documento: v })} />
+            <CampoTexto id="c-fun" rotulo={motorista ? 'Categoria' : 'Função'} valor={f.funcao} onChange={(v) => setF({ ...f, funcao: v })} />
+          </div>
+          <CampoTexto id="c-pix" rotulo="Chave Pix (opcional)" valor={f.chavePix} onChange={(v) => setF({ ...f, chavePix: v })} />
+          <p className={css.formula}>Dados cadastrais mudam em todos os meses. Pra mudar valor, use "Reajustar valor".</p>
+          {erro && <p className={css.alerta}>{erro}</p>}
+          <div className={css.dAcoes}>
+            <button className={css.btnTexto} onClick={() => { setAberto(''); setErro(null); }}>Cancelar</button>
+            <Botao variante="coral" className={css.btnPri} disabled={salvando || !f.nome.trim()}
+              onClick={() => enviar({ nome: f.nome, documento: f.documento, funcao: f.funcao, chavePix: f.chavePix })}>{salvando ? 'Salvando…' : 'Salvar dados'}</Botao>
+          </div>
+        </>
+      )}
     </section>
   );
 }
 
-function PainelMei({ l, mes, fechado, onSalvo, onTirar }: { l: PessoalLinhaMei; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onTirar: () => void }) {
+function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: PessoalLinhaMei; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void }) {
   const [f, setF] = useState({ ...l.lanc });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -888,7 +938,7 @@ function PainelMei({ l, mes, fechado, onSalvo, onTirar }: { l: PessoalLinhaMei; 
       <div className={css.pCorpo}>
         <section className={css.bloco}>
           <span className={css.lb}>Base de {mesCurto(mes)}</span>
-          <Linha2 k="Contrato" v={brl(l.valorCent)} />
+          <Linha2 k={`Contrato (desde ${mesCurto(l.valorDesde)})`} v={brl(l.valorCent)} />
           <Linha2 cls={css.grande} k={`${l.diasMes} dias (${l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}, sem feriados)`} v={brl(l.valorDiaCent)} />
           <Linha2 k={<span className={css.mute}>Valor-hora ({l.diasMes} × 8h) · extra × 1,5</span>} v={`${brl(l.valorHoraCent)} · ${brl(Math.round(l.valorHoraCent * 1.5))}`} />
         </section>
@@ -919,7 +969,7 @@ function PainelMei({ l, mes, fechado, onSalvo, onTirar }: { l: PessoalLinhaMei; 
             opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
         </section>
         <Observacao pessoaTipo="MEI" pessoaId={l.id} mes={mes} inicial={l.lanc.observacao} disabled={fechado} />
-        <DadosContrato p={l} fechado={fechado} onSalvo={onSalvo} />
+        <DadosContrato p={l} mes={mes} fechado={fechado} onSalvo={onContrato} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
       <div className={css.pRodape}>
@@ -934,7 +984,7 @@ function PainelMei({ l, mes, fechado, onSalvo, onTirar }: { l: PessoalLinhaMei; 
   );
 }
 
-function PainelMot({ l, mes, fechado, onSalvo, onTirar }: { l: PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onTirar: () => void }) {
+function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void }) {
   const [sem, setSem] = useState(l.semanas.map((s) => ({ ...s, diasManual: s.dias !== s.diasAuto })));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -976,7 +1026,7 @@ function PainelMot({ l, mes, fechado, onSalvo, onTirar }: { l: PessoalLinhaMot; 
           </section>
         ))}
         <Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} />
-        <DadosContrato p={l} fechado={fechado} onSalvo={onSalvo} />
+        <DadosContrato p={l} mes={mes} fechado={fechado} onSalvo={onContrato} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
       <div className={css.pRodape}>

@@ -44,6 +44,8 @@ export class EditarPrestadorDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) valorMensal?: number;
   @IsOptional() @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias?: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
+  /** Obrigatório quando muda valor ou base: o reajuste vale a partir deste mês. */
+  @IsOptional() @Matches(COMP) vigenteDesde?: string;
 }
 
 export class LancamentoDto {
