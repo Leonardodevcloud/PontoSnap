@@ -69,7 +69,11 @@ export function semanasDoMes(comp: string): { inicio: string; fim: string; dias:
  * Parcela do débito na competência (ou null se não cai nela). A última
  * parcela absorve o resto da divisão — a soma das parcelas fecha o total.
  */
-export type DebitoParcelado = { valorTotalCent: number; parcelas: number; competenciaInicio: string; parcelasPagas?: number };
+export type DebitoParcelado = {
+  valorTotalCent: number; parcelas: number; competenciaInicio: string; parcelasPagas?: number;
+  /** FIXO: valorTotalCent é o valor de cada mês, sem número de parcelas, até competenciaFim (se houver). */
+  tipo?: 'PARCELADO' | 'FIXO'; competenciaFim?: string | null;
+};
 
 /**
  * Parcela que cai no mês. Com parcelas já pagas antes do lançamento (débito
@@ -77,8 +81,12 @@ export type DebitoParcelado = { valorTotalCent: number; parcelas: number; compet
  * pagas, o início desconta a 5ª.
  */
 export function parcelaNoMes(d: DebitoParcelado, comp: string): { numero: number; valorCent: number } | null {
-  const pagas = d.parcelasPagas ?? 0;
   const i = mesesEntre(d.competenciaInicio, comp);
+  if (d.tipo === 'FIXO') {
+    if (i < 0 || (d.competenciaFim && comp > d.competenciaFim)) return null;
+    return { numero: i + 1, valorCent: d.valorTotalCent };
+  }
+  const pagas = d.parcelasPagas ?? 0;
   const numero = pagas + i + 1;
   if (i < 0 || numero > d.parcelas) return null;
   const base = Math.floor(d.valorTotalCent / d.parcelas);
@@ -87,9 +95,11 @@ export function parcelaNoMes(d: DebitoParcelado, comp: string): { numero: number
 }
 
 /** Situação do débito no mês: quanto já foi pago antes desta parcela e quanto falta depois dela. */
-export function situacaoDebito(d: DebitoParcelado, comp: string): { pagoCent: number; faltaCent: number } | null {
+export function situacaoDebito(d: DebitoParcelado, comp: string): { pagoCent: number; faltaCent: number | null } | null {
   const pc = parcelaNoMes(d, comp);
   if (!pc) return null;
+  // Fixo: já descontado nos meses anteriores; o que falta não tem fim definido.
+  if (d.tipo === 'FIXO') return { pagoCent: d.valorTotalCent * (pc.numero - 1), faltaCent: null };
   const base = Math.floor(d.valorTotalCent / d.parcelas);
   const pagoCent = base * (pc.numero - 1);
   return { pagoCent, faltaCent: d.valorTotalCent - pagoCent - pc.valorCent };

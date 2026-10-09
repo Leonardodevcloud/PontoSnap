@@ -110,6 +110,10 @@ export const pessoalDebito = pgTable('pessoal_debito', {
   parcelas: integer('parcelas').notNull().default(1),
   /** Parcelas pagas antes de lançar (débito retroativo). competenciaInicio = a da parcela seguinte. */
   parcelasPagas: integer('parcelas_pagas').notNull().default(0),
+  /** PARCELADO (valor total em N parcelas) | FIXO (valor_total = valor do mês, todo mês até encerrar). */
+  tipo: varchar('tipo', { length: 10 }).notNull().default('PARCELADO'),
+  /** Último mês com desconto (FIXO encerrado). Nulo = sem fim. */
+  competenciaFim: varchar('competencia_fim', { length: 7 }),
   competenciaInicio: varchar('competencia_inicio', { length: 7 }).notNull(),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_debito_tenant').on(t.tenantId)]);

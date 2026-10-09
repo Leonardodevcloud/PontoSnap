@@ -25,6 +25,7 @@ const pes = new PessoalService(db, trat, new CriptoService());
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };
 const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
+const retro2Id = () => '00000000-0000-0000-0000-000000000000';
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
@@ -208,7 +209,7 @@ async function main() {
   for (const x of debs) await pes.removerDebito(t.id, x.id);
 
   // ── débito retroativo: parcelas já pagas antes de lançar ──
-  const retro = await pes.criarDebito(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, descricao: 'Moto (retroativo)', valorTotal: 1200, parcelas: 12, parcelasPagas: 4, competenciaInicio: '2026-09' });
+  const retro = (await pes.criarDebito(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, descricao: 'Moto (retroativo)', valorTotal: 1200, parcelas: 12, parcelasPagas: 4, competenciaInicio: '2026-09' }))!;
   const dr = (await pes.competencia(t.id, '2026-09')).debitos.find((x) => x.id === retro.id)!;
   ok(dr.parcelaAtual === 5 && dr.parcelaCent === 10000 && dr.pagoCent === 40000 && dr.faltaCent === 70000,
     `retroativo 4/12 pagas: setembro é a 5ª, já pago R$ 400, falta R$ 700 depois (${dr.parcelaAtual} ${dr.pagoCent} ${dr.faltaCent})`);
@@ -219,6 +220,18 @@ async function main() {
   ok(dr2.parcelaAtual === 11 && dr2.faltaCent === 10000, `editar para 10 pagas: setembro é a 11ª, falta 1 parcela (${dr2.parcelaAtual}/${dr2.faltaCent})`);
   ok(!(await pes.competencia(t.id, '2026-11')).debitos.some((x) => x.id === retro.id), 'acaba na 12ª (outubro), novembro sem parcela');
   await pes.removerDebito(t.id, retro.id);
+
+  // ── débito fixo mensal: todo mês até encerrar ──
+  const fixo = (await pes.criarDebito(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, descricao: 'Adiantamento fixo', valorTotal: 150, parcelas: 1, tipo: 'FIXO', competenciaInicio: '2026-09' }))!;
+  const fx = (c: string) => pes.competencia(t.id, c).then((r) => r.debitos.find((x) => x.id === fixo.id));
+  const f9 = await fx('2026-09'), f12 = await fx('2027-03');
+  ok(f9?.tipo === 'FIXO' && f9.parcelaCent === 15000 && f9.faltaCent === null && f12?.parcelaCent === 15000 && f12.parcelaAtual === 7 && f12.pagoCent === 90000,
+    `fixo: R$ 150 em set/26 e em mar/27 (7º mês, já descontado R$ 900) sem fim (${f12?.parcelaAtual}/${f12?.pagoCent})`);
+  await pes.encerrarDebito(t.id, fixo.id, '2026-11');
+  ok(!!(await fx('2026-11')) && !(await fx('2026-12')), 'encerrado em nov: desconta em novembro, dezembro não');
+  ok((await erroDe(() => pes.encerrarDebito(t.id, retro2Id(), '2026-11'))) !== '', 'encerrar débito inexistente dá erro');
+  await pes.encerrarDebito(t.id, fixo.id, '2026-08');
+  ok(!(await fx('2026-09')), 'encerrar antes do início = remover');
   await pes.excluir(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', escopo: 'DIANTE' });
 
   // ── tirar do mês ──

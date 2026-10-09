@@ -752,7 +752,9 @@ export interface PessoalDebito {
   /** Parcelas pagas antes de lançar (débito retroativo). */
   parcelasPagas?: number;
   /** Já pago antes da parcela do mês e o que falta depois dela. */
-  pagoCent?: number; faltaCent?: number;
+  pagoCent?: number; faltaCent?: number | null;
+  /** PARCELADO | FIXO (mesmo valor todo mês, até encerrar). */
+  tipo?: 'PARCELADO' | 'FIXO'; competenciaFim?: string | null;
 }
 export interface PessoalCompetencia {
   competencia: string; proxima: string; fechado: boolean; fechadoEm: string | null;

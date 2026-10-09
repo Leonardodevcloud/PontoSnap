@@ -89,6 +89,13 @@ export class DebitoDto {
   @Matches(COMP) competenciaInicio!: string;
   /** Débito retroativo: parcelas já pagas antes de lançar. */
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(59) parcelasPagas?: number;
+  /** FIXO: valorTotal é o valor de cada mês, sem número de parcelas. */
+  @IsOptional() @IsIn(['PARCELADO', 'FIXO']) tipo?: 'PARCELADO' | 'FIXO';
+}
+
+export class EncerrarDebitoDto {
+  /** Último mês com desconto. */
+  @Matches(COMP) ultimaCompetencia!: string;
 }
 
 export class EditarDebitoDto {

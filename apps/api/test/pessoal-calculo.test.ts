@@ -39,6 +39,14 @@ describe('débito parcelado', () => {
     expect(situacaoDebito(r, '2026-10')).toEqual({ pagoCent: 8333 * 4, faltaCent: 100000 - 8333 * 5 });
     expect(situacaoDebito(r, '2027-05')).toEqual({ pagoCent: 8333 * 11, faltaCent: 0 });
   });
+  it('fixo: mesmo valor todo mês, sem fim, até o mês de encerramento', () => {
+    const f = { valorTotalCent: 15000, parcelas: 1, competenciaInicio: '2026-10', tipo: 'FIXO' as const };
+    expect(parcelaNoMes(f, '2026-09')).toBeNull();
+    expect(parcelaNoMes(f, '2028-10')).toEqual({ numero: 25, valorCent: 15000 });
+    expect(situacaoDebito(f, '2026-12')).toEqual({ pagoCent: 30000, faltaCent: null });
+    expect(parcelaNoMes({ ...f, competenciaFim: '2026-11' }, '2026-12')).toBeNull();
+    expect(parcelaNoMes({ ...f, competenciaFim: '2026-11' }, '2026-11')).toEqual({ numero: 2, valorCent: 15000 });
+  });
 });
 
 describe('benefícios com acerto do mês anterior', () => {

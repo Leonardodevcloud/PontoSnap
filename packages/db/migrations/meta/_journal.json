@@ -351,6 +351,13 @@
       "when": 1784602860000,
       "tag": "0049_debito_parcelas_pagas",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1784602920000,
+      "tag": "0050_debito_fixo",
+      "breakpoints": true
     }
   ]
 }

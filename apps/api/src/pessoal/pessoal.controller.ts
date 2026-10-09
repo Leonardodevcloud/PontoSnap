@@ -6,7 +6,7 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PessoalService } from './pessoal.service';
-import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PagamentoDto, AdmissaoDto, ClienteDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarDebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
+import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PagamentoDto, AdmissaoDto, ClienteDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarDebitoDto, EncerrarDebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
 
 /** Gestão de Pessoal: benefícios, prestadores, débitos e fechamento do mês. Escopo = empresa ativa. */
 @Controller('pessoal')
@@ -68,6 +68,9 @@ export class PessoalController {
   }
   @Put('debitos/:id') editarDebito(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: EditarDebitoDto) {
     return this.pessoal.editarDebito(this.tenant(u), id, dto);
+  }
+  @Post('debitos/:id/encerrar') encerrarDebito(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: EncerrarDebitoDto) {
+    return this.pessoal.encerrarDebito(this.tenant(u), id, dto.ultimaCompetencia);
   }
   @Delete('debitos/:id') removerDebito(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.pessoal.removerDebito(this.tenant(u), id);
