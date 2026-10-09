@@ -316,6 +316,13 @@
       "when": 1784602560000,
       "tag": "0044_pessoal_pagamento_empresa",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1784602620000,
+      "tag": "0045_inicio_real",
+      "breakpoints": true
     }
   ]
 }

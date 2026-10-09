@@ -285,3 +285,40 @@ label.pixItem:hover{ background:var(--cream); }
 .histComp{ font-weight:800; white-space:nowrap; }
 .histComp small{ display:block; margin-top:3px; }
 .histAberto td{ background:#FFF8E8; }
+
+/* ---------- redesign: topo, barra do mês, trilha fina, resumo ---------- */
+.topo{ display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; }
+.topo h2{ font-size:26px; margin:0; }
+.seg{ display:inline-flex; background:var(--white); border:1px solid rgba(var(--ink-rgb),.14); border-radius:var(--r-pill); padding:3px; }
+.seg button{ border:none; background:none; border-radius:var(--r-pill); padding:8px 16px; font:inherit; font-weight:800; font-size:14px; color:var(--ash); cursor:pointer; white-space:nowrap; }
+.seg button:hover{ color:var(--ink); }
+.seg button[aria-pressed="true"]{ background:var(--ink); color:var(--cream); }
+.seg button:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.barraMes{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.esp{ flex:1; }
+.chip{ font-family:var(--ff-mono); font-size:11px; font-weight:600; border-radius:var(--r-pill); padding:4px 10px; white-space:nowrap; }
+.chipAberto{ background:#FFF0D6; color:#7A4A00; }
+.chipOk{ background:#EEF9CC; color:#2F5B00; }
+.fechadoLinha{ margin:-4px 0 0; font-size:13px; color:var(--ash); }
+.trilha{ grid-template-columns:repeat(4, minmax(0,1fr)); }
+.trilha .passo{ align-items:center; gap:10px; padding:10px 14px; font-size:13.5px; flex-wrap:nowrap; min-width:0; }
+.trilha .passo b{ display:inline; font-size:13.5px; white-space:nowrap; }
+.passoTxt{ color:var(--ash); font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.trilha .bola{ width:22px; height:22px; font-size:11px; }
+@media (max-width:900px){ .trilha{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.resumo{ display:flex; flex-wrap:wrap; margin:0; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); }
+.resumo > div{ padding:10px 18px; border-right:1px solid rgba(var(--ink-rgb),.08); display:flex; flex-direction:column; gap:1px; min-width:0; }
+.resumo > div:last-child{ border-right:none; }
+.resumo dt{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); }
+.resumo dd{ margin:0; font-family:var(--ff-mono); font-weight:600; font-size:15px; color:var(--ink); white-space:nowrap; }
+.resumo small{ font-size:11.5px; color:var(--ash); }
+.resOk{ color:#2F5B00 !important; }
+.resNeg{ color:var(--coral-dark) !important; }
+.como{ display:inline-flex; align-items:center; gap:6px; background:none; border:none; padding:4px 2px; font:inherit; font-weight:800; font-size:13.5px; color:var(--ink); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.como:hover{ color:var(--coral-dark); }
+.como:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; border-radius:4px; }
+.fecharResumo{ display:flex; flex-direction:column; gap:4px; background:var(--cream); border-radius:12px; padding:10px 14px; }
+.linhaCampo{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+.linhaCampo .campo{ flex:1; min-width:160px; }
+.histPerfil dd small{ display:block; font-weight:600; color:var(--ash); font-size:12px; }
+.subCorta{ max-width:190px; margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

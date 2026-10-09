@@ -20,7 +20,7 @@ const COMP_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const reais = (c: number) => (c / 100).toFixed(2);
 
 export interface LinhaClt {
-  empregadoId: string; nome: string; matricula: string | null;
+  empregadoId: string; nome: string; matricula: string | null; admissao: string | null;
   /**
    * Valores aplicados na carga do próximo mês. origem: PADRAO (segue o padrão
    * da empresa), PROPRIO (valor da pessoa) ou NENHUM (sem benefício).
@@ -72,7 +72,9 @@ export interface ValorContrato { vigenteDesde: string; valorCent: number; baseDi
 /** Registro de pagamento do mês (motorista: linha MES, além do "pago" de cada semana). */
 export interface PagamentoMes { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }
 export interface LinhaMei {
-  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
+  /** Início real da prestação e primeira competência no sistema. */
+  inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
   /** Desde quando o valor deste mês vale + histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; lanc: LancMei; debitosCent: number;
@@ -81,7 +83,9 @@ export interface LinhaMei {
 }
 export interface SemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null }
 export interface LinhaMot {
-  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
+  /** Início real da prestação e primeira competência no sistema. */
+  inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
   valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: SemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
@@ -301,7 +305,9 @@ export class PessoalService {
       const pagoCom = linhaAnt?.config ?? beneficioEm(e.id, comp);
       // Cesta: valor vigente NESTE mês; liberada depois da carência.
       const cestaManual = dados.cestaRows.find((c) => c.empregadoId === e.id)?.cestaDesde ?? null;
-      const cestaAuto = e.dataInicioPonto ? somarMeses(e.dataInicioPonto.slice(0, 7), 3) : null;
+      // Carência conta da admissão real; sem ela, do início no ponto.
+      const baseCesta = e.dataAdmissao ?? e.dataInicioPonto;
+      const cestaAuto = baseCesta ? somarMeses(baseCesta.slice(0, 7), 3) : null;
       const cestaDesde = cestaManual ?? cestaAuto;
       const ben = calcularBeneficio({
         vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
@@ -318,7 +324,7 @@ export class PessoalService {
       const custoBrutoCent = sal + proventosCent - descontosCent + ben.vrProxCent + ben.cestaCent + ben.vtProxCent;
       const abatimentosCent = debitosCent + ben.acertoCent;
       clt.push({
-        empregadoId: e.id, nome: e.nome, matricula: e.matricula, config, salarioCent, salarioPartes,
+        empregadoId: e.id, nome: e.nome, matricula: e.matricula, admissao: e.dataAdmissao ?? null, config, salarioCent, salarioPartes,
         diasMes,
         valorDiaMesCent: diasMes ? Math.round(sal / diasMes) : 0,
         // Base de falta e valor-hora: o salário vigente no fim do mês.
@@ -370,7 +376,7 @@ export class PessoalService {
           nfArquivo: dados.nfs.get(`MEI:${p.id}:MES`) ?? null,
         };
         const r = calcularMei({ valorCent, diasMes, heMin: lanc.heMin, faltas: lanc.faltas, feriadosTrab: lanc.feriadosTrab, metaCent: lanc.metaCent, metaPaga: lanc.metaPaga, debitosCent });
-        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
+        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, inicioAtividade: p.inicioAtividade ?? null, competenciaInicio: p.competenciaInicio, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
       } else {
         const sem: SemanaMot[] = semanas.map((s) => {
           const l = lancDe('MOTORISTA', p.id, s.inicio);
@@ -385,7 +391,7 @@ export class PessoalService {
         const totalCent = Math.round((valorCent / Math.max(1, diasMes)) * sem.reduce((a, s) => a + s.dias, 0))
           + sem.reduce((a, s) => a + s.adicionalCent, 0);
         motoristas.push({
-          id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes,
+          id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, inicioAtividade: p.inicioAtividade ?? null, competenciaInicio: p.competenciaInicio, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes,
           diariaCent: calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias: 1, adicionalCent: 0 }).diariaCent,
           semanas: sem, totalCent, debitosCent, liquidoCent: totalCent - debitosCent,
           observacao: lancDe('MOTORISTA', p.id)?.observacao ?? null,
@@ -476,6 +482,17 @@ export class PessoalService {
    * Mês a partir do qual a cesta é paga. null = volta ao automático (3 meses
    * depois do início no ponto). Meses fechados não mudam (são retrato).
    */
+  /** Admissão real do CLT (base da carência da cesta; mostrada no histórico). */
+  async definirAdmissao(tenantId: string, empregadoId: string, data: string | null) {
+    if (data && data > new Date().toISOString().slice(0, 10)) throw new BadRequestException('A admissão não pode ser no futuro.');
+    return comTenant(this.db, tenantId, async (tx) => {
+      const [r] = await tx.update(empregado).set({ dataAdmissao: data })
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).returning({ id: empregado.id });
+      if (!r) throw new NotFoundException('Funcionário não encontrado');
+      return { dataAdmissao: data };
+    });
+  }
+
   async definirInicioCesta(tenantId: string, empregadoId: string, cestaDesde: string | null) {
     return comTenant(this.db, tenantId, async (tx) => {
       const e = (await tx.select({ id: empregado.id }).from(empregado)
@@ -504,7 +521,7 @@ export class PessoalService {
   }
 
   async criarPrestador(tenantId: string, d: {
-    tipo: 'MEI' | 'MOTORISTA'; nome: string; documento?: string | null; funcao?: string | null; empresa?: string | null;
+    tipo: 'MEI' | 'MOTORISTA'; nome: string; documento?: string | null; funcao?: string | null; empresa?: string | null; inicioAtividade?: string | null;
     valorMensal: number; baseDias: BaseDias; chavePix?: string | null; competenciaInicio: string;
   }) {
     this.validarComp(d.competenciaInicio);
@@ -512,6 +529,7 @@ export class PessoalService {
       const [r] = await tx.insert(pessoalPrestador).values({
         tenantId, tipo: d.tipo, nome: d.nome.trim(), documento: d.documento?.replace(/\D/g, '') || null, funcao: d.funcao?.trim() || null,
         empresa: d.empresa?.trim() || null,
+        inicioAtividade: d.inicioAtividade || null,
         valorMensal: reais(centavos(d.valorMensal)), baseDias: d.baseDias, chavePix: d.chavePix?.trim() || null,
         competenciaInicio: d.competenciaInicio,
       }).returning();
@@ -529,7 +547,7 @@ export class PessoalService {
    * os meses anteriores continuam lendo o valor que valia na época.
    */
   async editarPrestador(tenantId: string, id: string, d: Partial<{
-    nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorMensal: number; baseDias: BaseDias; chavePix: string | null;
+    nome: string; documento: string | null; funcao: string | null; empresa: string | null; inicioAtividade: string | null; valorMensal: number; baseDias: BaseDias; chavePix: string | null;
     vigenteDesde: string;
   }>) {
     const reajuste = d.valorMensal !== undefined || d.baseDias !== undefined;
@@ -548,6 +566,7 @@ export class PessoalService {
       if (d.funcao !== undefined) set.funcao = d.funcao?.trim() || null;
       if (d.chavePix !== undefined) set.chavePix = d.chavePix?.trim() || null;
       if (d.empresa !== undefined) set.empresa = d.empresa?.trim() || null;
+      if (d.inicioAtividade !== undefined) set.inicioAtividade = d.inicioAtividade || null;
       if (reajuste) {
         if (d.vigenteDesde! < p.competenciaInicio) {
           throw new BadRequestException(`O contrato começa em ${p.competenciaInicio}. O reajuste não pode valer antes disso.`);

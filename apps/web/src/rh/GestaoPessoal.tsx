@@ -107,6 +107,9 @@ export function GestaoPessoal() {
   const [toast, setToast] = useState<Toast>(null);
   const [busca, setBusca] = useState('');
   const [pix, setPix] = useState<PixAlvo | null>(null);
+  const [comoAberto, setComoAberto] = useState(false);
+  const ultimaAba = useRef<Aba>('folha');
+  useEffect(() => { if (aba !== 'historico') ultimaAba.current = aba; setComoAberto(false); }, [aba]);
   const [verNf, setVerNf] = useState<{ arquivo: PessoalNfArquivo; titulo: string } | null>(null);
   const gatilho = useRef<HTMLElement | null>(null);
 
@@ -207,113 +210,92 @@ export function GestaoPessoal() {
   const linhaMei = painel?.tipo === 'mei' ? d?.mei.find((m) => m.id === painel.id) : undefined;
   const linhaMot = painel?.tipo === 'mot' ? d?.motoristas.find((m) => m.id === painel.id) : undefined;
 
+  const visao: 'fech' | 'hist' = aba === 'historico' ? 'hist' : 'fech';
+  const comoTexto: Record<Exclude<Aba, 'historico'>, ReactNode> = {
+    folha: <>Valor do dia = salário ÷ dias de trabalho de {mesCurto(mes)}. Extras, faltas e atrasos vêm do ponto. Hora extra de quem tem banco de horas vai pro banco e não entra em R$. Indenização de intervalo é paga sempre (não vai pro banco).</>,
+    beneficios: d ? <>Hoje você carrega <b>{mesCurto(d.proxima)}</b>. O que foi pago para <b>{mesCurto(mes)}</b> e não foi usado (feriado, falta, férias, atestado) volta
+      como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos. A cesta só é paga sem falta no mês e depois da carência.
+      {d.clt.some((c) => c.beneficios.pagosEstimado) && <> Como {mesCurto(mes)} ainda não foi fechado no sistema, os dias pagos foram estimados pela escala.</>}</> : null,
+    mei: <><b>Bruto</b> = contrato + extras + feriados trabalhados − faltas + meta. É o valor da nota fiscal. <b>Líquido</b> = bruto − débitos − meta que já foi paga antes. Valor-hora = contrato ÷ (dias do mês × 8h); extra × 1,5.</>,
+    motoristas: <>Diária = valor mensal ÷ dias do mês (sem feriados). Cada semana já vem com os dias previstos; ajuste no painel se ele faltou ou trabalhou a mais. <b>Líquido</b> = total das notas − débitos.</>,
+    debitos: <>Débitos parcelados são descontados um pouco por mês, na folha (CLT) ou no pagamento (MEI e motoristas). A última parcela ajusta os centavos.</>,
+  };
+  const acaoAba = aba === 'beneficios' && !fechado && d
+    ? <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'padrao' }, e.currentTarget)}>{d.padrao ? 'Alterar padrão da empresa' : 'Definir padrão da empresa'}</Botao>
+    : aba === 'debitos' && !fechado ? <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'debito' }, e.currentTarget)}>Adicionar débito</Botao>
+    : null;
+
   return (
     <div className={css.pagina}>
-      <div className={css.head}>
-        <div>
-          <span className={css.lb}>Gestão de pessoal</span>
-          <h2>Fechamento de {mesCurto(mes)}</h2>
-          <p>Folha, benefícios e prestadores da empresa. Horas extras e faltas dos CLT vêm direto do ponto.</p>
-        </div>
-        <div className={css.acoes}>
-          {!fechado && <Botao variante="ghost" className={css.btnSec} onClick={() => ir({ novo: aba === 'motoristas' ? 'MOTORISTA' : 'MEI' })}>Adicionar MEI ou motorista</Botao>}
-          {fechado
-            ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
-            : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}
+      <div className={css.topo}>
+        <h2>Gestão de pessoal</h2>
+        <div className={css.seg} role="group" aria-label="Visão">
+          <button type="button" aria-pressed={visao === 'fech'} onClick={() => ir({ aba: ultimaAba.current })}>Fechamento do mês</button>
+          <button type="button" aria-pressed={visao === 'hist'} onClick={() => ir({ aba: 'historico' })}>Histórico</button>
         </div>
       </div>
+      {erro && <p className={css.erro} role="alert">{erro}</p>}
 
-      <div className={css.controles}>
-        <div className={css.sel}>
-          <span className={css.lb}>Competência</span>
+      {visao === 'hist' && (
+        <AbaHistorico sel={params.get('pessoa')} onSel={(k) => ir({ pessoa: k })} onVerNf={(arquivo, titulo) => setVerNf({ arquivo, titulo })}
+          onAbrirMes={(comp, tipo, id) => { ir({ mes: comp, aba: tipo === 'CLT' ? 'folha' : tipo === 'MEI' ? 'mei' : 'motoristas' }); abrir({ tipo: tipo === 'CLT' ? 'clt' : tipo === 'MEI' ? 'mei' : 'mot', id }); }} />
+      )}
+
+      {visao === 'fech' && <>
+        <div className={css.barraMes}>
           <div className={css.comp}>
             <button aria-label="Mês anterior" onClick={() => ir({ mes: somarMes(mes, -1) })}>‹</button>
             <input type="month" aria-label="Competência" value={mes} onChange={(e) => e.target.value && ir({ mes: e.target.value })} />
             <button aria-label="Próximo mês" onClick={() => ir({ mes: somarMes(mes, 1) })} disabled={mes >= somarMes(mesAtual(), 1)}>›</button>
           </div>
+          {d && (fechado
+            ? <span className={`${css.chip} ${css.chipOk}`} title={`Fechado em ${new Date(d.fechadoEm!).toLocaleDateString('pt-BR')}`}>fechado em {new Date(d.fechadoEm!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+            : <span className={`${css.chip} ${css.chipAberto}`}>em aberto</span>)}
+          <span className={css.esp} />
+          {!fechado && <Botao variante="ghost" className={css.btnSec} onClick={() => ir({ novo: aba === 'motoristas' ? 'MOTORISTA' : 'MEI' })}>Adicionar MEI ou motorista</Botao>}
+          {fechado
+            ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
+            : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}
         </div>
-      </div>
+        {fechado && <p className={css.fechadoLinha}>Os números de {mesCurto(mes)} são o retrato do fechamento e não mudam mais. Nota fiscal e pagamento ainda podem ser registrados.</p>}
 
-      {fechado && d && (
-        <div className={css.fechadoBar} role="status">
-          <b>{mesLongo(mes)} está fechado</b> desde {new Date(d.fechadoEm!).toLocaleDateString('pt-BR')}. Os números abaixo são o retrato do fechamento e não mudam mais.
+        <nav className={css.trilha} aria-label="Passos do fechamento">
+          {passos.map((p, i) => (
+            <button key={p.titulo} className={`${css.passo} ${p.aba === aba || (p.aba === 'mei' && aba === 'motoristas') ? css.passoAtual : ''}`}
+              aria-current={p.aba === aba ? 'step' : undefined}
+              onClick={() => (p.aba ? ir({ aba: p.aba }) : !fechado && d && setDialogo({ tipo: 'fechar' }))}>
+              <span className={`${css.bola} ${p.status === 'ok' ? css.bolaOk : p.status === 'aviso' ? css.bolaAviso : ''}`}>{p.status === 'ok' ? '✓' : p.status === 'aviso' ? '!' : i + 1}</span>
+              <b>{p.titulo}</b><span className={css.passoTxt} title={p.texto}>{p.texto}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
+          {([
+            ['folha', 'Folha CLT', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length], ['mei', 'MEI', d?.mei.length],
+            ['motoristas', 'Motoristas', d?.motoristas.length], ['debitos', 'Débitos', d?.debitos.length],
+          ] as [Aba, string, number | undefined][]).map(([k, t, n]) => (
+            <button key={k} role="tab" aria-selected={aba === k} className={`${css.aba} ${aba === k ? css.abaOn : ''}`} onClick={() => ir({ aba: k })}>
+              {t} {n != null && <span className={css.cont}>{n}</span>}
+              {k === 'mei' && (d?.pendencias.nfMei ?? 0) > 0 && <span className={css.contAlerta}>NF</span>}
+              {k === 'motoristas' && (d?.pendencias.nfMotorista ?? 0) > 0 && <span className={css.contAlerta}>NF</span>}
+            </button>
+          ))}
         </div>
-      )}
-      {erro && <p className={css.erro} role="alert">{erro}</p>}
 
-      <nav className={css.trilha} aria-label="Trilha de fechamento">
-        {passos.map((p, i) => (
-          <button key={p.titulo} className={`${css.passo} ${p.aba === aba || (p.aba === 'mei' && aba === 'motoristas') ? css.passoAtual : ''}`}
-            aria-current={p.aba === aba ? 'step' : undefined}
-            onClick={() => (p.aba ? ir({ aba: p.aba }) : !fechado && d && setDialogo({ tipo: 'fechar' }))}>
-            <span className={`${css.bola} ${p.status === 'ok' ? css.bolaOk : p.status === 'aviso' ? css.bolaAviso : ''}`}>{p.status === 'ok' ? '✓' : i + 1}</span>
-            <span><b>{p.titulo}</b><span>{p.texto}</span></span>
+        {d && aba !== 'historico' && <ResumoAba aba={aba} d={d} />}
+        {d && aba === 'folha' && <AvisoPrevia />}
+
+        <div className={css.barra}>
+          <input className={vt.busca} type="search" placeholder={aba === 'mei' || aba === 'motoristas' ? 'Buscar pessoa ou empresa' : 'Buscar pessoa'} aria-label="Buscar pessoa" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          <button type="button" className={css.como} aria-expanded={comoAberto} aria-controls="como-calc" onClick={() => setComoAberto(!comoAberto)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M12 11v6M12 7.5v.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
+            {aba === 'beneficios' ? 'Como funciona o acerto' : 'Como é calculado'}
           </button>
-        ))}
-      </nav>
-
-      {d && (
-        <div className={`${vt.kpis} ${css.kpis}`}>
-          <div className={vt.kpi}><div className={vt.kpiK}>Pessoas no mês</div><div className={vt.kpiV}>{d.totais.pessoas.clt + d.totais.pessoas.mei + d.totais.pessoas.motoristas}</div>
-            <div className={vt.kpiS}>{d.totais.pessoas.clt} CLT · {d.totais.pessoas.mei} MEI · {d.totais.pessoas.motoristas} motoristas</div></div>
-          <div className={`${vt.kpi} ${vt.kpiInk}`} title="Salário − faltas + extras + benefícios do mês (CLT), valor das notas (MEI e motoristas). Débitos, acertos e metas já pagas não entram: esse dinheiro já tinha saído.">
-            <div className={vt.kpiK}>Custo bruto da empresa</div><div className={vt.kpiV}>{brl(d.totais.brutoCent)}</div>
-            <div className={vt.kpiS}>sem tirar o que já foi pago antes</div></div>
-          <div className={`${vt.kpi} ${vt.kpiPeach}`}><div className={vt.kpiK}>Abatimentos</div><div className={vt.kpiV}>{brl(d.totais.abatimentosCent)}</div>
-            <div className={vt.kpiS}>débitos, acerto de benefícios e metas já pagas</div></div>
-          <div className={vt.kpi}><div className={vt.kpiK}>Líquido a pagar</div><div className={vt.kpiV}>{brl(d.totais.liquidoCent)}</div>
-            <div className={vt.kpiS}>o que sai do caixa neste fechamento</div></div>
+          <span className={css.esp} />
+          {acaoAba}
         </div>
-      )}
-
-      <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
-        {([
-          ['folha', 'Folha CLT', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length], ['mei', 'MEI', d?.mei.length],
-          ['motoristas', 'Motoristas', d?.motoristas.length], ['debitos', 'Débitos', d?.debitos.length], ['historico', 'Histórico', undefined],
-        ] as [Aba, string, number | undefined][]).map(([k, t, n]) => (
-          <button key={k} role="tab" aria-selected={aba === k} className={`${css.aba} ${aba === k ? css.abaOn : ''}`} onClick={() => ir({ aba: k })}>
-            {t} {n != null && <span className={css.cont}>{n}</span>}
-            {k === 'mei' && (d?.pendencias.nfMei ?? 0) > 0 && <span className={css.contAlerta}>NF</span>}
-          </button>
-        ))}
-      </div>
-
-      {aba === 'historico' && (
-        <AbaHistorico sel={params.get('pessoa')} onSel={(k) => ir({ pessoa: k })} onVerNf={(arquivo, titulo) => setVerNf({ arquivo, titulo })}
-          onAbrirMes={(comp, tipo, id) => { ir({ mes: comp, aba: tipo === 'CLT' ? 'folha' : tipo === 'MEI' ? 'mei' : 'motoristas' }); abrir({ tipo: tipo === 'CLT' ? 'clt' : tipo === 'MEI' ? 'mei' : 'mot', id }); }} />
-      )}
-
-      {aba !== 'historico' && <div className={css.barra}>
-        <input className={vt.busca} type="search" placeholder="Buscar pessoa" aria-label="Buscar pessoa" value={busca} onChange={(e) => setBusca(e.target.value)} />
-        <span className={css.legenda}>
-          {d && aba === 'beneficios' && `Dias de ${mesCurto(d.proxima)} já sem feriados · acerto de ${mesCurto(mes)} vem do ponto`}
-          {d && aba === 'folha' && `Valor do dia = salário ÷ dias de trabalho de ${mesCurto(mes)}`}
-          {d && aba === 'mei' && 'Bruto = valor da nota fiscal · Líquido = o que você paga'}
-          {d && aba === 'debitos' && 'Parcelas descontadas na folha ou no pagamento'}
-        </span>
-        {aba === 'beneficios' && !fechado && d && <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'padrao' }, e.currentTarget)}>{d.padrao ? 'Alterar padrão da empresa' : 'Definir padrão da empresa'}</Botao>}
-        {aba === 'debitos' && !fechado && <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'debito' }, e.currentTarget)}>Adicionar débito</Botao>}
-      </div>}
-
-      {d && aba === 'beneficios' && (
-        <div className={css.padraoBar}>
-          <span className={css.lb}>Padrão da empresa</span>
-          {d.padrao
-            ? <span><b>{resumoBen(d.padrao)}</b> <small>desde {mesLongo(d.padrao.vigenteDesde)} · vale pra quem não tem valor próprio</small></span>
-            : <span>Ainda não definido. Defina uma vez e todos os CLT sem valor próprio passam a receber.</span>}
-        </div>
-      )}
-      {d && aba === 'beneficios' && (
-        <div className={css.nota}>
-          Hoje você carrega <b>{mesCurto(d.proxima)}</b>. O que foi pago para <b>{mesCurto(mes)}</b> e não foi usado (feriado, falta, férias, atestado) volta
-          como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos.
-          {d.clt.some((c) => c.beneficios.pagosEstimado) && <> Como {mesCurto(mes)} ainda não foi fechado no sistema, os dias pagos foram estimados pela escala.</>}
-        </div>
-      )}
-      {d && aba === 'folha' && <AvisoPrevia />}
-      {d && aba === 'mei' && (
-        <div className={css.nota}><b>Bruto</b> = contrato + extras + feriados trabalhados − faltas + meta. É o valor da nota fiscal. <b>Líquido</b> = bruto − débitos − meta que já foi paga antes.</div>
-      )}
+        {comoAberto && aba !== 'historico' && <div id="como-calc" className={css.nota}>{comoTexto[aba]}</div>}
 
       {carregando && !d && <p className={css.carregando}>Calculando {mesLongo(mes)}…</p>}
 
@@ -343,6 +325,8 @@ export function GestaoPessoal() {
         </div>
       )}
 
+      </>}
+
       {painel && d && (
         <PainelLateral onFechar={fecharPainel} titulo={
           linhaClt?.nome ?? linhaMei?.nome ?? linhaMot?.nome ?? (painel.tipo === 'padrao' ? 'Padrão de benefícios' : 'Adicionar débito')}
@@ -364,6 +348,12 @@ export function GestaoPessoal() {
       {dialogo?.tipo === 'fechar' && d && (
         <Dialogo titulo={`Fechar ${mesLongo(mes)}?`} onCancelar={() => setDialogo(null)} confirmar={`Fechar ${mesCurto(mes)}`} onConfirmar={fecharMes}>
           <p className={css.hint}>Os números de {mesCurto(mes)} ficam congelados como estão agora, e os dias de benefício carregados para {mesCurto(d.proxima)} viram a base do acerto do mês que vem.</p>
+          <div className={css.fecharResumo}>
+            <Linha2 k={`Pessoas · ${d.totais.pessoas.clt} CLT, ${d.totais.pessoas.mei} MEI, ${d.totais.pessoas.motoristas} motoristas`} v={String(d.totais.pessoas.clt + d.totais.pessoas.mei + d.totais.pessoas.motoristas)} />
+            <Linha2 k={<span title="Salário − faltas + extras + benefícios (CLT) e valor das notas (MEI e motoristas), sem tirar o que já foi pago antes">Custo bruto da empresa</span>} v={brl(d.totais.brutoCent)} />
+            <Linha2 k={<span className={css.mute}>− débitos, acerto de benefícios e metas já pagas</span>} v={brl(-d.totais.abatimentosCent)} cls={css.neg} />
+            <Linha2 cls={css.grande} k="Líquido do fechamento" v={brl(d.totais.liquidoCent)} />
+          </div>
           {(nfPend > 0 || folhaPend > 0) ? (
             <ul className={css.pendList}>
               {nfPend > 0 && <li>{nfPend === 1 ? '1 nota fiscal pendente' : `${nfPend} notas fiscais pendentes`} (MEI e motoristas)</li>}
@@ -411,7 +401,7 @@ const Vazio = ({ cols, children }: { cols: number; children: ReactNode }) => <tr
 function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void }) {
   const t = linhas.reduce((a, l) => ({ sal: a.sal + (l.salarioCent ?? 0), pr: a.pr + l.proventosCent, de: a.de + l.descontosCent, db: a.db + l.debitosCent, li: a.li + l.liquidoSalarioCent, br: a.br + l.custoBrutoCent }), { sal: 0, pr: 0, de: 0, db: 0, li: 0, br: 0 });
   return (
-    <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
+    <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
       <thead><tr><th>Colaborador</th><th className={vt.n}>Salário</th><th className={vt.n} title={`Salário ÷ dias de trabalho de ${mesCurto(mes)}`}>Valor do dia</th>
         <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras e intervalo</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n} title="Simulação a partir do ponto, sem INSS, IRRF e encargos. O valor real vem da contabilidade.">Líquido (prévia)</th>
         <th className={vt.n} title="Salário − descontos + extras + benefícios, sem tirar débitos">Custo bruto</th><th aria-label="Abrir" /></tr></thead>
@@ -455,7 +445,7 @@ function StatusCesta({ l }: { l: PessoalLinhaClt }) {
 function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d: PessoalCompetencia; onAbrir: (id: string, el: HTMLElement) => void }) {
   const t = linhas.reduce((a, l) => ({ vr: a.vr + l.beneficios.vrProxCent, ce: a.ce + l.beneficios.cestaCent, vt: a.vt + l.beneficios.vtProxCent, ac: a.ac + l.beneficios.acertoCent, ca: a.ca + l.beneficios.cargaCent }), { vr: 0, ce: 0, vt: 0, ac: 0, ca: 0 });
   return (
-    <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
+    <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
       <thead><tr><th>Colaborador</th><th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th>
         <th className={vt.n} title={`Cesta de ${mesCurto(d.competencia)}: só pra quem não faltou no mês e já passou da carência`}>Cesta</th><th className={vt.n}>VT / combustível</th>
         <th className={vt.n}>Acerto de {mesCurto(d.competencia)}</th><th className={vt.n}>A carregar</th><th aria-label="Abrir" /></tr></thead>
@@ -474,7 +464,7 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
               <td className={vt.n}><StatusCesta l={l} /></td>
               <td className={vt.n}>{c.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)}<small className={css.sub}>{c.vtTipo === 'FIXO' ? 'combustível · fixo' : c.vtTipo === 'DIA' ? `VT ${brl(c.vtValorCent)}/dia` : ''}</small></td>
               <td className={vt.n}>{b.acertoCent ? <><span className={vt.neg}>{brl(-b.acertoCent)}</span>
-                <small className={css.sub}>{b.naoUsados.length} dia{b.naoUsados.length > 1 ? 's' : ''}: {b.naoUsados.slice(0, 2).map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}{b.naoUsados.length > 2 ? '…' : ''}</small></> : '—'}</td>
+                <small className={`${css.sub} ${css.subCorta}`} title={b.naoUsados.map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}>{b.naoUsados.length} dia{b.naoUsados.length > 1 ? 's' : ''}: {b.naoUsados.slice(0, 2).map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}{b.naoUsados.length > 2 ? '…' : ''}</small></> : '—'}</td>
               <td className={`${vt.n} ${css.forte}`}>{brl(b.cargaCent)}</td>
             </Linha>
           );
@@ -490,7 +480,7 @@ function TabelaMei({ linhas, debitos, onAbrir, onNovo, onPix, onPago, onVerNf }:
   linhas: PessoalLinhaMei[]; debitos: PessoalDebito[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void;
   onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMei, pago: boolean) => void; onVerNf: (a: PessoalNfArquivo, titulo: string) => void;
 }) {
-  const t = linhas.reduce((a, l) => ({ c: a.c + l.valorCent, b: a.b + l.brutoCent, li: a.li + l.liquidoCent, pg: a.pg + (l.lanc.valorPagoCent ?? 0) }), { c: 0, b: 0, li: 0, pg: 0 });
+  const t = linhas.reduce((a, l) => ({ c: a.c + l.valorCent, b: a.b + l.brutoCent, li: a.li + l.liquidoCent, pg: a.pg + (l.lanc.pago ? (l.lanc.valorPagoCent ?? l.liquidoCent) : 0) }), { c: 0, b: 0, li: 0, pg: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
       <thead><tr><th>Colaborador MEI</th><th>Empresa</th><th className={vt.n}>Contrato</th><th className={vt.n}>Extras</th><th className={vt.n}>Faltas</th>
@@ -511,7 +501,7 @@ function TabelaMei({ linhas, debitos, onAbrir, onNovo, onPix, onPago, onVerNf }:
               <CelulaNf numero={l.lanc.nfNumero} arquivo={l.lanc.nfArquivo} onVer={(a) => onVerNf(a, `Nota de ${l.nome}`)} /></td>
             <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
             <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
-            <td className={vt.n}><CelulaPagamento nome={l.nome} pago={l.lanc.pago} valorPagoCent={l.lanc.valorPagoCent} pagoEm={l.lanc.pagoEm} onMudar={(v) => onPago(l, v)} /></td>
+            <td className={vt.n}><CelulaPagamento nome={l.nome} pago={l.lanc.pago} valorPagoCent={l.lanc.valorPagoCent} liquidoCent={l.liquidoCent} pagoEm={l.lanc.pagoEm} onMudar={(v) => onPago(l, v)} /></td>
           </Linha>
         ))}
       </tbody>
@@ -527,7 +517,7 @@ function TabelaMot({ linhas, debitos, onAbrir, onNovo, onPix, onPago }: {
   onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMot, pago: boolean) => void;
 }) {
   const total = linhas.reduce((a, l) => a + l.totalCent, 0);
-  const pagoTot = linhas.reduce((a, l) => a + (l.pagamento.valorPagoCent ?? 0), 0);
+  const pagoTot = linhas.reduce((a, l) => a + (l.pagamento.pago ? (l.pagamento.valorPagoCent ?? l.liquidoCent) : 0), 0);
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
       <thead><tr><th>Motorista</th><th>Empresa</th><th className={vt.n}>Mensal</th><th className={vt.n}>Dias no mês</th><th className={vt.n}>Adicionais</th>
@@ -548,7 +538,7 @@ function TabelaMot({ linhas, debitos, onAbrir, onNovo, onPix, onPago }: {
               <td className={vt.n}>{l.semanas.some((s) => s.adicionalCent) ? brl(l.semanas.reduce((a, s) => a + s.adicionalCent, 0)) : '—'}</td>
               <td className={`${vt.n} ${css.forte}`}>{brl(l.totalCent)}{l.debitosCent > 0 && <small className={css.sub}>líquido {brl(l.liquidoCent)}</small>}</td>
               <td className={vt.n}>{semNf ? <span className={`${vt.pill} ${vt.pillErr}`}>{semNf} sem NF</span> : <span className={`${vt.pill} ${vt.pillMute}`}>{comDias.length ? 'em dia' : '—'}</span>}</td>
-              <td className={vt.n}>{comDias.length > 0 && <CelulaPagamento nome={l.nome} pago={pago} valorPagoCent={l.pagamento.valorPagoCent} pagoEm={l.pagamento.pagoEm}
+              <td className={vt.n}>{comDias.length > 0 && <CelulaPagamento nome={l.nome} pago={pago} valorPagoCent={l.pagamento.valorPagoCent} liquidoCent={l.liquidoCent} pagoEm={l.pagamento.pagoEm}
                 parcial={!pago && pagas > 0 ? `${pagas}/${comDias.length} semanas` : undefined} onMudar={(v) => onPago(l, v)} />}</td>
             </Linha>
           );
@@ -568,7 +558,7 @@ function TabelaDebitos({ d, busca, fechado, onAbrir, onRemover }: {
   const manuais = d.debitos.filter((x) => ok(x.nome));
   const acertos = d.clt.filter((c) => c.beneficios.acertoCent > 0 && ok(c.nome));
   return (
-    <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
+    <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
       <thead><tr><th>Débito</th><th className={vt.n}>Valor total</th><th className={vt.n}>Parcela</th><th className={vt.n}>Desconta em {mesCurto(d.competencia)}</th><th>Origem</th><th aria-label="Ações" /></tr></thead>
       <tbody>
         {manuais.length + acertos.length === 0 && <Vazio cols={6}>Nenhum débito em {mesCurto(d.competencia)}. Use "Adicionar débito" para adiantamentos e equipamentos.</Vazio>}
@@ -909,6 +899,7 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
           {!fechado && <Botao variante="coral" className={css.btnPri} disabled={!mudou || salvando} onClick={salvar}>{salvando ? 'Salvando…' : `Salvar a partir de ${mesCurto(f.vig)}`}</Botao>}
         </section>
 
+        <Admissao l={l} onSalvo={onSalvo} onAviso={onAviso} />
         <InicioCesta l={l} fechado={fechado} onSalvo={onSalvo} onAviso={onAviso} />
 
         <section className={css.bloco}>
@@ -947,7 +938,7 @@ function InicioCesta({ l, fechado, onSalvo, onAviso }: { l: PessoalLinhaClt; fec
       <span className={css.lb}>Cesta básica</span>
       <p className={css.formula}>
         {b.cestaDesde
-          ? `Recebe a partir de ${mesLongo(b.cestaDesde)}${b.cestaDesdeOrigem === 'AUTO' ? ' (automático: 3 meses depois do início no ponto)' : ' (definido aqui)'}.`
+          ? `Recebe a partir de ${mesLongo(b.cestaDesde)}${b.cestaDesdeOrigem === 'AUTO' ? ` (automático: 3 meses depois ${l.admissao ? 'da admissão' : 'do início no ponto'})` : ' (definido aqui)'}.`
           : 'Sem carência: recebe desde já.'} Mês com falta não paga a cesta.
       </p>
       {!fechado && (
@@ -958,7 +949,7 @@ function InicioCesta({ l, fechado, onSalvo, onAviso }: { l: PessoalLinhaClt; fec
           </label>
           {erro && <p className={css.alerta}>{erro}</p>}
           <div className={css.acoes}>
-            <Botao variante="coral" className={css.btnPri} disabled={salvando || !valor || (valor === b.cestaDesde && b.cestaDesdeOrigem === 'MANUAL')} onClick={() => salvar(valor)}>
+            <Botao variante="ghost" className={css.btnSec} disabled={salvando || !valor || (valor === b.cestaDesde && b.cestaDesdeOrigem === 'MANUAL')} onClick={() => salvar(valor)}>
               {salvando ? 'Salvando…' : valor ? `Cesta a partir de ${mesCurto(valor)}` : 'Escolha o mês'}
             </Botao>
             {b.cestaDesdeOrigem === 'MANUAL' && <button className={css.link} onClick={() => salvar(null)}>Voltar ao automático</button>}
@@ -981,7 +972,7 @@ function ZonaTirar({ nome, mes, onTirar }: { nome: string; mes: string; onTirar:
 
 function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinhaMei | PessoalLinhaMot; mes: string; fechado: boolean; empresas: string[]; onSalvo: () => Promise<void> }) {
   const [aberto, setAberto] = useState<'' | 'dados' | 'reajuste'>('');
-  const [f, setF] = useState({ nome: p.nome, empresa: p.empresa ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
+  const [f, setF] = useState({ nome: p.nome, empresa: p.empresa ?? '', inicioAtividade: p.inicioAtividade ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
   const [r, setR] = useState({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes });
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -998,7 +989,8 @@ function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinha
       <span className={css.lb}>Contrato</span>
       <Linha2 k={`Valor em ${mesCurto(mes)}`} v={brl(p.valorCent)} />
       {p.empresa && <Linha2 k={<span className={css.mute}>Empresa</span>} v={p.empresa} />}
-      <p className={css.formula}>Vale desde {mesLongo(p.valorDesde)} · {p.baseDias === 'SEG_SAB' ? 'segunda a sábado' : 'segunda a sexta'}</p>
+      <Linha2 k={<span className={css.mute}>Presta serviço desde</span>} v={p.inicioAtividade ? new Date(`${p.inicioAtividade}T12:00:00`).toLocaleDateString('pt-BR') : 'não informado'} />
+      <p className={css.formula}>{p.historicoValores.length > 1 ? `Reajustado em ${mesLongo(p.valorDesde)}` : `No sistema desde ${mesLongo(p.competenciaInicio)}`} · {p.baseDias === 'SEG_SAB' ? 'segunda a sábado' : 'segunda a sexta'}</p>
       {p.historicoValores.length > 1 && (
         <div className={css.historico}>
           {p.historicoValores.map((h) => (
@@ -1011,7 +1003,7 @@ function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinha
       {!fechado && aberto === '' && (
         <div className={css.acoes}>
           <button className={css.btnContornoNeutro} onClick={() => { setR({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes }); setAberto('reajuste'); }}>Reajustar valor</button>
-          <button className={css.link} onClick={() => { setF({ nome: p.nome, empresa: p.empresa ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, empresa, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
+          <button className={css.link} onClick={() => { setF({ nome: p.nome, empresa: p.empresa ?? '', inicioAtividade: p.inicioAtividade ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, empresa, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
         </div>
       )}
 
@@ -1041,6 +1033,8 @@ function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinha
         <>
           <CampoTexto id="c-nome" rotulo="Nome" valor={f.nome} onChange={(v) => setF({ ...f, nome: v })} />
           <CampoEmpresa id="c-emp" valor={f.empresa} empresas={empresas} onChange={(v) => setF({ ...f, empresa: v })} />
+          <CampoTexto id="c-desde" tipo="date" rotulo="Presta serviço desde" valor={f.inicioAtividade} onChange={(v) => setF({ ...f, inicioAtividade: v })}
+            ajuda="Data real de início, mesmo que antes de usar o sistema." />
           <div className={css.grade2}>
             <CampoTexto id="c-doc" rotulo={motorista ? 'CPF ou CNPJ' : 'CNPJ'} valor={f.documento} numerico placeholder={motorista ? '000.000.000-00' : '00.000.000/0001-00'}
               onChange={(v) => setF({ ...f, documento: mascaraDoc(v) })} erro={docIncompleto(f.documento, !motorista)} />
@@ -1053,7 +1047,7 @@ function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinha
           <div className={css.dAcoes}>
             <button className={css.btnTexto} onClick={() => { setAberto(''); setErro(null); }}>Cancelar</button>
             <Botao variante="coral" className={css.btnPri} disabled={salvando || !f.nome.trim() || !!docIncompleto(f.documento, !motorista)}
-              onClick={() => enviar({ nome: f.nome, empresa: f.empresa, documento: f.documento, funcao: f.funcao, chavePix: f.chavePix })}>{salvando ? 'Salvando…' : 'Salvar dados'}</Botao>
+              onClick={() => enviar({ nome: f.nome, empresa: f.empresa, inicioAtividade: f.inicioAtividade || null, documento: f.documento, funcao: f.funcao, chavePix: f.chavePix })}>{salvando ? 'Salvando…' : 'Salvar dados'}</Botao>
           </div>
         </>
       )}
@@ -1258,7 +1252,7 @@ function PainelDebito({ mes, onSalvo }: { mes: string; onSalvo: (descricao: stri
 // =================== cadastro de prestador (página) ===================
 
 function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tipoInicial: 'MEI' | 'MOTORISTA'; mes: string; empresas: string[]; onVoltar: () => void; onCriado: (nome: string, tipo: 'MEI' | 'MOTORISTA') => void }) {
-  const [f, setF] = useState({ tipo: tipoInicial, nome: '', empresa: '', documento: '', funcao: '', valorCent: 0, baseDias: (tipoInicial === 'MEI' ? 'SEG_SAB' : 'SEG_SEX') as BaseDias, chavePix: '', inicio: mes });
+  const [f, setF] = useState({ tipo: tipoInicial, nome: '', empresa: '', inicioAtividade: '', documento: '', funcao: '', valorCent: 0, baseDias: (tipoInicial === 'MEI' ? 'SEG_SAB' : 'SEG_SEX') as BaseDias, chavePix: '', inicio: mes });
   const [tocado, setTocado] = useState<Record<string, boolean>>({});
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -1276,7 +1270,7 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
     setSalvando(true); setErro(null);
     try {
       await api.post('/pessoal/prestadores', {
-        tipo: f.tipo, nome: f.nome, empresa: f.empresa, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100,
+        tipo: f.tipo, nome: f.nome, empresa: f.empresa, inicioAtividade: f.inicioAtividade || null, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100,
         baseDias: f.baseDias, chavePix: f.chavePix, competenciaInicio: f.inicio,
       });
       onCriado(f.nome.trim(), f.tipo);
@@ -1321,8 +1315,11 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
           <p className={css.hint}>Valor do dia = valor mensal ÷ dias do mês nessa base, já sem os feriados da empresa.</p>
         </section>
         <section className={css.secao}>
-          <h3><span className={css.num}>4</span>Começa em</h3>
-          <label className={css.campo} htmlFor="p-ini"><span>Primeira competência</span>
+          <h3><span className={css.num}>4</span>Datas</h3>
+          <label className={css.campo} htmlFor="p-desde"><span>Presta serviço desde (opcional)</span>
+            <span className={css.input}><input id="p-desde" type="date" value={f.inicioAtividade} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setF({ ...f, inicioAtividade: e.target.value })} /></span>
+            <small>Quando a pessoa começou de verdade, mesmo que antes de usar o sistema. Aparece no histórico.</small></label>
+          <label className={css.campo} htmlFor="p-ini"><span>Primeira competência no sistema</span>
             <span className={css.input}><input id="p-ini" type="month" value={f.inicio} onChange={(e) => e.target.value && setF({ ...f, inicio: e.target.value })} /></span>
             <small>Aparece desta competência em diante. Meses anteriores não mudam.</small></label>
         </section>
@@ -1460,7 +1457,7 @@ function ModalPix({ alvo, mes, onFechar, onRegistrar }: {
         </div>
         {r?.pago && (
           <div className={css.pagoFaixa}>
-            <span>Pago{r.valorPagoCent != null ? ` ${brl(r.valorPagoCent)}` : ''}{r.pagoEm ? ` em ${fmtPagoEm(r.pagoEm)}` : ''}</span>
+            <span>Pago{r.valorPagoCent != null ? ` ${brl(r.valorPagoCent)}` : ' (valor não registrado)'}{r.pagoEm ? ` em ${fmtPagoEm(r.pagoEm)}` : ''}</span>
             <button type="button" className={css.link} onClick={() => onRegistrar(r, false, null)}>Desfazer pagamento</button>
           </div>
         )}
@@ -1517,15 +1514,13 @@ function ModalPix({ alvo, mes, onFechar, onRegistrar }: {
 }
 
 /** Pagamento na linha: valor pago + data/hora, e o interruptor. */
-function CelulaPagamento({ nome, pago, valorPagoCent, pagoEm, parcial, onMudar }: {
-  nome: string; pago: boolean; valorPagoCent: number | null; pagoEm: string | null; parcial?: string; onMudar: (v: boolean) => void;
+function CelulaPagamento({ nome, pago, valorPagoCent, liquidoCent, pagoEm, parcial, onMudar }: {
+  nome: string; pago: boolean; valorPagoCent: number | null; liquidoCent: number; pagoEm: string | null; parcial?: string; onMudar: (v: boolean) => void;
 }) {
   return (
     <span className={css.pagCel}>
       <span className={css.pagV}>
-        {pago
-          ? <>{valorPagoCent != null ? <b>{brl(valorPagoCent)}</b> : <b>pago</b>}{pagoEm && <small className={css.sub}>{fmtPagoEm(pagoEm)}</small>}</>
-          : <small className={css.sub}>{parcial ?? 'a pagar'}</small>}
+        {pago ? <PagoInfo pago valorPagoCent={valorPagoCent} liquidoCent={liquidoCent} pagoEm={pagoEm} /> : <small className={css.sub}>{parcial ?? 'a pagar'}</small>}
       </span>
       <TogglePago nome={nome} pago={pago} onMudar={async (v) => onMudar(v)} />
     </span>
@@ -1832,7 +1827,12 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
 }) {
   const meses = h.meses;
   const fech = meses.filter((m) => m.fechado).length;
-  const kMeses = { k: 'Meses', v: String(meses.length), s: `${fech} fechado${fech === 1 ? '' : 's'} · ${meses.length - fech} em aberto` };
+  const kMeses = { k: 'Meses no sistema', v: String(meses.length), s: `${fech} fechado${fech === 1 ? '' : 's'} · ${meses.length - fech} em aberto` };
+  const inicioReal = (ini: string | null, sistema: string): [string, ReactNode] => ['Presta serviço desde', ini
+    ? <>{mesLongo(ini.slice(0, 7))}<small>no sistema desde {mesAbrev(sistema)}</small></>
+    : <>não informado<small>no sistema desde {mesAbrev(sistema)}</small></>];
+  const contrato = (l: PessoalLinhaMei | PessoalLinhaMot): [string, ReactNode] => ['Contrato', <>{brl(l.valorCent)}/mês<small>
+    {l.historicoValores.length > 1 ? `reajustado em ${mesAbrev(l.valorDesde)}` : l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}</small></>];
   if (meses.length === 0) {
     return <div className={css.histVazio}><b>Nada por aqui ainda</b>{pessoa?.nome ?? 'Essa pessoa'} não aparece em nenhum mês fechado nem no mês atual.</div>;
   }
@@ -1851,9 +1851,9 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
     const pagos = ls.filter((x) => x.l.lanc.pago);
     const semNf = ls.filter((x) => !x.l.lanc.nfNumero && !x.l.lanc.nfArquivo).length;
     const naoPagos = ls.length - pagos.length;
-    perfil = { tipo: 'MEI', nome: ult.nome, info: [['Empresa', ult.empresa ?? '—'], ['CNPJ', fmtDoc(ult.documento) ?? '—'], ['Contrato atual', `${brl(ult.valorCent)} desde ${mesAbrev(ult.valorDesde)}`], ['Pix', ult.chavePix ?? '—']] };
+    perfil = { tipo: 'MEI', nome: ult.nome, info: [['Empresa', ult.empresa ?? '—'], ['CNPJ', fmtDoc(ult.documento) ?? '—'], inicioReal(ult.inicioAtividade, ult.competenciaInicio), contrato(ult), ['Pix', ult.chavePix ?? '—']] };
     kpis = [kMeses,
-      { k: 'Total pago', v: brl(pagos.reduce((a, x) => a + (x.l.lanc.valorPagoCent ?? 0), 0)), s: pagos.length ? `em ${pagos.length} pagamento${pagos.length === 1 ? '' : 's'}` : 'nenhum pagamento ainda', dark: true },
+      { k: 'Total pago', v: brl(pagos.reduce((a, x) => a + (x.l.lanc.valorPagoCent ?? x.l.liquidoCent), 0)), s: pagos.length ? `em ${pagos.length} pagamento${pagos.length === 1 ? '' : 's'}` : 'nenhum pagamento ainda', dark: true },
       { k: 'Bruto (NFs)', v: brl(ls.reduce((a, x) => a + x.l.brutoCent, 0)), s: 'soma das notas' },
       { k: 'Pendências', v: semNf || naoPagos ? [semNf ? `${semNf} NF` : '', naoPagos ? `${naoPagos} a pagar` : ''].filter(Boolean).join(' · ') : 'nenhuma', s: semNf ? 'meses sem nota' : 'tudo em dia' }];
     tabela = (
@@ -1870,7 +1870,7 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
             <td className={`${vt.n} ${css.forte}`}>{brl(l.brutoCent)}<CelulaNf numero={l.lanc.nfNumero} arquivo={l.lanc.nfArquivo} onVer={(a) => onVerNf(a, `Nota de ${l.nome} · ${mesLongo(m.competencia)}`)} /></td>
             <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
             <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
-            <td className={vt.n}><PagoInfo pago={l.lanc.pago} valorPagoCent={l.lanc.valorPagoCent} pagoEm={l.lanc.pagoEm} /></td>
+            <td className={vt.n}><PagoInfo pago={l.lanc.pago} valorPagoCent={l.lanc.valorPagoCent} liquidoCent={l.liquidoCent} pagoEm={l.lanc.pagoEm} /></td>
             <td className={vt.n}>{abrir(m.competencia)}</td>
           </tr>
         ))}</tbody>
@@ -1882,9 +1882,9 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
     const pagoDe = (l: PessoalLinhaMot) => l.pagamento.pago || (l.semanas.some((x) => x.dias > 0) && l.semanas.filter((x) => x.dias > 0).every((x) => x.pago));
     const pagos = ls.filter((x) => pagoDe(x.l));
     const semNf = ls.reduce((a, x) => a + x.l.semanas.filter((s) => s.dias > 0 && !s.nfNumero && !s.nfArquivo).length, 0);
-    perfil = { tipo: 'Motorista', nome: ult.nome, info: [['Empresa', ult.empresa ?? '—'], ['Documento', fmtDoc(ult.documento) ?? '—'], ['Contrato atual', `${brl(ult.valorCent)} · ${ult.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}`], ['Pix', ult.chavePix ?? '—']] };
+    perfil = { tipo: 'Motorista', nome: ult.nome, info: [['Empresa', ult.empresa ?? '—'], ['Documento', fmtDoc(ult.documento) ?? '—'], inicioReal(ult.inicioAtividade, ult.competenciaInicio), contrato(ult), ['Pix', ult.chavePix ?? '—']] };
     kpis = [kMeses,
-      { k: 'Total pago', v: brl(pagos.reduce((a, x) => a + (x.l.pagamento.valorPagoCent ?? 0), 0)), s: pagos.length ? `em ${pagos.length} ${pagos.length === 1 ? 'mês pago' : 'meses pagos'}` : 'nenhum mês pago ainda', dark: true },
+      { k: 'Total pago', v: brl(pagos.reduce((a, x) => a + (x.l.pagamento.valorPagoCent ?? x.l.liquidoCent), 0)), s: pagos.length ? `em ${pagos.length} ${pagos.length === 1 ? 'mês pago' : 'meses pagos'}` : 'nenhum mês pago ainda', dark: true },
       { k: 'Total das NFs', v: brl(ls.reduce((a, x) => a + x.l.totalCent, 0)), s: 'soma das semanas' },
       { k: 'Pendências', v: semNf ? `${semNf} semana${semNf > 1 ? 's' : ''}` : 'nenhuma', s: semNf ? 'sem nota fiscal' : 'notas em dia' }];
     tabela = (
@@ -1905,7 +1905,7 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
               <td className={vt.n}>{com.length === 0 ? '—' : <>
                 <small className={`${css.sub} ${comNf < com.length ? css.subErr : ''}`}>{comNf} de {com.length} com NF</small>
                 <button type="button" className={css.nfLink} onClick={() => onNotasMot(l.nome, m.competencia, l.semanas)}>ver notas</button></>}</td>
-              <td className={vt.n}><PagoInfo pago={pagoDe(l)} valorPagoCent={l.pagamento.valorPagoCent} pagoEm={l.pagamento.pagoEm} /></td>
+              <td className={vt.n}><PagoInfo pago={pagoDe(l)} valorPagoCent={l.pagamento.valorPagoCent} liquidoCent={l.liquidoCent} pagoEm={l.pagamento.pagoEm} /></td>
               <td className={vt.n}>{abrir(m.competencia)}</td>
             </tr>
           );
@@ -1917,6 +1917,7 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
     const ult = ls[0]!.l;
     const faltas = ls.reduce((a, x) => a + x.l.faltasDias.length, 0);
     perfil = { tipo: 'CLT', nome: ult.nome, info: [['Matrícula', ult.matricula ? `#${ult.matricula}` : '—'], ['Cargo', ult.config.cargo ?? '—'],
+      ['Admissão', ult.admissao ? new Date(`${ult.admissao}T12:00:00`).toLocaleDateString('pt-BR') : <>não informada<small>edite no painel do funcionário</small></>],
       ['Salário atual', ult.salarioCent == null ? '—' : brl(ult.salarioCent)], ['Benefício', ult.config.origem === 'PROPRIO' ? 'valor próprio' : ult.config.origem === 'PADRAO' ? 'padrão da empresa' : 'sem benefício'], ['Pix', ult.config.chavePix ?? '—']] };
     kpis = [kMeses,
       { k: 'Líquido (prévia)', v: brl(ls.reduce((a, x) => a + x.l.liquidoSalarioCent, 0)), s: 'soma dos meses, sem encargos', dark: true },
@@ -1951,18 +1952,96 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
         <dl>{perfil.info.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       </div>
       {h.pessoaTipo === 'CLT' && <AvisoPrevia />}
-      <div className={`${vt.kpis} ${css.kpis}`}>
-        {kpis.map((x) => (
-          <div key={x.k} className={`${vt.kpi} ${x.dark ? vt.kpiInk : ''}`}><div className={vt.kpiK}>{x.k}</div><div className={vt.kpiV}>{x.v}</div><div className={vt.kpiS}>{x.s}</div></div>
-        ))}
-      </div>
+      <Resumo itens={kpis.map((x) => ({ k: x.k, v: x.v, s: x.s, tom: x.dark ? 'ok' as const : undefined }))} />
       <div className={vt.tab}><div className={vt.scroll}>{tabela}</div></div>
       <p className={css.hint}>Mês fechado mostra o retrato do fechamento; o mês em aberto (em amarelo) mostra os números de agora. Nota e pagamento são sempre os atuais. "Abrir mês" leva ao fechamento daquela competência com a pessoa aberta.</p>
     </>
   );
 }
 
-function PagoInfo({ pago, valorPagoCent, pagoEm }: { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }) {
+function PagoInfo({ pago, valorPagoCent, liquidoCent, pagoEm }: { pago: boolean; valorPagoCent: number | null; liquidoCent: number; pagoEm: string | null }) {
   if (!pago) return <small className={`${css.sub} ${css.subWarn}`}>a pagar</small>;
-  return <>{valorPagoCent != null ? <b>{brl(valorPagoCent)}</b> : <b>pago</b>}{pagoEm && <small className={css.sub}>{fmtPagoEm(pagoEm)}</small>}</>;
+  // Pago antes de existir o valor pago: considera o líquido do mês.
+  return <><b>{brl(valorPagoCent ?? liquidoCent)}</b><small className={css.sub}>{[pagoEm ? fmtPagoEm(pagoEm) : '', valorPagoCent == null ? 'líquido' : ''].filter(Boolean).join(' · ')}</small></>;
+}
+
+/** Admissão real do CLT (pode ser antes do ponto). Base da carência da cesta. */
+function Admissao({ l, onSalvo, onAviso }: { l: PessoalLinhaClt; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
+  const [valor, setValor] = useState(l.admissao ?? '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => { setValor(l.admissao ?? ''); }, [l.admissao]);
+  async function salvar() {
+    setSalvando(true); setErro(null);
+    try {
+      await api.put(`/pessoal/clt/${l.empregadoId}/admissao`, { dataAdmissao: valor || null });
+      await onSalvo(); onAviso(valor ? `Admissão de ${l.nome}: ${new Date(`${valor}T12:00:00`).toLocaleDateString('pt-BR')}.` : `Admissão de ${l.nome} apagada.`);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setSalvando(false); }
+  }
+  return (
+    <section className={css.bloco}>
+      <span className={css.lb}>Admissão</span>
+      <p className={css.formula}>Data real de entrada na empresa, mesmo que antes de usar o ponto. Conta a carência da cesta e aparece no histórico.</p>
+      <div className={css.linhaCampo}>
+        <label className={css.campo} htmlFor="adm"><span>Admitido em</span>
+          <span className={css.input}><input id="adm" type="date" value={valor} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setValor(e.target.value)} /></span></label>
+        <Botao variante="ghost" className={css.btnSec} disabled={salvando || valor === (l.admissao ?? '')} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar admissão'}</Botao>
+      </div>
+      {erro && <p className={css.alerta}>{erro}</p>}
+    </section>
+  );
+}
+
+/** Faixa de resumo: poucos números, um por bloco. Mesma peça em todas as abas e no histórico. */
+function Resumo({ itens }: { itens: { k: string; v: ReactNode; s?: string; tom?: 'ok' | 'neg' }[] }) {
+  return (
+    <dl className={css.resumo}>
+      {itens.map((x) => (
+        <div key={x.k}><dt>{x.k}</dt><dd className={x.tom === 'ok' ? css.resOk : x.tom === 'neg' ? css.resNeg : ''}>{x.v}</dd>{x.s && <small>{x.s}</small>}</div>
+      ))}
+    </dl>
+  );
+}
+
+function ResumoAba({ aba, d }: { aba: Aba; d: PessoalCompetencia }) {
+  const soma = <T,>(l: T[], f: (x: T) => number) => l.reduce((a, x) => a + f(x), 0);
+  if (aba === 'folha') return <Resumo itens={[
+    { k: 'Funcionários', v: String(d.clt.length) },
+    { k: 'Salários', v: brl(soma(d.clt, (x) => x.salarioCent ?? 0)) },
+    { k: 'Extras e intervalo', v: brl(soma(d.clt, (x) => x.proventosCent)) },
+    { k: 'Faltas e atrasos', v: brl(-soma(d.clt, (x) => x.descontosCent)), tom: 'neg' },
+    { k: 'Líquido (prévia)', v: brl(soma(d.clt, (x) => x.liquidoSalarioCent)) },
+  ]} />;
+  if (aba === 'beneficios') return <Resumo itens={[
+    { k: `Carga de ${mesCurto(d.proxima)}`, v: brl(soma(d.clt, (x) => x.beneficios.cargaCent)) },
+    { k: `Acerto de ${mesCurto(d.competencia)}`, v: brl(-soma(d.clt, (x) => x.beneficios.acertoCent)), tom: 'neg' },
+    { k: 'Padrão da empresa', v: d.padrao ? resumoBen(d.padrao) : 'não definido', s: d.padrao ? `desde ${mesCurto(d.padrao.vigenteDesde)} · quem não tem valor próprio` : 'defina para os CLT sem valor próprio' },
+  ]} />;
+  if (aba === 'mei') {
+    const pagos = d.mei.filter((x) => x.lanc.pago);
+    return <Resumo itens={[
+      { k: 'Pessoas', v: String(d.mei.length) },
+      { k: 'Bruto (NFs)', v: brl(soma(d.mei, (x) => x.brutoCent)) },
+      { k: 'Líquido', v: brl(soma(d.mei, (x) => x.liquidoCent)) },
+      { k: 'Pago', v: brl(soma(pagos, (x) => x.lanc.valorPagoCent ?? x.liquidoCent)), s: `${pagos.length} de ${d.mei.length}`, tom: pagos.length ? 'ok' : undefined },
+      { k: 'NF pendente', v: String(d.pendencias.nfMei), tom: d.pendencias.nfMei ? 'neg' : undefined },
+    ]} />;
+  }
+  if (aba === 'motoristas') {
+    const pagos = d.motoristas.filter((x) => x.pagamento.pago);
+    return <Resumo itens={[
+      { k: 'Motoristas', v: String(d.motoristas.length) },
+      { k: 'Total das NFs', v: brl(soma(d.motoristas, (x) => x.totalCent)) },
+      { k: 'Líquido', v: brl(soma(d.motoristas, (x) => x.liquidoCent)) },
+      { k: 'Pago', v: brl(soma(pagos, (x) => x.pagamento.valorPagoCent ?? x.liquidoCent)), s: `${pagos.length} de ${d.motoristas.length}`, tom: pagos.length ? 'ok' : undefined },
+      { k: 'Semanas sem NF', v: String(d.pendencias.nfMotorista), tom: d.pendencias.nfMotorista ? 'neg' : undefined },
+    ]} />;
+  }
+  if (aba === 'debitos') return <Resumo itens={[
+    { k: 'Débitos neste mês', v: String(d.debitos.length) },
+    { k: 'Descontado neste mês', v: brl(-soma(d.debitos, (x) => x.parcelaCent)), tom: d.debitos.length ? 'neg' : undefined },
+    { k: 'Saldo total dos débitos', v: brl(soma(d.debitos, (x) => x.valorTotalCent)) },
+  ]} />;
+  return null;
 }

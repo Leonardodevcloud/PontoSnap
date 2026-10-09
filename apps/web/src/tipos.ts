@@ -641,7 +641,7 @@ export type BaseDias = 'SEG_SAB' | 'SEG_SEX';
 export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
 
 export interface PessoalLinhaClt {
-  empregadoId: string; nome: string; matricula: string | null;
+  empregadoId: string; nome: string; matricula: string | null; admissao: string | null;
   config: {
     cargo: string | null; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number; chavePix: string | null;
     /** PADRAO = segue o padrão da empresa · PROPRIO = valor da pessoa · NENHUM = sem benefício */
@@ -683,7 +683,9 @@ export interface PessoalLancMei {
 export interface PessoalNfArquivo { id: string; nome: string; mime: string; bytes: number; enviadoEm: string }
 export interface PessoalPagamentoMes { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }
 export interface PessoalLinhaMei {
-  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
+  /** Início real da prestação (pode ser antes do sistema) e 1ª competência no sistema. */
+  inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
   /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: { vigenteDesde: string; valorCent: number; baseDias: BaseDias }[];
   baseDias: BaseDias; diasMes: number; lanc: PessoalLancMei; debitosCent: number;
@@ -692,7 +694,9 @@ export interface PessoalLinhaMei {
 }
 export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: PessoalNfArquivo | null }
 export interface PessoalLinhaMot {
-  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
+  /** Início real da prestação (pode ser antes do sistema) e 1ª competência no sistema. */
+  inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
   /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: { vigenteDesde: string; valorCent: number; baseDias: BaseDias }[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: PessoalSemanaMot[];

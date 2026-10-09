@@ -17,6 +17,8 @@ export const empregado = pgTable('empregado', {
   ativo: boolean('ativo').notNull().default(true),
   /** A apuração ignora dias anteriores a esta data (migração / admissão). Nulo = sem corte. */
   dataInicioPonto: date('data_inicio_ponto'),
+  /** Admissão real (pode ser anterior ao uso do ponto). Base da carência da cesta. */
+  dataAdmissao: date('data_admissao'),
   salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

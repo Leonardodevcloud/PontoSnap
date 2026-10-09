@@ -32,6 +32,7 @@ export class CriarPrestadorDto {
   @IsOptional() @IsString() @MaxLength(20) documento?: string | null;
   @IsOptional() @IsString() @MaxLength(80) funcao?: string | null;
   @IsOptional() @IsString() @MaxLength(120) empresa?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null && v !== '') @Matches(DATA) inicioAtividade?: string | null;
   @Type(() => Number) @IsNumber() @Min(0) valorMensal!: number;
   @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias!: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
@@ -43,6 +44,7 @@ export class EditarPrestadorDto {
   @IsOptional() @IsString() @MaxLength(20) documento?: string | null;
   @IsOptional() @IsString() @MaxLength(80) funcao?: string | null;
   @IsOptional() @IsString() @MaxLength(120) empresa?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null && v !== '') @Matches(DATA) inicioAtividade?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) valorMensal?: number;
   @IsOptional() @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias?: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
@@ -112,4 +114,8 @@ export class PagamentoDto {
   @IsBoolean() pago!: boolean;
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber() @Min(0) valorPago?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) @ArrayMaxSize(6) semanas?: string[];
+}
+
+export class AdmissaoDto {
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(DATA) dataAdmissao!: string | null;
 }

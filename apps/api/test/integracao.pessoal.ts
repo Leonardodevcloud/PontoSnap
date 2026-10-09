@@ -28,9 +28,9 @@ const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
-  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000166', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000177', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
   const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
-    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000166', razaoSocial: 'PESSOAL LTDA',
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000177', razaoSocial: 'PESSOAL LTDA',
     numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
   }).returning()))[0]!;
   const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
@@ -106,10 +106,17 @@ async function main() {
   ok(caioC.beneficios.cargaCent === caioC.beneficios.vrProxCent + 8000 - caioC.beneficios.acertoCent, 'cesta entra na carga');
   await pes.definirInicioCesta(t.id, caio.id, null);
   ok((await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!.beneficios.cestaDesde === '2026-11', 'limpar volta ao automático (3 meses)');
+  // admissão real antes do ponto: a carência conta da admissão
+  await pes.definirAdmissao(t.id, caio.id, '2025-01-10');
+  const caioAdm = (await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!;
+  ok(caioAdm.admissao === '2025-01-10' && caioAdm.beneficios.cestaDesde === '2025-04' && caioAdm.beneficios.cestaStatus === 'PAGA',
+    `admitido em jan/2025: carência já passou, cesta paga (${caioAdm.beneficios.cestaDesde})`);
+  ok((await erroDe(() => pes.definirAdmissao(t.id, caio.id, '2099-01-01'))).includes('futuro'), 'admissão no futuro é recusada');
+  await pes.definirAdmissao(t.id, caio.id, null);
   await pes.definirInicioCesta(t.id, caio.id, '2026-09');
 
   // ── MEI ──
-  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60.874.544/0001-04', funcao: 'Vendedor', empresa: ' Fiix Peças ', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
+  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60.874.544/0001-04', funcao: 'Vendedor', empresa: ' Fiix Peças ', inicioAtividade: '2023-03-01', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
   await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 500, metaPaga: true, metaPagaEm: '2026-09-05', faltas: 1 });
   await pes.criarDebito(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, descricao: 'Notebook', valorTotal: 300, parcelas: 2, competenciaInicio: '2026-09' });
   const set2 = await pes.competencia(t.id, '2026-09');
@@ -123,6 +130,7 @@ async function main() {
 
   // ── pagamento: valor e hora ──
   ok(m.empresa === 'Fiix Peças', `empresa gravada (${m.empresa})`);
+  ok(m.inicioAtividade === '2023-03-01' && m.competenciaInicio === '2026-09', 'início real (mar/2023) separado da 1ª competência no sistema');
   ok(m.lanc.valorPagoCent === null && m.lanc.pagoEm === null, 'sem pagamento registrado');
   ok((await erroDe(() => pes.registrarPagamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true }))).includes('valor'),
     'marcar pago exige o valor');

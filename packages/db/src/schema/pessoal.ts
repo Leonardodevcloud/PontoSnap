@@ -52,6 +52,8 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   chavePix: varchar('chave_pix', { length: 120 }),
   /** Empresa para quem presta o serviço (texto livre). */
   empresa: varchar('empresa', { length: 120 }),
+  /** Data real em que começou a prestar serviço (pode ser antes de usar o sistema). */
+  inicioAtividade: date('inicio_atividade'),
   competenciaInicio: varchar('competencia_inicio', { length: 7 }).notNull(),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
