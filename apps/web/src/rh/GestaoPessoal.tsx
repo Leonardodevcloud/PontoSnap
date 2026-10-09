@@ -8,7 +8,7 @@ import { arquivoParaBase64, salvarBlob } from '../lib/download';
 import { brCodePix, normalizarChave } from '../lib/pix';
 import { Botao } from '../components/Botao';
 import type {
-  BaseDias, PessoaTipo, PessoalCompetencia, PessoalNfArquivo, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
+  BaseDias, PessoaTipo, PessoalCompetencia, PessoalDebito, PessoalNfArquivo, PessoalPagamentoMes, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
 import css from './GestaoPessoal.module.css';
@@ -106,6 +106,7 @@ export function GestaoPessoal() {
   const [toast, setToast] = useState<Toast>(null);
   const [busca, setBusca] = useState('');
   const [pix, setPix] = useState<PixAlvo | null>(null);
+  const [verNf, setVerNf] = useState<{ arquivo: PessoalNfArquivo; titulo: string } | null>(null);
   const gatilho = useRef<HTMLElement | null>(null);
 
   const recarregar = useCallback(async () => {
@@ -117,30 +118,51 @@ export function GestaoPessoal() {
   useEffect(() => { void recarregar(); }, [recarregar, sessao?.tenantId]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t); }, [toast]);
 
-  /** "Pago" direto na linha: MEI é o mês; motorista marca todas as semanas trabalhadas. Vale em mês fechado. */
-  async function marcarPago(tipo: 'MEI' | 'MOTORISTA', id: string, nome: string, pago: boolean, periodos: string[]) {
-    try {
-      for (const periodo of periodos) await api.put('/pessoal/lancamento', { pessoaTipo: tipo, pessoaId: id, competencia: mes, periodo, pago });
-      await recarregar();
-      avisar(`${nome}: ${pago ? 'marcado como pago' : 'voltou para pendente'}.`, async () => {
-        for (const periodo of periodos) await api.put('/pessoal/lancamento', { pessoaTipo: tipo, pessoaId: id, competencia: mes, periodo, pago: !pago });
-        await recarregar();
-      });
-    } catch (e) { setErro((e as Error).message); }
+  /**
+   * Pagamento sem esperar o servidor: a tela muda na hora e a gravação vai em
+   * segundo plano (sem recalcular o mês inteiro). Se falhar, volta o que era.
+   */
+  function aplicarPagamento(tipo: 'MEI' | 'MOTORISTA', id: string, pg: PessoalPagamentoMes, semanas: string[]) {
+    setDados((at) => at && ({
+      ...at,
+      mei: tipo !== 'MEI' ? at.mei : at.mei.map((m) => (m.id !== id ? m : { ...m, lanc: { ...m.lanc, ...pg } })),
+      motoristas: tipo !== 'MOTORISTA' ? at.motoristas : at.motoristas.map((m) => (m.id !== id ? m : {
+        ...m, pagamento: pg, semanas: m.semanas.map((s) => (semanas.includes(s.inicio) ? { ...s, pago: pg.pago } : s)),
+      })),
+    }));
+  }
+  function registrarPagamento(r: PixRegistro, pago: boolean, valorCent: number | null) {
+    const antes = { pago: r.pago, valorPagoCent: r.valorPagoCent, pagoEm: r.pagoEm };
+    const agora: PessoalPagamentoMes = pago ? { pago: true, valorPagoCent: valorCent, pagoEm: new Date().toISOString() } : { pago: false, valorPagoCent: null, pagoEm: null };
+    aplicarPagamento(r.pessoaTipo, r.pessoaId, agora, r.semanas);
+    const enviar = (pg: PessoalPagamentoMes) => api.put<PessoalPagamentoMes>('/pessoal/pagamento', {
+      pessoaTipo: r.pessoaTipo, pessoaId: r.pessoaId, competencia: mes, semanas: r.semanas,
+      pago: pg.pago, valorPago: pg.pago && pg.valorPagoCent != null ? pg.valorPagoCent / 100 : null,
+    });
+    enviar(agora)
+      .then((res) => aplicarPagamento(r.pessoaTipo, r.pessoaId, res, r.semanas))
+      .catch((e) => { aplicarPagamento(r.pessoaTipo, r.pessoaId, antes, r.semanas); setErro(`Não deu pra salvar o pagamento de ${r.nome}: ${(e as Error).message}`); });
+    avisar(pago ? `${r.nome}: pago ${brl(valorCent ?? 0)} às ${fmtHoraCurta(agora.pagoEm!)}.` : `${r.nome}: pagamento desfeito.`, async () => {
+      aplicarPagamento(r.pessoaTipo, r.pessoaId, antes, r.semanas);
+      const res = await enviar(antes.pago ? antes : { pago: false, valorPagoCent: null, pagoEm: null });
+      aplicarPagamento(r.pessoaTipo, r.pessoaId, antes.pago ? { ...res, pagoEm: antes.pagoEm ?? res.pagoEm } : res, r.semanas);
+    });
   }
 
   const abrir = (p: Painel, el?: HTMLElement | null) => { gatilho.current = el ?? (document.activeElement as HTMLElement); setPainel(p); };
   const fecharPainel = () => { setPainel(null); setTimeout(() => gatilho.current?.focus?.(), 0); };
   const avisar = (msg: string, desfazer?: () => Promise<void>) => setToast({ msg, desfazer });
 
+  const empresas = [...new Set([...(dados?.mei ?? []), ...(dados?.motoristas ?? [])].map((x) => x.empresa).filter((x): x is string => !!x))].sort();
   if (novo === 'MEI' || novo === 'MOTORISTA') {
-    return <FormPrestador tipoInicial={novo} mes={mes} onVoltar={() => ir({ novo: null })}
+    return <FormPrestador tipoInicial={novo} mes={mes} empresas={empresas} onVoltar={() => ir({ novo: null })}
       onCriado={(nome, tipo) => { ir({ novo: null, aba: tipo === 'MEI' ? 'mei' : 'motoristas' }); avisar(`${nome} adicionado a partir de ${mesCurto(mes)}.`); void recarregar(); }} />;
   }
 
   const d = dados;
   const fechado = !!d?.fechado;
-  const filtra = <T extends { nome: string }>(l: T[]) => (busca ? l.filter((x) => x.nome.toLowerCase().includes(busca.toLowerCase())) : l);
+  const filtra = <T extends { nome: string; empresa?: string | null }>(l: T[]) => (busca
+    ? l.filter((x) => `${x.nome} ${x.empresa ?? ''}`.toLowerCase().includes(busca.toLowerCase())) : l);
   const nfPend = (d?.pendencias.nfMei ?? 0) + (d?.pendencias.nfMotorista ?? 0);
   const semBeneficio = d?.clt.filter((c) => c.config.origem === 'NENHUM' || (c.config.vrDiaCent === 0 && c.config.vtTipo === 'NENHUM')).length ?? 0;
   const folhaPend = (d?.pendencias.semPonto ?? 0) + (d?.pendencias.semSalario ?? 0);
@@ -282,18 +304,19 @@ export function GestaoPessoal() {
           {d.clt.some((c) => c.beneficios.pagosEstimado) && <> Como {mesCurto(mes)} ainda não foi fechado no sistema, os dias pagos foram estimados pela escala.</>}
         </div>
       )}
+      {d && aba === 'folha' && <AvisoPrevia />}
       {d && aba === 'mei' && (
         <div className={css.nota}><b>Bruto</b> = contrato + extras + feriados trabalhados − faltas + meta. É o valor da nota fiscal. <b>Líquido</b> = bruto − débitos − meta que já foi paga antes.</div>
       )}
 
       {carregando && !d && <p className={css.carregando}>Calculando {mesLongo(mes)}…</p>}
 
-      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} mes={mes} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} onPix={setPix} />}
+      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} debitos={d.debitos} mes={mes} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} onPix={setPix} />}
       {d && aba === 'beneficios' && <TabelaBeneficios linhas={filtra(d.clt)} d={d} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} />}
-      {d && aba === 'mei' && <TabelaMei linhas={filtra(d.mei)} onAbrir={(id, el) => abrir({ tipo: 'mei', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MEI' })}
-        onPix={setPix} onPago={(l, v) => marcarPago('MEI', l.id, l.nome, v, ['MES'])} />}
-      {d && aba === 'motoristas' && <TabelaMot linhas={filtra(d.motoristas)} onAbrir={(id, el) => abrir({ tipo: 'mot', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MOTORISTA' })}
-        onPix={setPix} onPago={(l, v) => marcarPago('MOTORISTA', l.id, l.nome, v, l.semanas.filter((s) => s.dias > 0).map((s) => s.inicio))} />}
+      {d && aba === 'mei' && <TabelaMei linhas={filtra(d.mei)} debitos={d.debitos} onAbrir={(id, el) => abrir({ tipo: 'mei', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MEI' })}
+        onPix={setPix} onPago={(l, v) => registrarPagamento(registroMei(l), v, l.liquidoCent)} onVerNf={(arquivo, titulo) => setVerNf({ arquivo, titulo })} />}
+      {d && aba === 'motoristas' && <TabelaMot linhas={filtra(d.motoristas)} debitos={d.debitos} onAbrir={(id, el) => abrir({ tipo: 'mot', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MOTORISTA' })}
+        onPix={setPix} onPago={(l, v) => registrarPagamento(registroMot(l), v, l.liquidoCent)} />}
       {d && aba === 'debitos' && <TabelaDebitos d={d} busca={busca} fechado={fechado}
         onAbrir={(tipo, id, el) => abrir({ tipo: tipo === 'CLT' ? 'clt' : tipo === 'MEI' ? 'mei' : 'mot', id }, el)}
         onRemover={(id, descricao, nome) => setDialogo({ tipo: 'remDebito', id, descricao, nome })} />}
@@ -323,9 +346,9 @@ export function GestaoPessoal() {
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
           {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} onSalvo={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
-          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
+          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MEI', pessoaId: linhaMei.id, nome: linhaMei.nome })} />}
-          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }} onRecarregar={recarregar} onAviso={avisar}
+          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} empresas={empresas} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MOTORISTA', pessoaId: linhaMot.id, nome: linhaMot.nome })} />}
           {painel.tipo === 'debito' && <PainelDebito mes={mes} onSalvo={async (desc) => { await recarregar(); fecharPainel(); avisar(`Débito "${desc}" adicionado.`); }} />}
         </PainelLateral>
@@ -351,7 +374,10 @@ export function GestaoPessoal() {
         </Dialogo>
       )}
 
-      {pix && <ModalPix alvo={pix} mes={mes} onFechar={() => setPix(null)} />}
+      {pix && d && <ModalPix key={`${pix.nome}`} alvo={atualizarAlvo(pix, d)} mes={mes} onFechar={() => setPix(null)}
+        onRegistrar={(r, pago, valor) => registrarPagamento(r, pago, valor)} />}
+      {verNf && <VisualizarNf arquivo={verNf.arquivo} titulo={verNf.titulo} onFechar={() => setVerNf(null)}
+        onBaixar={async () => { try { salvarBlob(await api.baixar(`/pessoal/nf/${verNf.arquivo.id}`), verNf.arquivo.nome); } catch (e) { setErro((e as Error).message); } }} />}
 
       {toast && (
         <div className={css.toast} role="status">
@@ -376,18 +402,18 @@ function Linha({ onAbrir, children, rotulo }: { onAbrir: (el: HTMLElement) => vo
 }
 const Vazio = ({ cols, children }: { cols: number; children: ReactNode }) => <tr><td colSpan={cols} className={vt.vazio}>{children}</td></tr>;
 
-function TabelaFolha({ linhas, mes, onAbrir, onPix }: { linhas: PessoalLinhaClt[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void }) {
+function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void }) {
   const t = linhas.reduce((a, l) => ({ sal: a.sal + (l.salarioCent ?? 0), pr: a.pr + l.proventosCent, de: a.de + l.descontosCent, db: a.db + l.debitosCent, li: a.li + l.liquidoSalarioCent, br: a.br + l.custoBrutoCent }), { sal: 0, pr: 0, de: 0, db: 0, li: 0, br: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
       <thead><tr><th>Colaborador</th><th className={vt.n}>Salário</th><th className={vt.n} title={`Salário ÷ dias de trabalho de ${mesCurto(mes)}`}>Valor do dia</th>
-        <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras e intervalo</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido salário</th>
+        <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras e intervalo</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n} title="Simulação a partir do ponto, sem INSS, IRRF e encargos. O valor real vem da contabilidade.">Líquido (prévia)</th>
         <th className={vt.n} title="Salário − descontos + extras + benefícios, sem tirar débitos">Custo bruto</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={9}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
         {linhas.map((l) => (
           <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} valorCent={l.liquidoSalarioCent} rotuloValor="líquido do salário" comValor={false} onPix={onPix} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
+            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
               {l.erro && <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro}>sem escala</span>}
               {l.salarioCent == null && <span className={`${vt.pill} ${vt.pillWarn}`}>sem salário</span>}</td>
             <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub} title={l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ')}>proporcional · mudou {fmtDia(l.salarioPartes[1]!.desde)}</small>}</td>
@@ -454,72 +480,76 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
   );
 }
 
-function TabelaMei({ linhas, onAbrir, onNovo, onPix, onPago }: {
-  linhas: PessoalLinhaMei[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void; onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMei, pago: boolean) => Promise<void>;
+function TabelaMei({ linhas, debitos, onAbrir, onNovo, onPix, onPago, onVerNf }: {
+  linhas: PessoalLinhaMei[]; debitos: PessoalDebito[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void;
+  onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMei, pago: boolean) => void; onVerNf: (a: PessoalNfArquivo, titulo: string) => void;
 }) {
-  const t = linhas.reduce((a, l) => ({ c: a.c + l.valorCent, b: a.b + l.brutoCent, li: a.li + l.liquidoCent }), { c: 0, b: 0, li: 0 });
+  const t = linhas.reduce((a, l) => ({ c: a.c + l.valorCent, b: a.b + l.brutoCent, li: a.li + l.liquidoCent, pg: a.pg + (l.lanc.valorPagoCent ?? 0) }), { c: 0, b: 0, li: 0, pg: 0 });
   return (
-    <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
-      <thead><tr><th>Colaborador MEI</th><th className={vt.n}>Contrato</th><th className={vt.n}>Valor do dia</th><th className={vt.n}>Extras</th><th className={vt.n}>Faltas</th>
-        <th className={vt.n}>Meta</th><th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={css.colPago}>Pago</th><th aria-label="Abrir" /></tr></thead>
+    <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
+      <thead><tr><th>Colaborador MEI</th><th>Empresa</th><th className={vt.n}>Contrato</th><th className={vt.n}>Extras</th><th className={vt.n}>Faltas</th>
+        <th className={vt.n}>Meta</th><th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={vt.n}>Pagamento</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={11}>Nenhum MEI neste mês. {onNovo && <button className={css.link} onClick={onNovo}>Adicionar MEI</button>}</Vazio>}
         {linhas.map((l) => (
           <Linha key={l.id} rotulo={`Abrir lançamento de ${l.nome}`} onAbrir={(el) => onAbrir(l.id, el)}>
-            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.chavePix} valorCent={l.liquidoCent} rotuloValor="líquido a pagar" comValor={!l.lanc.pago} onPix={onPix} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
-            <td className={vt.n}>{brl(l.valorCent)}</td>
-            <td className={vt.n}>{brl(l.valorDiaCent)}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
-            <td className={vt.n}>{l.heCent ? <span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span> : l.feriadosCent ? <span className={vt.pos}>{brl(l.feriadosCent)}</span> : '—'}</td>
-            <td className={vt.n}>{l.faltasCent ? <span className={vt.neg}>{brl(-l.faltasCent)}</span> : '—'}</td>
+            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
+            <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
+            <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${l.diasMes} dias no mês`}>{brl(l.valorDiaCent)}/dia</small></td>
+            <td className={vt.n}>{l.heCent + l.feriadosCent ? <><span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span>
+              <small className={css.sub}>{[l.lanc.heMin ? minutosParaHhMm(l.lanc.heMin) : '', l.lanc.feriadosTrab ? `${l.lanc.feriadosTrab} feriado${l.lanc.feriadosTrab > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</small></> : '—'}</td>
+            <td className={vt.n}>{l.faltasCent ? <><span className={vt.neg}>{brl(-l.faltasCent)}</span><small className={css.sub}>{l.lanc.faltas} falta{l.lanc.faltas > 1 ? 's' : ''}</small></> : '—'}</td>
             <td className={vt.n}>{!l.lanc.metaCent ? '—' : <>{brl(l.lanc.metaCent)}
               <small className={`${css.sub} ${l.lanc.metaPaga ? css.subOk : css.subWarn}`}>{l.lanc.metaPaga ? 'já paga' : 'a pagar'}</small></>}</td>
             <td className={`${vt.n} ${css.forte}`}>{brl(l.brutoCent)}
-              {l.lanc.nfNumero || l.lanc.nfArquivo
-                ? <small className={css.sub} title={l.lanc.nfArquivo ? `Arquivo anexado: ${l.lanc.nfArquivo.nome}` : 'Número informado, sem arquivo'}>{l.lanc.nfNumero ? `NF ${l.lanc.nfNumero}` : 'NF anexada'}{l.lanc.nfArquivo && <IconeClipe />}</small>
-                : <small className={`${css.sub} ${css.subErr}`}>NF pendente</small>}</td>
+              <CelulaNf numero={l.lanc.nfNumero} arquivo={l.lanc.nfArquivo} onVer={(a) => onVerNf(a, `Nota de ${l.nome}`)} /></td>
             <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
             <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
-            <td className={css.colPago}><TogglePago nome={l.nome} pago={l.lanc.pago} onMudar={(v) => onPago(l, v)} /></td>
+            <td className={vt.n}><CelulaPagamento nome={l.nome} pago={l.lanc.pago} valorPagoCent={l.lanc.valorPagoCent} pagoEm={l.lanc.pagoEm} onMudar={(v) => onPago(l, v)} /></td>
           </Linha>
         ))}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td className={vt.n}>{brl(t.c)}</td><td /><td /><td /><td />
-        <td className={vt.n}>{brl(t.b)}</td><td /><td className={vt.n}>{brl(t.li)}</td><td className={css.colPago}>{linhas.filter((l) => l.lanc.pago).length}/{linhas.length}</td><td /></tr></tfoot>}
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.c)}</td><td /><td /><td />
+        <td className={vt.n}>{brl(t.b)}</td><td /><td className={vt.n}>{brl(t.li)}</td>
+        <td className={vt.n}>{brl(t.pg)}<small className={css.sub}>{linhas.filter((l) => l.lanc.pago).length} de {linhas.length} pagos</small></td><td /></tr></tfoot>}
     </table></div></div>
   );
 }
 
-function TabelaMot({ linhas, onAbrir, onNovo, onPix, onPago }: {
-  linhas: PessoalLinhaMot[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void; onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMot, pago: boolean) => Promise<void>;
+function TabelaMot({ linhas, debitos, onAbrir, onNovo, onPix, onPago }: {
+  linhas: PessoalLinhaMot[]; debitos: PessoalDebito[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void;
+  onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMot, pago: boolean) => void;
 }) {
   const total = linhas.reduce((a, l) => a + l.totalCent, 0);
+  const pagoTot = linhas.reduce((a, l) => a + (l.pagamento.valorPagoCent ?? 0), 0);
   return (
-    <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
-      <thead><tr><th>Motorista</th><th className={vt.n}>Mensal</th><th className={vt.n}>Diária</th><th className={vt.n}>Dias no mês</th><th className={vt.n}>Adicionais</th>
-        <th className={vt.n}>Total das NFs</th><th className={vt.n}>Notas</th><th className={css.colPago}>Pago</th><th aria-label="Abrir" /></tr></thead>
+    <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
+      <thead><tr><th>Motorista</th><th>Empresa</th><th className={vt.n}>Mensal</th><th className={vt.n}>Dias no mês</th><th className={vt.n}>Adicionais</th>
+        <th className={vt.n}>Total das NFs</th><th className={vt.n}>Notas</th><th className={vt.n}>Pagamento</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={9}>Nenhum motorista neste mês. {onNovo && <button className={css.link} onClick={onNovo}>Adicionar motorista</button>}</Vazio>}
         {linhas.map((l) => {
           const comDias = l.semanas.filter((s) => s.dias > 0);
           const pagas = comDias.filter((s) => s.pago).length;
           const semNf = comDias.filter((s) => !s.nfNumero && !s.nfArquivo).length;
-          const tudoPago = comDias.length > 0 && pagas === comDias.length;
+          const pago = l.pagamento.pago || (comDias.length > 0 && pagas === comDias.length);
           return (
             <Linha key={l.id} rotulo={`Abrir semanas de ${l.nome}`} onAbrir={(el) => onAbrir(l.id, el)}>
-              <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.chavePix} valorCent={l.liquidoCent} rotuloValor="líquido do mês" comValor={!tudoPago} onPix={onPix} /></span><small>{l.funcao ?? 'motorista'} · {l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}</small></td>
-              <td className={vt.n}>{brl(l.valorCent)}</td>
-              <td className={vt.n}>{brl(l.diariaCent)}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
+              <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMot(l, debitos))} /></span><small>{l.funcao ?? 'motorista'} · {l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}</small></td>
+              <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
+              <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${l.diasMes} dias no mês`}>{brl(l.diariaCent)}/dia</small></td>
               <td className={vt.n}>{l.semanas.reduce((a, s) => a + s.dias, 0)}</td>
               <td className={vt.n}>{l.semanas.some((s) => s.adicionalCent) ? brl(l.semanas.reduce((a, s) => a + s.adicionalCent, 0)) : '—'}</td>
-              <td className={`${vt.n} ${css.forte}`}>{brl(l.totalCent)}</td>
+              <td className={`${vt.n} ${css.forte}`}>{brl(l.totalCent)}{l.debitosCent > 0 && <small className={css.sub}>líquido {brl(l.liquidoCent)}</small>}</td>
               <td className={vt.n}>{semNf ? <span className={`${vt.pill} ${vt.pillErr}`}>{semNf} sem NF</span> : <span className={`${vt.pill} ${vt.pillMute}`}>{comDias.length ? 'em dia' : '—'}</span>}</td>
-              <td className={css.colPago}>{comDias.length > 0 && <TogglePago nome={l.nome} pago={tudoPago} parcial={pagas > 0 && !tudoPago ? `${pagas}/${comDias.length}` : undefined}
-                onMudar={(v) => onPago(l, v)} />}</td>
+              <td className={vt.n}>{comDias.length > 0 && <CelulaPagamento nome={l.nome} pago={pago} valorPagoCent={l.pagamento.valorPagoCent} pagoEm={l.pagamento.pagoEm}
+                parcial={!pago && pagas > 0 ? `${pagas}/${comDias.length} semanas` : undefined} onMudar={(v) => onPago(l, v)} />}</td>
             </Linha>
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td /><td /><td /><td className={vt.n}>{brl(total)}</td><td /><td /><td /></tr></tfoot>}
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td /><td /><td /><td className={vt.n}>{brl(total)}</td><td />
+        <td className={vt.n}>{brl(pagoTot)}</td><td /></tr></tfoot>}
     </table></div></div>
   );
 }
@@ -877,10 +907,11 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
 
         <section className={css.bloco}>
           <span className={css.lb}>Resumo</span>
-          <Linha2 k="Líquido do salário" v={brl(l.liquidoSalarioCent)} />
+          <Linha2 k="Líquido do salário (prévia)" v={brl(l.liquidoSalarioCent)} />
           <Linha2 k="Débitos descontados" v={l.debitosCent ? brl(-l.debitosCent) : '—'} />
           <Linha2 cls={css.total} k="Custo bruto da empresa" v={brl(l.custoBrutoCent)} />
           <p className={css.formula}>O custo bruto não tira débitos nem acertos: esse dinheiro já tinha saído antes.</p>
+          <p className={css.formula}><b>Prévia:</b> sem INSS, IRRF e encargos. O valor real de pagamento é o que a contabilidade informar.</p>
         </section>
 
         <Observacao pessoaTipo="CLT" pessoaId={l.empregadoId} mes={mes} inicial={l.observacao} disabled={fechado} />
@@ -942,9 +973,9 @@ function ZonaTirar({ nome, mes, onTirar }: { nome: string; mes: string; onTirar:
   );
 }
 
-function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void> }) {
+function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinhaMei | PessoalLinhaMot; mes: string; fechado: boolean; empresas: string[]; onSalvo: () => Promise<void> }) {
   const [aberto, setAberto] = useState<'' | 'dados' | 'reajuste'>('');
-  const [f, setF] = useState({ nome: p.nome, documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
+  const [f, setF] = useState({ nome: p.nome, empresa: p.empresa ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
   const [r, setR] = useState({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes });
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -960,6 +991,7 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
     <section className={css.bloco}>
       <span className={css.lb}>Contrato</span>
       <Linha2 k={`Valor em ${mesCurto(mes)}`} v={brl(p.valorCent)} />
+      {p.empresa && <Linha2 k={<span className={css.mute}>Empresa</span>} v={p.empresa} />}
       <p className={css.formula}>Vale desde {mesLongo(p.valorDesde)} · {p.baseDias === 'SEG_SAB' ? 'segunda a sábado' : 'segunda a sexta'}</p>
       {p.historicoValores.length > 1 && (
         <div className={css.historico}>
@@ -973,7 +1005,7 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
       {!fechado && aberto === '' && (
         <div className={css.acoes}>
           <button className={css.btnContornoNeutro} onClick={() => { setR({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes }); setAberto('reajuste'); }}>Reajustar valor</button>
-          <button className={css.link} onClick={() => { setF({ nome: p.nome, documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
+          <button className={css.link} onClick={() => { setF({ nome: p.nome, empresa: p.empresa ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, empresa, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
         </div>
       )}
 
@@ -1002,6 +1034,7 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
       {aberto === 'dados' && (
         <>
           <CampoTexto id="c-nome" rotulo="Nome" valor={f.nome} onChange={(v) => setF({ ...f, nome: v })} />
+          <CampoEmpresa id="c-emp" valor={f.empresa} empresas={empresas} onChange={(v) => setF({ ...f, empresa: v })} />
           <div className={css.grade2}>
             <CampoTexto id="c-doc" rotulo={motorista ? 'CPF ou CNPJ' : 'CNPJ'} valor={f.documento} numerico placeholder={motorista ? '000.000.000-00' : '00.000.000/0001-00'}
               onChange={(v) => setF({ ...f, documento: mascaraDoc(v) })} erro={docIncompleto(f.documento, !motorista)} />
@@ -1014,7 +1047,7 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
           <div className={css.dAcoes}>
             <button className={css.btnTexto} onClick={() => { setAberto(''); setErro(null); }}>Cancelar</button>
             <Botao variante="coral" className={css.btnPri} disabled={salvando || !f.nome.trim() || !!docIncompleto(f.documento, !motorista)}
-              onClick={() => enviar({ nome: f.nome, documento: f.documento, funcao: f.funcao, chavePix: f.chavePix })}>{salvando ? 'Salvando…' : 'Salvar dados'}</Botao>
+              onClick={() => enviar({ nome: f.nome, empresa: f.empresa, documento: f.documento, funcao: f.funcao, chavePix: f.chavePix })}>{salvando ? 'Salvando…' : 'Salvar dados'}</Botao>
           </div>
         </>
       )}
@@ -1022,8 +1055,8 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
   );
 }
 
-function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
-  l: PessoalLinhaMei; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+function PainelMei({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
+  l: PessoalLinhaMei; mes: string; fechado: boolean; empresas: string[]; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
   onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
 }) {
   const [f, setF] = useState({ ...l.lanc });
@@ -1034,13 +1067,15 @@ function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar
   async function salvar() {
     setSalvando(true); setErro(null);
     try {
+      // Marcou "pago" agora: registra o líquido como valor pago (pelo Pix dá pra pagar outro valor).
+      const valorPago = f.pago && !l.lanc.pago ? { valorPago: Math.max(0, pv.liquidoCent) / 100 } : {};
       // Mês fechado: só NF e pagamento (o resto está congelado).
       await api.put('/pessoal/lancamento', fechado ? {
-        pessoaTipo: 'MEI', pessoaId: l.id, competencia: mes, nfNumero: f.nfNumero ?? '', nfData: f.nfData || null, pago: f.pago,
+        pessoaTipo: 'MEI', pessoaId: l.id, competencia: mes, nfNumero: f.nfNumero ?? '', nfData: f.nfData || null, pago: f.pago, ...valorPago,
       } : {
         pessoaTipo: 'MEI', pessoaId: l.id, competencia: mes,
         heMin: f.heMin, faltas: f.faltas, feriadosTrab: f.feriadosTrab, meta: f.metaCent / 100, metaPaga: f.metaPaga,
-        metaPagaEm: f.metaPaga ? (f.metaPagaEm || hojeIso) : null, nfNumero: f.nfNumero ?? '', nfData: f.nfData || null, pago: f.pago,
+        metaPagaEm: f.metaPaga ? (f.metaPagaEm || hojeIso) : null, nfNumero: f.nfNumero ?? '', nfData: f.nfData || null, pago: f.pago, ...valorPago,
       });
       await onSalvo();
     } catch (e) { setErro((e as Error).message); setSalvando(false); }
@@ -1080,10 +1115,11 @@ function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar
           <AnexoNf pessoaTipo="MEI" pessoaId={l.id} mes={mes} periodo="MES" nome={l.nome} arquivo={l.lanc.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />
           <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={f.pago ? 'sim' : 'nao'} onChange={(v) => setF({ ...f, pago: v === 'sim' })}
             opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
+          {l.lanc.pago && l.lanc.pagoEm && <p className={css.formula}>Pago{l.lanc.valorPagoCent != null ? ` ${brl(l.lanc.valorPagoCent)}` : ''} em {fmtPagoEm(l.lanc.pagoEm)}.</p>}
           {fechado && <p className={css.formula}>Mês fechado: os valores estão congelados, mas a nota e o pagamento ainda podem ser registrados.</p>}
         </section>
         <Observacao pessoaTipo="MEI" pessoaId={l.id} mes={mes} inicial={l.lanc.observacao} disabled={fechado} />
-        <DadosContrato p={l} mes={mes} fechado={fechado} onSalvo={onContrato} />
+        <DadosContrato p={l} mes={mes} fechado={fechado} empresas={empresas} onSalvo={onContrato} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
       <div className={css.pRodape}>
@@ -1098,8 +1134,8 @@ function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar
   );
 }
 
-function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
-  l: PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+function PainelMot({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
+  l: PessoalLinhaMot; mes: string; fechado: boolean; empresas: string[]; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
   onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
 }) {
   const [sem, setSem] = useState(l.semanas.map((s) => ({ ...s, diasManual: s.dias !== s.diasAuto })));
@@ -1147,7 +1183,7 @@ function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar
           </section>
         ))}
         <Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} />
-        <DadosContrato p={l} mes={mes} fechado={fechado} onSalvo={onContrato} />
+        <DadosContrato p={l} mes={mes} fechado={fechado} empresas={empresas} onSalvo={onContrato} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
       <div className={css.pRodape}>
@@ -1215,8 +1251,8 @@ function PainelDebito({ mes, onSalvo }: { mes: string; onSalvo: (descricao: stri
 
 // =================== cadastro de prestador (página) ===================
 
-function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 'MEI' | 'MOTORISTA'; mes: string; onVoltar: () => void; onCriado: (nome: string, tipo: 'MEI' | 'MOTORISTA') => void }) {
-  const [f, setF] = useState({ tipo: tipoInicial, nome: '', documento: '', funcao: '', valorCent: 0, baseDias: (tipoInicial === 'MEI' ? 'SEG_SAB' : 'SEG_SEX') as BaseDias, chavePix: '', inicio: mes });
+function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tipoInicial: 'MEI' | 'MOTORISTA'; mes: string; empresas: string[]; onVoltar: () => void; onCriado: (nome: string, tipo: 'MEI' | 'MOTORISTA') => void }) {
+  const [f, setF] = useState({ tipo: tipoInicial, nome: '', empresa: '', documento: '', funcao: '', valorCent: 0, baseDias: (tipoInicial === 'MEI' ? 'SEG_SAB' : 'SEG_SEX') as BaseDias, chavePix: '', inicio: mes });
   const [tocado, setTocado] = useState<Record<string, boolean>>({});
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -1234,7 +1270,7 @@ function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 
     setSalvando(true); setErro(null);
     try {
       await api.post('/pessoal/prestadores', {
-        tipo: f.tipo, nome: f.nome, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100,
+        tipo: f.tipo, nome: f.nome, empresa: f.empresa, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100,
         baseDias: f.baseDias, chavePix: f.chavePix, competenciaInicio: f.inicio,
       });
       onCriado(f.nome.trim(), f.tipo);
@@ -1259,6 +1295,7 @@ function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 
             <CampoTexto id="p-nome" rotulo="Nome completo" valor={f.nome} placeholder="Ana Souza" onChange={(v) => setF({ ...f, nome: v })} />
             {tocado.nome && erros.nome && <small className={css.erroCampo}>{erros.nome}</small>}
           </div>
+          <CampoEmpresa id="p-emp" valor={f.empresa} empresas={empresas} onChange={(v) => setF({ ...f, empresa: v })} />
           <div className={css.grade2}>
             <CampoTexto id="p-doc" rotulo={mei ? 'CNPJ do MEI' : 'CPF ou CNPJ (opcional)'} valor={f.documento} numerico placeholder={mei ? '00.000.000/0001-00' : '000.000.000-00'}
               onChange={(v) => setF({ ...f, documento: mascaraDoc(v) })} erro={erros.documento} />
@@ -1296,40 +1333,103 @@ function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 
 
 // =================== Pix, pago e nota fiscal ===================
 
-type PixAlvo = { nome: string; chave: string; valorCent: number; rotuloValor: string; comValor: boolean };
+/** O que pode entrar no Pix (marcável) e o que sempre desconta. */
+type PixItem = { id: string; rotulo: string; detalhe?: string; cent: number; marcado: boolean; bloqueio?: string };
+type PixAbatimento = { rotulo: string; detalhe?: string; cent: number };
+/** Pagamento que dá pra registrar (MEI e motorista; CLT é prévia, sem registro). */
+type PixRegistro = { pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; nome: string; semanas: string[] } & PessoalPagamentoMes;
+type PixAlvo = {
+  origem: { tipo: 'CLT' | 'MEI' | 'MOTORISTA'; id: string };
+  nome: string; chave: string; itens: PixItem[]; abatimentos: PixAbatimento[]; registro: PixRegistro | null; previa?: boolean;
+};
+
+const fmtHoraCurta = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const fmtPagoEm = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} · ${fmtHoraCurta(iso)}`;
+};
+const debitosDaPessoa = (debitos: PessoalDebito[], tipo: PessoaTipo, id: string): PixAbatimento[] =>
+  debitos.filter((x) => x.pessoaTipo === tipo && x.pessoaId === id)
+    .map((x) => ({ rotulo: 'Débito', detalhe: `${x.descricao}${x.parcelas > 1 ? ` · parcela ${x.parcelaAtual}/${x.parcelas}` : ''}`, cent: x.parcelaCent }));
+
+function registroMei(l: PessoalLinhaMei): PixRegistro {
+  return { pessoaTipo: 'MEI', pessoaId: l.id, nome: l.nome, semanas: [], pago: l.lanc.pago, valorPagoCent: l.lanc.valorPagoCent, pagoEm: l.lanc.pagoEm };
+}
+function registroMot(l: PessoalLinhaMot): PixRegistro {
+  const comDias = l.semanas.filter((s) => s.dias > 0);
+  const pago = l.pagamento.pago || (comDias.length > 0 && comDias.every((s) => s.pago));
+  return { pessoaTipo: 'MOTORISTA', pessoaId: l.id, nome: l.nome, semanas: comDias.map((s) => s.inicio), pago, valorPagoCent: l.pagamento.valorPagoCent, pagoEm: l.pagamento.pagoEm };
+}
+function pixMei(l: PessoalLinhaMei, debitos: PessoalDebito[]): PixAlvo {
+  const itens: PixItem[] = [{ id: 'contrato', rotulo: 'Contrato', detalhe: `valor mensal · ${brl(l.valorDiaCent)}/dia`, cent: l.valorCent, marcado: true }];
+  if (l.heCent) itens.push({ id: 'he', rotulo: 'Horas extras', detalhe: `${minutosParaHhMm(l.lanc.heMin)} × ${brl(Math.round(l.valorHoraCent * 1.5))}`, cent: l.heCent, marcado: true });
+  if (l.feriadosCent) itens.push({ id: 'fer', rotulo: 'Feriados trabalhados', detalhe: `${l.lanc.feriadosTrab} dia${l.lanc.feriadosTrab > 1 ? 's' : ''}`, cent: l.feriadosCent, marcado: true });
+  if (l.lanc.metaCent) itens.push(l.lanc.metaPaga
+    ? { id: 'meta', rotulo: 'Meta', detalhe: 'já foi paga', cent: l.lanc.metaCent, marcado: false, bloqueio: l.lanc.metaPagaEm ? `paga em ${fmtDia(l.lanc.metaPagaEm)}` : 'já paga' }
+    : { id: 'meta', rotulo: 'Meta', detalhe: 'ainda não paga', cent: l.lanc.metaCent, marcado: true });
+  const abatimentos: PixAbatimento[] = [];
+  if (l.faltasCent) abatimentos.push({ rotulo: 'Faltas', detalhe: `${l.lanc.faltas} dia${l.lanc.faltas > 1 ? 's' : ''}`, cent: l.faltasCent });
+  abatimentos.push(...debitosDaPessoa(debitos, 'MEI', l.id));
+  return { origem: { tipo: 'MEI', id: l.id }, nome: l.nome, chave: l.chavePix ?? '', itens, abatimentos, registro: registroMei(l) };
+}
+function pixMot(l: PessoalLinhaMot, debitos: PessoalDebito[]): PixAlvo {
+  const dias = l.semanas.reduce((a, s) => a + s.dias, 0);
+  const adic = l.semanas.reduce((a, s) => a + s.adicionalCent, 0);
+  const itens: PixItem[] = [{ id: 'diarias', rotulo: 'Diárias', detalhe: `${dias} dia${dias === 1 ? '' : 's'} × ${brl(l.diariaCent)}`, cent: l.totalCent - adic, marcado: true }];
+  if (adic) itens.push({ id: 'adic', rotulo: 'Adicionais', detalhe: 'sábado extra, freelancer…', cent: adic, marcado: true });
+  return { origem: { tipo: 'MOTORISTA', id: l.id }, nome: l.nome, chave: l.chavePix ?? '', itens, abatimentos: debitosDaPessoa(debitos, 'MOTORISTA', l.id), registro: registroMot(l) };
+}
+function pixClt(l: PessoalLinhaClt, debitos: PessoalDebito[]): PixAlvo {
+  const itens: PixItem[] = [{ id: 'sal', rotulo: 'Salário do mês', detalhe: l.salarioPartes.length > 1 ? 'proporcional (mudou no mês)' : undefined, cent: l.salarioCent ?? 0, marcado: true }];
+  if (l.proventosCent) itens.push({ id: 'ext', rotulo: 'Extras e intervalo', detalhe: 'pagos nesta folha', cent: l.proventosCent, marcado: true });
+  const abatimentos: PixAbatimento[] = [];
+  if (l.descontosCent) abatimentos.push({ rotulo: 'Faltas e atrasos', detalhe: 'do ponto', cent: l.descontosCent });
+  abatimentos.push(...debitosDaPessoa(debitos, 'CLT', l.empregadoId));
+  return { origem: { tipo: 'CLT', id: l.empregadoId }, nome: l.nome, chave: l.config.chavePix ?? '', itens, abatimentos, registro: null, previa: true };
+}
+/** Refaz o alvo com os dados mais novos (ex.: depois de registrar o pagamento). */
+function atualizarAlvo(a: PixAlvo, d: PessoalCompetencia): PixAlvo {
+  if (a.origem.tipo === 'MEI') { const l = d.mei.find((x) => x.id === a.origem.id); return l ? pixMei(l, d.debitos) : a; }
+  if (a.origem.tipo === 'MOTORISTA') { const l = d.motoristas.find((x) => x.id === a.origem.id); return l ? pixMot(l, d.debitos) : a; }
+  const l = d.clt.find((x) => x.empregadoId === a.origem.id); return l ? pixClt(l, d.debitos) : a;
+}
 
 const ROT_CHAVE = { CPF: 'CPF', CNPJ: 'CNPJ', TELEFONE: 'celular', EMAIL: 'e-mail', ALEATORIA: 'chave aleatória' } as const;
 
 /** Ícone de Pix ao lado do nome. Sem chave cadastrada, fica apagado com dica. */
-function BotaoPix({ nome, chave, valorCent, rotuloValor, comValor, onPix }: {
-  nome: string; chave: string | null; valorCent: number; rotuloValor: string; comValor: boolean; onPix: (a: PixAlvo) => void;
-}) {
+function BotaoPix({ nome, chave, onPix }: { nome: string; chave: string | null; onPix: () => void }) {
   const ok = !!chave && !!normalizarChave(chave);
   return (
     <button type="button" className={`${css.pixBtn} ${ok ? '' : css.pixSem}`} disabled={!ok}
-      title={ok ? `QR Code Pix de ${nome}` : chave ? 'Chave Pix inválida — corrija no cadastro' : 'Sem chave Pix cadastrada'}
-      aria-label={ok ? `Abrir QR Code Pix de ${nome}` : `${nome} sem chave Pix`}
-      onClick={(e) => { e.stopPropagation(); if (ok) onPix({ nome, chave: chave!, valorCent, rotuloValor, comValor }); }}
+      title={ok ? `Pagar ${nome} por Pix` : chave ? 'Chave Pix inválida — corrija no cadastro' : 'Sem chave Pix cadastrada'}
+      aria-label={ok ? `Pagar ${nome} por Pix` : `${nome} sem chave Pix`}
+      onClick={(e) => { e.stopPropagation(); if (ok) onPix(); }}
       onKeyDown={(e) => e.stopPropagation()}>
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2.6 9.1 5.5a3 3 0 0 1 2.1.9L12 7.2l.8-.8a3 3 0 0 1 2.1-.9L12 2.6Zm-5.7 4.1L3.6 9.4a3.7 3.7 0 0 0 0 5.2l2.7 2.7h1.4c.5 0 1-.2 1.4-.6l1.7-1.7a1.7 1.7 0 0 1 2.4 0l1.7 1.7c.4.4.9.6 1.4.6h1.4l2.7-2.7a3.7 3.7 0 0 0 0-5.2l-2.7-2.7h-1.4c-.5 0-1 .2-1.4.6l-1.7 1.7a1.7 1.7 0 0 1-2.4 0L9.1 7.3a2 2 0 0 0-1.4-.6H6.3Zm2.8 11.8L12 21.4l2.9-2.9a3 3 0 0 1-2.1-.9l-.8-.8-.8.8a3 3 0 0 1-2.1.9Z"/></svg>
     </button>
   );
 }
 
-function ModalPix({ alvo, mes, onFechar }: { alvo: PixAlvo; mes: string; onFechar: () => void }) {
+function ModalPix({ alvo, mes, onFechar, onRegistrar }: {
+  alvo: PixAlvo; mes: string; onFechar: () => void; onRegistrar: (r: PixRegistro, pago: boolean, valorCent: number | null) => void;
+}) {
   const norm = normalizarChave(alvo.chave)!;
-  const podeValor = alvo.valorCent > 0;
-  const [comValor, setComValor] = useState(alvo.comValor && podeValor);
+  const [marcados, setMarcados] = useState<Record<string, boolean>>(() => Object.fromEntries(alvo.itens.map((i) => [i.id, i.marcado])));
+  const [modo, setModo] = useState<'itens' | 'outro'>('itens');
+  const [outroCent, setOutroCent] = useState(0);
   const [img, setImg] = useState('');
   const [copiado, setCopiado] = useState(false);
   const fechar = useRef<HTMLButtonElement>(null);
+  const somaItens = alvo.itens.reduce((a, i) => a + (marcados[i.id] && !i.bloqueio ? i.cent : 0), 0);
+  const somaAbat = alvo.abatimentos.reduce((a, x) => a + x.cent, 0);
+  const totalItens = Math.max(0, somaItens - somaAbat);
+  const valor = modo === 'itens' ? totalItens : outroCent;
   const codigo = useMemo(() => brCodePix({
-    chave: norm.chave, nome: alvo.nome, valorCent: comValor ? alvo.valorCent : null,
-    txid: `PS${mes.replace('-', '')}`,
-  }), [norm.chave, alvo.nome, alvo.valorCent, comValor, mes]);
+    chave: norm.chave, nome: alvo.nome, valorCent: valor > 0 ? valor : null, txid: `PS${mes.replace('-', '')}`,
+  }), [norm.chave, alvo.nome, valor, mes]);
   useEffect(() => {
     let vivo = true;
-    QRCode.toDataURL(codigo, { margin: 1, width: 232, errorCorrectionLevel: 'M', color: { dark: '#10403F', light: '#FFFFFF' } })
+    QRCode.toDataURL(codigo, { margin: 1, width: 216, errorCorrectionLevel: 'M', color: { dark: '#10403F', light: '#FFFFFF' } })
       .then((u) => { if (vivo) setImg(u); }).catch(() => setImg(''));
     return () => { vivo = false; };
   }, [codigo]);
@@ -1343,27 +1443,107 @@ function ModalPix({ alvo, mes, onFechar }: { alvo: PixAlvo; mes: string; onFecha
   async function copiar() {
     try { await navigator.clipboard.writeText(codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2500); } catch { /* sem permissão: o texto está visível pra copiar */ }
   }
+  const r = alvo.registro;
   return (
     <div className={css.dFundo} data-dialogo onClick={onFechar}>
       <div className={`${css.dialogo} ${css.pixModal}`} role="dialog" aria-modal="true" aria-labelledby="pix-titulo" onClick={(e) => e.stopPropagation()}>
         <div className={css.pixTopo}>
-          <div><h3 id="pix-titulo">Pix para {alvo.nome}</h3><p className={css.hint}>Chave ({ROT_CHAVE[norm.tipo]}): <b className={css.mono}>{norm.tipo === 'CPF' || norm.tipo === 'CNPJ' ? mascaraDoc(norm.chave) : norm.chave}</b></p></div>
+          <div><h3 id="pix-titulo">Pagar {alvo.nome}</h3>
+            <p className={css.hint}>Pix ({ROT_CHAVE[norm.tipo]}) <b className={css.mono}>{norm.tipo === 'CPF' || norm.tipo === 'CNPJ' ? mascaraDoc(norm.chave) : norm.chave}</b> · {mesLongo(mes)}</p></div>
           <button ref={fechar} className={css.pX} onClick={onFechar} aria-label="Fechar">✕</button>
         </div>
-        <div className={css.pixQr}>{img ? <img src={img} width={232} height={232} alt={`QR Code Pix de ${alvo.nome}${comValor ? ` no valor de ${brl(alvo.valorCent)}` : ''}`} /> : <span className={css.hint}>Gerando…</span>}</div>
-        <div className={css.pixValor}>{comValor ? <><span>{alvo.rotuloValor} · {mesCurto(mes)}</span><strong>{brl(alvo.valorCent)}</strong></> : <span>Sem valor — quem paga digita o valor no app do banco.</span>}</div>
-        {podeValor && (
-          <label className={css.pixChk}><input type="checkbox" checked={comValor} onChange={(e) => setComValor(e.target.checked)} />
-            Incluir o valor ({brl(alvo.valorCent)}) no QR Code</label>
+        {r?.pago && (
+          <div className={css.pagoFaixa}>
+            <span>Pago{r.valorPagoCent != null ? ` ${brl(r.valorPagoCent)}` : ''}{r.pagoEm ? ` em ${fmtPagoEm(r.pagoEm)}` : ''}</span>
+            <button type="button" className={css.link} onClick={() => onRegistrar(r, false, null)}>Desfazer pagamento</button>
+          </div>
         )}
-        <label className={css.campo} htmlFor="pix-cc"><span>Pix copia e cola</span>
-          <textarea id="pix-cc" className={css.pixCc} readOnly value={codigo} rows={3} onFocus={(e) => e.currentTarget.select()} /></label>
+        {alvo.previa && <p className={css.previaLinha}><b>Prévia</b> sem INSS, IRRF e encargos — confira o valor com a contabilidade antes de pagar.</p>}
+        <div className={css.pixGrade}>
+          <div>
+            <span className={css.lb}>O que entra neste pagamento</span>
+            <div className={css.pixItens}>
+              {alvo.itens.map((i) => (
+                <label key={i.id} className={`${css.pixItem} ${!marcados[i.id] || i.bloqueio ? css.pixItemOff : ''}`} title={i.bloqueio}>
+                  <input type="checkbox" checked={!!marcados[i.id] && !i.bloqueio} disabled={!!i.bloqueio || modo === 'outro'}
+                    onChange={(e) => setMarcados({ ...marcados, [i.id]: e.target.checked })} />
+                  <span>{i.rotulo}{(i.bloqueio ?? i.detalhe) && <small>{i.bloqueio ?? i.detalhe}</small>}</span>
+                  <b className={css.mono}>{brl(i.cent)}</b>
+                </label>
+              ))}
+            </div>
+            {alvo.abatimentos.length > 0 && (
+              <div className={css.pixAbat}>
+                <span className={css.lb}>Sempre descontado</span>
+                {alvo.abatimentos.map((x, k) => (
+                  <div key={k} className={css.pixItem}><span className={css.pixMenos} aria-hidden="true">−</span>
+                    <span>{x.rotulo}{x.detalhe && <small>{x.detalhe}</small>}</span><b className={`${css.mono} ${css.neg}`}>{brl(x.cent)}</b></div>
+                ))}
+              </div>
+            )}
+            <div className={css.pixTotal}><span>Total</span><strong>{brl(totalItens)}</strong></div>
+            <div className={css.alternar} role="group" aria-label="Valor do Pix" style={{ marginTop: 10 }}>
+              <button type="button" aria-pressed={modo === 'itens'} onClick={() => setModo('itens')}>Usar o total</button>
+              <button type="button" aria-pressed={modo === 'outro'} onClick={() => { if (!outroCent) setOutroCent(totalItens); setModo('outro'); }}>Digitar outro valor</button>
+            </div>
+            {modo === 'outro' && (
+              <CampoReais id="pix-outro" rotulo="Valor a pagar" valorCent={outroCent} onChange={setOutroCent}
+                ajuda="Adiantamento ou pagamento em partes. Esse valor vai pro QR e vira o valor pago." />
+            )}
+          </div>
+          <div className={css.pixLado}>
+            <div className={css.pixQr}>{img ? <img src={img} width={216} height={216} alt={`QR Code Pix de ${alvo.nome}${valor > 0 ? ` no valor de ${brl(valor)}` : ''}`} /> : <span className={css.hint}>Gerando…</span>}</div>
+            <div className={css.pixValor}><span>Valor no QR Code</span><strong>{valor > 0 ? brl(valor) : 'sem valor'}</strong></div>
+            <label className={css.campo} htmlFor="pix-cc"><span>Pix copia e cola</span>
+              <textarea id="pix-cc" className={css.pixCc} readOnly value={codigo} rows={3} onFocus={(e) => e.currentTarget.select()} /></label>
+          </div>
+        </div>
         <p className={css.formula}>Confira o nome do recebedor no app do banco antes de confirmar.</p>
         <div className={css.dAcoes}>
           <button className={css.btnTexto} onClick={onFechar}>Fechar</button>
-          <Botao variante="coral" className={css.btnPri} onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar código'}</Botao>
+          <button type="button" className={css.btnContornoNeutro} onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar código'}</button>
+          {r && <Botao variante="coral" className={css.btnPri} disabled={valor <= 0}
+            onClick={() => { onRegistrar(r, true, valor); onFechar(); }}>{r.pago ? `Atualizar para ${brl(valor)}` : `Registrar pagamento de ${brl(valor)}`}</Botao>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Pagamento na linha: valor pago + data/hora, e o interruptor. */
+function CelulaPagamento({ nome, pago, valorPagoCent, pagoEm, parcial, onMudar }: {
+  nome: string; pago: boolean; valorPagoCent: number | null; pagoEm: string | null; parcial?: string; onMudar: (v: boolean) => void;
+}) {
+  return (
+    <span className={css.pagCel}>
+      <span className={css.pagV}>
+        {pago
+          ? <>{valorPagoCent != null ? <b>{brl(valorPagoCent)}</b> : <b>pago</b>}{pagoEm && <small className={css.sub}>{fmtPagoEm(pagoEm)}</small>}</>
+          : <small className={css.sub}>{parcial ?? 'a pagar'}</small>}
+      </span>
+      <TogglePago nome={nome} pago={pago} onMudar={async (v) => onMudar(v)} />
+    </span>
+  );
+}
+
+/** NF na tabela: com arquivo, abre a nota direto (sem o painel). */
+function CelulaNf({ numero, arquivo, onVer }: { numero: string | null; arquivo: PessoalNfArquivo | null; onVer: (a: PessoalNfArquivo) => void }) {
+  if (!numero && !arquivo) return <small className={`${css.sub} ${css.subErr}`}>NF pendente</small>;
+  const curto = numero ? (numero.length > 14 ? `…${numero.slice(-8)}` : numero) : 'anexada';
+  if (!arquivo) return <small className={css.sub} title={`NF ${numero} — sem arquivo anexado`}>NF {curto}</small>;
+  return (
+    <button type="button" className={css.nfLink} title={`Abrir ${numero ? `NF ${numero}` : arquivo.nome}`}
+      onClick={(e) => { e.stopPropagation(); onVer(arquivo); }} onKeyDown={(e) => e.stopPropagation()}>
+      NF {curto}<IconeClipe />
+    </button>
+  );
+}
+
+function AvisoPrevia() {
+  return (
+    <div className={css.previa} role="note">
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M12 7v6M12 16.5v.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
+      <span><b>Prévia, não é holerite.</b> Os valores da folha CLT são uma simulação a partir do ponto, sem INSS, IRRF, FGTS e demais encargos. O valor real de pagamento de cada funcionário é o que a contabilidade informar.</span>
     </div>
   );
 }
@@ -1502,5 +1682,18 @@ function VisualizarNf({ arquivo, titulo, onBaixar, onFechar }: { arquivo: Pessoa
         </div>
       </div>
     </div>
+  );
+}
+
+/** Empresa: texto livre, com as que já foram usadas como sugestão. */
+function CampoEmpresa({ id, valor, empresas, onChange }: { id: string; valor: string; empresas: string[]; onChange: (v: string) => void }) {
+  return (
+    <label className={css.campo} htmlFor={id}>
+      <span>Empresa</span>
+      <span className={css.input}><input id={id} value={valor} list={`${id}-lista`} maxLength={120} autoComplete="off" placeholder="Para quem presta o serviço"
+        onChange={(e) => onChange(e.target.value)} /></span>
+      <datalist id={`${id}-lista`}>{empresas.map((e) => <option key={e} value={e} />)}</datalist>
+      <small>{empresas.length ? 'Escolha uma das que já usou ou digite uma nova.' : 'Opcional. Aparece na tabela, depois do nome.'}</small>
+    </label>
   );
 }

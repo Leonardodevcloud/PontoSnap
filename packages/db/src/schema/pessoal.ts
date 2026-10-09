@@ -50,6 +50,8 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   /** SEG_SAB | SEG_SEX */
   baseDias: varchar('base_dias', { length: 8 }).notNull().default('SEG_SAB'),
   chavePix: varchar('chave_pix', { length: 120 }),
+  /** Empresa para quem presta o serviço (texto livre). */
+  empresa: varchar('empresa', { length: 120 }),
   competenciaInicio: varchar('competencia_inicio', { length: 7 }).notNull(),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
@@ -84,6 +86,9 @@ export const pessoalLancamento = pgTable('pessoal_lancamento', {
   nfNumero: varchar('nf_numero', { length: 60 }),
   nfData: date('nf_data'),
   pago: boolean('pago').notNull().default(false),
+  /** Quanto foi de fato pago e quando (registrado ao marcar "pago"). */
+  valorPago: numeric('valor_pago', { precision: 12, scale: 2 }),
+  pagoEm: timestamp('pago_em', { withTimezone: true }),
   observacao: text('observacao'),
   atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

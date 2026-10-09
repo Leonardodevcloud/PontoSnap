@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +31,7 @@ export class CriarPrestadorDto {
   @IsString() @MaxLength(80) nome!: string;
   @IsOptional() @IsString() @MaxLength(20) documento?: string | null;
   @IsOptional() @IsString() @MaxLength(80) funcao?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) empresa?: string | null;
   @Type(() => Number) @IsNumber() @Min(0) valorMensal!: number;
   @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias!: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
@@ -41,6 +42,7 @@ export class EditarPrestadorDto {
   @IsOptional() @IsString() @MaxLength(80) nome?: string;
   @IsOptional() @IsString() @MaxLength(20) documento?: string | null;
   @IsOptional() @IsString() @MaxLength(80) funcao?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) empresa?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) valorMensal?: number;
   @IsOptional() @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias?: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
@@ -61,6 +63,7 @@ export class LancamentoDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) meta?: number;
   @IsOptional() @IsBoolean() metaPaga?: boolean;
   @IsOptional() @ValidateIf((_, v) => v !== null && v !== '') @Matches(DATA) metaPagaEm?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber() @Min(0) valorPago?: number | null;
   @IsOptional() @IsString() @MaxLength(60) nfNumero?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null && v !== '') @Matches(DATA) nfData?: string | null;
   @IsOptional() @IsBoolean() pago?: boolean;
@@ -100,4 +103,13 @@ export class NfArquivoDto {
   @IsString() arquivoBase64!: string;
   @IsString() @MaxLength(160) arquivoNome!: string;
   @IsString() @MaxLength(80) arquivoMime!: string;
+}
+
+export class PagamentoDto {
+  @IsIn(['MEI', 'MOTORISTA']) pessoaTipo!: 'MEI' | 'MOTORISTA';
+  @IsUUID() pessoaId!: string;
+  @Matches(COMP) competencia!: string;
+  @IsBoolean() pago!: boolean;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber() @Min(0) valorPago?: number | null;
+  @IsOptional() @IsArray() @IsString({ each: true }) @ArrayMaxSize(6) semanas?: string[];
 }

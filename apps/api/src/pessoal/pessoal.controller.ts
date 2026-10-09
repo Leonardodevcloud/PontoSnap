@@ -6,7 +6,7 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PessoalService } from './pessoal.service';
-import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
+import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PagamentoDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
 
 /** Gestão de Pessoal: benefícios, prestadores, débitos e fechamento do mês. Escopo = empresa ativa. */
 @Controller('pessoal')
@@ -54,6 +54,10 @@ export class PessoalController {
   }
   @Delete('debitos/:id') removerDebito(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.pessoal.removerDebito(this.tenant(u), id);
+  }
+  /** Marca/desmarca pago com valor e hora (vale em mês fechado). */
+  @Put('pagamento') pagamento(@UsuarioAtual() u: PayloadAcesso, @Body() dto: PagamentoDto) {
+    return this.pessoal.registrarPagamento(this.tenant(u), dto);
   }
   /** Arquivo da NF: sobe/substitui, abre (inline) e remove. */
   @Post('nf') subirNf(@UsuarioAtual() u: PayloadAcesso, @Body() dto: NfArquivoDto) {

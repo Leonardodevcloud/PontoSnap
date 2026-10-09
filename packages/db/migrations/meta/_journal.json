@@ -309,6 +309,13 @@
       "when": 1784602500000,
       "tag": "0043_pessoal_nf_arquivo",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1784602560000,
+      "tag": "0044_pessoal_pagamento_empresa",
+      "breakpoints": true
     }
   ]
 }

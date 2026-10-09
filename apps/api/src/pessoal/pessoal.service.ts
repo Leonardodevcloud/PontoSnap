@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import {
   comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, type Db,
@@ -57,6 +57,8 @@ export interface PadraoBeneficio extends ConfigBeneficio { vigenteDesde: string 
 export interface LancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
   nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
+  /** Quanto foi pago e quando (null enquanto não pago). */
+  valorPagoCent: number | null; pagoEm: string | null;
   /** Arquivo da NF enviado (metadados; o conteúdo baixa por /pessoal/nf/:id). */
   nfArquivo: NfArquivo | null;
 }
@@ -64,8 +66,10 @@ export interface NfArquivo { id: string; nome: string; mime: string; bytes: numb
 /** Valor de contrato com vigência (o mês usa a linha mais recente ≤ ele). */
 export interface ValorContrato { vigenteDesde: string; valorCent: number; baseDias: BaseDias }
 
+/** Registro de pagamento do mês (motorista: linha MES, além do "pago" de cada semana). */
+export interface PagamentoMes { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }
 export interface LinhaMei {
-  id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
   /** Desde quando o valor deste mês vale + histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; lanc: LancMei; debitosCent: number;
@@ -74,10 +78,11 @@ export interface LinhaMei {
 }
 export interface SemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null }
 export interface LinhaMot {
-  id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
   valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: SemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
+  pagamento: PagamentoMes;
 }
 export interface LinhaDebito {
   id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;
@@ -143,12 +148,17 @@ export class PessoalService {
       nfs: await this.nfsDoMes(tx, tenantId, comp),
     }));
     const l = (tipo: string, id: string, per: string) => lancs.find((x) => x.pessoaTipo === tipo && x.pessoaId === id && x.periodo === per);
+    const pg = (x?: { pago: boolean; valorPago: string | null; pagoEm: Date | null }) => ({
+      valorPagoCent: x?.pago && x.valorPago != null ? centavos(x.valorPago) : null,
+      pagoEm: x?.pago && x.pagoEm ? x.pagoEm.toISOString() : null,
+    });
     const mei = snap.mei.map((m) => {
       const x = l('MEI', m.id, 'MES');
-      return { ...m, lanc: { ...m.lanc, nfNumero: x?.nfNumero ?? null, nfData: x?.nfData ?? null, pago: x?.pago ?? false, nfArquivo: nfs.get(`MEI:${m.id}:MES`) ?? null } };
+      return { ...m, lanc: { ...m.lanc, nfNumero: x?.nfNumero ?? null, nfData: x?.nfData ?? null, pago: x?.pago ?? false, ...pg(x), nfArquivo: nfs.get(`MEI:${m.id}:MES`) ?? null } };
     });
     const motoristas = snap.motoristas.map((m) => ({
       ...m,
+      pagamento: { pago: l('MOTORISTA', m.id, 'MES')?.pago ?? false, ...pg(l('MOTORISTA', m.id, 'MES')) },
       semanas: m.semanas.map((s) => {
         const x = l('MOTORISTA', m.id, s.inicio);
         return { ...s, nfNumero: x?.nfNumero ?? null, pago: x?.pago ?? false, nfArquivo: nfs.get(`MOTORISTA:${m.id}:${s.inicio}`) ?? null };
@@ -324,6 +334,10 @@ export class PessoalService {
     }
 
     // ---------- MEI ----------
+    const pagamentoDe = (l?: { pago: boolean; valorPago: string | null; pagoEm: Date | null }) => ({
+      valorPagoCent: l?.pago && l.valorPago != null ? centavos(l.valorPago) : null,
+      pagoEm: l?.pago && l.pagoEm ? l.pagoEm.toISOString() : null,
+    });
     const mei: LinhaMei[] = [];
     const motoristas: LinhaMot[] = [];
     const semanas = semanasDoMes(comp);
@@ -349,10 +363,11 @@ export class PessoalService {
           heMin: l?.heMin ?? 0, faltas: l?.faltas ?? 0, feriadosTrab: l?.feriadosTrab ?? 0,
           metaCent: centavos(l?.meta), metaPaga: l?.metaPaga ?? false, metaPagaEm: l?.metaPagaEm ?? null,
           nfNumero: l?.nfNumero ?? null, nfData: l?.nfData ?? null, pago: l?.pago ?? false, observacao: l?.observacao ?? null,
+          ...pagamentoDe(l),
           nfArquivo: dados.nfs.get(`MEI:${p.id}:MES`) ?? null,
         };
         const r = calcularMei({ valorCent, diasMes, heMin: lanc.heMin, faltas: lanc.faltas, feriadosTrab: lanc.feriadosTrab, metaCent: lanc.metaCent, metaPaga: lanc.metaPaga, debitosCent });
-        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
+        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
       } else {
         const sem: SemanaMot[] = semanas.map((s) => {
           const l = lancDe('MOTORISTA', p.id, s.inicio);
@@ -367,10 +382,11 @@ export class PessoalService {
         const totalCent = Math.round((valorCent / Math.max(1, diasMes)) * sem.reduce((a, s) => a + s.dias, 0))
           + sem.reduce((a, s) => a + s.adicionalCent, 0);
         motoristas.push({
-          id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes,
+          id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes,
           diariaCent: calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias: 1, adicionalCent: 0 }).diariaCent,
           semanas: sem, totalCent, debitosCent, liquidoCent: totalCent - debitosCent,
           observacao: lancDe('MOTORISTA', p.id)?.observacao ?? null,
+          pagamento: { pago: lancDe('MOTORISTA', p.id)?.pago ?? false, ...pagamentoDe(lancDe('MOTORISTA', p.id)) },
         });
       }
     }
@@ -485,13 +501,14 @@ export class PessoalService {
   }
 
   async criarPrestador(tenantId: string, d: {
-    tipo: 'MEI' | 'MOTORISTA'; nome: string; documento?: string | null; funcao?: string | null;
+    tipo: 'MEI' | 'MOTORISTA'; nome: string; documento?: string | null; funcao?: string | null; empresa?: string | null;
     valorMensal: number; baseDias: BaseDias; chavePix?: string | null; competenciaInicio: string;
   }) {
     this.validarComp(d.competenciaInicio);
     return comTenant(this.db, tenantId, async (tx) => {
       const [r] = await tx.insert(pessoalPrestador).values({
         tenantId, tipo: d.tipo, nome: d.nome.trim(), documento: d.documento?.replace(/\D/g, '') || null, funcao: d.funcao?.trim() || null,
+        empresa: d.empresa?.trim() || null,
         valorMensal: reais(centavos(d.valorMensal)), baseDias: d.baseDias, chavePix: d.chavePix?.trim() || null,
         competenciaInicio: d.competenciaInicio,
       }).returning();
@@ -509,7 +526,7 @@ export class PessoalService {
    * os meses anteriores continuam lendo o valor que valia na época.
    */
   async editarPrestador(tenantId: string, id: string, d: Partial<{
-    nome: string; documento: string | null; funcao: string | null; valorMensal: number; baseDias: BaseDias; chavePix: string | null;
+    nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorMensal: number; baseDias: BaseDias; chavePix: string | null;
     vigenteDesde: string;
   }>) {
     const reajuste = d.valorMensal !== undefined || d.baseDias !== undefined;
@@ -527,6 +544,7 @@ export class PessoalService {
       if (d.documento !== undefined) set.documento = d.documento?.replace(/\D/g, '') || null;
       if (d.funcao !== undefined) set.funcao = d.funcao?.trim() || null;
       if (d.chavePix !== undefined) set.chavePix = d.chavePix?.trim() || null;
+      if (d.empresa !== undefined) set.empresa = d.empresa?.trim() || null;
       if (reajuste) {
         if (d.vigenteDesde! < p.competenciaInicio) {
           throw new BadRequestException(`O contrato começa em ${p.competenciaInicio}. O reajuste não pode valer antes disso.`);
@@ -555,14 +573,14 @@ export class PessoalService {
     pessoaTipo: PessoaTipo; pessoaId: string; competencia: string; periodo?: string;
     heMin?: number; faltas?: number; feriadosTrab?: number; dias?: number | null; adicional?: number;
     meta?: number; metaPaga?: boolean; metaPagaEm?: string | null; nfNumero?: string | null; nfData?: string | null;
-    pago?: boolean; observacao?: string | null;
+    pago?: boolean; valorPago?: number | null; observacao?: string | null;
   }) {
     this.validarComp(d.competencia);
     // Mês fechado: valores congelados, mas NF e pagamento ainda podem ser
     // registrados (chegam depois do fechamento e não mudam nenhum cálculo).
     const soPagamento = Object.entries(d)
       .filter(([k, v]) => v !== undefined && !['pessoaTipo', 'pessoaId', 'competencia', 'periodo'].includes(k))
-      .every(([k]) => ['pago', 'nfNumero', 'nfData'].includes(k));
+      .every(([k]) => ['pago', 'valorPago', 'nfNumero', 'nfData'].includes(k));
     if (!soPagamento) await this.exigirAberta(tenantId, d.competencia);
     const periodo = d.periodo ?? 'MES';
     const set: Record<string, unknown> = { atualizadoEm: new Date() };
@@ -573,14 +591,52 @@ export class PessoalService {
       if (d[k] !== undefined) set[k] = (typeof d[k] === 'string' ? (d[k] as string).trim() : d[k]) || null;
     }
     if (d.metaPaga === false) set.metaPagaEm = null;
+    if (d.valorPago !== undefined) set.valorPago = d.valorPago == null ? null : reais(centavos(d.valorPago));
+    // Hora do pagamento: grava ao marcar "pago" (mantém a primeira), apaga ao desmarcar.
+    const ins: Record<string, unknown> = { ...set };
+    const upd: Record<string, unknown> = { ...set };
+    if (d.pago === true) { ins.pagoEm = new Date(); upd.pagoEm = sql`coalesce(${pessoalLancamento.pagoEm}, now())`; }
+    if (d.pago === false) { ins.pagoEm = upd.pagoEm = null; ins.valorPago = upd.valorPago = null; }
     return comTenant(this.db, tenantId, async (tx) => {
       const [r] = await tx.insert(pessoalLancamento).values({
-        tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, competencia: d.competencia, periodo, ...set,
+        tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, competencia: d.competencia, periodo, ...ins,
       }).onConflictDoUpdate({
         target: [pessoalLancamento.tenantId, pessoalLancamento.pessoaTipo, pessoalLancamento.pessoaId, pessoalLancamento.competencia, pessoalLancamento.periodo],
-        set,
+        set: upd,
       }).returning();
       return r;
+    });
+  }
+
+  /**
+   * Registra (ou desfaz) o pagamento do mês numa ida só: valor e hora no
+   * lançamento do mês; no motorista também marca as semanas trabalhadas.
+   * Vale em mês fechado (pagamento não mexe em cálculo).
+   */
+  async registrarPagamento(tenantId: string, d: {
+    pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string; pago: boolean; valorPago?: number | null; semanas?: string[];
+  }) {
+    this.validarComp(d.competencia);
+    if (d.pago && (d.valorPago == null || d.valorPago < 0)) throw new BadRequestException('Informe o valor pago.');
+    const agora = new Date();
+    const valorPago = d.pago ? reais(centavos(d.valorPago!)) : null;
+    const pagoEm = d.pago ? agora : null;
+    const alvo = [pessoalLancamento.tenantId, pessoalLancamento.pessoaTipo, pessoalLancamento.pessoaId, pessoalLancamento.competencia, pessoalLancamento.periodo];
+    return comTenant(this.db, tenantId, async (tx) => {
+      const p = (await tx.select({ id: pessoalPrestador.id }).from(pessoalPrestador)
+        .where(and(eq(pessoalPrestador.id, d.pessoaId), eq(pessoalPrestador.tenantId, tenantId))).limit(1))[0];
+      if (!p) throw new NotFoundException('Prestador não encontrado');
+      const base = { tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, competencia: d.competencia };
+      await tx.insert(pessoalLancamento).values({ ...base, periodo: 'MES', pago: d.pago, valorPago, pagoEm, atualizadoEm: agora })
+        .onConflictDoUpdate({ target: alvo, set: { pago: d.pago, valorPago, pagoEm, atualizadoEm: agora } });
+      if (d.pessoaTipo === 'MOTORISTA') {
+        for (const s of d.semanas ?? []) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !s.startsWith(d.competencia)) continue;
+          await tx.insert(pessoalLancamento).values({ ...base, periodo: s, pago: d.pago, pagoEm, atualizadoEm: agora })
+            .onConflictDoUpdate({ target: alvo, set: { pago: d.pago, pagoEm, atualizadoEm: agora } });
+        }
+      }
+      return { pago: d.pago, valorPagoCent: d.pago ? centavos(d.valorPago!) : null, pagoEm: pagoEm?.toISOString() ?? null };
     });
   }
 

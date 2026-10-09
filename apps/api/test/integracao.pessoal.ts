@@ -28,9 +28,9 @@ const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
-  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000144', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000155', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
   const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
-    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000144', razaoSocial: 'PESSOAL LTDA',
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000155', razaoSocial: 'PESSOAL LTDA',
     numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
   }).returning()))[0]!;
   const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
@@ -109,7 +109,7 @@ async function main() {
   await pes.definirInicioCesta(t.id, caio.id, '2026-09');
 
   // ── MEI ──
-  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60.874.544/0001-04', funcao: 'Vendedor', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
+  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60.874.544/0001-04', funcao: 'Vendedor', empresa: ' Fiix Peças ', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
   await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 500, metaPaga: true, metaPagaEm: '2026-09-05', faltas: 1 });
   await pes.criarDebito(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, descricao: 'Notebook', valorTotal: 300, parcelas: 2, competenciaInicio: '2026-09' });
   const set2 = await pes.competencia(t.id, '2026-09');
@@ -120,6 +120,41 @@ async function main() {
   ok(m.liquidoCent === m.brutoCent - 15000 - 50000, `líquido = bruto − parcela 150 − meta já paga (${m.liquidoCent})`);
   ok(set2.debitos.some((d) => d.descricao === 'Notebook' && d.parcelaAtual === 1), 'débito aparece como parcela 1/2');
   ok(set2.pendencias.nfMei === 1, 'NF do MEI pendente sinalizada');
+
+  // ── pagamento: valor e hora ──
+  ok(m.empresa === 'Fiix Peças', `empresa gravada (${m.empresa})`);
+  ok(m.lanc.valorPagoCent === null && m.lanc.pagoEm === null, 'sem pagamento registrado');
+  ok((await erroDe(() => pes.registrarPagamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true }))).includes('valor'),
+    'marcar pago exige o valor');
+  const reg = await pes.registrarPagamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true, valorPago: 2000 });
+  ok(reg.valorPagoCent === 200000 && !!reg.pagoEm, `pagamento registrado com valor e hora (${reg.pagoEm})`);
+  let mp = (await pes.competencia(t.id, '2026-09')).mei.find((x) => x.id === mei!.id)!;
+  ok(mp.lanc.pago && mp.lanc.valorPagoCent === 200000 && mp.lanc.pagoEm === reg.pagoEm, 'competência mostra pago, valor e hora');
+  ok(mp.brutoCent === m.brutoCent && mp.lanc.metaCent === 50000 && mp.lanc.faltas === 1, 'registrar pagamento não mexe no lançamento');
+  await pes.registrarPagamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: false });
+  mp = (await pes.competencia(t.id, '2026-09')).mei.find((x) => x.id === mei!.id)!;
+  ok(!mp.lanc.pago && mp.lanc.valorPagoCent === null && mp.lanc.pagoEm === null, 'desmarcar apaga valor e hora');
+  // pelo painel (salvarLancamento): pago grava a hora uma vez só
+  await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true, valorPago: 1000 });
+  const h1 = (await pes.competencia(t.id, '2026-09')).mei.find((x) => x.id === mei!.id)!.lanc.pagoEm;
+  await new Promise((r) => setTimeout(r, 30));
+  await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true });
+  const h2 = (await pes.competencia(t.id, '2026-09')).mei.find((x) => x.id === mei!.id)!.lanc;
+  ok(!!h1 && h1 === h2.pagoEm && h2.valorPagoCent === 100000, 'salvar de novo mantém a hora do primeiro pagamento');
+  await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: false });
+  // motorista: registra no mês e marca as semanas
+  const mot = await pes.criarPrestador(t.id, { tipo: 'MOTORISTA', nome: 'Rui Mot', valorMensal: 2600, baseDias: 'SEG_SEX', competenciaInicio: '2026-09', empresa: 'IG Express' });
+  const c0 = await pes.competencia(t.id, '2026-09');
+  const mo = c0.motoristas.find((x) => x.id === mot!.id)!;
+  const semDias = mo.semanas.filter((x) => x.dias > 0).map((x) => x.inicio);
+  await pes.registrarPagamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', pago: true, valorPago: mo.liquidoCent / 100, semanas: semDias });
+  const mo2 = (await pes.competencia(t.id, '2026-09')).motoristas.find((x) => x.id === mot!.id)!;
+  ok(mo2.pagamento.pago && mo2.pagamento.valorPagoCent === mo.liquidoCent && mo2.semanas.filter((x) => x.dias > 0).every((x) => x.pago),
+    `motorista: pagamento do mês + semanas marcadas (${mo2.pagamento.valorPagoCent})`);
+  ok(mo2.totalCent === mo.totalCent && mo2.empresa === 'IG Express', 'total do motorista não muda; empresa gravada');
+  await pes.editarPrestador(t.id, mot!.id, { empresa: '' });
+  ok((await pes.competencia(t.id, '2026-09')).motoristas.find((x) => x.id === mot!.id)!.empresa === null, 'empresa vazia vira nula');
+  await pes.excluir(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', escopo: 'DIANTE' });
 
   // ── tirar do mês ──
   const ex = await pes.excluir(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-08', escopo: 'MES' });
@@ -152,7 +187,9 @@ async function main() {
   ok((await erroDe(() => pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true, nfNumero: '123', nfData: '2026-10-02' }))) === '',
     'mês fechado aceita pago + número da NF');
   const nf = await pes.salvarNf(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', arquivoBase64: pdf.toString('base64'), arquivoNome: 'nf-123.pdf', arquivoMime: 'application/pdf' });
+  await pes.registrarPagamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true, valorPago: 2346 });
   const fech2 = await pes.competencia(t.id, '2026-09');
+  ok(fech2.mei.find((x) => x.id === mei!.id)!.lanc.valorPagoCent === 234600, 'mês fechado: registrar pagamento funciona e aparece no retrato');
   const mf = fech2.mei.find((x) => x.id === mei!.id)!;
   ok(mf.lanc.pago && mf.lanc.nfNumero === '123', 'retrato fechado mostra pago e NF ao vivo');
   ok(mf.lanc.nfArquivo?.id === nf!.id && mf.lanc.nfArquivo.nome === 'nf-123.pdf', 'metadados do arquivo da NF aparecem no lançamento');

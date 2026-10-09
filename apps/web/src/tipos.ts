@@ -675,12 +675,15 @@ export interface PessoalLinhaClt {
 export interface PessoalLancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
   nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
+  /** Quanto foi pago e quando (null enquanto não pago). */
+  valorPagoCent: number | null; pagoEm: string | null;
   nfArquivo: PessoalNfArquivo | null;
 }
 /** Arquivo da NF enviado (metadados; o conteúdo vem de /pessoal/nf/:id). */
 export interface PessoalNfArquivo { id: string; nome: string; mime: string; bytes: number; enviadoEm: string }
+export interface PessoalPagamentoMes { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }
 export interface PessoalLinhaMei {
-  id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
   /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: { vigenteDesde: string; valorCent: number; baseDias: BaseDias }[];
   baseDias: BaseDias; diasMes: number; lanc: PessoalLancMei; debitosCent: number;
@@ -689,11 +692,12 @@ export interface PessoalLinhaMei {
 }
 export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: PessoalNfArquivo | null }
 export interface PessoalLinhaMot {
-  id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
+  id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null; valorCent: number; chavePix: string | null;
   /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: { vigenteDesde: string; valorCent: number; baseDias: BaseDias }[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: PessoalSemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
+  pagamento: PessoalPagamentoMes;
 }
 export interface PessoalDebito {
   id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;
