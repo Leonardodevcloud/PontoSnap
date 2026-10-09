@@ -28,9 +28,9 @@ const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
-  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000177', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000199', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
   const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
-    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000177', razaoSocial: 'PESSOAL LTDA',
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000199', razaoSocial: 'PESSOAL LTDA',
     numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
   }).returning()))[0]!;
   const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
@@ -162,6 +162,27 @@ async function main() {
   ok(mo2.totalCent === mo.totalCent && mo2.empresa === 'IG Express', 'total do motorista não muda; empresa gravada');
   await pes.editarPrestador(t.id, mot!.id, { empresa: '' });
   ok((await pes.competencia(t.id, '2026-09')).motoristas.find((x) => x.id === mot!.id)!.empresa === null, 'empresa vazia vira nula');
+  // pagamento por semana com o débito aplicado na semana escolhida
+  await pes.registrarPagamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', pago: false, semanas: semDias });
+  await pes.criarDebito(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, descricao: 'Capacete', valorTotal: 100, parcelas: 1, competenciaInicio: '2026-09' });
+  let ms = (await pes.competencia(t.id, '2026-09')).motoristas.find((x) => x.id === mot!.id)!;
+  ok(ms.debitoPendenteCent === 10000, `débito do mês pendente antes de aplicar (${ms.debitoPendenteCent})`);
+  const s1 = ms.semanas.filter((x) => x.dias > 0)[1]!;
+  const vSem = (s1.totalCent - 10000) / 100;
+  const pg1 = await pes.registrarPagamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', periodo: s1.inicio, pago: true, valorPago: vSem, debitoAplicado: 100 });
+  ms = (await pes.competencia(t.id, '2026-09')).motoristas.find((x) => x.id === mot!.id)!;
+  const s1b = ms.semanas.find((x) => x.inicio === s1.inicio)!;
+  ok(s1b.pago && s1b.valorPagoCent === s1.totalCent - 10000 && s1b.debitoAplicadoCent === 10000 && s1b.pagoEm === pg1.pagoEm, 'semana paga com valor, hora e débito aplicado');
+  ok(ms.debitoPendenteCent === 0 && ms.semanas.filter((x) => x.inicio !== s1.inicio).every((x) => !x.pago), 'débito todo aplicado; as outras semanas seguem em aberto');
+  ok(ms.liquidoCent === ms.totalCent - 10000, 'líquido do mês não muda com a semana escolhida');
+  const s2 = ms.semanas.filter((x) => x.dias > 0)[2]!;
+  ok((await erroDe(() => pes.registrarPagamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', periodo: s2.inicio, pago: true, valorPago: 1, debitoAplicado: 50 }))).includes('Já foram descontados'),
+    'não deixa descontar mais que o débito do mês');
+  await pes.registrarPagamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', periodo: s1.inicio, pago: false, debitoAplicado: 0 });
+  ms = (await pes.competencia(t.id, '2026-09')).motoristas.find((x) => x.id === mot!.id)!;
+  ok(ms.debitoPendenteCent === 10000 && !ms.semanas.find((x) => x.inicio === s1.inicio)!.pago, 'desfazer a semana devolve o débito para pendente');
+  const debs = (await pes.competencia(t.id, '2026-09')).debitos.filter((x) => x.pessoaId === mot!.id);
+  for (const x of debs) await pes.removerDebito(t.id, x.id);
   await pes.excluir(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', escopo: 'DIANTE' });
 
   // ── tirar do mês ──

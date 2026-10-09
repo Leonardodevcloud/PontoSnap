@@ -66,6 +66,7 @@ export class LancamentoDto {
   @IsOptional() @IsBoolean() metaPaga?: boolean;
   @IsOptional() @ValidateIf((_, v) => v !== null && v !== '') @Matches(DATA) metaPagaEm?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber() @Min(0) valorPago?: number | null;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) debitoAplicado?: number;
   @IsOptional() @IsString() @MaxLength(60) nfNumero?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null && v !== '') @Matches(DATA) nfData?: string | null;
   @IsOptional() @IsBoolean() pago?: boolean;
@@ -114,6 +115,8 @@ export class PagamentoDto {
   @IsBoolean() pago!: boolean;
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber() @Min(0) valorPago?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) @ArrayMaxSize(6) semanas?: string[];
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) periodo?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) debitoAplicado?: number;
 }
 
 export class AdmissaoDto {

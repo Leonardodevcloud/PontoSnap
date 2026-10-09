@@ -91,6 +91,8 @@ export const pessoalLancamento = pgTable('pessoal_lancamento', {
   /** Quanto foi de fato pago e quando (registrado ao marcar "pago"). */
   valorPago: numeric('valor_pago', { precision: 12, scale: 2 }),
   pagoEm: timestamp('pago_em', { withTimezone: true }),
+  /** Motorista: parte dos débitos do mês descontada nesta semana. */
+  debitoAplicado: numeric('debito_aplicado', { precision: 12, scale: 2 }).notNull().default('0'),
   observacao: text('observacao'),
   atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

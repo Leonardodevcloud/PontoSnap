@@ -692,7 +692,11 @@ export interface PessoalLinhaMei {
   valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
   brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
 }
-export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: PessoalNfArquivo | null }
+export interface PessoalSemanaMot {
+  inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: PessoalNfArquivo | null;
+  /** Débito do mês descontado nesta semana e o pagamento da semana. */
+  debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
+}
 export interface PessoalLinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação (pode ser antes do sistema) e 1ª competência no sistema. */
@@ -702,6 +706,8 @@ export interface PessoalLinhaMot {
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: PessoalSemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
   pagamento: PessoalPagamentoMes;
+  /** Débitos do mês ainda não descontados em nenhuma semana. */
+  debitoPendenteCent: number;
 }
 export interface PessoalDebito {
   id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;

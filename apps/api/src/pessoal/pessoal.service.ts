@@ -81,7 +81,11 @@ export interface LinhaMei {
   valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
   brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
 }
-export interface SemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null }
+export interface SemanaMot {
+  inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null;
+  /** Débito do mês descontado nesta semana e o pagamento da semana (valor e hora). */
+  debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
+}
 export interface LinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação e primeira competência no sistema. */
@@ -90,6 +94,8 @@ export interface LinhaMot {
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: SemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
   pagamento: PagamentoMes;
+  /** Débitos do mês ainda não descontados em nenhuma semana. */
+  debitoPendenteCent: number;
 }
 export interface LinhaDebito {
   id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;
@@ -168,9 +174,10 @@ export class PessoalService {
       pagamento: { pago: l('MOTORISTA', m.id, 'MES')?.pago ?? false, ...pg(l('MOTORISTA', m.id, 'MES')) },
       semanas: m.semanas.map((s) => {
         const x = l('MOTORISTA', m.id, s.inicio);
-        return { ...s, nfNumero: x?.nfNumero ?? null, pago: x?.pago ?? false, nfArquivo: nfs.get(`MOTORISTA:${m.id}:${s.inicio}`) ?? null };
+        return { ...s, nfNumero: x?.nfNumero ?? null, pago: x?.pago ?? false, nfArquivo: nfs.get(`MOTORISTA:${m.id}:${s.inicio}`) ?? null,
+          debitoAplicadoCent: centavos(x?.debitoAplicado), ...pg(x) };
       }),
-    }));
+    })).map((m) => ({ ...m, debitoPendenteCent: Math.max(0, m.debitosCent - m.semanas.reduce((a, s) => a + s.debitoAplicadoCent, 0)) }));
     return {
       ...snap, mei, motoristas,
       pendencias: {
@@ -385,7 +392,8 @@ export class PessoalService {
           const adicionalCent = centavos(l?.adicional);
           const { totalCent } = calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias, adicionalCent });
           return { inicio: s.inicio, fim: s.fim, diasAuto, dias, adicionalCent, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, totalCent,
-            nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null };
+            nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null,
+            debitoAplicadoCent: centavos(l?.debitoAplicado), ...pagamentoDe(l) };
         });
         // Arredonda uma vez no mês: dias × (mensal ÷ dias do mês) fecha no mensal exato.
         const totalCent = Math.round((valorCent / Math.max(1, diasMes)) * sem.reduce((a, s) => a + s.dias, 0))
@@ -396,6 +404,7 @@ export class PessoalService {
           semanas: sem, totalCent, debitosCent, liquidoCent: totalCent - debitosCent,
           observacao: lancDe('MOTORISTA', p.id)?.observacao ?? null,
           pagamento: { pago: lancDe('MOTORISTA', p.id)?.pago ?? false, ...pagamentoDe(lancDe('MOTORISTA', p.id)) },
+          debitoPendenteCent: Math.max(0, debitosDe('MOTORISTA', p.id) - sem.reduce((a, x) => a + x.debitoAplicadoCent, 0)),
         });
       }
     }
@@ -595,14 +604,14 @@ export class PessoalService {
     pessoaTipo: PessoaTipo; pessoaId: string; competencia: string; periodo?: string;
     heMin?: number; faltas?: number; feriadosTrab?: number; dias?: number | null; adicional?: number;
     meta?: number; metaPaga?: boolean; metaPagaEm?: string | null; nfNumero?: string | null; nfData?: string | null;
-    pago?: boolean; valorPago?: number | null; observacao?: string | null;
+    pago?: boolean; valorPago?: number | null; debitoAplicado?: number; observacao?: string | null;
   }) {
     this.validarComp(d.competencia);
     // Mês fechado: valores congelados, mas NF e pagamento ainda podem ser
     // registrados (chegam depois do fechamento e não mudam nenhum cálculo).
     const soPagamento = Object.entries(d)
       .filter(([k, v]) => v !== undefined && !['pessoaTipo', 'pessoaId', 'competencia', 'periodo'].includes(k))
-      .every(([k]) => ['pago', 'valorPago', 'nfNumero', 'nfData'].includes(k));
+      .every(([k]) => ['pago', 'valorPago', 'debitoAplicado', 'nfNumero', 'nfData'].includes(k));
     if (!soPagamento) await this.exigirAberta(tenantId, d.competencia);
     const periodo = d.periodo ?? 'MES';
     const set: Record<string, unknown> = { atualizadoEm: new Date() };
@@ -614,12 +623,17 @@ export class PessoalService {
     }
     if (d.metaPaga === false) set.metaPagaEm = null;
     if (d.valorPago !== undefined) set.valorPago = d.valorPago == null ? null : reais(centavos(d.valorPago));
+    if (d.debitoAplicado !== undefined) {
+      if (d.pessoaTipo !== 'MOTORISTA' || periodo === 'MES') throw new BadRequestException('Débito por semana é só para motorista.');
+      set.debitoAplicado = reais(centavos(d.debitoAplicado));
+    }
     // Hora do pagamento: grava ao marcar "pago" (mantém a primeira), apaga ao desmarcar.
     const ins: Record<string, unknown> = { ...set };
     const upd: Record<string, unknown> = { ...set };
     if (d.pago === true) { ins.pagoEm = new Date(); upd.pagoEm = sql`coalesce(${pessoalLancamento.pagoEm}, now())`; }
     if (d.pago === false) { ins.pagoEm = upd.pagoEm = null; ins.valorPago = upd.valorPago = null; }
     return comTenant(this.db, tenantId, async (tx) => {
+      if (d.debitoAplicado !== undefined) await this.validarDebitoSemana(tx, tenantId, d.pessoaId, d.competencia, periodo, centavos(d.debitoAplicado));
       const [r] = await tx.insert(pessoalLancamento).values({
         tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, competencia: d.competencia, periodo, ...ins,
       }).onConflictDoUpdate({
@@ -637,9 +651,11 @@ export class PessoalService {
    */
   async registrarPagamento(tenantId: string, d: {
     pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string; pago: boolean; valorPago?: number | null; semanas?: string[];
+    /** Motorista: paga UMA semana (início YYYY-MM-DD). */ periodo?: string; debitoAplicado?: number;
   }) {
     this.validarComp(d.competencia);
     if (d.pago && (d.valorPago == null || d.valorPago < 0)) throw new BadRequestException('Informe o valor pago.');
+    if (d.periodo) return this.pagarSemana(tenantId, { ...d, periodo: d.periodo });
     const agora = new Date();
     const valorPago = d.pago ? reais(centavos(d.valorPago!)) : null;
     const pagoEm = d.pago ? agora : null;
@@ -659,6 +675,48 @@ export class PessoalService {
         }
       }
       return { pago: d.pago, valorPagoCent: d.pago ? centavos(d.valorPago!) : null, pagoEm: pagoEm?.toISOString() ?? null };
+    });
+  }
+
+  /** Débitos de um prestador que caem neste mês (soma das parcelas). */
+  private async debitosDoMes(tx: Tx, tenantId: string, tipo: PessoaTipo, id: string, comp: string) {
+    const debs = await tx.select().from(pessoalDebito)
+      .where(and(eq(pessoalDebito.tenantId, tenantId), eq(pessoalDebito.pessoaTipo, tipo), eq(pessoalDebito.pessoaId, id)));
+    return debs.reduce((s, x) => s + (parcelaNoMes({ valorTotalCent: centavos(x.valorTotal), parcelas: x.parcelas, competenciaInicio: x.competenciaInicio }, comp)?.valorCent ?? 0), 0);
+  }
+
+  /** Quanto dos débitos do mês um motorista pode ainda descontar numa semana (sem passar do total do mês). */
+  private async validarDebitoSemana(tx: Tx, tenantId: string, id: string, comp: string, periodo: string, cent: number) {
+    if (cent <= 0) return;
+    const total = await this.debitosDoMes(tx, tenantId, 'MOTORISTA', id, comp);
+    const outras = (await tx.select().from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId),
+      eq(pessoalLancamento.pessoaTipo, 'MOTORISTA'), eq(pessoalLancamento.pessoaId, id), eq(pessoalLancamento.competencia, comp))))
+      .filter((l) => l.periodo !== periodo && l.periodo !== 'MES').reduce((a, l) => a + centavos(l.debitoAplicado), 0);
+    if (outras + cent > total) {
+      throw new BadRequestException(`Os débitos de ${comp} somam ${(total / 100).toFixed(2).replace('.', ',')}. Já foram descontados ${(outras / 100).toFixed(2).replace('.', ',')} em outras semanas.`);
+    }
+  }
+
+  /** Paga (ou desfaz) uma semana do motorista, com o débito descontado nela. */
+  private async pagarSemana(tenantId: string, d: { pessoaId: string; competencia: string; periodo: string; pago: boolean; valorPago?: number | null; debitoAplicado?: number }) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.periodo) || !d.periodo.startsWith(d.competencia)) throw new BadRequestException('Semana inválida');
+    const agora = new Date();
+    const alvo = [pessoalLancamento.tenantId, pessoalLancamento.pessoaTipo, pessoalLancamento.pessoaId, pessoalLancamento.competencia, pessoalLancamento.periodo];
+    return comTenant(this.db, tenantId, async (tx) => {
+      const p = (await tx.select({ id: pessoalPrestador.id }).from(pessoalPrestador)
+        .where(and(eq(pessoalPrestador.id, d.pessoaId), eq(pessoalPrestador.tenantId, tenantId), eq(pessoalPrestador.tipo, 'MOTORISTA'))).limit(1))[0];
+      if (!p) throw new NotFoundException('Motorista não encontrado');
+      const set: Record<string, unknown> = {
+        pago: d.pago, valorPago: d.pago ? reais(centavos(d.valorPago!)) : null, pagoEm: d.pago ? agora : null, atualizadoEm: agora,
+      };
+      if (d.debitoAplicado !== undefined) {
+        const cent = centavos(d.debitoAplicado);
+        await this.validarDebitoSemana(tx, tenantId, d.pessoaId, d.competencia, d.periodo, cent);
+        set.debitoAplicado = reais(cent);
+      }
+      await tx.insert(pessoalLancamento).values({ tenantId, pessoaTipo: 'MOTORISTA', pessoaId: d.pessoaId, competencia: d.competencia, periodo: d.periodo, ...set })
+        .onConflictDoUpdate({ target: alvo, set });
+      return { pago: d.pago, valorPagoCent: d.pago ? centavos(d.valorPago!) : null, pagoEm: d.pago ? agora.toISOString() : null };
     });
   }
 
@@ -878,8 +936,10 @@ export class PessoalService {
         const m = linha as LinhaMot; const x = lancDe(comp, 'MES');
         viva = {
           ...m, pagamento: { pago: x?.pago ?? false, ...pg(x) },
-          semanas: m.semanas.map((sm) => { const y = lancDe(comp, sm.inicio); return { ...sm, nfNumero: y?.nfNumero ?? null, pago: y?.pago ?? false, nfArquivo: nfDe(comp, sm.inicio) }; }),
+          semanas: m.semanas.map((sm) => { const y = lancDe(comp, sm.inicio); return { ...sm, nfNumero: y?.nfNumero ?? null, pago: y?.pago ?? false, nfArquivo: nfDe(comp, sm.inicio),
+            debitoAplicadoCent: centavos(y?.debitoAplicado), ...pg(y) }; }),
         };
+        (viva as LinhaMot).debitoPendenteCent = Math.max(0, m.debitosCent - (viva as LinhaMot).semanas.reduce((a, s) => a + s.debitoAplicadoCent, 0));
       }
       meses.push({ competencia: comp, fechado: true, fechadoEm: f.fechadoEm.toISOString(), linha: viva });
     }

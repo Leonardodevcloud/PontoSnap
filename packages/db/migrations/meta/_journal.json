@@ -323,6 +323,13 @@
       "when": 1784602620000,
       "tag": "0045_inicio_real",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1784602680000,
+      "tag": "0046_debito_semana",
+      "breakpoints": true
     }
   ]
 }

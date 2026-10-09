@@ -327,3 +327,40 @@ label.pixItem:hover{ background:var(--cream); }
 .tagMot{ background:#E3F0EF; color:var(--ink); }
 .nomeLinha .tagTipo{ margin-left:0; }
 .rodapeTab{ margin:0; padding:10px 16px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13px; color:var(--ash); }
+
+/* ---------- motorista por semana ---------- */
+.semana{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:12px 14px; display:flex; flex-direction:column; gap:10px; flex:none; }
+.semanaPaga{ border-color:rgba(47,91,0,.35); }
+.semTopo{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.semTopo b{ font-family:var(--ff-display); font-size:16px; }
+.semValor{ margin-left:auto; font-family:var(--ff-mono); font-weight:600; font-size:15px; }
+.grade3{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+@media (max-width:520px){ .grade3{ grid-template-columns:1fr 1fr; } }
+.semAcoes{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; border-top:1px dashed rgba(var(--ink-rgb),.14); padding-top:10px; }
+.semAcoes .hint{ margin:0; margin-right:auto; }
+.btnPequeno{ width:auto; white-space:nowrap; padding:8px 16px; font-size:14px; }
+.debPend{ margin:0; background:#FFF0D6; color:#7A4A00; border-radius:10px; padding:8px 12px; font-size:13px; }
+.debPend b{ color:var(--ink); }
+.debOpc{ display:flex; align-items:center; gap:10px; margin-top:8px; padding:10px 12px; border:2px dashed rgba(var(--ink-rgb),.2); border-radius:12px; font-size:14px; cursor:pointer; background:#FFF8E8; }
+.debOpc input{ width:18px; height:18px; accent-color:var(--ink); flex:none; }
+.debOpc > span{ flex:1; min-width:0; }
+.debOpc small{ display:block; color:var(--ash); font-size:12px; font-weight:600; }
+.debOpcOn{ border-style:solid; border-color:var(--coral); }
+.pagSem{ display:inline-flex; align-items:center; gap:8px; background:none; border:none; padding:4px 6px; margin:-4px -6px; border-radius:8px; cursor:pointer; color:var(--ink); font:inherit; }
+.pagSem:hover{ background:var(--cream); }
+.pagSem:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.pagSemSeta{ color:var(--ash); font-size:16px; }
+.barraSem{ display:inline-flex; gap:2px; vertical-align:1px; }
+.barraSem i{ display:block; width:10px; height:6px; border-radius:2px; background:rgba(var(--ink-rgb),.14); }
+.bsPaga{ background:var(--ink) !important; }
+.bsAberta{ background:#D9A441 !important; }
+.histMes{ cursor:pointer; }
+.histMes:hover td{ background:var(--cream); }
+.seta{ background:none; border:none; padding:0 6px 0 0; font-size:13px; color:var(--ash); cursor:pointer; }
+.seta:focus-visible{ outline:2px solid var(--coral); border-radius:4px; }
+.histSemanas > td{ background:var(--cream); padding:0 16px 14px !important; }
+.subTab{ width:100%; table-layout:fixed; border-collapse:collapse; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:10px; overflow:hidden; }
+.subTab th{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); font-weight:400; text-align:left; padding:8px 12px; }
+.subTab td{ padding:8px 12px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13px; }
+.subTab td:first-child{ white-space:nowrap; }
+.subTab th:nth-child(2), .subTab th:nth-child(3), .subTab th:nth-child(4), .subTab th:nth-child(6), .subTab td:nth-child(2), .subTab td:nth-child(3), .subTab td:nth-child(4), .subTab td:nth-child(6){ text-align:right; font-family:var(--ff-mono); }
