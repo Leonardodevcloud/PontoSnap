@@ -33,10 +33,6 @@ function resumoBanco(b: ConfigRegra['banco']): string {
 const ehContratoHoras = (c: ConfigRegra | undefined, escalaFlexivel?: boolean) =>
   c?.contrato ? c.contrato.tipoJornada === 'CONTRATO_HORAS' : !!escalaFlexivel;
 
-/** O banco desta regra acumula entre meses? (herda = segue a empresa) */
-const bancoAcumula = (b: ConfigRegra['banco'], empresaAtiva: boolean) =>
-  !b || b.bancoModo === 'HERDA' ? empresaAtiva : b.bancoModo === 'ATIVO' && b.formaCalculo !== 'INTRA_MES';
-
 const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
 export function Funcionarios() {
@@ -56,17 +52,12 @@ export function Funcionarios() {
   const [dataInicioPara, setDataInicioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
   const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
-  const [bancoEmpresaAtivo, setBancoEmpresaAtivo] = useState(false);
 
   async function carregar() {
     try { setLista(await api.get<Empregado[]>('/empregados')); }
     catch (e) { setErro((e as Error).message); }
   }
   useEffect(() => { void carregar(); }, []);
-  useEffect(() => {
-    api.get<{ ativo?: boolean; tipoAcordo?: string }>('/banco/config')
-      .then((c) => setBancoEmpresaAtivo(c.ativo ?? (!!c.tipoAcordo && c.tipoAcordo !== 'NENHUM'))).catch(() => {});
-  }, []);
   useEffect(() => {
     api.get<PerfilResumo[]>('/perfis-regra').then(setPerfis).catch(() => {});
   }, [perfilPara]);
@@ -82,11 +73,8 @@ export function Funcionarios() {
 
   /** Perfil que vale pro funcionário (o dele ou o padrão da empresa). */
   const perfilEfetivo = (e: Empregado) => (e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined) ?? perfis.find((x) => x.padrao);
-  /** Contrato de horas com banco que acumula: quase sempre é perfil esquecido. */
-  const desencontrado = (e: Empregado) => {
-    const c = perfilEfetivo(e)?.config;
-    return e.ativo && ehContratoHoras(c, e.escalaFlexivel) && bancoAcumula(c?.banco, bancoEmpresaAtivo);
-  };
+  /** Contrato de horas que ainda vem da escala (forma antiga): falta definir no perfil. */
+  const desencontrado = (e: Empregado) => e.ativo && !!e.escalaFlexivel && !perfilEfetivo(e)?.config?.contrato;
   const nDesencontrados = lista?.filter(desencontrado).length ?? 0;
 
   const visiveis = lista?.filter((e) => {
@@ -120,8 +108,8 @@ export function Funcionarios() {
 
       {nDesencontrados > 0 && (
         <div className={css.avisoContrato}>
-          <b>{nDesencontrados === 1 ? '1 funcionário' : `${nDesencontrados} funcionários`} em contrato de horas com banco que acumula.</b>{' '}
-          Para compensar no mês e pagar a diferença, coloque {nDesencontrados === 1 ? 'ele' : 'eles'} num perfil com “Tipo de jornada: contrato de horas” (em <strong>Perfis de regra</strong>).
+          <b>{nDesencontrados === 1 ? '1 funcionário' : `${nDesencontrados} funcionários`} com contrato de horas definido só na escala (forma antiga).</b>{' '}
+          Coloque {nDesencontrados === 1 ? 'ele' : 'eles'} num perfil com “Tipo de jornada: contrato de horas” (em <strong>Perfis de regra</strong>), com a regra de banco certa.
         </div>
       )}
 
@@ -169,8 +157,8 @@ export function Funcionarios() {
                       : <span className={css.bancoResumo}>horário fixo</span>}
                     <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco)}</span>
                     {desencontrado(e) && (
-                      <span className={css.alertaContrato} title="Contrato de horas costuma compensar no mês. Este perfil acumula as horas no banco.">
-                        ⚠ contrato de horas com banco que acumula: confira o perfil
+                      <span className={css.alertaContrato} title="O contrato de horas vem da escala (forma antiga). Coloque num perfil com Tipo de jornada: contrato de horas.">
+                        ⚠ contrato de horas só na escala: defina no perfil
                       </span>
                     )}
                   </>

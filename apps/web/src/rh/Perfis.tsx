@@ -120,19 +120,12 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
   const setBloco = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
   const [sugestao, setSugestao] = useState<string | null>(null);
 
-  /** Contrato de horas costuma compensar no mês: ajusta o banco junto (dá pra mudar). */
+  /** Escolhe o tipo de jornada. O banco é decidido à parte (não mexe nele). */
   function escolherJornada(k: 'FIXO' | 'CONTRATO_HORAS') {
-    setSugestao(null);
-    setCfg((c) => {
-      const novo: Config = { ...c, contrato: { tipoJornada: k } };
-      const b = c.banco;
-      const acumulaOuHerda = !b || b.bancoModo === 'HERDA' || (b.bancoModo === 'ATIVO' && b.formaCalculo !== 'INTRA_MES');
-      if (k === 'CONTRATO_HORAS' && acumulaOuHerda) {
-        novo.banco = { bancoModo: 'ATIVO', bancoTipoAcordo: b?.bancoTipoAcordo ?? 'INDIVIDUAL', bancoPrazoMeses: b?.bancoPrazoMeses ?? 6, formaCalculo: 'INTRA_MES', negativoMes: 'CARREGA' };
-        setSugestao('Contrato de horas costuma compensar no mês: o banco de horas abaixo foi ajustado para “compensa no mês · devendo passa para o mês seguinte”. Pode mudar.');
-      }
-      return novo;
-    });
+    setCfg((c) => ({ ...c, contrato: { tipoJornada: k } }));
+    setSugestao(k === 'CONTRATO_HORAS'
+      ? 'Agora escolha no Banco de horas o que acontece com o saldo: acumular entre os meses (positivo e negativo seguem para o mês seguinte) ou compensar no mês e pagar a diferença.'
+      : null);
   }
 
   async function salvar() {
