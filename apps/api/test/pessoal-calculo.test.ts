@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calcularBeneficio, calcularMei, calcularSemanaMotorista, diasBase, diasComVr, parcelaNoMes, semanasDoMes, somarMeses,
+  calcularBeneficio, calcularMei, calcularSemanaMotorista, diasBase, diasComVr, parcelaNoMes, situacaoDebito, semanasDoMes, somarMeses,
 } from '../src/pessoal/calculo';
 
 describe('calendário', () => {
@@ -28,6 +28,16 @@ describe('débito parcelado', () => {
     const imp = { valorTotalCent: 1000, parcelas: 3, competenciaInicio: '2026-10' };
     const soma = ['2026-10', '2026-11', '2026-12'].reduce((s, c) => s + parcelaNoMes(imp, c)!.valorCent, 0);
     expect(soma).toBe(1000);
+  });
+  it('retroativo: com parcelas já pagas, o início desconta a próxima e o resto fecha o total', () => {
+    // R$ 1.000 em 12×, 4 pagas antes do sistema: out/26 é a 5ª, set/27 seria a 13ª (não existe)
+    const r = { valorTotalCent: 100000, parcelas: 12, competenciaInicio: '2026-10', parcelasPagas: 4 };
+    expect(parcelaNoMes(r, '2026-09')).toBeNull();
+    expect(parcelaNoMes(r, '2026-10')).toEqual({ numero: 5, valorCent: 8333 });
+    expect(parcelaNoMes(r, '2027-05')).toEqual({ numero: 12, valorCent: 100000 - 8333 * 11 });
+    expect(parcelaNoMes(r, '2027-06')).toBeNull();
+    expect(situacaoDebito(r, '2026-10')).toEqual({ pagoCent: 8333 * 4, faltaCent: 100000 - 8333 * 5 });
+    expect(situacaoDebito(r, '2027-05')).toEqual({ pagoCent: 8333 * 11, faltaCent: 0 });
   });
 });
 

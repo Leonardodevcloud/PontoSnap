@@ -206,6 +206,19 @@ async function main() {
   ok(ms.debitoPendenteCent === 10000 && !ms.semanas.find((x) => x.inicio === s1.inicio)!.pago, 'desfazer a semana devolve o débito para pendente');
   const debs = (await pes.competencia(t.id, '2026-09')).debitos.filter((x) => x.pessoaId === mot!.id);
   for (const x of debs) await pes.removerDebito(t.id, x.id);
+
+  // ── débito retroativo: parcelas já pagas antes de lançar ──
+  const retro = await pes.criarDebito(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, descricao: 'Moto (retroativo)', valorTotal: 1200, parcelas: 12, parcelasPagas: 4, competenciaInicio: '2026-09' });
+  const dr = (await pes.competencia(t.id, '2026-09')).debitos.find((x) => x.id === retro.id)!;
+  ok(dr.parcelaAtual === 5 && dr.parcelaCent === 10000 && dr.pagoCent === 40000 && dr.faltaCent === 70000,
+    `retroativo 4/12 pagas: setembro é a 5ª, já pago R$ 400, falta R$ 700 depois (${dr.parcelaAtual} ${dr.pagoCent} ${dr.faltaCent})`);
+  ok((await erroDe(() => pes.criarDebito(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, descricao: 'x', valorTotal: 100, parcelas: 3, parcelasPagas: 3, competenciaInicio: '2026-09' }))).includes('menos que o total'),
+    'parcelas pagas = total é recusado');
+  await pes.editarDebito(t.id, retro.id, { descricao: 'Moto (retroativo)', valorTotal: 1200, parcelas: 12, parcelasPagas: 10, competenciaInicio: '2026-09' });
+  const dr2 = (await pes.competencia(t.id, '2026-09')).debitos.find((x) => x.id === retro.id)!;
+  ok(dr2.parcelaAtual === 11 && dr2.faltaCent === 10000, `editar para 10 pagas: setembro é a 11ª, falta 1 parcela (${dr2.parcelaAtual}/${dr2.faltaCent})`);
+  ok(!(await pes.competencia(t.id, '2026-11')).debitos.some((x) => x.id === retro.id), 'acaba na 12ª (outubro), novembro sem parcela');
+  await pes.removerDebito(t.id, retro.id);
   await pes.excluir(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: mot!.id, competencia: '2026-09', escopo: 'DIANTE' });
 
   // ── tirar do mês ──

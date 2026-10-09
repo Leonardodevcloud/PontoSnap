@@ -749,6 +749,10 @@ export interface PessoalLinhaMot {
 export interface PessoalDebito {
   id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;
   valorTotalCent: number; parcelas: number; competenciaInicio: string; parcelaAtual: number; parcelaCent: number;
+  /** Parcelas pagas antes de lançar (débito retroativo). */
+  parcelasPagas?: number;
+  /** Já pago antes da parcela do mês e o que falta depois dela. */
+  pagoCent?: number; faltaCent?: number;
 }
 export interface PessoalCompetencia {
   competencia: string; proxima: string; fechado: boolean; fechadoEm: string | null;

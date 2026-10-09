@@ -370,3 +370,8 @@ label.pixItem:hover{ background:var(--cream); }
 .compacta thead th:first-child{ background:linear-gradient(var(--thead-bg), var(--thead-bg)), var(--white); z-index:2; }
 .compacta tfoot td:first-child:not([colspan]){ background:linear-gradient(var(--thead-bg), var(--thead-bg)), var(--white); }
 .compacta tr:hover td:first-child:not([colspan]){ background:linear-gradient(var(--field-bg), var(--field-bg)), var(--white); }
+
+.acoesDeb{ display:inline-flex; gap:12px; }
+.chkRetro{ display:flex; gap:9px; align-items:flex-start; font-size:13px; line-height:1.5; color:var(--ash); margin:4px 0 12px; cursor:pointer; }
+.chkRetro b{ color:var(--ink); }
+.chkRetro input{ margin-top:3px; accent-color:var(--ink); }

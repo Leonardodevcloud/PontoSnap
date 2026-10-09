@@ -344,6 +344,13 @@
       "when": 1784602800000,
       "tag": "0048_empregado_cliente",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1784602860000,
+      "tag": "0049_debito_parcelas_pagas",
+      "breakpoints": true
     }
   ]
 }

@@ -75,7 +75,7 @@ function previaMei(valorCent: number, diasMes: number, l: { heMin: number; falta
   return { heCent, feriadosCent, faltasCent, brutoCent, abat, liquidoCent: brutoCent - abat };
 }
 
-type Painel = { tipo: 'clt' | 'mei' | 'mot'; id: string } | { tipo: 'debito' } | { tipo: 'padrao' } | null;
+type Painel = { tipo: 'clt' | 'mei' | 'mot'; id: string } | { tipo: 'debito'; editar?: PessoalDebito } | { tipo: 'padrao' } | null;
 type Dialogo =
   | { tipo: 'tirar'; pessoaTipo: PessoaTipo; pessoaId: string; nome: string }
   | { tipo: 'fechar' }
@@ -231,7 +231,7 @@ export function GestaoPessoal() {
     prestadores: <><b>MEI</b> é por mês, com uma nota fiscal no mês: <b>bruto</b> = contrato + extras + feriados trabalhados − faltas + meta (valor da NF);
       valor-hora = contrato ÷ (dias do mês × 8h), extra × 1,5. <b>Motorista</b> é por semana, com uma nota por semana: diária = valor mensal ÷ dias do mês (sem feriados),
       e cada semana já vem com os dias previstos. Para os dois, <b>líquido</b> = bruto − débitos (− meta que já foi paga antes, no MEI).</>,
-    debitos: <>Débitos parcelados são descontados um pouco por mês, na folha (CLT) ou no pagamento (MEI e motoristas). A última parcela ajusta os centavos.</>,
+    debitos: <>Débitos parcelados são descontados um pouco por mês, na folha (CLT) ou no pagamento (MEI e motoristas). A última parcela ajusta os centavos. Débito que já vinha sendo pago antes do sistema: marque <b>retroativo</b> e informe as parcelas já pagas. Elas entram em “Já pago” e o desconto continua da próxima parcela.</>,
   };
   const acaoAba = aba === 'beneficios' && !fechado && d
     ? <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'padrao' }, e.currentTarget)}>{d.padrao ? 'Alterar padrão da empresa' : 'Definir padrão da empresa'}</Botao>
@@ -327,6 +327,7 @@ export function GestaoPessoal() {
         onVerNf={(arquivo, titulo) => setVerNf({ arquivo, titulo })} />}
       {d && aba === 'debitos' && <TabelaDebitos d={d} busca={busca} fechado={fechado}
         onAbrir={(tipo, id, el) => abrir({ tipo: tipo === 'CLT' ? 'clt' : tipo === 'MEI' ? 'mei' : 'mot', id }, el)}
+        onEditar={(x, el) => abrir({ tipo: 'debito', editar: x }, el)}
         onRemover={(id, descricao, nome) => setDialogo({ tipo: 'remDebito', id, descricao, nome })} />}
 
       {d && d.foraDoMes.length > 0 && (
@@ -349,10 +350,10 @@ export function GestaoPessoal() {
 
       {painel && d && (
         <PainelLateral onFechar={fecharPainel} titulo={
-          linhaClt?.nome ?? linhaMei?.nome ?? linhaMot?.nome ?? (painel.tipo === 'padrao' ? 'Padrão de benefícios' : 'Adicionar débito')}
+          linhaClt?.nome ?? linhaMei?.nome ?? linhaMot?.nome ?? (painel.tipo === 'padrao' ? 'Padrão de benefícios' : painel.tipo === 'debito' && painel.editar ? 'Editar débito' : 'Adicionar débito')}
           sub={linhaClt ? `${linhaClt.config.cargo ? `${linhaClt.config.cargo} · ` : ''}CLT · ${mesLongo(mes)}` : linhaMei ? `MEI · ${fmtDoc(linhaMei.documento) ?? 'sem CNPJ'} · ${mesLongo(mes)}`
             : linhaMot ? ['Motorista', linhaMot.empresa, linhaMot.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex', mesLongo(mes)].filter(Boolean).join(' · ')
-            : painel.tipo === 'padrao' ? 'Vale para todos os CLT sem valor próprio' : `Desconto parcelado a partir de ${mesCurto(mes)}`}>
+            : painel.tipo === 'padrao' ? 'Vale para todos os CLT sem valor próprio' : painel.tipo === 'debito' && painel.editar ? `${painel.editar.nome} · ${ROT_TIPO[painel.editar.pessoaTipo]}` : `Desconto parcelado a partir de ${mesCurto(mes)}`}>
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
           {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} onSalvo={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
@@ -362,7 +363,7 @@ export function GestaoPessoal() {
             onPagarSemana={(sm) => setPix(pixSemana(linhaMot, sm, d.debitos))}
             onDesfazerSemana={(sm) => { const a = pixSemana(linhaMot, sm, d.debitos); if (a.registro) registrarPagamento(a.registro, false, null); }} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MOTORISTA', pessoaId: linhaMot.id, nome: linhaMot.nome })} />}
-          {painel.tipo === 'debito' && <PainelDebito mes={mes} onSalvo={async (desc) => { await recarregar(); fecharPainel(); avisar(`Débito "${desc}" adicionado.`); }} />}
+          {painel.tipo === 'debito' && <PainelDebito key={painel.editar?.id ?? 'novo'} mes={mes} editar={painel.editar} onSalvo={async (desc) => { await recarregar(); fecharPainel(); avisar(`Débito "${desc}" ${painel.editar ? 'atualizado' : 'adicionado'}.`); }} />}
         </PainelLateral>
       )}
 
@@ -584,26 +585,31 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
   );
 }
 
-function TabelaDebitos({ d, busca, fechado, onAbrir, onRemover }: {
+function TabelaDebitos({ d, busca, fechado, onAbrir, onEditar, onRemover }: {
   d: PessoalCompetencia; busca: string; fechado: boolean;
-  onAbrir: (tipo: PessoaTipo, id: string, el: HTMLElement) => void; onRemover: (id: string, descricao: string, nome: string) => void;
+  onAbrir: (tipo: PessoaTipo, id: string, el: HTMLElement) => void; onEditar: (x: PessoalDebito, el: HTMLElement) => void;
+  onRemover: (id: string, descricao: string, nome: string) => void;
 }) {
   const ok = (n: string) => !busca || n.toLowerCase().includes(busca.toLowerCase());
   const manuais = d.debitos.filter((x) => ok(x.nome));
   const acertoTotal = d.clt.reduce((a, c) => a + c.beneficios.acertoCent, 0);
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Débito</th><th className={vt.n}>Valor total</th><th className={vt.n}>Parcela</th><th className={vt.n}>Desconta em {mesCurto(d.competencia)}</th><th>Vínculo</th><th aria-label="Ações" /></tr></thead>
+      <thead><tr><th>Débito</th><th className={vt.n}>Valor total</th><th className={vt.n} title="Parcelas anteriores a esta, inclusive as pagas antes de lançar no sistema">Já pago</th><th className={vt.n}>Parcela</th><th className={vt.n}>Desconta em {mesCurto(d.competencia)}</th><th className={vt.n} title="O que ainda falta descontar depois desta parcela">Falta depois</th><th>Vínculo</th><th aria-label="Ações" /></tr></thead>
       <tbody>
-        {manuais.length === 0 && <Vazio cols={6}>Nenhum débito em {mesCurto(d.competencia)}. Use "Adicionar débito" para adiantamentos, equipamentos e descontos combinados.</Vazio>}
+        {manuais.length === 0 && <Vazio cols={8}>Nenhum débito em {mesCurto(d.competencia)}. Use "Adicionar débito" para adiantamentos, equipamentos e descontos combinados.</Vazio>}
         {manuais.map((x) => (
           <tr key={x.id}>
             <td className={vt.nome}><button className={css.linkNome} onClick={(e) => onAbrir(x.pessoaTipo, x.pessoaId, e.currentTarget)}>{x.descricao}</button><small>{x.nome} · {ROT_TIPO[x.pessoaTipo]}</small></td>
             <td className={vt.n}>{brl(x.valorTotalCent)}</td>
+            <td className={vt.n}>{x.pagoCent ? brl(x.pagoCent) : '—'}{(x.parcelasPagas ?? 0) > 0 && <small className={css.sub} title="Pagas antes de lançar no sistema">{x.parcelasPagas} antes do sistema</small>}</td>
             <td className={vt.n}>{x.parcelaAtual}/{x.parcelas}</td>
             <td className={`${vt.n} ${vt.neg} ${css.forte}`}>{brl(-x.parcelaCent)}</td>
+            <td className={vt.n}>{x.faltaCent == null ? '—' : x.faltaCent === 0 ? <span className={vt.pos}>quita</span> : <>{brl(x.faltaCent)}<small className={css.sub}>{x.parcelas - x.parcelaAtual}× restante{x.parcelas - x.parcelaAtual > 1 ? 's' : ''}</small></>}</td>
             <td>{ROT_TIPO[x.pessoaTipo]}</td>
-            <td className={vt.n}>{!fechado && <button className={css.link} onClick={() => onRemover(x.id, x.descricao, x.nome)}>Remover</button>}</td>
+            <td className={vt.n}>{!fechado && <span className={css.acoesDeb}>
+              <button className={css.link} onClick={(e) => onEditar(x, e.currentTarget)}>Editar</button>
+              <button className={css.link} onClick={() => onRemover(x.id, x.descricao, x.nome)}>Remover</button></span>}</td>
           </tr>
         ))}
       </tbody>
@@ -1271,22 +1277,29 @@ function BarraSemanas({ l }: { l: PessoalLinhaMot }) {
   );
 }
 
-function PainelDebito({ mes, onSalvo }: { mes: string; onSalvo: (descricao: string) => Promise<void> }) {
+function PainelDebito({ mes, editar, onSalvo }: { mes: string; editar?: PessoalDebito; onSalvo: (descricao: string) => Promise<void> }) {
   const [pessoas, setPessoas] = useState<PessoalPessoa[]>([]);
-  const [f, setF] = useState({ pessoa: '', descricao: '', valorCent: 0, parcelas: 1, inicio: mes });
+  const [f, setF] = useState(editar
+    ? { pessoa: `${editar.pessoaTipo}:${editar.pessoaId}`, descricao: editar.descricao, valorCent: editar.valorTotalCent, parcelas: editar.parcelas, pagas: editar.parcelasPagas ?? 0, inicio: editar.competenciaInicio }
+    : { pessoa: '', descricao: '', valorCent: 0, parcelas: 1, pagas: 0, inicio: mes });
+  const [retro, setRetro] = useState((editar?.parcelasPagas ?? 0) > 0);
   const [erro, setErro] = useState<string | null>(null);
   const [tocado, setTocado] = useState(false);
   const [salvando, setSalvando] = useState(false);
   useEffect(() => { api.get<PessoalPessoa[]>('/pessoal/pessoas').then(setPessoas).catch((e) => setErro((e as Error).message)); }, []);
-  const valido = !!f.pessoa && !!f.descricao.trim() && f.valorCent > 0 && f.parcelas >= 1;
+  const pagas = retro ? f.pagas : 0;
+  const valido = !!f.pessoa && !!f.descricao.trim() && f.valorCent > 0 && f.parcelas >= 1 && pagas < f.parcelas;
   const parcela = f.parcelas ? Math.floor(f.valorCent / f.parcelas) : 0;
+  const restantes = f.parcelas - pagas;
   async function salvar() {
     setTocado(true);
     if (!valido) return;
     const [pessoaTipo, pessoaId] = f.pessoa.split(':');
     setSalvando(true); setErro(null);
     try {
-      await api.post('/pessoal/debitos', { pessoaTipo, pessoaId, descricao: f.descricao, valorTotal: f.valorCent / 100, parcelas: f.parcelas, competenciaInicio: f.inicio });
+      const corpo = { descricao: f.descricao, valorTotal: f.valorCent / 100, parcelas: f.parcelas, parcelasPagas: pagas, competenciaInicio: f.inicio };
+      if (editar) await api.put(`/pessoal/debitos/${editar.id}`, corpo);
+      else await api.post('/pessoal/debitos', { pessoaTipo, pessoaId, ...corpo });
       await onSalvo(f.descricao.trim());
     } catch (e) { setErro((e as Error).message); setSalvando(false); }
   }
@@ -1294,7 +1307,7 @@ function PainelDebito({ mes, onSalvo }: { mes: string; onSalvo: (descricao: stri
     <>
       <div className={css.pCorpo}>
         <label className={css.campo} htmlFor="db-p"><span>Quem</span>
-          <span className={css.input}><select id="db-p" value={f.pessoa} onChange={(e) => setF({ ...f, pessoa: e.target.value })}>
+          <span className={css.input}><select id="db-p" value={f.pessoa} disabled={!!editar} onChange={(e) => setF({ ...f, pessoa: e.target.value })}>
             <option value="">Selecione a pessoa</option>
             {(['CLT', 'MEI', 'MOTORISTA'] as PessoaTipo[]).map((t) => {
               const doTipo = pessoas.filter((p) => p.pessoaTipo === t);
@@ -1310,13 +1323,25 @@ function PainelDebito({ mes, onSalvo }: { mes: string; onSalvo: (descricao: stri
           <CampoNum id="db-n" rotulo="Parcelas" max={60} valor={f.parcelas} onChange={(n) => setF({ ...f, parcelas: Math.max(1, n) })} />
         </div>
         {tocado && f.valorCent <= 0 && <small className={css.erroCampo}>Informe um valor maior que zero.</small>}
-        <label className={css.campo} htmlFor="db-i"><span>Primeira parcela em</span>
+        <label className={css.chkRetro}>
+          <input type="checkbox" checked={retro} onChange={(e) => setRetro(e.target.checked)} />
+          <span><b>Débito retroativo</b>: algumas parcelas já foram pagas antes de lançar aqui.</span>
+        </label>
+        {retro && (
+          <>
+            <CampoNum id="db-pg" rotulo="Parcelas já pagas" max={Math.max(0, f.parcelas - 1)} valor={f.pagas} onChange={(n) => setF({ ...f, pagas: n })} sufixo={`de ${f.parcelas}`} />
+            {f.parcelas > 0 && f.pagas >= f.parcelas && <small className={css.erroCampo}>As pagas precisam ser menos que o total de parcelas.</small>}
+          </>
+        )}
+        <label className={css.campo} htmlFor="db-i"><span>{pagas > 0 ? `Próxima parcela (${pagas + 1}ª) em` : 'Primeira parcela em'}</span>
           <span className={css.input}><input id="db-i" type="month" value={f.inicio} min={mes} onChange={(e) => e.target.value && setF({ ...f, inicio: e.target.value })} /></span></label>
-        {f.valorCent > 0 && <p className={css.formula}>{f.parcelas}× de {brl(parcela)} a partir de {mesLongo(f.inicio)}{f.parcelas > 1 && f.valorCent % f.parcelas ? ' (a última ajusta os centavos)' : ''}.</p>}
+        {f.valorCent > 0 && pagas < f.parcelas && (pagas > 0
+          ? <p className={css.formula}>Total {brl(f.valorCent)} em {f.parcelas}× de {brl(parcela)}. Já pago: {pagas}× = <b>{brl(parcela * pagas)}</b>. Faltam <b>{restantes}× ({brl(f.valorCent - parcela * pagas)})</b> a partir de {mesLongo(f.inicio)}.</p>
+          : <p className={css.formula}>{f.parcelas}× de {brl(parcela)} a partir de {mesLongo(f.inicio)}{f.parcelas > 1 && f.valorCent % f.parcelas ? ' (a última ajusta os centavos)' : ''}.</p>)}
       </div>
       <div className={css.pRodape}>
         {erro && <p className={css.alerta}>{erro}</p>}
-        <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Adicionar débito'}</Botao>
+        <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : editar ? 'Salvar débito' : 'Adicionar débito'}</Botao>
       </div>
     </>
   );
@@ -2176,7 +2201,7 @@ function ResumoAba({ aba, d }: { aba: Aba; d: PessoalCompetencia }) {
   if (aba === 'debitos') return <Resumo itens={[
     { k: 'Débitos neste mês', v: String(d.debitos.length) },
     { k: 'Descontado neste mês', v: brl(-soma(d.debitos, (x) => x.parcelaCent)), tom: d.debitos.length ? 'neg' : undefined },
-    { k: 'Saldo total dos débitos', v: brl(soma(d.debitos, (x) => x.valorTotalCent)) },
+    { k: 'Saldo devedor', v: brl(soma(d.debitos, (x) => x.valorTotalCent - (x.pagoCent ?? 0))), s: `de ${brl(soma(d.debitos, (x) => x.valorTotalCent))} no total · já pago ${brl(soma(d.debitos, (x) => x.pagoCent ?? 0))}` },
   ]} />;
   return null;
 }

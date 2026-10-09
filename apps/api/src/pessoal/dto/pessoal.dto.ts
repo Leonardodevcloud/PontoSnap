@@ -87,6 +87,16 @@ export class DebitoDto {
   @Type(() => Number) @IsNumber() @Min(0.01) valorTotal!: number;
   @Type(() => Number) @IsInt() @Min(1) @Max(60) parcelas!: number;
   @Matches(COMP) competenciaInicio!: string;
+  /** Débito retroativo: parcelas já pagas antes de lançar. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(59) parcelasPagas?: number;
+}
+
+export class EditarDebitoDto {
+  @IsString() @MaxLength(120) descricao!: string;
+  @Type(() => Number) @IsNumber() @Min(0.01) valorTotal!: number;
+  @Type(() => Number) @IsInt() @Min(1) @Max(60) parcelas!: number;
+  @Matches(COMP) competenciaInicio!: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(59) parcelasPagas?: number;
 }
 
 export class CompetenciaDto {

@@ -69,14 +69,30 @@ export function semanasDoMes(comp: string): { inicio: string; fim: string; dias:
  * Parcela do débito na competência (ou null se não cai nela). A última
  * parcela absorve o resto da divisão — a soma das parcelas fecha o total.
  */
-export function parcelaNoMes(
-  d: { valorTotalCent: number; parcelas: number; competenciaInicio: string }, comp: string,
-): { numero: number; valorCent: number } | null {
+export type DebitoParcelado = { valorTotalCent: number; parcelas: number; competenciaInicio: string; parcelasPagas?: number };
+
+/**
+ * Parcela que cai no mês. Com parcelas já pagas antes do lançamento (débito
+ * retroativo), a competência de início é a da parcela seguinte: com 4 de 12
+ * pagas, o início desconta a 5ª.
+ */
+export function parcelaNoMes(d: DebitoParcelado, comp: string): { numero: number; valorCent: number } | null {
+  const pagas = d.parcelasPagas ?? 0;
   const i = mesesEntre(d.competenciaInicio, comp);
-  if (i < 0 || i >= d.parcelas) return null;
+  const numero = pagas + i + 1;
+  if (i < 0 || numero > d.parcelas) return null;
   const base = Math.floor(d.valorTotalCent / d.parcelas);
-  const valorCent = i === d.parcelas - 1 ? d.valorTotalCent - base * (d.parcelas - 1) : base;
-  return { numero: i + 1, valorCent };
+  const valorCent = numero === d.parcelas ? d.valorTotalCent - base * (d.parcelas - 1) : base;
+  return { numero, valorCent };
+}
+
+/** Situação do débito no mês: quanto já foi pago antes desta parcela e quanto falta depois dela. */
+export function situacaoDebito(d: DebitoParcelado, comp: string): { pagoCent: number; faltaCent: number } | null {
+  const pc = parcelaNoMes(d, comp);
+  if (!pc) return null;
+  const base = Math.floor(d.valorTotalCent / d.parcelas);
+  const pagoCent = base * (pc.numero - 1);
+  return { pagoCent, faltaCent: d.valorTotalCent - pagoCent - pc.valorCent };
 }
 
 // ---------- benefícios (CLT) ----------

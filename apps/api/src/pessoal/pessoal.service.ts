@@ -12,7 +12,7 @@ import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
 import {
-  calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, faixaDoMes, parcelaNoMes,
+  calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, faixaDoMes, parcelaNoMes, situacaoDebito,
   semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
 } from './calculo';
 
@@ -107,9 +107,17 @@ export interface LinhaMot {
   /** Débitos do mês ainda não descontados em nenhuma semana. */
   debitoPendenteCent: number;
 }
+/** Linha do banco → débito parcelado (com as parcelas pagas antes do lançamento). */
+const debParc = (d: { valorTotal: string; parcelas: number; competenciaInicio: string; parcelasPagas: number }) =>
+  ({ valorTotalCent: centavos(d.valorTotal), parcelas: d.parcelas, competenciaInicio: d.competenciaInicio, parcelasPagas: d.parcelasPagas });
+
 export interface LinhaDebito {
   id: string; pessoaTipo: PessoaTipo; pessoaId: string; nome: string; descricao: string;
   valorTotalCent: number; parcelas: number; competenciaInicio: string; parcelaAtual: number; parcelaCent: number;
+  /** Parcelas pagas antes do lançamento (retroativo). */
+  parcelasPagas?: number;
+  /** Já pago antes desta parcela (retroativo + meses anteriores) e o que falta depois dela. */
+  pagoCent?: number; faltaCent?: number;
 }
 export interface CompetenciaPessoal {
   competencia: string; proxima: string; fechado: boolean; fechadoEm: string | null;
@@ -246,7 +254,7 @@ export class PessoalService {
       dados.lancs.find((l) => l.pessoaTipo === tipo && l.pessoaId === id && l.periodo === periodo);
     const debitosDe = (tipo: PessoaTipo, id: string) => dados.debs
       .filter((d) => d.pessoaTipo === tipo && d.pessoaId === id)
-      .reduce((s, d) => s + (parcelaNoMes({ valorTotalCent: centavos(d.valorTotal), parcelas: d.parcelas, competenciaInicio: d.competenciaInicio }, comp)?.valorCent ?? 0), 0);
+      .reduce((s, d) => s + (parcelaNoMes(debParc(d), comp)?.valorCent ?? 0), 0);
 
     const feriadosLista = (await this.trat.listarFeriados(tenantId, inicio, fim)).map((f) => f.data);
     const feriadosProx = (await this.trat.listarFeriados(tenantId, fx.inicio, fx.fim)).map((f) => f.data);
@@ -441,12 +449,13 @@ export class PessoalService {
       (tipo === 'CLT' ? dados.emps.find((e) => e.id === id)?.nome : dados.prest.find((p) => p.id === id)?.nome) ?? '—';
     const ativos = new Set([...clt.map((c) => `CLT:${c.empregadoId}`), ...mei.map((m) => `MEI:${m.id}`), ...motoristas.map((m) => `MOTORISTA:${m.id}`)]);
     const debitos: LinhaDebito[] = dados.debs.flatMap((d) => {
-      const pc = parcelaNoMes({ valorTotalCent: centavos(d.valorTotal), parcelas: d.parcelas, competenciaInicio: d.competenciaInicio }, comp);
+      const pc = parcelaNoMes(debParc(d), comp);
       if (!pc || !ativos.has(`${d.pessoaTipo}:${d.pessoaId}`)) return [];
       return [{
         id: d.id, pessoaTipo: d.pessoaTipo as PessoaTipo, pessoaId: d.pessoaId, nome: nomeDe(d.pessoaTipo, d.pessoaId), descricao: d.descricao,
         valorTotalCent: centavos(d.valorTotal), parcelas: d.parcelas, competenciaInicio: d.competenciaInicio,
-        parcelaAtual: pc.numero, parcelaCent: pc.valorCent,
+        parcelaAtual: pc.numero, parcelaCent: pc.valorCent, parcelasPagas: d.parcelasPagas,
+        ...situacaoDebito(debParc(d), comp)!,
       }];
     });
 
@@ -720,7 +729,7 @@ export class PessoalService {
   private async debitosDoMes(tx: Tx, tenantId: string, tipo: PessoaTipo, id: string, comp: string) {
     const debs = await tx.select().from(pessoalDebito)
       .where(and(eq(pessoalDebito.tenantId, tenantId), eq(pessoalDebito.pessoaTipo, tipo), eq(pessoalDebito.pessoaId, id)));
-    return debs.reduce((s, x) => s + (parcelaNoMes({ valorTotalCent: centavos(x.valorTotal), parcelas: x.parcelas, competenciaInicio: x.competenciaInicio }, comp)?.valorCent ?? 0), 0);
+    return debs.reduce((s, x) => s + (parcelaNoMes(debParc(x), comp)?.valorCent ?? 0), 0);
   }
 
   /** Quanto dos débitos do mês um motorista pode ainda descontar numa semana (sem passar do total do mês). */
@@ -786,17 +795,51 @@ export class PessoalService {
     });
   }
 
-  async criarDebito(tenantId: string, d: {
-    pessoaTipo: PessoaTipo; pessoaId: string; descricao: string; valorTotal: number; parcelas: number; competenciaInicio: string;
-  }) {
+  private validarDebito(d: { valorTotal: number; parcelas: number; parcelasPagas?: number; competenciaInicio: string }) {
     this.validarComp(d.competenciaInicio);
-    await this.exigirAberta(tenantId, d.competenciaInicio);
     if (d.valorTotal <= 0) throw new BadRequestException('Informe um valor maior que zero');
+    const pagas = d.parcelasPagas ?? 0;
+    if (pagas < 0 || pagas >= d.parcelas) throw new BadRequestException('As parcelas já pagas precisam ser menos que o total de parcelas.');
+  }
+
+  /** Débito que já caiu num mês fechado não pode mudar: mudaria o passado. */
+  private async mesFechadoAtingido(tx: Tx, tenantId: string, d: typeof pessoalDebito.$inferSelect) {
+    const fechados = await tx.select({ c: pessoalFechamento.competencia }).from(pessoalFechamento)
+      .where(eq(pessoalFechamento.tenantId, tenantId));
+    return fechados.find((f) => parcelaNoMes(debParc(d), f.c))?.c ?? null;
+  }
+
+  async criarDebito(tenantId: string, d: {
+    pessoaTipo: PessoaTipo; pessoaId: string; descricao: string; valorTotal: number; parcelas: number; competenciaInicio: string; parcelasPagas?: number;
+  }) {
+    this.validarDebito(d);
+    await this.exigirAberta(tenantId, d.competenciaInicio);
     return comTenant(this.db, tenantId, async (tx) => {
       const [r] = await tx.insert(pessoalDebito).values({
         tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, descricao: d.descricao.trim(),
         valorTotal: reais(centavos(d.valorTotal)), parcelas: d.parcelas, competenciaInicio: d.competenciaInicio,
+        parcelasPagas: d.parcelasPagas ?? 0,
       }).returning();
+      return r;
+    });
+  }
+
+  /** Corrige um débito (ex.: informar as parcelas já pagas de um retroativo). */
+  async editarDebito(tenantId: string, id: string, d: {
+    descricao: string; valorTotal: number; parcelas: number; competenciaInicio: string; parcelasPagas?: number;
+  }) {
+    this.validarDebito(d);
+    await this.exigirAberta(tenantId, d.competenciaInicio);
+    return comTenant(this.db, tenantId, async (tx) => {
+      const atual = (await tx.select().from(pessoalDebito)
+        .where(and(eq(pessoalDebito.id, id), eq(pessoalDebito.tenantId, tenantId))).limit(1))[0];
+      if (!atual) throw new NotFoundException('Débito não encontrado');
+      const atingido = await this.mesFechadoAtingido(tx, tenantId, atual);
+      if (atingido) throw new BadRequestException(`Este débito já foi descontado em ${atingido}, que está fechado. Reabra esse mês para editar.`);
+      const [r] = await tx.update(pessoalDebito).set({
+        descricao: d.descricao.trim(), valorTotal: reais(centavos(d.valorTotal)), parcelas: d.parcelas,
+        competenciaInicio: d.competenciaInicio, parcelasPagas: d.parcelasPagas ?? 0,
+      }).where(eq(pessoalDebito.id, id)).returning();
       return r;
     });
   }
@@ -807,10 +850,8 @@ export class PessoalService {
         .where(and(eq(pessoalDebito.id, id), eq(pessoalDebito.tenantId, tenantId))).limit(1))[0];
       if (!d) throw new NotFoundException('Débito não encontrado');
       // Débito que já caiu num mês fechado não pode sumir: mudaria o passado.
-      const fechados = await tx.select({ c: pessoalFechamento.competencia }).from(pessoalFechamento)
-        .where(eq(pessoalFechamento.tenantId, tenantId));
-      const atingido = fechados.find((f) => parcelaNoMes({ valorTotalCent: 1, parcelas: d.parcelas, competenciaInicio: d.competenciaInicio }, f.c));
-      if (atingido) throw new BadRequestException(`Este débito já foi descontado em ${atingido.c}, que está fechado. Reabra esse mês para remover.`);
+      const atingido = await this.mesFechadoAtingido(tx, tenantId, d);
+      if (atingido) throw new BadRequestException(`Este débito já foi descontado em ${atingido}, que está fechado. Reabra esse mês para remover.`);
       await tx.delete(pessoalDebito).where(eq(pessoalDebito.id, id));
       return { removido: true };
     });
