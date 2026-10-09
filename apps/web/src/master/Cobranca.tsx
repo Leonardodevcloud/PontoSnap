@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lerReais } from '../lib/formato';
 import { api } from '../lib/api';
 import type { Tenant, PainelCobranca, Plano, Cobranca, Assinatura } from '../tipos';
 import css from './Cobranca.module.css';
@@ -169,7 +170,7 @@ function ModalAssinatura({ tenant, planos, assinatura, onFechar, onSalvo }: {
       await api.post(`/cobranca/tenants/${tenant.id}/assinatura`, {
         planoId: planoId || null,
         modoOverride: usarOverride ? modoOverride : null,
-        valorOverride: usarOverride ? Number(valorOverride.replace(',', '.')) : null,
+        valorOverride: usarOverride ? lerReais(valorOverride) : null,
         diaVencimento: Number(diaVencimento),
         situacao,
       });
@@ -260,7 +261,7 @@ function ModalPlanos({ planos, onFechar, onMudou }: {
     setErro(null);
     try {
       await api.post('/cobranca/planos', {
-        nome: nome.trim(), modo, valor: Number(valor.replace(',', '.')), descricao: descricao.trim() || undefined,
+        nome: nome.trim(), modo, valor: lerReais(valor), descricao: descricao.trim() || undefined,
       });
       setNome(''); setValor(''); setDescricao('');
       onMudou();

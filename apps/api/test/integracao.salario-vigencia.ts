@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { EmpregadoService } from '../src/empregado/empregado.service';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
 import { PessoalService } from '../src/pessoal/pessoal.service';
+import { CriptoService } from '../src/common/cripto.service';
 import { diasDoMes, diaSemana } from '../src/pessoal/calculo';
 
 /** Promoção no meio do mês: salário com vigência, mês proporcional, passado intacto. */
@@ -13,7 +14,7 @@ const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', use
 const db = drizzle(client, { schema });
 const empSvc = new EmpregadoService(db as never, {} as never, { exigirVaga: async () => {} } as never);
 const trat = new TratamentoService(db);
-const pes = new PessoalService(db, trat);
+const pes = new PessoalService(db, trat, new CriptoService());
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };
 const em = (d: string, hm: string) => new Date(`${d}T${hm}:00-0300`);

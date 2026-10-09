@@ -1,12 +1,13 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, lte } from 'drizzle-orm';
 import {
-  comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalPrestador, pessoalExclusao, pessoalLancamento,
+  comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
+import { CriptoService } from '../common/cripto.service';
 import {
   calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, faixaDoMes, parcelaNoMes,
   semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
@@ -40,6 +41,10 @@ export interface LinhaClt {
     vrProxCent: number; vtProxCent: number;
     naoUsados: { data: string; motivo: MotivoNaoUso }[];
     acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;
+    /** Cesta do mês apurado: paga só sem falta e depois da carência. */
+    cestaCent: number; cestaStatus: 'PAGA' | 'PERDIDA_FALTA' | 'CARENCIA' | 'SEM_CESTA';
+    /** Mês a partir do qual a cesta é paga; origem MANUAL (definido no painel) ou AUTO (3 meses após o início no ponto). */
+    cestaDesde: string | null; cestaDesdeOrigem: 'MANUAL' | 'AUTO' | null;
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null;
@@ -52,7 +57,10 @@ export interface PadraoBeneficio extends ConfigBeneficio { vigenteDesde: string 
 export interface LancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
   nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
+  /** Arquivo da NF enviado (metadados; o conteúdo baixa por /pessoal/nf/:id). */
+  nfArquivo: NfArquivo | null;
 }
+export interface NfArquivo { id: string; nome: string; mime: string; bytes: number; enviadoEm: string }
 /** Valor de contrato com vigência (o mês usa a linha mais recente ≤ ele). */
 export interface ValorContrato { vigenteDesde: string; valorCent: number; baseDias: BaseDias }
 
@@ -64,7 +72,7 @@ export interface LinhaMei {
   valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
   brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
 }
-export interface SemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number }
+export interface SemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null }
 export interface LinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
   valorDesde: string; historicoValores: ValorContrato[];
@@ -96,6 +104,7 @@ export class PessoalService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly trat: TratamentoService,
+    private readonly cripto: CriptoService,
   ) {}
 
   private validarComp(c: string) {
@@ -118,8 +127,50 @@ export class PessoalService {
   async competencia(tenantId: string, comp: string): Promise<CompetenciaPessoal> {
     this.validarComp(comp);
     const fech = await comTenant(this.db, tenantId, (tx) => this.fechamento(tx, tenantId, comp));
-    if (fech) return { ...(fech.snapshot as CompetenciaPessoal), fechado: true, fechadoEm: fech.fechadoEm.toISOString() };
+    if (fech) return this.sobreporPagamento(tenantId, { ...(fech.snapshot as CompetenciaPessoal), fechado: true, fechadoEm: fech.fechadoEm.toISOString() });
     return this.calcular(tenantId, comp);
+  }
+
+  /**
+   * Mês fechado é retrato dos VALORES. Mas NF e pagamento chegam depois do
+   * fechamento — então número/data da NF, arquivo e "pago" são lidos ao vivo
+   * por cima do retrato.
+   */
+  private async sobreporPagamento(tenantId: string, snap: CompetenciaPessoal): Promise<CompetenciaPessoal> {
+    const comp = snap.competencia;
+    const { lancs, nfs } = await comTenant(this.db, tenantId, async (tx) => ({
+      lancs: await tx.select().from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.competencia, comp))),
+      nfs: await this.nfsDoMes(tx, tenantId, comp),
+    }));
+    const l = (tipo: string, id: string, per: string) => lancs.find((x) => x.pessoaTipo === tipo && x.pessoaId === id && x.periodo === per);
+    const mei = snap.mei.map((m) => {
+      const x = l('MEI', m.id, 'MES');
+      return { ...m, lanc: { ...m.lanc, nfNumero: x?.nfNumero ?? null, nfData: x?.nfData ?? null, pago: x?.pago ?? false, nfArquivo: nfs.get(`MEI:${m.id}:MES`) ?? null } };
+    });
+    const motoristas = snap.motoristas.map((m) => ({
+      ...m,
+      semanas: m.semanas.map((s) => {
+        const x = l('MOTORISTA', m.id, s.inicio);
+        return { ...s, nfNumero: x?.nfNumero ?? null, pago: x?.pago ?? false, nfArquivo: nfs.get(`MOTORISTA:${m.id}:${s.inicio}`) ?? null };
+      }),
+    }));
+    return {
+      ...snap, mei, motoristas,
+      pendencias: {
+        ...snap.pendencias,
+        nfMei: mei.filter((m) => !m.lanc.nfNumero && !m.lanc.nfArquivo).length,
+        nfMotorista: motoristas.reduce((a, m) => a + m.semanas.filter((s) => s.dias > 0 && !s.nfNumero && !s.nfArquivo).length, 0),
+      },
+    };
+  }
+
+  /** Metadados das NFs do mês (sem o conteúdo), por "TIPO:pessoa:período". */
+  private async nfsDoMes(tx: Tx, tenantId: string, comp: string): Promise<Map<string, NfArquivo>> {
+    const rows = await tx.select({
+      id: pessoalNfArquivo.id, pessoaTipo: pessoalNfArquivo.pessoaTipo, pessoaId: pessoalNfArquivo.pessoaId, periodo: pessoalNfArquivo.periodo,
+      nome: pessoalNfArquivo.arquivoNome, mime: pessoalNfArquivo.arquivoMime, bytes: pessoalNfArquivo.arquivoBytes, criadoEm: pessoalNfArquivo.criadoEm,
+    }).from(pessoalNfArquivo).where(and(eq(pessoalNfArquivo.tenantId, tenantId), eq(pessoalNfArquivo.competencia, comp)));
+    return new Map(rows.map((r) => [`${r.pessoaTipo}:${r.pessoaId}:${r.periodo}`, { id: r.id, nome: r.nome, mime: r.mime, bytes: r.bytes, enviadoEm: r.criadoEm.toISOString() }]));
   }
 
   private async calcular(tenantId: string, comp: string): Promise<CompetenciaPessoal> {
@@ -133,6 +184,8 @@ export class PessoalService {
       const configs = await tx.select().from(pessoalCltConfig).where(eq(pessoalCltConfig.tenantId, tenantId));
       const padroesRows = await tx.select().from(pessoalPadrao).where(eq(pessoalPadrao.tenantId, tenantId));
       const valoresRows = await tx.select().from(pessoalPrestadorValor).where(eq(pessoalPrestadorValor.tenantId, tenantId));
+      const cestaRows = await tx.select().from(pessoalCltCesta).where(eq(pessoalCltCesta.tenantId, tenantId));
+      const nfs = await this.nfsDoMes(tx, tenantId, comp);
       const prest = await tx.select().from(pessoalPrestador)
         .where(and(eq(pessoalPrestador.tenantId, tenantId), lte(pessoalPrestador.competenciaInicio, comp)))
         .orderBy(asc(pessoalPrestador.nome));
@@ -143,7 +196,7 @@ export class PessoalService {
       const debs = await tx.select().from(pessoalDebito)
         .where(and(eq(pessoalDebito.tenantId, tenantId), lte(pessoalDebito.competenciaInicio, comp)));
       const fechAnt = await this.fechamento(tx, tenantId, somarMeses(comp, -1));
-      return { emps, configs, padroesRows, valoresRows, prest, excl, lancs, debs, fechAnt };
+      return { emps, configs, padroesRows, valoresRows, cestaRows, nfs, prest, excl, lancs, debs, fechAnt };
     });
 
     // Quem está fora deste mês: exclusão do próprio mês, ou "daqui em diante" de um mês anterior.
@@ -233,8 +286,12 @@ export class PessoalService {
       // O acerto devolve pelo valor que FOI PAGO para este mês: o do fechamento
       // anterior, ou (sem fechamento) o valor vigente neste mês.
       const pagoCom = linhaAnt?.config ?? beneficioEm(e.id, comp);
+      // Cesta: valor vigente NESTE mês; liberada depois da carência.
+      const cestaManual = dados.cestaRows.find((c) => c.empregadoId === e.id)?.cestaDesde ?? null;
+      const cestaAuto = e.dataInicioPonto ? somarMeses(e.dataInicioPonto.slice(0, 7), 3) : null;
+      const cestaDesde = cestaManual ?? cestaAuto;
       const ben = calcularBeneficio({
-        vrDiaCent: config.vrDiaCent, cestaCent: config.cestaCent, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
+        vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, pagos,
         previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados,
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
@@ -245,7 +302,7 @@ export class PessoalService {
       const diasMes = diasUteis.length;
       const debitosCent = debitosDe('CLT', e.id);
       const liquidoSalarioCent = sal + proventosCent - descontosCent - debitosCent;
-      const custoBrutoCent = sal + proventosCent - descontosCent + ben.vrProxCent + ben.vtProxCent;
+      const custoBrutoCent = sal + proventosCent - descontosCent + ben.vrProxCent + ben.cestaCent + ben.vtProxCent;
       const abatimentosCent = debitosCent + ben.acertoCent;
       clt.push({
         empregadoId: e.id, nome: e.nome, matricula: e.matricula, config, salarioCent, salarioPartes,
@@ -255,7 +312,10 @@ export class PessoalService {
         valorDia30Cent: Math.round(salarioFimMesCent / 30),
         valorHoraCent: Math.round(salarioFimMesCent / 220),
         heMin, heNoBancoMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
-        beneficios: { ...ben, diasProx: diasProxLista.length, diasProxLista, pagosEstimado: !pagosSnap },
+        beneficios: {
+          ...ben, diasProx: diasProxLista.length, diasProxLista, pagosEstimado: !pagosSnap,
+          cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null,
+        },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,
         liquidoPagarCent: liquidoSalarioCent + ben.cargaCent,
         observacao: lancDe('CLT', e.id)?.observacao ?? null,
@@ -289,6 +349,7 @@ export class PessoalService {
           heMin: l?.heMin ?? 0, faltas: l?.faltas ?? 0, feriadosTrab: l?.feriadosTrab ?? 0,
           metaCent: centavos(l?.meta), metaPaga: l?.metaPaga ?? false, metaPagaEm: l?.metaPagaEm ?? null,
           nfNumero: l?.nfNumero ?? null, nfData: l?.nfData ?? null, pago: l?.pago ?? false, observacao: l?.observacao ?? null,
+          nfArquivo: dados.nfs.get(`MEI:${p.id}:MES`) ?? null,
         };
         const r = calcularMei({ valorCent, diasMes, heMin: lanc.heMin, faltas: lanc.faltas, feriadosTrab: lanc.feriadosTrab, metaCent: lanc.metaCent, metaPaga: lanc.metaPaga, debitosCent });
         mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
@@ -299,7 +360,8 @@ export class PessoalService {
           const dias = l?.dias ?? diasAuto;
           const adicionalCent = centavos(l?.adicional);
           const { totalCent } = calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias, adicionalCent });
-          return { inicio: s.inicio, fim: s.fim, diasAuto, dias, adicionalCent, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, totalCent };
+          return { inicio: s.inicio, fim: s.fim, diasAuto, dias, adicionalCent, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, totalCent,
+            nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null };
         });
         // Arredonda uma vez no mês: dias × (mensal ÷ dias do mês) fecha no mensal exato.
         const totalCent = Math.round((valorCent / Math.max(1, diasMes)) * sem.reduce((a, s) => a + s.dias, 0))
@@ -341,8 +403,8 @@ export class PessoalService {
       semanas: semanas.map((s) => ({ inicio: s.inicio, fim: s.fim })),
       foraDoMes, totais,
       pendencias: {
-        nfMei: mei.filter((m) => !m.lanc.nfNumero).length,
-        nfMotorista: motoristas.reduce((a, m) => a + m.semanas.filter((s) => s.dias > 0 && !s.nfNumero).length, 0),
+        nfMei: mei.filter((m) => !m.lanc.nfNumero && !m.lanc.nfArquivo).length,
+        nfMotorista: motoristas.reduce((a, m) => a + m.semanas.filter((s) => s.dias > 0 && !s.nfNumero && !s.nfArquivo).length, 0),
         semSalario: clt.filter((c) => c.salarioCent == null).length,
         semPonto: clt.filter((c) => c.erro).length,
       },
@@ -391,6 +453,26 @@ export class PessoalService {
     });
   }
 
+  /**
+   * Mês a partir do qual a cesta é paga. null = volta ao automático (3 meses
+   * depois do início no ponto). Meses fechados não mudam (são retrato).
+   */
+  async definirInicioCesta(tenantId: string, empregadoId: string, cestaDesde: string | null) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const e = (await tx.select({ id: empregado.id }).from(empregado)
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!e) throw new NotFoundException('Funcionário não encontrado');
+      if (cestaDesde == null) {
+        await tx.delete(pessoalCltCesta).where(and(eq(pessoalCltCesta.tenantId, tenantId), eq(pessoalCltCesta.empregadoId, empregadoId)));
+        return { cestaDesde: null };
+      }
+      this.validarComp(cestaDesde);
+      await tx.insert(pessoalCltCesta).values({ tenantId, empregadoId, cestaDesde })
+        .onConflictDoUpdate({ target: [pessoalCltCesta.tenantId, pessoalCltCesta.empregadoId], set: { cestaDesde, atualizadoEm: new Date() } });
+      return { cestaDesde };
+    });
+  }
+
   /** Padrão de benefício da empresa a partir de um mês (vigência). */
   async salvarPadrao(tenantId: string, d: { vrDia: number; cestaMensal: number; vtTipo: VtTipo; vtValor: number; vigenteDesde: string }) {
     await this.exigirVigenciaAberta(tenantId, d.vigenteDesde);
@@ -409,7 +491,7 @@ export class PessoalService {
     this.validarComp(d.competenciaInicio);
     return comTenant(this.db, tenantId, async (tx) => {
       const [r] = await tx.insert(pessoalPrestador).values({
-        tenantId, tipo: d.tipo, nome: d.nome.trim(), documento: d.documento?.trim() || null, funcao: d.funcao?.trim() || null,
+        tenantId, tipo: d.tipo, nome: d.nome.trim(), documento: d.documento?.replace(/\D/g, '') || null, funcao: d.funcao?.trim() || null,
         valorMensal: reais(centavos(d.valorMensal)), baseDias: d.baseDias, chavePix: d.chavePix?.trim() || null,
         competenciaInicio: d.competenciaInicio,
       }).returning();
@@ -442,7 +524,7 @@ export class PessoalService {
       if (!p) throw new NotFoundException('Prestador não encontrado');
       const set: Record<string, unknown> = {};
       if (d.nome !== undefined) set.nome = d.nome.trim();
-      if (d.documento !== undefined) set.documento = d.documento?.trim() || null;
+      if (d.documento !== undefined) set.documento = d.documento?.replace(/\D/g, '') || null;
       if (d.funcao !== undefined) set.funcao = d.funcao?.trim() || null;
       if (d.chavePix !== undefined) set.chavePix = d.chavePix?.trim() || null;
       if (reajuste) {
@@ -476,7 +558,12 @@ export class PessoalService {
     pago?: boolean; observacao?: string | null;
   }) {
     this.validarComp(d.competencia);
-    await this.exigirAberta(tenantId, d.competencia);
+    // Mês fechado: valores congelados, mas NF e pagamento ainda podem ser
+    // registrados (chegam depois do fechamento e não mudam nenhum cálculo).
+    const soPagamento = Object.entries(d)
+      .filter(([k, v]) => v !== undefined && !['pessoaTipo', 'pessoaId', 'competencia', 'periodo'].includes(k))
+      .every(([k]) => ['pago', 'nfNumero', 'nfData'].includes(k));
+    if (!soPagamento) await this.exigirAberta(tenantId, d.competencia);
     const periodo = d.periodo ?? 'MES';
     const set: Record<string, unknown> = { atualizadoEm: new Date() };
     for (const k of ['heMin', 'faltas', 'feriadosTrab', 'dias', 'metaPaga', 'pago'] as const) if (d[k] !== undefined) set[k] = d[k];
@@ -580,6 +667,55 @@ export class PessoalService {
       await tx.delete(pessoalFechamento)
         .where(and(eq(pessoalFechamento.tenantId, tenantId), eq(pessoalFechamento.competencia, comp)));
       return { reaberto: true };
+    });
+  }
+
+  // ======================= arquivo da NF =======================
+
+  private static readonly NF_MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/xml', 'text/xml'];
+  private static readonly NF_MAX = 5 * 1024 * 1024;
+
+  /** Sobe (ou substitui) o arquivo da NF de um lançamento. Vale também em mês fechado. */
+  async salvarNf(tenantId: string, d: {
+    pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string; periodo?: string;
+    arquivoBase64: string; arquivoNome: string; arquivoMime: string;
+  }) {
+    this.validarComp(d.competencia);
+    const mime = d.arquivoMime === 'text/xml' ? 'application/xml' : d.arquivoMime;
+    if (!PessoalService.NF_MIMES.includes(mime)) throw new BadRequestException('Envie a nota em PDF, XML ou imagem (JPG/PNG).');
+    const bruto = Buffer.from(d.arquivoBase64, 'base64');
+    if (bruto.length === 0) throw new BadRequestException('Arquivo vazio.');
+    if (bruto.length > PessoalService.NF_MAX) throw new BadRequestException('Arquivo maior que 5 MB. Envie um PDF menor.');
+    const periodo = d.periodo ?? 'MES';
+    return comTenant(this.db, tenantId, async (tx) => {
+      const p = (await tx.select({ id: pessoalPrestador.id }).from(pessoalPrestador)
+        .where(and(eq(pessoalPrestador.id, d.pessoaId), eq(pessoalPrestador.tenantId, tenantId))).limit(1))[0];
+      if (!p) throw new NotFoundException('Prestador não encontrado');
+      const valores = {
+        arquivo: this.cripto.cifrarBytes(bruto), arquivoNome: d.arquivoNome.slice(0, 160), arquivoMime: mime, arquivoBytes: bruto.length, criadoEm: new Date(),
+      };
+      const [r] = await tx.insert(pessoalNfArquivo).values({ tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, competencia: d.competencia, periodo, ...valores })
+        .onConflictDoUpdate({
+          target: [pessoalNfArquivo.tenantId, pessoalNfArquivo.pessoaTipo, pessoalNfArquivo.pessoaId, pessoalNfArquivo.competencia, pessoalNfArquivo.periodo],
+          set: valores,
+        }).returning({ id: pessoalNfArquivo.id, nome: pessoalNfArquivo.arquivoNome, bytes: pessoalNfArquivo.arquivoBytes });
+      return r;
+    });
+  }
+
+  async baixarNf(tenantId: string, id: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const r = (await tx.select().from(pessoalNfArquivo)
+        .where(and(eq(pessoalNfArquivo.id, id), eq(pessoalNfArquivo.tenantId, tenantId))).limit(1))[0];
+      if (!r) throw new NotFoundException('Arquivo não encontrado');
+      return { bytes: this.cripto.decifrarBytes(r.arquivo), nome: r.arquivoNome, mime: r.arquivoMime };
+    });
+  }
+
+  async removerNf(tenantId: string, id: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      await tx.delete(pessoalNfArquivo).where(and(eq(pessoalNfArquivo.id, id), eq(pessoalNfArquivo.tenantId, tenantId)));
+      return { removido: true };
     });
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
+import { lerReais } from '../lib/formato';
 import type { Empregado, Horario } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
@@ -260,7 +261,7 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
   async function salvar() {
     setErro(null); setEnviando(true);
     try {
-      const sal = salario ? Number(salario.replace(',', '.')) : undefined;
+      const sal = salario ? lerReais(salario) : undefined;
       const r = await api.post<{ acesso?: { email: string; senhaProvisoria: string } }>('/empregados', {
         nome: nome.trim(), cpf: soDigitos(cpf),
         matricula: matricula.trim() || undefined,
@@ -448,7 +449,7 @@ function ModalSalario({ empregado, onFechar, onSalvo }: { empregado: Empregado; 
   const primeiro = hist !== null && hist.length === 0;
   const reais = (v: string | number) => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const dataBr = (iso: string) => iso <= '2000-01-01' ? 'o início' : `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
-  const numero = Number(String(salario).replace(/\./g, '').replace(',', '.'));
+  const numero = lerReais(salario);
 
   async function salvar() {
     setErro(null); setEnviando(true);

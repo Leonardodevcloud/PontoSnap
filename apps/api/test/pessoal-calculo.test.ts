@@ -61,10 +61,22 @@ describe('benefícios com acerto do mês anterior', () => {
     expect(r.vrProxCent).toBe(19 * 3000);
     expect(r.acertoVrCent).toBe(2 * 2500);
   });
-  it('cesta básica é mensal e não sofre acerto', () => {
-    const r = calcularBeneficio({ ...base, cestaCent: 8000 });
-    expect(r.vrProxCent).toBe(19 * 2500 + 8000);
-    expect(r.acertoVrCent).toBe(5000);
+  it('cesta: teve falta no mês, perde a cesta inteira', () => {
+    const r = calcularBeneficio({ ...base, cestaCent: 8000 });   // base tem falta em 20/10
+    expect(r.cestaStatus).toBe('PERDIDA_FALTA');
+    expect(r.cestaCent).toBe(0);
+    expect(r.vrProxCent).toBe(19 * 2500);
+  });
+  it('cesta: sem falta é paga cheia e entra na carga (sem acerto)', () => {
+    const r = calcularBeneficio({ ...base, cestaCent: 8000, faltas: new Set() , previstosMes: new Set(['2026-10-13', '2026-10-20', '2026-10-21']) });
+    expect(r.cestaStatus).toBe('PAGA');
+    expect(r.cestaCent).toBe(8000);
+    expect(r.cargaCent).toBe(r.vrProxCent + 8000 + r.vtProxCent - r.acertoCent);
+  });
+  it('cesta: em carência não paga, mesmo sem falta', () => {
+    const r = calcularBeneficio({ ...base, cestaCent: 8000, faltas: new Set(), cestaLiberada: false });
+    expect(r.cestaStatus).toBe('CARENCIA');
+    expect(r.cestaCent).toBe(0);
   });
 });
 

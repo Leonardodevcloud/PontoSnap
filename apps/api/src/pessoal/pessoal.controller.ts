@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, StreamableFile, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -6,7 +6,7 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PessoalService } from './pessoal.service';
-import { CompetenciaDto, ConfigCltDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
+import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
 
 /** Gestão de Pessoal: benefícios, prestadores, débitos e fechamento do mês. Escopo = empresa ativa. */
 @Controller('pessoal')
@@ -27,6 +27,9 @@ export class PessoalController {
   }
   @Put('clt/:empregadoId/config') configClt(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: ConfigCltDto) {
     return this.pessoal.salvarConfigClt(this.tenant(u), id, dto);
+  }
+  @Put('clt/:empregadoId/cesta') inicioCesta(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: InicioCestaDto) {
+    return this.pessoal.definirInicioCesta(this.tenant(u), id, dto.cestaDesde ?? null);
   }
   @Put('padrao') padrao(@UsuarioAtual() u: PayloadAcesso, @Body() dto: PadraoDto) {
     return this.pessoal.salvarPadrao(this.tenant(u), dto);
@@ -51,6 +54,18 @@ export class PessoalController {
   }
   @Delete('debitos/:id') removerDebito(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.pessoal.removerDebito(this.tenant(u), id);
+  }
+  /** Arquivo da NF: sobe/substitui, abre (inline) e remove. */
+  @Post('nf') subirNf(@UsuarioAtual() u: PayloadAcesso, @Body() dto: NfArquivoDto) {
+    return this.pessoal.salvarNf(this.tenant(u), dto);
+  }
+  @Get('nf/:id') @Header('Cache-Control', 'private, no-store')
+  async abrirNf(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    const a = await this.pessoal.baixarNf(this.tenant(u), id);
+    return new StreamableFile(a.bytes, { type: a.mime, disposition: `inline; filename="${a.nome.replace(/"/g, '')}"` });
+  }
+  @Delete('nf/:id') removerNf(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.pessoal.removerNf(this.tenant(u), id);
   }
   @Post('fechar') fechar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: CompetenciaDto) {
     return this.pessoal.fechar(this.tenant(u), dto.competencia);

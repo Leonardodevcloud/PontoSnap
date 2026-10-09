@@ -105,3 +105,38 @@ export function rotuloProxima(jaBatidas: number, esperadas: number): string {
 
 export const reaisDeCentavos = (c: number) =>
   'R$ ' + (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Lê um valor em reais digitado do jeito brasileiro (ou não):
+ *  "5200" · "5.200" · "5.200,50" · "5200,5" · "R$ 1.234,56" · "2200.50" (ponto decimal)
+ * Regra: vírgula é sempre decimal. Sem vírgula, ponto seguido de exatamente 3
+ * dígitos em grupos é milhar ("5.200", "1.234.567"); qualquer outro ponto é decimal.
+ */
+export function lerReais(s: string): number {
+  const t = String(s ?? '').trim().replace(/\s|R\$/gi, '');
+  if (!t) return 0;
+  let n: number;
+  if (t.includes(',')) n = Number(t.replace(/\./g, '').replace(',', '.'));
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) n = Number(t.replace(/\./g, ''));
+  else n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+/** Máscara progressiva de documento: até 11 dígitos é CPF, depois vira CNPJ. */
+export function mascaraDoc(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 14);
+  if (d.length <= 11) {
+    return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+  }
+  return d.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+}
+/** Documento salvo (só dígitos) formatado para exibir; vazio vira null. */
+export const fmtDoc = (v: string | null | undefined): string | null => (v ? mascaraDoc(v) : null);
+/** Documento válido para cadastro: vazio, CPF (11) ou CNPJ (14). */
+export function docIncompleto(v: string, soCnpj = false): string {
+  const n = v.replace(/\D/g, '').length;
+  if (n === 0) return '';
+  if (soCnpj) return n === 14 ? '' : 'CNPJ tem 14 dígitos.';
+  return n === 11 || n === 14 ? '' : 'CPF tem 11 dígitos e CNPJ tem 14.';
+}

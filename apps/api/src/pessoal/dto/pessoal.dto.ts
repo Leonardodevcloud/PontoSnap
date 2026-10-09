@@ -86,3 +86,18 @@ export class DebitoDto {
 export class CompetenciaDto {
   @Matches(COMP) competencia!: string;
 }
+
+export class InicioCestaDto {
+  /** YYYY-MM a partir do qual a cesta é paga. null = automático (3 meses após o início no ponto). */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(COMP) cestaDesde!: string | null;
+}
+
+export class NfArquivoDto {
+  @IsIn(['MEI', 'MOTORISTA']) pessoaTipo!: 'MEI' | 'MOTORISTA';
+  @IsUUID() pessoaId!: string;
+  @Matches(COMP) competencia!: string;
+  @IsOptional() @Matches(/^(MES|\d{4}-\d{2}-\d{2})$/) periodo?: string;
+  @IsString() arquivoBase64!: string;
+  @IsString() @MaxLength(160) arquivoNome!: string;
+  @IsString() @MaxLength(80) arquivoMime!: string;
+}

@@ -101,12 +101,23 @@ export interface EntradaBeneficio {
    * valor antigo. Ausente = mesmos valores da carga.
    */
   pagoCom?: { vrDiaCent: number; vtTipo: VtTipo; vtValorCent: number };
+  /**
+   * Cesta básica: prêmio de assiduidade do mês apurado. Só é paga se a pessoa
+   * já cumpriu a carência (cestaLiberada) e não teve falta injustificada no mês.
+   */
+  cestaLiberada?: boolean;
 }
 
 export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
 
+export type StatusCesta = 'PAGA' | 'PERDIDA_FALTA' | 'CARENCIA' | 'SEM_CESTA';
+
 export interface ResultadoBeneficio {
+  /** VR/VA por dia do próximo mês (a cesta vem separada). */
   vrProxCent: number;
+  /** Cesta paga neste fechamento (0 se perdeu por falta, em carência ou sem cesta). */
+  cestaCent: number;
+  cestaStatus: StatusCesta;
   vtProxCent: number;
   naoUsados: { data: string; motivo: MotivoNaoUso }[];
   acertoVrCent: number;
@@ -125,7 +136,12 @@ export interface ResultadoBeneficio {
  * afastamento abatem, a 1/30 do valor por dia.
  */
 export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
-  const vrProxCent = e.diasProx * e.vrDiaCent + e.cestaCent;
+  const vrProxCent = e.diasProx * e.vrDiaCent;
+  // Cesta = assiduidade: qualquer falta injustificada no mês apurado zera.
+  const cestaStatus: StatusCesta = e.cestaCent <= 0 ? 'SEM_CESTA'
+    : e.cestaLiberada === false ? 'CARENCIA'
+    : e.faltas.size > 0 ? 'PERDIDA_FALTA' : 'PAGA';
+  const cestaCent = cestaStatus === 'PAGA' ? e.cestaCent : 0;
   const vtProxCent = e.vtTipo === 'DIA' ? e.diasProx * e.vtValorCent : e.vtTipo === 'FIXO' ? e.vtValorCent : 0;
 
   const naoUsados = e.pagos
@@ -143,8 +159,8 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
     : pg.vtTipo === 'FIXO' ? Math.round((semFeriado * pg.vtValorCent) / 30) : 0;
   const acertoCent = acertoVrCent + acertoVtCent;
   return {
-    vrProxCent, vtProxCent, naoUsados, acertoVrCent, acertoVtCent, acertoCent,
-    cargaCent: Math.max(0, vrProxCent + vtProxCent - acertoCent),
+    vrProxCent, cestaCent, cestaStatus, vtProxCent, naoUsados, acertoVrCent, acertoVtCent, acertoCent,
+    cargaCent: Math.max(0, vrProxCent + cestaCent + vtProxCent - acertoCent),
   };
 }
 

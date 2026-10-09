@@ -2,10 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { minutosParaHhMm } from '../lib/formato';
+import QRCode from 'qrcode';
+import { docIncompleto, fmtDoc, lerReais, mascaraDoc, minutosParaHhMm } from '../lib/formato';
+import { arquivoParaBase64, salvarBlob } from '../lib/download';
+import { brCodePix, normalizarChave } from '../lib/pix';
 import { Botao } from '../components/Botao';
 import type {
-  BaseDias, PessoaTipo, PessoalCompetencia, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
+  BaseDias, PessoaTipo, PessoalCompetencia, PessoalNfArquivo, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
 import css from './GestaoPessoal.module.css';
@@ -31,12 +34,7 @@ const somarMes = (c: string, n: number) => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 };
 /** "1.234,56" | "1234.56" → 1234.56 */
-const numeroBr = (s: string): number => {
-  const t = s.trim().replace(/\s|R\$/g, '');
-  if (!t) return 0;
-  const n = t.includes(',') ? Number(t.replace(/\./g, '').replace(',', '.')) : Number(t);
-  return Number.isFinite(n) ? n : 0;
-};
+const numeroBr = lerReais;
 const reaisTxt = (c: number) => (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ROT_TIPO: Record<PessoaTipo, string> = { CLT: 'CLT', MEI: 'MEI', MOTORISTA: 'Motorista' };
 const ROT_MOTIVO: Record<string, string> = { feriado: 'feriado', falta: 'falta', afastamento: 'férias/atestado/folga' };
@@ -107,6 +105,7 @@ export function GestaoPessoal() {
   const [dialogo, setDialogo] = useState<Dialogo>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [busca, setBusca] = useState('');
+  const [pix, setPix] = useState<PixAlvo | null>(null);
   const gatilho = useRef<HTMLElement | null>(null);
 
   const recarregar = useCallback(async () => {
@@ -117,6 +116,18 @@ export function GestaoPessoal() {
   }, [mes]);
   useEffect(() => { void recarregar(); }, [recarregar, sessao?.tenantId]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t); }, [toast]);
+
+  /** "Pago" direto na linha: MEI é o mês; motorista marca todas as semanas trabalhadas. Vale em mês fechado. */
+  async function marcarPago(tipo: 'MEI' | 'MOTORISTA', id: string, nome: string, pago: boolean, periodos: string[]) {
+    try {
+      for (const periodo of periodos) await api.put('/pessoal/lancamento', { pessoaTipo: tipo, pessoaId: id, competencia: mes, periodo, pago });
+      await recarregar();
+      avisar(`${nome}: ${pago ? 'marcado como pago' : 'voltou para pendente'}.`, async () => {
+        for (const periodo of periodos) await api.put('/pessoal/lancamento', { pessoaTipo: tipo, pessoaId: id, competencia: mes, periodo, pago: !pago });
+        await recarregar();
+      });
+    } catch (e) { setErro((e as Error).message); }
+  }
 
   const abrir = (p: Painel, el?: HTMLElement | null) => { gatilho.current = el ?? (document.activeElement as HTMLElement); setPainel(p); };
   const fecharPainel = () => { setPainel(null); setTimeout(() => gatilho.current?.focus?.(), 0); };
@@ -277,10 +288,12 @@ export function GestaoPessoal() {
 
       {carregando && !d && <p className={css.carregando}>Calculando {mesLongo(mes)}…</p>}
 
-      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} mes={mes} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} />}
+      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} mes={mes} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} onPix={setPix} />}
       {d && aba === 'beneficios' && <TabelaBeneficios linhas={filtra(d.clt)} d={d} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} />}
-      {d && aba === 'mei' && <TabelaMei linhas={filtra(d.mei)} onAbrir={(id, el) => abrir({ tipo: 'mei', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MEI' })} />}
-      {d && aba === 'motoristas' && <TabelaMot linhas={filtra(d.motoristas)} onAbrir={(id, el) => abrir({ tipo: 'mot', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MOTORISTA' })} />}
+      {d && aba === 'mei' && <TabelaMei linhas={filtra(d.mei)} onAbrir={(id, el) => abrir({ tipo: 'mei', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MEI' })}
+        onPix={setPix} onPago={(l, v) => marcarPago('MEI', l.id, l.nome, v, ['MES'])} />}
+      {d && aba === 'motoristas' && <TabelaMot linhas={filtra(d.motoristas)} onAbrir={(id, el) => abrir({ tipo: 'mot', id }, el)} onNovo={fechado ? undefined : () => ir({ novo: 'MOTORISTA' })}
+        onPix={setPix} onPago={(l, v) => marcarPago('MOTORISTA', l.id, l.nome, v, l.semanas.filter((s) => s.dias > 0).map((s) => s.inicio))} />}
       {d && aba === 'debitos' && <TabelaDebitos d={d} busca={busca} fechado={fechado}
         onAbrir={(tipo, id, el) => abrir({ tipo: tipo === 'CLT' ? 'clt' : tipo === 'MEI' ? 'mei' : 'mot', id }, el)}
         onRemover={(id, descricao, nome) => setDialogo({ tipo: 'remDebito', id, descricao, nome })} />}
@@ -304,15 +317,15 @@ export function GestaoPessoal() {
       {painel && d && (
         <PainelLateral onFechar={fecharPainel} titulo={
           linhaClt?.nome ?? linhaMei?.nome ?? linhaMot?.nome ?? (painel.tipo === 'padrao' ? 'Padrão de benefícios' : 'Adicionar débito')}
-          sub={linhaClt ? `${linhaClt.config.cargo ? `${linhaClt.config.cargo} · ` : ''}CLT · ${mesLongo(mes)}` : linhaMei ? `MEI · ${linhaMei.documento ?? 'sem CNPJ'} · ${mesLongo(mes)}`
+          sub={linhaClt ? `${linhaClt.config.cargo ? `${linhaClt.config.cargo} · ` : ''}CLT · ${mesLongo(mes)}` : linhaMei ? `MEI · ${fmtDoc(linhaMei.documento) ?? 'sem CNPJ'} · ${mesLongo(mes)}`
             : linhaMot ? `Motorista · ${linhaMot.funcao ?? ''} · ${mesLongo(mes)}`
             : painel.tipo === 'padrao' ? 'Vale para todos os CLT sem valor próprio' : `Desconto parcelado a partir de ${mesCurto(mes)}`}>
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
           {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} onSalvo={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
-          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }}
+          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MEI', pessoaId: linhaMei.id, nome: linhaMei.nome })} />}
-          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }}
+          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MOTORISTA', pessoaId: linhaMot.id, nome: linhaMot.nome })} />}
           {painel.tipo === 'debito' && <PainelDebito mes={mes} onSalvo={async (desc) => { await recarregar(); fecharPainel(); avisar(`Débito "${desc}" adicionado.`); }} />}
         </PainelLateral>
@@ -338,6 +351,8 @@ export function GestaoPessoal() {
         </Dialogo>
       )}
 
+      {pix && <ModalPix alvo={pix} mes={mes} onFechar={() => setPix(null)} />}
+
       {toast && (
         <div className={css.toast} role="status">
           {toast.msg}
@@ -361,7 +376,7 @@ function Linha({ onAbrir, children, rotulo }: { onAbrir: (el: HTMLElement) => vo
 }
 const Vazio = ({ cols, children }: { cols: number; children: ReactNode }) => <tr><td colSpan={cols} className={vt.vazio}>{children}</td></tr>;
 
-function TabelaFolha({ linhas, mes, onAbrir }: { linhas: PessoalLinhaClt[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void }) {
+function TabelaFolha({ linhas, mes, onAbrir, onPix }: { linhas: PessoalLinhaClt[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void }) {
   const t = linhas.reduce((a, l) => ({ sal: a.sal + (l.salarioCent ?? 0), pr: a.pr + l.proventosCent, de: a.de + l.descontosCent, db: a.db + l.debitosCent, li: a.li + l.liquidoSalarioCent, br: a.br + l.custoBrutoCent }), { sal: 0, pr: 0, de: 0, db: 0, li: 0, br: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
@@ -372,7 +387,7 @@ function TabelaFolha({ linhas, mes, onAbrir }: { linhas: PessoalLinhaClt[]; mes:
         {linhas.length === 0 && <Vazio cols={9}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
         {linhas.map((l) => (
           <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-            <td className={vt.nome}>{l.nome}<small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
+            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} valorCent={l.liquidoSalarioCent} rotuloValor="líquido do salário" comValor={false} onPix={onPix} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
               {l.erro && <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro}>sem escala</span>}
               {l.salarioCent == null && <span className={`${vt.pill} ${vt.pillWarn}`}>sem salário</span>}</td>
             <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub} title={l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ')}>proporcional · mudou {fmtDia(l.salarioPartes[1]!.desde)}</small>}</td>
@@ -396,14 +411,24 @@ function TabelaFolha({ linhas, mes, onAbrir }: { linhas: PessoalLinhaClt[]; mes:
   );
 }
 
+/** Cesta do mês: paga, perdida por falta, em carência ou sem cesta. */
+function StatusCesta({ l }: { l: PessoalLinhaClt }) {
+  const b = l.beneficios;
+  if (b.cestaStatus === 'PAGA') return <>{brl(b.cestaCent)}</>;
+  if (b.cestaStatus === 'PERDIDA_FALTA') return <span className={`${vt.pill} ${vt.pillErr}`} title="Faltou no mês: a cesta não é paga">perdida · falta {l.faltasDias.slice(0, 1).map(fmtDia).join('')}</span>;
+  if (b.cestaStatus === 'CARENCIA') return <span className={`${vt.pill} ${vt.pillMute}`} title="Ainda na carência">a partir de {b.cestaDesde ? mesCurto(b.cestaDesde) : '—'}</span>;
+  return <>—</>;
+}
+
 function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d: PessoalCompetencia; onAbrir: (id: string, el: HTMLElement) => void }) {
-  const t = linhas.reduce((a, l) => ({ vr: a.vr + l.beneficios.vrProxCent, vt: a.vt + l.beneficios.vtProxCent, ac: a.ac + l.beneficios.acertoCent, ca: a.ca + l.beneficios.cargaCent }), { vr: 0, vt: 0, ac: 0, ca: 0 });
+  const t = linhas.reduce((a, l) => ({ vr: a.vr + l.beneficios.vrProxCent, ce: a.ce + l.beneficios.cestaCent, vt: a.vt + l.beneficios.vtProxCent, ac: a.ac + l.beneficios.acertoCent, ca: a.ca + l.beneficios.cargaCent }), { vr: 0, ce: 0, vt: 0, ac: 0, ca: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
-      <thead><tr><th>Colaborador</th><th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th><th className={vt.n}>VT / combustível</th>
+      <thead><tr><th>Colaborador</th><th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th>
+        <th className={vt.n} title={`Cesta de ${mesCurto(d.competencia)}: só pra quem não faltou no mês e já passou da carência`}>Cesta</th><th className={vt.n}>VT / combustível</th>
         <th className={vt.n}>Acerto de {mesCurto(d.competencia)}</th><th className={vt.n}>A carregar</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={7}>Nenhum funcionário ativo no ponto.</Vazio>}
+        {linhas.length === 0 && <Vazio cols={8}>Nenhum funcionário ativo no ponto.</Vazio>}
         {linhas.map((l) => {
           const b = l.beneficios, c = l.config;
           const semCfg = c.origem === 'NENHUM' || (c.vrDiaCent === 0 && c.vtTipo === 'NENHUM');
@@ -414,6 +439,7 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
                   : <span className={`${vt.pill} ${c.origem === 'PROPRIO' ? vt.pillLime : vt.pillMute}`} title={c.vigenteDesde ? `Vale desde ${mesLongo(c.vigenteDesde)}` : undefined}>{c.origem === 'PROPRIO' ? 'valor próprio' : 'padrão'}</span>}</td>
               <td className={vt.n}>{b.diasProx}</td>
               <td className={vt.n}>{b.vrProxCent ? brl(b.vrProxCent) : '—'}</td>
+              <td className={vt.n}><StatusCesta l={l} /></td>
               <td className={vt.n}>{c.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)}<small className={css.sub}>{c.vtTipo === 'FIXO' ? 'combustível · fixo' : c.vtTipo === 'DIA' ? `VT ${brl(c.vtValorCent)}/dia` : ''}</small></td>
               <td className={vt.n}>{b.acertoCent ? <><span className={vt.neg}>{brl(-b.acertoCent)}</span>
                 <small className={css.sub}>{b.naoUsados.length} dia{b.naoUsados.length > 1 ? 's' : ''}: {b.naoUsados.slice(0, 2).map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}{b.naoUsados.length > 2 ? '…' : ''}</small></> : '—'}</td>
@@ -422,69 +448,78 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.vr)}</td><td className={vt.n}>{brl(t.vt)}</td>
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.vr)}</td><td className={vt.n}>{brl(t.ce)}</td><td className={vt.n}>{brl(t.vt)}</td>
         <td className={vt.n}>{brl(-t.ac)}</td><td className={vt.n}>{brl(t.ca)}</td><td /></tr></tfoot>}
     </table></div></div>
   );
 }
 
-function TabelaMei({ linhas, onAbrir, onNovo }: { linhas: PessoalLinhaMei[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void }) {
+function TabelaMei({ linhas, onAbrir, onNovo, onPix, onPago }: {
+  linhas: PessoalLinhaMei[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void; onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMei, pago: boolean) => Promise<void>;
+}) {
   const t = linhas.reduce((a, l) => ({ c: a.c + l.valorCent, b: a.b + l.brutoCent, li: a.li + l.liquidoCent }), { c: 0, b: 0, li: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
       <thead><tr><th>Colaborador MEI</th><th className={vt.n}>Contrato</th><th className={vt.n}>Valor do dia</th><th className={vt.n}>Extras</th><th className={vt.n}>Faltas</th>
-        <th className={vt.n}>Meta</th><th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={vt.n}>Nota</th><th aria-label="Abrir" /></tr></thead>
+        <th className={vt.n}>Meta</th><th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={css.colPago}>Pago</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={11}>Nenhum MEI neste mês. {onNovo && <button className={css.link} onClick={onNovo}>Adicionar MEI</button>}</Vazio>}
         {linhas.map((l) => (
           <Linha key={l.id} rotulo={`Abrir lançamento de ${l.nome}`} onAbrir={(el) => onAbrir(l.id, el)}>
-            <td className={vt.nome}>{l.nome}<small>{l.documento ?? l.funcao ?? 'MEI'}</small></td>
+            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.chavePix} valorCent={l.liquidoCent} rotuloValor="líquido a pagar" comValor={!l.lanc.pago} onPix={onPix} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
             <td className={vt.n}>{brl(l.valorCent)}</td>
             <td className={vt.n}>{brl(l.valorDiaCent)}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
             <td className={vt.n}>{l.heCent ? <span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span> : l.feriadosCent ? <span className={vt.pos}>{brl(l.feriadosCent)}</span> : '—'}</td>
             <td className={vt.n}>{l.faltasCent ? <span className={vt.neg}>{brl(-l.faltasCent)}</span> : '—'}</td>
-            <td className={vt.n}>{!l.lanc.metaCent ? '—' : l.lanc.metaPaga
-              ? <span className={`${vt.pill} ${vt.pillOk}`}>{brl(l.lanc.metaCent)} · paga</span>
-              : <span className={`${vt.pill} ${vt.pillWarn}`}>{brl(l.lanc.metaCent)} · a pagar</span>}</td>
-            <td className={`${vt.n} ${css.forte}`}>{brl(l.brutoCent)}</td>
+            <td className={vt.n}>{!l.lanc.metaCent ? '—' : <>{brl(l.lanc.metaCent)}
+              <small className={`${css.sub} ${l.lanc.metaPaga ? css.subOk : css.subWarn}`}>{l.lanc.metaPaga ? 'já paga' : 'a pagar'}</small></>}</td>
+            <td className={`${vt.n} ${css.forte}`}>{brl(l.brutoCent)}
+              {l.lanc.nfNumero || l.lanc.nfArquivo
+                ? <small className={css.sub} title={l.lanc.nfArquivo ? `Arquivo anexado: ${l.lanc.nfArquivo.nome}` : 'Número informado, sem arquivo'}>{l.lanc.nfNumero ? `NF ${l.lanc.nfNumero}` : 'NF anexada'}{l.lanc.nfArquivo && <IconeClipe />}</small>
+                : <small className={`${css.sub} ${css.subErr}`}>NF pendente</small>}</td>
             <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
             <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
-            <td className={vt.n}>{l.lanc.nfNumero ? <span className={`${vt.pill} ${l.lanc.pago ? vt.pillOk : vt.pillMute}`}>NF {l.lanc.nfNumero}{l.lanc.pago ? ' · paga' : ''}</span> : <span className={`${vt.pill} ${vt.pillErr}`}>NF pendente</span>}</td>
+            <td className={css.colPago}><TogglePago nome={l.nome} pago={l.lanc.pago} onMudar={(v) => onPago(l, v)} /></td>
           </Linha>
         ))}
       </tbody>
       {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td className={vt.n}>{brl(t.c)}</td><td /><td /><td /><td />
-        <td className={vt.n}>{brl(t.b)}</td><td /><td className={vt.n}>{brl(t.li)}</td><td /><td /></tr></tfoot>}
+        <td className={vt.n}>{brl(t.b)}</td><td /><td className={vt.n}>{brl(t.li)}</td><td className={css.colPago}>{linhas.filter((l) => l.lanc.pago).length}/{linhas.length}</td><td /></tr></tfoot>}
     </table></div></div>
   );
 }
 
-function TabelaMot({ linhas, onAbrir, onNovo }: { linhas: PessoalLinhaMot[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void }) {
+function TabelaMot({ linhas, onAbrir, onNovo, onPix, onPago }: {
+  linhas: PessoalLinhaMot[]; onAbrir: (id: string, el: HTMLElement) => void; onNovo?: () => void; onPix: (a: PixAlvo) => void; onPago: (l: PessoalLinhaMot, pago: boolean) => Promise<void>;
+}) {
   const total = linhas.reduce((a, l) => a + l.totalCent, 0);
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={vt.table}>
       <thead><tr><th>Motorista</th><th className={vt.n}>Mensal</th><th className={vt.n}>Diária</th><th className={vt.n}>Dias no mês</th><th className={vt.n}>Adicionais</th>
-        <th className={vt.n}>Total das NFs</th><th className={vt.n}>Semanas</th><th aria-label="Abrir" /></tr></thead>
+        <th className={vt.n}>Total das NFs</th><th className={vt.n}>Notas</th><th className={css.colPago}>Pago</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={8}>Nenhum motorista neste mês. {onNovo && <button className={css.link} onClick={onNovo}>Adicionar motorista</button>}</Vazio>}
+        {linhas.length === 0 && <Vazio cols={9}>Nenhum motorista neste mês. {onNovo && <button className={css.link} onClick={onNovo}>Adicionar motorista</button>}</Vazio>}
         {linhas.map((l) => {
           const comDias = l.semanas.filter((s) => s.dias > 0);
           const pagas = comDias.filter((s) => s.pago).length;
-          const semNf = comDias.filter((s) => !s.nfNumero).length;
+          const semNf = comDias.filter((s) => !s.nfNumero && !s.nfArquivo).length;
+          const tudoPago = comDias.length > 0 && pagas === comDias.length;
           return (
             <Linha key={l.id} rotulo={`Abrir semanas de ${l.nome}`} onAbrir={(el) => onAbrir(l.id, el)}>
-              <td className={vt.nome}>{l.nome}<small>{l.funcao ?? 'motorista'} · {l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}</small></td>
+              <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.chavePix} valorCent={l.liquidoCent} rotuloValor="líquido do mês" comValor={!tudoPago} onPix={onPix} /></span><small>{l.funcao ?? 'motorista'} · {l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}</small></td>
               <td className={vt.n}>{brl(l.valorCent)}</td>
               <td className={vt.n}>{brl(l.diariaCent)}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
               <td className={vt.n}>{l.semanas.reduce((a, s) => a + s.dias, 0)}</td>
               <td className={vt.n}>{l.semanas.some((s) => s.adicionalCent) ? brl(l.semanas.reduce((a, s) => a + s.adicionalCent, 0)) : '—'}</td>
               <td className={`${vt.n} ${css.forte}`}>{brl(l.totalCent)}</td>
-              <td className={vt.n}>{semNf ? <span className={`${vt.pill} ${vt.pillErr}`}>{semNf} sem NF</span> : <span className={`${vt.pill} ${pagas === comDias.length ? vt.pillOk : vt.pillMute}`}>{pagas}/{comDias.length} pagas</span>}</td>
+              <td className={vt.n}>{semNf ? <span className={`${vt.pill} ${vt.pillErr}`}>{semNf} sem NF</span> : <span className={`${vt.pill} ${vt.pillMute}`}>{comDias.length ? 'em dia' : '—'}</span>}</td>
+              <td className={css.colPago}>{comDias.length > 0 && <TogglePago nome={l.nome} pago={tudoPago} parcial={pagas > 0 && !tudoPago ? `${pagas}/${comDias.length}` : undefined}
+                onMudar={(v) => onPago(l, v)} />}</td>
             </Linha>
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td /><td /><td /><td className={vt.n}>{brl(total)}</td><td /><td /></tr></tfoot>}
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td /><td /><td /><td className={vt.n}>{brl(total)}</td><td /><td /><td /></tr></tfoot>}
     </table></div></div>
   );
 }
@@ -591,14 +626,19 @@ function DialogoTirar({ nome, mes, onCancelar, onConfirmar }: { nome: string; me
 // ---------- campos ----------
 
 function CampoReais({ id, rotulo, valorCent, onChange, ajuda, disabled }: { id: string; rotulo: string; valorCent: number; onChange: (c: number) => void; ajuda?: string; disabled?: boolean }) {
+  // Enquanto o campo está em foco, o texto é do usuário: nada de reformatar a
+  // cada tecla (era isso que jogava os dígitos pra depois da vírgula). Formata
+  // ao sair do campo. De fora, só sincroniza quando não está sendo editado.
   const [txt, setTxt] = useState(reaisTxt(valorCent));
-  useEffect(() => { setTxt(reaisTxt(valorCent)); }, [valorCent]);
+  const editando = useRef(false);
+  useEffect(() => { if (!editando.current) setTxt(reaisTxt(valorCent)); }, [valorCent]);
   return (
     <label className={css.campo} htmlFor={id}>
       <span>{rotulo}</span>
-      <span className={css.input}><em>R$</em><input id={id} inputMode="decimal" value={txt} disabled={disabled}
-        onChange={(e) => { setTxt(e.target.value); onChange(Math.round(numeroBr(e.target.value) * 100)); }}
-        onBlur={() => setTxt(reaisTxt(Math.round(numeroBr(txt) * 100)))} /></span>
+      <span className={css.input}><em>R$</em><input id={id} inputMode="decimal" value={txt} disabled={disabled} autoComplete="off"
+        onFocus={(e) => { editando.current = true; if (valorCent === 0) setTxt(''); else e.currentTarget.select(); }}
+        onChange={(e) => { const v = e.target.value.replace(/[^\d.,]/g, ''); setTxt(v); onChange(Math.round(numeroBr(v) * 100)); }}
+        onBlur={() => { editando.current = false; setTxt(reaisTxt(Math.round(numeroBr(txt) * 100))); }} /></span>
       {ajuda && <small>{ajuda}</small>}
     </label>
   );
@@ -612,12 +652,20 @@ function CampoNum({ id, rotulo, valor, onChange, sufixo, max, disabled }: { id: 
     </label>
   );
 }
-function CampoTexto({ id, rotulo, valor, onChange, placeholder, ajuda, disabled, tipo }: { id: string; rotulo: string; valor: string; onChange: (s: string) => void; placeholder?: string; ajuda?: string; disabled?: boolean; tipo?: string }) {
+function CampoTexto({ id, rotulo, valor, onChange, placeholder, ajuda, disabled, tipo, numerico, erro }: {
+  id: string; rotulo: string; valor: string; onChange: (s: string) => void; placeholder?: string; ajuda?: string; disabled?: boolean; tipo?: string;
+  numerico?: boolean; erro?: string;
+}) {
+  // Erro só aparece depois que a pessoa sai do campo (não grita enquanto digita).
+  const [saiu, setSaiu] = useState(false);
+  const mostraErro = !!erro && saiu;
   return (
     <label className={css.campo} htmlFor={id}>
       <span>{rotulo}</span>
-      <span className={css.input}><input id={id} type={tipo ?? 'text'} value={valor} placeholder={placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} /></span>
-      {ajuda && <small>{ajuda}</small>}
+      <span className={css.input}><input id={id} type={tipo ?? 'text'} value={valor} placeholder={placeholder} disabled={disabled}
+        inputMode={numerico ? 'numeric' : undefined} autoComplete={numerico ? 'off' : undefined} aria-invalid={mostraErro || undefined}
+        onBlur={() => setSaiu(true)} onChange={(e) => onChange(e.target.value)} /></span>
+      {mostraErro ? <small className={css.erroCampo}>{erro}</small> : ajuda && <small>{ajuda}</small>}
     </label>
   );
 }
@@ -710,6 +758,7 @@ function PainelPadrao({ d, onSalvo }: { d: PessoalCompetencia; onSalvo: (msg: st
     <>
       <div className={css.pCorpo}>
         <p className={css.hint}>Defina uma vez: todo CLT sem valor próprio recebe estes valores, todo mês, até você mudar. Hoje {seguem === 1 ? '1 pessoa segue' : `${seguem} pessoas seguem`} o padrão.</p>
+        <p className={css.formula}>Cesta básica: só é paga no mês sem falta e depois da carência (3 meses após o início no ponto, ou o mês definido no painel de cada pessoa).</p>
         <section className={css.bloco}>
           <span className={css.lb}>Valores</span>
           <CamposBeneficio f={f} set={setF} prefixo="pd" />
@@ -795,7 +844,9 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
 
         <section className={css.bloco}>
           <span className={css.lb}>Benefícios · carga de {mesCurto(d.proxima)}</span>
-          <Linha2 k={`VR/VA · ${b.diasProx} dias${l.config.cestaCent ? ' + cesta' : ''}`} v={brl(b.vrProxCent)} />
+          <Linha2 k={`VR/VA · ${b.diasProx} dias`} v={brl(b.vrProxCent)} />
+          <Linha2 k={`Cesta básica de ${mesCurto(mes)}`} v={<StatusCesta l={l} />} />
+          {b.cestaStatus === 'PERDIDA_FALTA' && <p className={css.formula}>Faltou em {l.faltasDias.map(fmtDia).join(', ')} — com falta no mês a cesta não é paga.</p>}
           <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível · fixo mensal' : l.config.vtTipo === 'DIA' ? `VT · ${b.diasProx} dias` : 'Transporte'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
           <Linha2 k={`Acerto de ${mesCurto(mes)}`} v={b.acertoCent ? brl(-b.acertoCent) : '—'} cls={b.acertoCent ? css.neg : ''} />
           {b.naoUsados.length > 0 && <p className={css.formula}>{b.naoUsados.map((x) => `${fmtDia(x.data)} ${ROT_MOTIVO[x.motivo]}`).join(' · ')} — {b.acertoCent
@@ -822,6 +873,8 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
           {!fechado && <Botao variante="coral" className={css.btnPri} disabled={!mudou || salvando} onClick={salvar}>{salvando ? 'Salvando…' : `Salvar a partir de ${mesCurto(f.vig)}`}</Botao>}
         </section>
 
+        <InicioCesta l={l} fechado={fechado} onSalvo={onSalvo} onAviso={onAviso} />
+
         <section className={css.bloco}>
           <span className={css.lb}>Resumo</span>
           <Linha2 k="Líquido do salário" v={brl(l.liquidoSalarioCent)} />
@@ -837,6 +890,48 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
   );
 }
 
+/** Mês a partir do qual a cesta é paga (carência). Vazio = automático. */
+function InicioCesta({ l, fechado, onSalvo, onAviso }: { l: PessoalLinhaClt; fechado: boolean; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
+  const b = l.beneficios;
+  const [valor, setValor] = useState(b.cestaDesde ?? '');
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  useEffect(() => { setValor(b.cestaDesde ?? ''); }, [b.cestaDesde]);
+  async function salvar(v: string | null) {
+    setSalvando(true); setErro(null);
+    try {
+      await api.put(`/pessoal/clt/${l.empregadoId}/cesta`, { cestaDesde: v });
+      await onSalvo(); onAviso(v ? `Cesta de ${l.nome} a partir de ${mesLongo(v)}.` : `Cesta de ${l.nome} volta ao automático.`);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setSalvando(false); }
+  }
+  return (
+    <section className={css.bloco}>
+      <span className={css.lb}>Cesta básica</span>
+      <p className={css.formula}>
+        {b.cestaDesde
+          ? `Recebe a partir de ${mesLongo(b.cestaDesde)}${b.cestaDesdeOrigem === 'AUTO' ? ' (automático: 3 meses depois do início no ponto)' : ' (definido aqui)'}.`
+          : 'Sem carência: recebe desde já.'} Mês com falta não paga a cesta.
+      </p>
+      {!fechado && (
+        <>
+          <label className={css.campo} htmlFor="cesta-desde">
+            <span>Recebe a partir de</span>
+            <span className={css.input}><input id="cesta-desde" type="month" value={valor} onChange={(e) => setValor(e.target.value)} /></span>
+          </label>
+          {erro && <p className={css.alerta}>{erro}</p>}
+          <div className={css.acoes}>
+            <Botao variante="coral" className={css.btnPri} disabled={salvando || !valor || (valor === b.cestaDesde && b.cestaDesdeOrigem === 'MANUAL')} onClick={() => salvar(valor)}>
+              {salvando ? 'Salvando…' : valor ? `Cesta a partir de ${mesCurto(valor)}` : 'Escolha o mês'}
+            </Botao>
+            {b.cestaDesdeOrigem === 'MANUAL' && <button className={css.link} onClick={() => salvar(null)}>Voltar ao automático</button>}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function ZonaTirar({ nome, mes, onTirar }: { nome: string; mes: string; onTirar: () => void }) {
   return (
     <section className={`${css.bloco} ${css.zonaPerigo}`}>
@@ -849,7 +944,7 @@ function ZonaTirar({ nome, mes, onTirar }: { nome: string; mes: string; onTirar:
 
 function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void> }) {
   const [aberto, setAberto] = useState<'' | 'dados' | 'reajuste'>('');
-  const [f, setF] = useState({ nome: p.nome, documento: p.documento ?? '', funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
+  const [f, setF] = useState({ nome: p.nome, documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' });
   const [r, setR] = useState({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes });
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -878,7 +973,7 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
       {!fechado && aberto === '' && (
         <div className={css.acoes}>
           <button className={css.btnContornoNeutro} onClick={() => { setR({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes }); setAberto('reajuste'); }}>Reajustar valor</button>
-          <button className={css.link} onClick={() => { setF({ nome: p.nome, documento: p.documento ?? '', funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
+          <button className={css.link} onClick={() => { setF({ nome: p.nome, documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
         </div>
       )}
 
@@ -908,15 +1003,17 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
         <>
           <CampoTexto id="c-nome" rotulo="Nome" valor={f.nome} onChange={(v) => setF({ ...f, nome: v })} />
           <div className={css.grade2}>
-            <CampoTexto id="c-doc" rotulo={motorista ? 'Documento' : 'CNPJ'} valor={f.documento} onChange={(v) => setF({ ...f, documento: v })} />
+            <CampoTexto id="c-doc" rotulo={motorista ? 'CPF ou CNPJ' : 'CNPJ'} valor={f.documento} numerico placeholder={motorista ? '000.000.000-00' : '00.000.000/0001-00'}
+              onChange={(v) => setF({ ...f, documento: mascaraDoc(v) })} erro={docIncompleto(f.documento, !motorista)} />
             <CampoTexto id="c-fun" rotulo={motorista ? 'Categoria' : 'Função'} valor={f.funcao} onChange={(v) => setF({ ...f, funcao: v })} />
           </div>
-          <CampoTexto id="c-pix" rotulo="Chave Pix (opcional)" valor={f.chavePix} onChange={(v) => setF({ ...f, chavePix: v })} />
+          <CampoTexto id="c-pix" rotulo="Chave Pix (opcional)" valor={f.chavePix} placeholder="CPF, CNPJ, celular, e-mail ou aleatória" onChange={(v) => setF({ ...f, chavePix: v })}
+            erro={f.chavePix.trim() && !normalizarChave(f.chavePix) ? 'Não reconheci essa chave Pix.' : ''} />
           <p className={css.formula}>Dados cadastrais mudam em todos os meses. Pra mudar valor, use "Reajustar valor".</p>
           {erro && <p className={css.alerta}>{erro}</p>}
           <div className={css.dAcoes}>
             <button className={css.btnTexto} onClick={() => { setAberto(''); setErro(null); }}>Cancelar</button>
-            <Botao variante="coral" className={css.btnPri} disabled={salvando || !f.nome.trim()}
+            <Botao variante="coral" className={css.btnPri} disabled={salvando || !f.nome.trim() || !!docIncompleto(f.documento, !motorista)}
               onClick={() => enviar({ nome: f.nome, documento: f.documento, funcao: f.funcao, chavePix: f.chavePix })}>{salvando ? 'Salvando…' : 'Salvar dados'}</Botao>
           </div>
         </>
@@ -925,7 +1022,10 @@ function DadosContrato({ p, mes, fechado, onSalvo }: { p: PessoalLinhaMei | Pess
   );
 }
 
-function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: PessoalLinhaMei; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void }) {
+function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
+  l: PessoalLinhaMei; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+  onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
+}) {
   const [f, setF] = useState({ ...l.lanc });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -934,7 +1034,10 @@ function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: Pesso
   async function salvar() {
     setSalvando(true); setErro(null);
     try {
-      await api.put('/pessoal/lancamento', {
+      // Mês fechado: só NF e pagamento (o resto está congelado).
+      await api.put('/pessoal/lancamento', fechado ? {
+        pessoaTipo: 'MEI', pessoaId: l.id, competencia: mes, nfNumero: f.nfNumero ?? '', nfData: f.nfData || null, pago: f.pago,
+      } : {
         pessoaTipo: 'MEI', pessoaId: l.id, competencia: mes,
         heMin: f.heMin, faltas: f.faltas, feriadosTrab: f.feriadosTrab, meta: f.metaCent / 100, metaPaga: f.metaPaga,
         metaPagaEm: f.metaPaga ? (f.metaPagaEm || hojeIso) : null, nfNumero: f.nfNumero ?? '', nfData: f.nfData || null, pago: f.pago,
@@ -971,11 +1074,13 @@ function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: Pesso
         <section className={css.bloco}>
           <span className={css.lb}>Nota fiscal e pagamento</span>
           <div className={css.grade2}>
-            <CampoTexto id="nf" rotulo="Número da NF" valor={f.nfNumero ?? ''} placeholder="000214" onChange={(v) => setF({ ...f, nfNumero: v })} disabled={fechado} />
-            <CampoTexto id="nf-data" tipo="date" rotulo="Data da NF" valor={f.nfData ?? ''} onChange={(v) => setF({ ...f, nfData: v })} disabled={fechado} />
+            <CampoTexto id="nf" rotulo="Número da NF" valor={f.nfNumero ?? ''} placeholder="000214" onChange={(v) => setF({ ...f, nfNumero: v })} />
+            <CampoTexto id="nf-data" tipo="date" rotulo="Data da NF" valor={f.nfData ?? ''} onChange={(v) => setF({ ...f, nfData: v })} />
           </div>
-          <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={f.pago ? 'sim' : 'nao'} disabled={fechado} onChange={(v) => setF({ ...f, pago: v === 'sim' })}
+          <AnexoNf pessoaTipo="MEI" pessoaId={l.id} mes={mes} periodo="MES" nome={l.nome} arquivo={l.lanc.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />
+          <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={f.pago ? 'sim' : 'nao'} onChange={(v) => setF({ ...f, pago: v === 'sim' })}
             opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
+          {fechado && <p className={css.formula}>Mês fechado: os valores estão congelados, mas a nota e o pagamento ainda podem ser registrados.</p>}
         </section>
         <Observacao pessoaTipo="MEI" pessoaId={l.id} mes={mes} inicial={l.lanc.observacao} disabled={fechado} />
         <DadosContrato p={l} mes={mes} fechado={fechado} onSalvo={onContrato} />
@@ -987,13 +1092,16 @@ function PainelMei({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: Pesso
         <Linha2 cls={css.grande} k="Líquido a pagar" v={brl(pv.liquidoCent)} />
         <p className={css.formula}>{brl(l.valorCent)} + extras {brl(pv.heCent)} + feriados {brl(pv.feriadosCent)} − faltas {brl(pv.faltasCent)} + meta {brl(f.metaCent)}</p>
         {erro && <p className={css.alerta}>{erro}</p>}
-        {!fechado && <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar lançamento'}</Botao>}
+        <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : fechado ? 'Salvar nota e pagamento' : 'Salvar lançamento'}</Botao>
       </div>
     </>
   );
 }
 
-function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void }) {
+function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
+  l: PessoalLinhaMot; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+  onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
+}) {
   const [sem, setSem] = useState(l.semanas.map((s) => ({ ...s, diasManual: s.dias !== s.diasAuto })));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -1007,7 +1115,9 @@ function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: Pesso
       for (let i = 0; i < sem.length; i++) {
         const s = sem[i]!, o = l.semanas[i]!;
         if (s.dias === o.dias && s.adicionalCent === o.adicionalCent && (s.nfNumero ?? '') === (o.nfNumero ?? '') && s.pago === o.pago) continue;
-        await api.put('/pessoal/lancamento', {
+        await api.put('/pessoal/lancamento', fechado ? {
+          pessoaTipo: 'MOTORISTA', pessoaId: l.id, competencia: mes, periodo: s.inicio, nfNumero: s.nfNumero ?? '', pago: s.pago,
+        } : {
           pessoaTipo: 'MOTORISTA', pessoaId: l.id, competencia: mes, periodo: s.inicio,
           dias: s.dias === s.diasAuto ? null : s.dias, adicional: s.adicionalCent / 100, nfNumero: s.nfNumero ?? '', pago: s.pago,
         });
@@ -1029,9 +1139,11 @@ function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: Pesso
             <div className={css.grade2}>
               <CampoNum id={`d-${i}`} rotulo={`Dias (previsto ${s.diasAuto})`} max={7} valor={s.dias} onChange={(n) => up(i, { dias: n })} disabled={fechado} />
               <CampoReais id={`a-${i}`} rotulo="Adicionais" valorCent={s.adicionalCent} onChange={(c) => up(i, { adicionalCent: c })} disabled={fechado} ajuda="Sábado extra, freelancer…" />
-              <CampoTexto id={`n-${i}`} rotulo="Número da NF" valor={s.nfNumero ?? ''} onChange={(v) => up(i, { nfNumero: v })} disabled={fechado} />
-              <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={s.pago ? 'sim' : 'nao'} disabled={fechado} onChange={(v) => up(i, { pago: v === 'sim' })} opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
+              <CampoTexto id={`n-${i}`} rotulo="Número da NF" valor={s.nfNumero ?? ''} onChange={(v) => up(i, { nfNumero: v })} />
+              <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={s.pago ? 'sim' : 'nao'} onChange={(v) => up(i, { pago: v === 'sim' })} opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
             </div>
+            {s.dias > 0 && <AnexoNf pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} periodo={s.inicio} nome={`${l.nome} · semana ${fmtDia(s.inicio)}`}
+              arquivo={l.semanas[i]?.nfArquivo ?? null} onMudou={onRecarregar} onAviso={onAviso} />}
           </section>
         ))}
         <Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} />
@@ -1043,7 +1155,8 @@ function PainelMot({ l, mes, fechado, onSalvo, onContrato, onTirar }: { l: Pesso
         <Linha2 k={<span className={css.mute}>− débitos</span>} v={l.debitosCent ? brl(-l.debitosCent) : '—'} cls={css.neg} />
         <Linha2 cls={css.grande} k="Líquido a pagar" v={brl(total - l.debitosCent)} />
         {erro && <p className={css.alerta}>{erro}</p>}
-        {!fechado && <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar semanas'}</Botao>}
+        {fechado && <p className={css.formula}>Mês fechado: só nota e pagamento podem mudar.</p>}
+        <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : fechado ? 'Salvar notas e pagamentos' : 'Salvar semanas'}</Botao>
       </div>
     </>
   );
@@ -1110,12 +1223,14 @@ function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 
   const erros = {
     nome: !f.nome.trim() ? 'Informe o nome completo.' : '',
     valor: f.valorCent <= 0 ? `Informe o valor ${f.tipo === 'MEI' ? 'do contrato' : 'mensal'}.` : '',
+    documento: docIncompleto(f.documento, f.tipo === 'MEI'),
   };
   const mei = f.tipo === 'MEI';
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setTocado({ nome: true, valor: true });
     if (erros.nome || erros.valor) return;
+    if (erros.documento) { document.getElementById('p-doc')?.focus(); return; }
     setSalvando(true); setErro(null);
     try {
       await api.post('/pessoal/prestadores', {
@@ -1145,10 +1260,12 @@ function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 
             {tocado.nome && erros.nome && <small className={css.erroCampo}>{erros.nome}</small>}
           </div>
           <div className={css.grade2}>
-            <CampoTexto id="p-doc" rotulo={mei ? 'CNPJ do MEI' : 'Documento (opcional)'} valor={f.documento} placeholder={mei ? '00.000.000/0001-00' : 'CPF ou CNPJ'} onChange={(v) => setF({ ...f, documento: v })} />
+            <CampoTexto id="p-doc" rotulo={mei ? 'CNPJ do MEI' : 'CPF ou CNPJ (opcional)'} valor={f.documento} numerico placeholder={mei ? '00.000.000/0001-00' : '000.000.000-00'}
+              onChange={(v) => setF({ ...f, documento: mascaraDoc(v) })} erro={erros.documento} />
             <CampoTexto id="p-fun" rotulo={mei ? 'Função' : 'Categoria / cliente'} valor={f.funcao} placeholder={mei ? 'Vendedor externo' : 'Cobra · 814'} onChange={(v) => setF({ ...f, funcao: v })} />
           </div>
-          <CampoTexto id="p-pix" rotulo="Chave Pix (opcional)" valor={f.chavePix} onChange={(v) => setF({ ...f, chavePix: v })} />
+          <CampoTexto id="p-pix" rotulo="Chave Pix (opcional)" valor={f.chavePix} placeholder="CPF, CNPJ, celular, e-mail ou aleatória" onChange={(v) => setF({ ...f, chavePix: v })}
+            erro={f.chavePix.trim() && !normalizarChave(f.chavePix) ? 'Não reconheci essa chave Pix.' : ''} ajuda="Usada no QR Code de pagamento." />
         </section>
         <section className={css.secao}>
           <h3><span className={css.num}>3</span>Valores</h3>
@@ -1172,6 +1289,218 @@ function FormPrestador({ tipoInicial, mes, onVoltar, onCriado }: { tipoInicial: 
           <Botao type="submit" variante="coral" className={css.btnPri} disabled={salvando}>{salvando ? 'Adicionando…' : `Adicionar ${mei ? 'MEI' : 'motorista'}`}</Botao>
         </div>
       </form>
+    </div>
+  );
+}
+
+
+// =================== Pix, pago e nota fiscal ===================
+
+type PixAlvo = { nome: string; chave: string; valorCent: number; rotuloValor: string; comValor: boolean };
+
+const ROT_CHAVE = { CPF: 'CPF', CNPJ: 'CNPJ', TELEFONE: 'celular', EMAIL: 'e-mail', ALEATORIA: 'chave aleatória' } as const;
+
+/** Ícone de Pix ao lado do nome. Sem chave cadastrada, fica apagado com dica. */
+function BotaoPix({ nome, chave, valorCent, rotuloValor, comValor, onPix }: {
+  nome: string; chave: string | null; valorCent: number; rotuloValor: string; comValor: boolean; onPix: (a: PixAlvo) => void;
+}) {
+  const ok = !!chave && !!normalizarChave(chave);
+  return (
+    <button type="button" className={`${css.pixBtn} ${ok ? '' : css.pixSem}`} disabled={!ok}
+      title={ok ? `QR Code Pix de ${nome}` : chave ? 'Chave Pix inválida — corrija no cadastro' : 'Sem chave Pix cadastrada'}
+      aria-label={ok ? `Abrir QR Code Pix de ${nome}` : `${nome} sem chave Pix`}
+      onClick={(e) => { e.stopPropagation(); if (ok) onPix({ nome, chave: chave!, valorCent, rotuloValor, comValor }); }}
+      onKeyDown={(e) => e.stopPropagation()}>
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 2.6 9.1 5.5a3 3 0 0 1 2.1.9L12 7.2l.8-.8a3 3 0 0 1 2.1-.9L12 2.6Zm-5.7 4.1L3.6 9.4a3.7 3.7 0 0 0 0 5.2l2.7 2.7h1.4c.5 0 1-.2 1.4-.6l1.7-1.7a1.7 1.7 0 0 1 2.4 0l1.7 1.7c.4.4.9.6 1.4.6h1.4l2.7-2.7a3.7 3.7 0 0 0 0-5.2l-2.7-2.7h-1.4c-.5 0-1 .2-1.4.6l-1.7 1.7a1.7 1.7 0 0 1-2.4 0L9.1 7.3a2 2 0 0 0-1.4-.6H6.3Zm2.8 11.8L12 21.4l2.9-2.9a3 3 0 0 1-2.1-.9l-.8-.8-.8.8a3 3 0 0 1-2.1.9Z"/></svg>
+    </button>
+  );
+}
+
+function ModalPix({ alvo, mes, onFechar }: { alvo: PixAlvo; mes: string; onFechar: () => void }) {
+  const norm = normalizarChave(alvo.chave)!;
+  const podeValor = alvo.valorCent > 0;
+  const [comValor, setComValor] = useState(alvo.comValor && podeValor);
+  const [img, setImg] = useState('');
+  const [copiado, setCopiado] = useState(false);
+  const fechar = useRef<HTMLButtonElement>(null);
+  const codigo = useMemo(() => brCodePix({
+    chave: norm.chave, nome: alvo.nome, valorCent: comValor ? alvo.valorCent : null,
+    txid: `PS${mes.replace('-', '')}`,
+  }), [norm.chave, alvo.nome, alvo.valorCent, comValor, mes]);
+  useEffect(() => {
+    let vivo = true;
+    QRCode.toDataURL(codigo, { margin: 1, width: 232, errorCorrectionLevel: 'M', color: { dark: '#10403F', light: '#FFFFFF' } })
+      .then((u) => { if (vivo) setImg(u); }).catch(() => setImg(''));
+    return () => { vivo = false; };
+  }, [codigo]);
+  useEffect(() => {
+    const voltar = document.activeElement as HTMLElement | null;
+    fechar.current?.focus();
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar(); };
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('keydown', esc); voltar?.focus?.(); };
+  }, [onFechar]);
+  async function copiar() {
+    try { await navigator.clipboard.writeText(codigo); setCopiado(true); setTimeout(() => setCopiado(false), 2500); } catch { /* sem permissão: o texto está visível pra copiar */ }
+  }
+  return (
+    <div className={css.dFundo} data-dialogo onClick={onFechar}>
+      <div className={`${css.dialogo} ${css.pixModal}`} role="dialog" aria-modal="true" aria-labelledby="pix-titulo" onClick={(e) => e.stopPropagation()}>
+        <div className={css.pixTopo}>
+          <div><h3 id="pix-titulo">Pix para {alvo.nome}</h3><p className={css.hint}>Chave ({ROT_CHAVE[norm.tipo]}): <b className={css.mono}>{norm.tipo === 'CPF' || norm.tipo === 'CNPJ' ? mascaraDoc(norm.chave) : norm.chave}</b></p></div>
+          <button ref={fechar} className={css.pX} onClick={onFechar} aria-label="Fechar">✕</button>
+        </div>
+        <div className={css.pixQr}>{img ? <img src={img} width={232} height={232} alt={`QR Code Pix de ${alvo.nome}${comValor ? ` no valor de ${brl(alvo.valorCent)}` : ''}`} /> : <span className={css.hint}>Gerando…</span>}</div>
+        <div className={css.pixValor}>{comValor ? <><span>{alvo.rotuloValor} · {mesCurto(mes)}</span><strong>{brl(alvo.valorCent)}</strong></> : <span>Sem valor — quem paga digita o valor no app do banco.</span>}</div>
+        {podeValor && (
+          <label className={css.pixChk}><input type="checkbox" checked={comValor} onChange={(e) => setComValor(e.target.checked)} />
+            Incluir o valor ({brl(alvo.valorCent)}) no QR Code</label>
+        )}
+        <label className={css.campo} htmlFor="pix-cc"><span>Pix copia e cola</span>
+          <textarea id="pix-cc" className={css.pixCc} readOnly value={codigo} rows={3} onFocus={(e) => e.currentTarget.select()} /></label>
+        <p className={css.formula}>Confira o nome do recebedor no app do banco antes de confirmar.</p>
+        <div className={css.dAcoes}>
+          <button className={css.btnTexto} onClick={onFechar}>Fechar</button>
+          <Botao variante="coral" className={css.btnPri} onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar código'}</Botao>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Interruptor "pago" na linha da tabela — não abre o painel. */
+function TogglePago({ nome, pago, parcial, onMudar, children }: { nome: string; pago: boolean; parcial?: string; onMudar: (v: boolean) => Promise<void>; children?: ReactNode }) {
+  const [enviando, setEnviando] = useState(false);
+  return (
+    <span className={css.pagoCel} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      <button type="button" role="switch" aria-checked={pago} disabled={enviando} className={`${css.chave} ${pago ? css.chaveOn : ''}`}
+        aria-label={`${nome}: ${pago ? 'pago' : parcial ? `${parcial} semanas pagas` : 'pagamento pendente'}`}
+        title={pago ? 'Pago — clique para voltar a pendente' : parcial ? `${parcial} semanas pagas — clique para marcar todas` : 'Marcar como pago'}
+        onClick={async () => { setEnviando(true); try { await onMudar(!pago); } finally { setEnviando(false); } }}>
+        <span className={css.chaveBola} />
+      </button>
+      {parcial && <small className={css.sub}>{parcial} pagas</small>}
+      {children}
+    </span>
+  );
+}
+
+const IconeClipe = () => (
+  <svg className={css.clipe} viewBox="0 0 24 24" width="12" height="12" aria-label="com arquivo"><path fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+    d="M20 11.5 12.4 19a5 5 0 0 1-7.1-7.1l7.8-7.7a3.3 3.3 0 0 1 4.7 4.7l-7.6 7.6a1.7 1.7 0 0 1-2.4-2.4l7-6.9" /></svg>
+);
+
+const tamanho = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`);
+const NF_ACEITA = '.pdf,.xml,.png,.jpg,.jpeg,.webp,application/pdf,text/xml,application/xml,image/png,image/jpeg,image/webp';
+
+/** Arquivo da nota fiscal: enviar, ver, baixar, trocar e remover. Funciona em mês fechado. */
+function AnexoNf({ pessoaTipo, pessoaId, mes, periodo, nome, arquivo, onMudou, onAviso }: {
+  pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; mes: string; periodo: string; nome: string; arquivo: PessoalNfArquivo | null;
+  onMudou: () => Promise<void>; onAviso: (m: string) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [ocupado, setOcupado] = useState<'' | 'enviando' | 'removendo'>('');
+  const [erro, setErro] = useState<string | null>(null);
+  const [ver, setVer] = useState(false);
+  const [confirmaRemover, setConfirmaRemover] = useState(false);
+  async function enviar(file: File) {
+    setErro(null);
+    if (file.size > 5 * 1024 * 1024) { setErro('Arquivo maior que 5 MB. Envie um PDF menor.'); return; }
+    const mime = file.type || (file.name.toLowerCase().endsWith('.xml') ? 'application/xml' : file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : '');
+    setOcupado('enviando');
+    try {
+      await api.post('/pessoal/nf', { pessoaTipo, pessoaId, competencia: mes, periodo, arquivoBase64: await arquivoParaBase64(file), arquivoNome: file.name, arquivoMime: mime });
+      await onMudou();
+      onAviso(`Nota de ${nome} ${arquivo ? 'substituída' : 'anexada'}.`);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setOcupado(''); if (input.current) input.current.value = ''; }
+  }
+  async function baixar() {
+    if (!arquivo) return;
+    try { salvarBlob(await api.baixar(`/pessoal/nf/${arquivo.id}`), arquivo.nome); } catch (e) { setErro((e as Error).message); }
+  }
+  async function remover() {
+    if (!arquivo) return;
+    setOcupado('removendo'); setErro(null);
+    try { await api.del(`/pessoal/nf/${arquivo.id}`); setConfirmaRemover(false); await onMudou(); onAviso(`Arquivo da nota de ${nome} removido.`); }
+    catch (e) { setErro((e as Error).message); }
+    finally { setOcupado(''); }
+  }
+  return (
+    <div className={css.anexo}>
+      <input ref={input} type="file" accept={NF_ACEITA} hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviar(f); }} />
+      {arquivo ? (
+        <>
+          <div className={css.anexoArq}>
+            <span className={css.anexoIco} aria-hidden="true">{arquivo.mime === 'application/pdf' ? 'PDF' : arquivo.mime.includes('xml') ? 'XML' : 'IMG'}</span>
+            <span className={css.anexoNome}><b title={arquivo.nome}>{arquivo.nome}</b><small>{tamanho(arquivo.bytes)} · enviado {fmtDia(arquivo.enviadoEm.slice(0, 10))}</small></span>
+          </div>
+          {confirmaRemover ? (
+            <div className={css.anexoAcoes}>
+              <span className={css.hint}>Remover o arquivo?</span>
+              <button type="button" className={css.btnTexto} onClick={() => setConfirmaRemover(false)}>Não</button>
+              <button type="button" className={`${css.link} ${css.linkPerigo}`} disabled={!!ocupado} onClick={remover}>{ocupado === 'removendo' ? 'Removendo…' : 'Sim, remover'}</button>
+            </div>
+          ) : (
+            <div className={css.anexoAcoes}>
+              <button type="button" className={css.btnContornoNeutro} onClick={() => setVer(true)}>Ver</button>
+              <button type="button" className={css.btnContornoNeutro} onClick={baixar}>Baixar</button>
+              <button type="button" className={css.link} disabled={!!ocupado} onClick={() => input.current?.click()}>{ocupado === 'enviando' ? 'Enviando…' : 'Trocar'}</button>
+              <button type="button" className={`${css.link} ${css.linkPerigo}`} onClick={() => setConfirmaRemover(true)}>Remover</button>
+            </div>
+          )}
+        </>
+      ) : (
+        <button type="button" className={css.anexoVazio} disabled={!!ocupado} onClick={() => input.current?.click()}
+          onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) void enviar(f); }}>
+          <IconeClipe /> {ocupado === 'enviando' ? 'Enviando…' : <>Anexar arquivo da nota <small>PDF, XML ou foto · até 5 MB</small></>}
+        </button>
+      )}
+      {erro && <p className={css.alerta}>{erro}</p>}
+      {ver && arquivo && <VisualizarNf arquivo={arquivo} titulo={`Nota de ${nome}`} onBaixar={baixar} onFechar={() => setVer(false)} />}
+    </div>
+  );
+}
+
+function VisualizarNf({ arquivo, titulo, onBaixar, onFechar }: { arquivo: PessoalNfArquivo; titulo: string; onBaixar: () => void; onFechar: () => void }) {
+  const [url, setUrl] = useState('');
+  const [texto, setTexto] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const fechar = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    let u = '';
+    let vivo = true;
+    api.baixar(`/pessoal/nf/${arquivo.id}`).then(async (b) => {
+      if (!vivo) return;
+      if (arquivo.mime.includes('xml')) setTexto(await b.text());
+      else { u = URL.createObjectURL(new Blob([b], { type: arquivo.mime })); setUrl(u); }
+    }).catch((e) => setErro((e as Error).message));
+    return () => { vivo = false; if (u) URL.revokeObjectURL(u); };
+  }, [arquivo.id, arquivo.mime]);
+  useEffect(() => {
+    fechar.current?.focus();
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onFechar(); } };
+    window.addEventListener('keydown', esc, true);
+    return () => window.removeEventListener('keydown', esc, true);
+  }, [onFechar]);
+  return (
+    <div className={css.dFundo} data-dialogo onClick={onFechar}>
+      <div className={css.visor} role="dialog" aria-modal="true" aria-labelledby="visor-titulo" onClick={(e) => e.stopPropagation()}>
+        <div className={css.visorTopo}>
+          <div><h3 id="visor-titulo">{titulo}</h3><p className={css.hint}>{arquivo.nome} · {tamanho(arquivo.bytes)}</p></div>
+          <div className={css.anexoAcoes}>
+            <button type="button" className={css.btnContornoNeutro} onClick={onBaixar}>Baixar</button>
+            <button ref={fechar} className={css.pX} onClick={onFechar} aria-label="Fechar visualização">✕</button>
+          </div>
+        </div>
+        <div className={css.visorCorpo}>
+          {erro ? <p className={css.alerta}>{erro}</p>
+            : texto !== null ? <pre className={css.visorXml}>{texto}</pre>
+            : !url ? <p className={css.hint}>Carregando…</p>
+            : arquivo.mime === 'application/pdf' ? <iframe title={arquivo.nome} src={url} className={css.visorPdf} />
+            : <img src={url} alt={arquivo.nome} className={css.visorImg} />}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
-import { pgTable, uuid, varchar, integer, numeric, boolean, date, text, timestamp, jsonb, unique, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, numeric, boolean, date, text, timestamp, jsonb, unique, index, customType } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 import { empregado } from './empregado';
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 
 /**
  * Gestão de Pessoal (migration 0038). CLT vem da tabela empregado; aqui fica
@@ -119,3 +121,30 @@ export const pessoalPrestadorValor = pgTable('pessoal_prestador_valor', {
   baseDias: varchar('base_dias', { length: 8 }).notNull().default('SEG_SAB'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique('uq_pessoal_prestador_valor').on(t.tenantId, t.prestadorId, t.vigenteDesde)]);
+
+/** Mês a partir do qual a cesta básica é paga (carência) — migration 0042. */
+export const pessoalCltCesta = pgTable('pessoal_clt_cesta', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
+  cestaDesde: varchar('cesta_desde', { length: 7 }).notNull(),
+  atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique('uq_pessoal_clt_cesta').on(t.tenantId, t.empregadoId)]);
+
+/** Arquivo da NF (cifrado) — migration 0043. Um por pessoa + competência + período. */
+export const pessoalNfArquivo = pgTable('pessoal_nf_arquivo', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  pessoaTipo: varchar('pessoa_tipo', { length: 10 }).notNull(),
+  pessoaId: uuid('pessoa_id').notNull(),
+  competencia: varchar('competencia', { length: 7 }).notNull(),
+  periodo: varchar('periodo', { length: 10 }).notNull().default('MES'),
+  arquivo: bytea('arquivo').notNull(),
+  arquivoNome: varchar('arquivo_nome', { length: 160 }).notNull(),
+  arquivoMime: varchar('arquivo_mime', { length: 80 }).notNull(),
+  arquivoBytes: integer('arquivo_bytes').notNull(),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique('uq_pessoal_nf_arquivo').on(t.tenantId, t.pessoaTipo, t.pessoaId, t.competencia, t.periodo),
+  index('idx_pessoal_nf_arquivo_comp').on(t.tenantId, t.competencia),
+]);

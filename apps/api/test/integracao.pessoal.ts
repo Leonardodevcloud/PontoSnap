@@ -1,9 +1,11 @@
 import 'reflect-metadata';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { schema, comoMaster, tenant, empregado, pontoRep, pontoHorarioContratual, pontoMarcacao, pontoFeriado } from '@ponto/db';
+import { schema, comoMaster, tenant, empregado, pontoRep, pontoHorarioContratual, pontoMarcacao, pontoFeriado, pessoalNfArquivo } from '@ponto/db';
+import { eq } from 'drizzle-orm';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
 import { PessoalService } from '../src/pessoal/pessoal.service';
+import { CriptoService } from '../src/common/cripto.service';
 import { diasDoMes, diaSemana } from '../src/pessoal/calculo';
 
 /**
@@ -18,7 +20,7 @@ import { diasDoMes, diaSemana } from '../src/pessoal/calculo';
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
 const db = drizzle(client, { schema });
 const trat = new TratamentoService(db);
-const pes = new PessoalService(db, trat);
+const pes = new PessoalService(db, trat, new CriptoService());
 
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };
@@ -79,8 +81,35 @@ async function main() {
   ok(b.config.origem === 'PADRAO' && b.config.vrDiaCent === 2000 && b.config.vtValorCent === 800, 'Beto, sem valor próprio, herda o padrão da empresa');
   ok(set.padrao?.vrDiaCent === 2000, 'padrão vigente aparece na competência');
 
+  // ── cesta básica: assiduidade + carência ──
+  await pes.salvarConfigClt(t.id, ana.id, { cargo: 'Auxiliar', vrDia: 25, cestaMensal: 80, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-09' });
+  const caio = (await comoMaster(db, (tx) => tx.insert(empregado).values({
+    tenantId: t.id, cpf: '40000000003', nome: 'Caio Assíduo', horarioContratualId: hor.id, salarioMensal: '1800.00', dataInicioPonto: '2026-08-01',
+  }).returning()))[0]!;
+  const bsCaio = diasDoMes('2026-09').filter((d) => { const w = diaSemana(d); return w >= 1 && w <= 5 && d !== '2026-09-07'; })
+    .flatMap((d) => [em(d, '08:00'), em(d, '12:00'), em(d, '13:00'), em(d, '17:00')]);
+  await comoMaster(db, (tx) => tx.insert(pontoMarcacao).values(bsCaio.map((b) => ({
+    tenantId: t.id, repId: rep.id, nsr: nsr, cpf: caio.cpf, dtMarcacao: b, coletor: 1, hashRegistro: String(nsr++).padStart(64, '0'),
+  }))));
+  await pes.salvarConfigClt(t.id, caio.id, { vrDia: 25, cestaMensal: 80, vtTipo: 'NENHUM', vtValor: 0, vigenteDesde: '2026-09' });
+  let c1 = await pes.competencia(t.id, '2026-09');
+  const anaC = c1.clt.find((c) => c.empregadoId === ana.id)!;
+  ok(anaC.beneficios.cestaStatus === 'PERDIDA_FALTA' && anaC.beneficios.cestaCent === 0, `Ana faltou em 15/09: perde a cesta (${anaC.beneficios.cestaStatus})`);
+  let caioC = c1.clt.find((c) => c.empregadoId === caio.id)!;
+  ok(caioC.beneficios.cestaStatus === 'CARENCIA' && caioC.beneficios.cestaDesde === '2026-11' && caioC.beneficios.cestaDesdeOrigem === 'AUTO',
+    `Caio começou em agosto: cesta só a partir de novembro (${caioC.beneficios.cestaStatus} / ${caioC.beneficios.cestaDesde})`);
+  await pes.definirInicioCesta(t.id, caio.id, '2026-09');
+  c1 = await pes.competencia(t.id, '2026-09');
+  caioC = c1.clt.find((c) => c.empregadoId === caio.id)!;
+  ok(caioC.beneficios.cestaStatus === 'PAGA' && caioC.beneficios.cestaCent === 8000 && caioC.beneficios.cestaDesdeOrigem === 'MANUAL',
+    `início definido em setembro e sem falta: cesta paga (${caioC.beneficios.cestaCent})`);
+  ok(caioC.beneficios.cargaCent === caioC.beneficios.vrProxCent + 8000 - caioC.beneficios.acertoCent, 'cesta entra na carga');
+  await pes.definirInicioCesta(t.id, caio.id, null);
+  ok((await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!.beneficios.cestaDesde === '2026-11', 'limpar volta ao automático (3 meses)');
+  await pes.definirInicioCesta(t.id, caio.id, '2026-09');
+
   // ── MEI ──
-  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60874544000104', funcao: 'Vendedor', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
+  const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60.874.544/0001-04', funcao: 'Vendedor', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });
   await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 500, metaPaga: true, metaPagaEm: '2026-09-05', faltas: 1 });
   await pes.criarDebito(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, descricao: 'Notebook', valorTotal: 300, parcelas: 2, competenciaInicio: '2026-09' });
   const set2 = await pes.competencia(t.id, '2026-09');
@@ -117,6 +146,30 @@ async function main() {
     'mês fechado não aceita lançamento');
   ok((await erroDe(() => pes.editarPrestador(t.id, mei!.id, { valorMensal: 9999, vigenteDesde: '2026-09' }))).includes('fechada'),
     'reajuste não entra em mês fechado');
+
+  // ── NF e pagamento chegam depois do fechamento ──
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF');
+  ok((await erroDe(() => pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true, nfNumero: '123', nfData: '2026-10-02' }))) === '',
+    'mês fechado aceita pago + número da NF');
+  const nf = await pes.salvarNf(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', arquivoBase64: pdf.toString('base64'), arquivoNome: 'nf-123.pdf', arquivoMime: 'application/pdf' });
+  const fech2 = await pes.competencia(t.id, '2026-09');
+  const mf = fech2.mei.find((x) => x.id === mei!.id)!;
+  ok(mf.lanc.pago && mf.lanc.nfNumero === '123', 'retrato fechado mostra pago e NF ao vivo');
+  ok(mf.lanc.nfArquivo?.id === nf!.id && mf.lanc.nfArquivo.nome === 'nf-123.pdf', 'metadados do arquivo da NF aparecem no lançamento');
+  ok(fech2.pendencias.nfMei === 0, 'NF enviada tira a pendência');
+  ok(mf.brutoCent === fech.mei.find((x) => x.id === mei!.id)!.brutoCent, 'valores do retrato não mudam');
+  const baixado = await pes.baixarNf(t.id, nf!.id);
+  ok(baixado.bytes.equals(pdf) && baixado.mime === 'application/pdf', 'arquivo volta íntegro (cifrado em repouso)');
+  const cru = await comoMaster(db, (tx) => tx.select().from(pessoalNfArquivo).where(eq(pessoalNfArquivo.id, nf!.id)));
+  ok(!!cru[0] && !Buffer.from(cru[0].arquivo).includes(Buffer.from('%PDF')), 'no banco o arquivo está cifrado');
+  const nf2 = await pes.salvarNf(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', arquivoBase64: pdf.toString('base64'), arquivoNome: 'nf-123-v2.pdf', arquivoMime: 'application/pdf' });
+  ok(nf2!.id === nf!.id && nf2!.nome === 'nf-123-v2.pdf', 'reenviar substitui o arquivo do mesmo mês');
+  ok((await erroDe(() => pes.salvarNf(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', arquivoBase64: 'AAAA', arquivoNome: 'x.exe', arquivoMime: 'application/x-msdownload' }))).includes('PDF'),
+    'tipo de arquivo não aceito é recusado');
+  ok((await erroDe(() => pes.baixarNf('00000000-0000-0000-0000-000000000000', nf!.id))) !== '', 'outra empresa não baixa a NF');
+  await pes.removerNf(t.id, nf!.id);
+  ok(!(await pes.competencia(t.id, '2026-09')).mei.find((x) => x.id === mei!.id)!.lanc.nfArquivo, 'remover tira o arquivo');
+  ok(vSet.documento === '60874544000104', `documento salvo só com dígitos (${vSet.documento})`);
 
   // ── mudar valor não mexe no passado ──
   ok((await erroDe(() => pes.salvarConfigClt(t.id, ana.id, { vrDia: 99, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-10' }))).includes('já foi feita'),

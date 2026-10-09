@@ -665,6 +665,9 @@ export interface PessoalLinhaClt {
     vrProxCent: number; vtProxCent: number;
     naoUsados: { data: string; motivo: MotivoNaoUso }[];
     acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;
+    /** Cesta do mês apurado: paga só sem falta e depois da carência. */
+    cestaCent: number; cestaStatus: 'PAGA' | 'PERDIDA_FALTA' | 'CARENCIA' | 'SEM_CESTA';
+    cestaDesde: string | null; cestaDesdeOrigem: 'MANUAL' | 'AUTO' | null;
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null; erro: string | null;
@@ -672,7 +675,10 @@ export interface PessoalLinhaClt {
 export interface PessoalLancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;
   nfNumero: string | null; nfData: string | null; pago: boolean; observacao: string | null;
+  nfArquivo: PessoalNfArquivo | null;
 }
+/** Arquivo da NF enviado (metadados; o conteúdo vem de /pessoal/nf/:id). */
+export interface PessoalNfArquivo { id: string; nome: string; mime: string; bytes: number; enviadoEm: string }
 export interface PessoalLinhaMei {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
   /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
@@ -681,7 +687,7 @@ export interface PessoalLinhaMei {
   valorDiaCent: number; valorHoraCent: number; heCent: number; feriadosCent: number; faltasCent: number;
   brutoCent: number; metaDescontadaCent: number; abatimentosCent: number; liquidoCent: number;
 }
-export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number }
+export interface PessoalSemanaMot { inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: PessoalNfArquivo | null }
 export interface PessoalLinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; valorCent: number; chavePix: string | null;
   /** Desde quando vale o valor deste mês, e o histórico de reajustes (mais recente primeiro). */
