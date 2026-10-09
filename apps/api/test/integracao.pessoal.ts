@@ -28,9 +28,10 @@ const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
-  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000211', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const CNPJ = `44${String(Date.now()).slice(-12)}`; // único por execução
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: CNPJ, razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
   const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
-    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000211', razaoSocial: 'PESSOAL LTDA',
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: CNPJ, razaoSocial: 'PESSOAL LTDA',
     numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
   }).returning()))[0]!;
   const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({

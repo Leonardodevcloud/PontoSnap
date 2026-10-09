@@ -34,6 +34,12 @@ export interface LinhaClt {
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   /** Hora extra de verdade (sem indenização), e quanto dela foi pro banco. */
   heMin: number; heNoBancoMin: number;
+  /**
+   * Banco que compensa no mês: horas acertadas no fechamento (> 0 pagas como
+   * extra, < 0 descontadas) e o valor delas — já dentro de proventos/descontos.
+   * Opcional porque fechamentos antigos não têm.
+   */
+  bancoAcertoMin?: number; bancoAcertoCent?: number; bancoPassaMin?: number;
   /** Indenização de intervalo/interjornada: sempre paga, não é hora extra. */
   indenizacaoMin: number; indenizacaoCent: number;
   /** Tudo que é pago em R$ vindo do ponto: extras pagas + indenização + noturno + reflexo. */
@@ -282,6 +288,7 @@ export class PessoalService {
       let diasProxVrLista: string[] = [];
       let jornadaMes: Record<string, number> = {};
       let heMin = 0, heNoBancoMin = 0, proventosCent = 0, descontosCent = 0, indenizacaoMin = 0, indenizacaoCent = 0;
+      let bancoAcertoMin = 0, bancoAcertoCent = 0, bancoPassaMin = 0;
       let faltasDias: string[] = [];
       try {
         const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim, feriadosLista);
@@ -298,7 +305,14 @@ export class PessoalService {
           indenizacaoCent = ap.valores.indenizacaoCentavos;
           proventosCent = ap.valores.extrasCentavos + ap.valores.adicionalNoturnoCentavos + ap.valores.reflexoDsrCentavos;
           descontosCent = ap.valores.descontoFaltasCentavos + ap.valores.descontoAtrasosCentavos + ap.valores.descontoDsrPerdidoCentavos;
+          if (ap.acertoBanco) {
+            proventosCent += ap.acertoBanco.extrasCentavos + ap.acertoBanco.reflexoDsrCentavos;
+            descontosCent += ap.acertoBanco.descontoCentavos;
+            bancoAcertoMin = ap.acertoBanco.acertoMin;
+            bancoAcertoCent = ap.acertoBanco.extrasCentavos + ap.acertoBanco.reflexoDsrCentavos - ap.acertoBanco.descontoCentavos;
+          }
         }
+        bancoPassaMin = ap.banco?.acerto?.passaMin ?? 0;
         const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim, feriadosProx);
         diasProxLista = apProx.diasPrevistos;
         diasProxVrLista = diasComVr(apProx.diasPrevistos, apProx.jornadaEscala);
@@ -345,7 +359,7 @@ export class PessoalService {
         // Base de falta e valor-hora: o salário vigente no fim do mês.
         valorDia30Cent: Math.round(salarioFimMesCent / 30),
         valorHoraCent: Math.round(salarioFimMesCent / 220),
-        heMin, heNoBancoMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
+        heMin, heNoBancoMin, bancoAcertoMin, bancoAcertoCent, bancoPassaMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
         beneficios: {
           ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, pagosEstimado: !pagosSnap,
           cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null,

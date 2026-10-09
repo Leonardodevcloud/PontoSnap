@@ -53,3 +53,21 @@
 .arquivo:hover{ border-color:var(--coral); color:var(--coral-d); }
 
 .acoes{ display:flex; gap:10px; margin-top:6px; }
+
+/* Banco de horas: três modos */
+.opBanco{ display:grid; gap:8px; margin-top:6px; }
+.opB{ width:100%; text-align:left; display:flex; gap:12px; align-items:flex-start; background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.14); border-radius:12px; padding:12px 14px; font:inherit; color:var(--ink); cursor:pointer; }
+.opB:hover{ border-color:rgba(var(--ink-rgb),.3); }
+.opB:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.opB b{ display:block; font-size:14px; }
+.opB span span{ display:block; font-size:12.5px; color:var(--ash); line-height:1.5; margin-top:2px; }
+.opBOn{ border-color:var(--ink); background:rgba(var(--ink-rgb),.04); }
+.opRd{ width:17px; height:17px; border-radius:50%; border:2px solid rgba(var(--ink-rgb),.3); flex-shrink:0; margin-top:2px; box-sizing:border-box; }
+.opBOn .opRd{ border:5px solid var(--ink); }
+.opEx{ display:inline-block; font-style:normal; font-family:var(--ff-mono); font-size:11px; background:var(--cream); border-radius:6px; padding:4px 8px; margin-top:6px; }
+.opSub{ margin:8px 0 2px 29px; padding:12px 14px; border-left:3px solid var(--lime); background:rgba(203,245,77,.08); border-radius:0 10px 10px 0; }
+.opSubLb{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); margin-bottom:7px; }
+.pills{ display:flex; gap:8px; flex-wrap:wrap; }
+.pill{ padding:8px 14px; border-radius:999px; border:1px solid rgba(var(--ink-rgb),.2); font:inherit; font-size:13px; font-weight:700; background:var(--white); color:var(--ink); cursor:pointer; }
+.pill:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.pillOn{ background:var(--ink); color:var(--cream); border-color:transparent; }

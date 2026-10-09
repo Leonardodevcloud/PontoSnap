@@ -161,7 +161,47 @@
 .hauto{ font-style:normal; font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); margin-left:6px; }
 .cSub{ font-size:11.5px; color:var(--ash); margin-top:4px; }
 .cSub .mono{ font-size:11.5px; }
-.extTag{ display:block; font-style:normal; font-family:var(--ff-mono); font-size:10px; color:var(--ash); margin-top:1px; }
+.extTag{ display:table; font-style:normal; font-family:var(--ff-mono); font-size:10px; color:var(--ash); margin-top:2px; padding:1px 6px; border-radius:5px; background:var(--cream); }
 
 .extAcao{ width:22px; text-align:center; }
 .extRemover{ margin-left:0 !important; }
+
+/* Baixar ou corrigir saldo */
+.modos{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:14px; }
+@media(max-width:620px){ .modos{ grid-template-columns:1fr; } }
+.modo{ text-align:left; border:1.5px solid rgba(var(--ink-rgb),.14); border-radius:12px; padding:11px 13px; background:var(--white); font:inherit; color:var(--ink); cursor:pointer; }
+.modo:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.modo b{ display:block; font-size:14px; margin-bottom:3px; }
+.modo span{ font-size:12px; color:var(--ash); line-height:1.45; }
+.modoOn{ background:var(--ink); border-color:transparent; color:var(--cream); }
+.modoOn span{ color:rgba(255,248,238,.75); }
+.campos3{ display:grid; grid-template-columns:140px 1fr 1fr; gap:9px; align-items:end; }
+@media(max-width:620px){ .campos3{ grid-template-columns:1fr; } }
+.campoB{ display:flex; flex-direction:column; gap:5px; min-width:0; }
+.campoB > span{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }
+.campoB .select, .campoB .mes{ width:100%; min-width:0; }
+.motivo{ width:100%; background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); resize:vertical; outline:none; }
+.motivo:focus{ border-color:var(--coral); }
+.chkAb{ display:flex; gap:9px; align-items:flex-start; font-size:12.5px; color:var(--ash); line-height:1.5; margin-top:10px; cursor:pointer; }
+.chkAb strong{ color:var(--ink); }
+.chkAb input{ margin-top:3px; accent-color:var(--ink); }
+.prev{ display:flex; align-items:center; gap:14px; background:var(--cream); border-radius:12px; padding:12px 14px; margin:14px 0; flex-wrap:wrap; }
+.prevK{ font-family:var(--ff-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ash); }
+.prevV{ font-family:var(--ff-display); font-size:20px; font-weight:600; }
+.prevSeta{ color:var(--ash); font-size:18px; }
+.prevDesc{ margin-left:auto; font-size:12.5px; color:var(--ash); text-align:right; max-width:320px; }
+.prevDesc b{ color:var(--ink); }
+.extTagPago{ background:var(--ok-bg); color:var(--ok-text); }
+/* Baixa em lote */
+.loteAviso{ background:var(--peach); border-radius:12px; padding:12px 14px; font-size:13px; line-height:1.5; margin:0 0 14px; }
+.loteTopo{ display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px; }
+.loteTopo .campoB{ width:220px; }
+.chkTodos{ display:flex; gap:8px; align-items:center; font-size:13px; margin-left:auto; cursor:pointer; }
+.chkTodos input, .loteOff input, tr input[type=checkbox]{ accent-color:var(--ink); width:16px; height:16px; }
+.loteOff td{ color:#a99f99; }
+.loteInp{ width:84px; padding:6px 8px; border-radius:8px; border:1px solid rgba(var(--ink-rgb),.15); background:var(--cream); font-family:var(--ff-mono); font-size:13px; text-align:right; color:var(--ink); }
+.loteInp:focus{ outline:none; border-color:var(--coral); }
+.loteInpErr{ border-color:var(--coral); background:#FFF3F0; }
+.loteRod{ display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; font-size:14px; color:var(--ash); }
+.loteRod b{ color:var(--ink); }
+.loteRod > :last-child{ margin-left:auto; }

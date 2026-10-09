@@ -315,17 +315,25 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
             {ap?.banco ? (
               <div className={css.banco}>
                 <div className={css.bK}>Banco de horas · {ap.banco.fechada ? 'saldo ao fim do mês' : 'saldo (meses fechados)'}</div>
-                <div className={`${css.bBig} ${(ap.banco.fechada ? ap.banco.saldoAcumuladoMin : ap.banco.saldoAnteriorMin) < 0 ? css.bBigNeg : ''}`}>
-                  {comSinal(ap.banco.fechada ? ap.banco.saldoAcumuladoMin : ap.banco.saldoAnteriorMin)}
-                </div>
+                {(() => {
+                  // Compensa no mês: depois do acerto, só fica o devendo que passa.
+                  const v = ap.banco.fechada ? (ap.banco.acerto ? ap.banco.acerto.passaMin : ap.banco.saldoAcumuladoMin) : ap.banco.saldoAnteriorMin;
+                  return <div className={`${css.bBig} ${v < 0 ? css.bBigNeg : ''}`}>{comSinal(v)}</div>;
+                })()}
                 {ap.banco.formaCalculo === 'INTRA_MES' ? (
-                  <div className={css.bAviso}>Regra intra-mês: compensa só dentro do mês, nada passa pro seguinte.</div>
+                  <>
+                    <div className={css.bAviso}>Compensa no mês e paga a diferença: sobra é paga na folha; devendo {ap.banco.acerto?.negativoMes === 'CARREGA' ? 'passa pro mês seguinte' : 'é descontado'}.</div>
+                    {ap.banco.saldoAnteriorMin !== 0 && <div className={css.bLinha}><span>Veio devendo do mês anterior</span><span className={`${css.bM} ${css.bNeg}`}>{comSinal(ap.banco.saldoAnteriorMin)}</span></div>}
+                  </>
                 ) : (
                   <div className={css.bLinha}><span>Veio dos meses anteriores (fechado)</span><span className={css.bM}>{comSinal(ap.banco.saldoAnteriorMin)}</span></div>
                 )}
                 <div className={css.bLinha}><span>{rotuloMes(mes).split(' de ')[0]} {ap.banco.fechada ? '(fechado)' : 'até agora (em andamento)'}</span><span className={`${css.bM} ${ap.banco.saldoMesMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.saldoMesMin)}</span></div>
                 {ap.banco.avulsoMin !== 0 && <div className={css.bLinha}><span>Folgas, pagamentos e ajustes</span><span className={`${css.bM} ${ap.banco.avulsoMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.avulsoMin)}</span></div>}
-                <div className={`${css.bLinha} ${css.bTotal}`}><span>{ap.banco.fechada ? 'Saldo acumulado' : 'Previsão ao fechar o mês'}</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
+                <div className={`${css.bLinha} ${css.bTotal}`}><span>{ap.banco.acerto ? 'Saldo do mês' : ap.banco.fechada ? 'Saldo acumulado' : 'Previsão ao fechar o mês'}</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
+                {ap.banco.acerto && ap.banco.acerto.acertoMin > 0 && <div className={css.bLinha}><span>{ap.banco.fechada ? 'Pago na folha' : 'Será pago na folha'}</span><span className={`${css.bM} ${css.bNeg}`}>{comSinal(-ap.banco.acerto.acertoMin)}</span></div>}
+                {ap.banco.acerto && ap.banco.acerto.acertoMin < 0 && <div className={css.bLinha}><span>{ap.banco.fechada ? 'Descontado na folha' : 'Será descontado na folha'}</span><span className={css.bM}>{comSinal(-ap.banco.acerto.acertoMin)}</span></div>}
+                {ap.banco.acerto && ap.banco.acerto.passaMin < 0 && <div className={css.bLinha}><span>Passa para o mês seguinte</span><span className={`${css.bM} ${css.bNeg}`}>{comSinal(ap.banco.acerto.passaMin)}</span></div>}
                 {ap.banco.desatualizado && <div className={css.bAviso}>Este mês estava fechado com outro valor e foi reaberto: o banco é refeito sozinho na próxima consulta.</div>}
                 <div className={css.bNota}>Os meses fecham sozinhos no dia 1º. Ajuste aprovado ou atestado abonado refazem o mês.</div>
               </div>

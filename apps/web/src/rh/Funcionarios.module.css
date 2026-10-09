@@ -138,3 +138,8 @@
 .formGrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
 .spanFull{ grid-column:1 / -1; }
 @media (max-width:600px){ .formGrid{ grid-template-columns:1fr; } }
+
+/* Regra de banco do perfil, ao lado do nome */
+.bancoResumo{ font-family:var(--ff-mono); font-size:11px; color:var(--ash); background:var(--cream); border-radius:6px; padding:4px 8px; }
+.bancoPrev{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; font-weight:700; background:var(--cream); border-radius:10px; padding:10px 12px; margin:0 0 14px; }
+.bancoPrevLb{ font-family:var(--ff-mono); font-size:10px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }

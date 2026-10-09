@@ -129,3 +129,61 @@ export function valorizarPeriodo(
     indenizacaoCentavos,
   };
 }
+
+/** Resultado do acerto do banco "compensa no mês" valorizado em R$. */
+export interface AcertoBancoValores {
+  /** Horas acertadas: > 0 pagas, < 0 descontadas. */
+  acertoMin: number;
+  /** Hora extra paga (base + adicional), por adicional. */
+  porAdicionalMin: Record<string, number>;
+  extrasCentavos: number;
+  reflexoDsrCentavos: number;
+  descontoCentavos: number;
+}
+
+/**
+ * Valoriza o acerto do banco que compensa no mês e paga a diferença.
+ *
+ * Positivo: é hora extra que sobrou depois de compensar — paga com adicional.
+ * A sobra sai das extras do mês começando pelo adicional mais alto (domingo e
+ * feriado primeiro, o que nunca prejudica o empregado); o que passar das
+ * extras do mês (lançamento avulso positivo) vai pelo adicional de dia útil.
+ * Reflete no DSR na mesma proporção das extras.
+ *
+ * Negativo: horas devidas descontadas pelo valor da hora, sem adicional.
+ */
+export function valorizarAcertoBanco(
+  r: ResultadoPeriodo, valorHoraCentavos: number, acertoMin: number, regras: RegrasApuracao,
+): AcertoBancoValores {
+  const vazio: AcertoBancoValores = { acertoMin, porAdicionalMin: {}, extrasCentavos: 0, reflexoDsrCentavos: 0, descontoCentavos: 0 };
+  if (acertoMin < 0) return { ...vazio, descontoCentavos: porMin(-acertoMin, valorHoraCentavos) };
+  if (acertoMin === 0) return vazio;
+
+  const doMes: Record<string, number> = {};
+  for (const d of r.dias) {
+    for (const e of d.extras) {
+      if (ehIndenizacao(e.motivo)) continue;
+      doMes[String(e.adicionalPct)] = (doMes[String(e.adicionalPct)] ?? 0) + e.min;
+    }
+  }
+  const porAdicionalMin: Record<string, number> = {};
+  let falta = acertoMin;
+  for (const pct of Object.keys(doMes).sort((a, b) => Number(b) - Number(a))) {
+    if (falta <= 0) break;
+    const usa = Math.min(falta, doMes[pct]!);
+    if (usa > 0) porAdicionalMin[pct] = usa;
+    falta -= usa;
+  }
+  if (falta > 0) {
+    const k = String(regras.extra.diaUtilPct);
+    porAdicionalMin[k] = (porAdicionalMin[k] ?? 0) + falta;
+  }
+
+  let extrasCentavos = 0;
+  for (const [pct, min] of Object.entries(porAdicionalMin)) {
+    extrasCentavos += Math.round(porMin(min, valorHoraCentavos) * (1 + Number(pct) / 100));
+  }
+  const extrasMesMin = Object.values(doMes).reduce((a, b) => a + b, 0);
+  const reflexoMin = extrasMesMin > 0 ? Math.round(r.reflexoDsrMin * Math.min(1, acertoMin / extrasMesMin)) : 0;
+  return { ...vazio, porAdicionalMin, extrasCentavos, reflexoDsrCentavos: porMin(reflexoMin, valorHoraCentavos) };
+}

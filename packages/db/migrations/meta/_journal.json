@@ -330,6 +330,13 @@
       "when": 1784602680000,
       "tag": "0046_debito_semana",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1784602740000,
+      "tag": "0047_banco_acerto_mes",
+      "breakpoints": true
     }
   ]
 }

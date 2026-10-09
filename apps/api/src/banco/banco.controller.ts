@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { BancoService } from './banco.service';
-import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto, LancarLoteDto, FolgaDto } from './dto/banco.dto';
+import { ConfigBancoDto, MovimentoDto, LancarCompetenciaDto, LancarLoteDto, FolgaDto, BaixaAberturaDto } from './dto/banco.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -105,6 +105,20 @@ export class BancoController {
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
   folga(@UsuarioAtual() u: PayloadAcesso, @Body() dto: FolgaDto) {
     return this.banco.registrarFolga(this.tenant(u), dto.empregadoId, dto.data, dto.minutos ?? null);
+  }
+
+  /** Quem ainda tem saldo de abertura (migração) no banco, e quanto falta baixar. */
+  @Get('aberturas')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  aberturas(@UsuarioAtual() u: PayloadAcesso) {
+    return this.banco.aberturas(this.tenant(u));
+  }
+
+  /** Baixa em lote o saldo de abertura que já foi pago em dinheiro na folha. */
+  @Post('baixa-abertura')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  baixaAbertura(@UsuarioAtual() u: PayloadAcesso, @Body() dto: BaixaAberturaDto) {
+    return this.banco.baixarAberturas(this.tenant(u), dto);
   }
 
   /** Remove um lançamento manual do banco (folga, ajuste, saldo de abertura). */

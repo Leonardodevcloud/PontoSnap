@@ -15,10 +15,18 @@ interface ConfigRegra {
   tolerancia?: { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number } | null;
   noturno?: { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number } | null;
   jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
-  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' } | null;
+  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA' } | null;
   destinacao?: { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' } | null;
 }
 interface PerfilResumo { id: string; nome: string; padrao: boolean; config?: ConfigRegra; usadoPor?: number; }
+
+/** Resumo curto da regra de banco de um perfil (lista e troca de perfil). */
+function resumoBanco(b: ConfigRegra['banco']): string {
+  if (!b || b.bancoModo === 'HERDA') return 'banco como a empresa';
+  if (b.bancoModo === 'INATIVO') return 'hora extra sempre paga';
+  if (b.formaCalculo === 'INTRA_MES') return `paga a diferença no mês · devendo ${b.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}`;
+  return `acumula no banco · ${b.bancoPrazoMeses ?? 6}m`;
+}
 
 const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
@@ -120,9 +128,15 @@ export function Funcionarios() {
               {(() => {
                 const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
                 const padrao = perfis.find((x) => x.padrao);
-                if (p) return <button type="button" className={css.perfilBadge} onClick={() => setRegrasDe(p)} title="Ver as regras deste perfil">⚙ {p.nome}</button>;
-                if (padrao) return <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(padrao)} title="Ver as regras deste perfil">⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></button>;
-                return <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(null)} title="Ver as regras aplicadas">CLT padrão</button>;
+                const efetivo = p ?? padrao;
+                return (
+                  <>
+                    {p && <button type="button" className={css.perfilBadge} onClick={() => setRegrasDe(p)} title="Ver as regras deste perfil">⚙ {p.nome}</button>}
+                    {!p && padrao && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(padrao)} title="Ver as regras deste perfil">⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></button>}
+                    {!efetivo && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(null)} title="Ver as regras aplicadas">CLT padrão</button>}
+                    <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco)}</span>
+                  </>
+                );
               })()}
               <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setPerfilPara(e); }}>trocar perfil</button>
             </div>
@@ -426,6 +440,15 @@ function ModalPerfil({ empregado, perfis, onFechar, onSalvo }: {
           ))}
         </select>
       </label>
+      {perfis.length > 0 && (() => {
+        const escolhido = sel ? perfis.find((p) => p.id === sel) : padrao;
+        return (
+          <p className={css.bancoPrev}>
+            <span className={css.bancoPrevLb}>Banco de horas</span>
+            {resumoBanco(escolhido?.config?.banco)}
+          </p>
+        );
+      })()}
       {perfis.length === 0 && (
         <p className={css.aviso}>Você ainda não criou perfis. Vá em <strong>Perfis de regra</strong> e crie o primeiro.</p>
       )}
@@ -630,8 +653,9 @@ function ModalRegras({ perfil, onFechar }: { perfil: PerfilResumo | null; onFech
     const b = c.banco;
     if (!b || b.bancoModo === 'HERDA') return clt('como a empresa');
     if (b.bancoModo === 'INATIVO') return val('Não usa banco');
+    if (b.formaCalculo === 'INTRA_MES') return val(`Compensa no mês e paga a diferença · devendo ${b.negativoMes === 'CARREGA' ? 'passa pro mês seguinte' : 'desconta na folha'}`);
     const acordo = b.bancoTipoAcordo === 'COLETIVO' ? 'Acordo coletivo' : 'Acordo individual';
-    return val(`${acordo} · ${b.bancoPrazoMeses}m`);
+    return val(`Acumula · ${acordo} · ${b.bancoPrazoMeses}m`);
   };
   const faltaTxt = () => {
     const f = c.destinacao?.destinacaoFaltas;

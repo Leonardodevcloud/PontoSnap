@@ -20,6 +20,7 @@ function legivel(acao: string): string {
     [/DELETE \/afastamentos/, 'Removeu férias/afastamento'],
     [/POST \/banco\/config/, 'Alterou acordo de banco de horas'],
     [/POST \/banco\/movimento/, 'Lançou movimento no banco de horas'],
+    [/POST \/banco\/baixa-abertura/, 'Baixou saldos de abertura pagos na folha'],
     [/POST \/banco\/lancar-competencia/, 'Fechou competência no banco de horas'],
     [/POST \/tratamento\/marcacoes/, 'Incluiu marcação'],
     [/DELETE \/tratamento/, 'Removeu tratamento'],

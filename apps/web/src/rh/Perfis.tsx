@@ -7,7 +7,7 @@ interface Config {
   tolerancia?: { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number } | null;
   noturno?: { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number } | null;
   jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
-  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' } | null;
+  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA' } | null;
   destinacao?: { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' } | null;
 }
 interface PerfilLista {
@@ -84,7 +84,17 @@ function resumo(c: Config): { lb: string; valor: string }[] {
 }
 const bancoTxt = (b: Config['banco']) => !b || b.bancoModo === 'HERDA' ? 'como a empresa'
   : b.bancoModo === 'INATIVO' ? 'não usa'
-  : `${b.bancoTipoAcordo === 'COLETIVO' ? 'acordo coletivo' : 'acordo individual'} · ${b.bancoPrazoMeses}m`;
+  : b.formaCalculo === 'INTRA_MES' ? `paga a diferença no mês · devendo ${b.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}`
+  : `acumula · ${b.bancoTipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'} · ${b.bancoPrazoMeses}m`;
+
+type ModoBanco = 'ACUMULA' | 'MES' | 'NAO';
+const modoDe = (b: NonNullable<Config['banco']>): ModoBanco =>
+  b.bancoModo === 'INATIVO' ? 'NAO' : b.formaCalculo === 'INTRA_MES' ? 'MES' : 'ACUMULA';
+const OPCOES_BANCO: { k: ModoBanco; t: string; d: string; ex?: string }[] = [
+  { k: 'ACUMULA', t: 'Acumula no banco, para folgar depois', d: 'O saldo passa de um mês para o outro até ser compensado com folga. O que passar do prazo vence e é pago.', ex: 'fez +10h em set → começa out com +10h' },
+  { k: 'MES', t: 'Compensa no mês e paga a diferença', d: 'Extra e atraso do mês se compensam. Se o mês fechar positivo, a diferença é paga como hora extra na folha e o banco zera.', ex: '+8h extra −3h atraso → paga 5h' },
+  { k: 'NAO', t: 'Não usa banco: toda hora extra é paga', d: 'Hora extra paga cheia; atraso e falta seguem a regra de desconto. Nada se compensa.' },
+];
 const faltaTxt = (f: string) => f === 'DESCONTA' ? 'descontam' : f === 'BANCO' ? 'abatem do banco' : 'abonadas';
 
 // ---------------------------------------------------------------------------
@@ -200,14 +210,47 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
         explicacao="Em vez de pagar a hora extra, ela fica guardada para o funcionário folgar depois. Precisa de acordo — individual (com o funcionário) ou coletivo (com o sindicato).">
         {cfg.banco && cfg.banco.bancoModo !== 'HERDA' && (
           <>
-            <label className={css.campo}>
-              <span className={css.lb}>As horas extras vão para o banco?</span>
-              <select className={css.inp} value={cfg.banco.bancoModo}
-                onChange={(e) => setBloco('banco', { ...cfg.banco!, bancoModo: e.target.value as 'ATIVO' | 'INATIVO' })}>
-                <option value="ATIVO">Sim — vão para o banco, para folgar depois</option>
-                <option value="INATIVO">Não — hora extra é sempre paga</option>
-              </select>
-            </label>
+            <div className={css.lb} id="lb-modo-banco">O que acontece com a hora a mais (e a hora a menos)</div>
+            <div className={css.opBanco} role="radiogroup" aria-labelledby="lb-modo-banco">
+              {OPCOES_BANCO.map((o) => {
+                const on = modoDe(cfg.banco!) === o.k;
+                return (
+                  <div key={o.k}>
+                    <button type="button" role="radio" aria-checked={on}
+                      className={`${css.opB} ${on ? css.opBOn : ''}`}
+                      onClick={() => setBloco('banco', {
+                        ...cfg.banco!,
+                        bancoModo: o.k === 'NAO' ? 'INATIVO' : 'ATIVO',
+                        formaCalculo: o.k === 'MES' ? 'INTRA_MES' : 'BANCO_HORAS',
+                        negativoMes: o.k === 'MES' ? (cfg.banco!.negativoMes ?? 'DESCONTA') : cfg.banco!.negativoMes,
+                      })}>
+                      <i className={css.opRd} aria-hidden />
+                      <span><b>{o.t}</b><span>{o.d}</span>{o.ex && <em className={css.opEx}>{o.ex}</em>}</span>
+                    </button>
+                    {o.k === 'MES' && on && (
+                      <div className={css.opSub}>
+                        <div className={css.opSubLb} id="lb-negativo">E se o mês fechar devendo horas?</div>
+                        <div className={css.pills} role="radiogroup" aria-labelledby="lb-negativo">
+                          {([['DESCONTA', 'Desconta na folha'], ['CARREGA', 'Passa para o mês seguinte']] as const).map(([k, t]) => (
+                            <button key={k} type="button" role="radio" aria-checked={(cfg.banco!.negativoMes ?? 'DESCONTA') === k}
+                              className={`${css.pill} ${(cfg.banco!.negativoMes ?? 'DESCONTA') === k ? css.pillOn : ''}`}
+                              onClick={() => setBloco('banco', { ...cfg.banco!, negativoMes: k })}>{t}</button>
+                          ))}
+                        </div>
+                        <p className={css.exp} style={{ marginTop: 8 }}>
+                          {(cfg.banco!.negativoMes ?? 'DESCONTA') === 'DESCONTA'
+                            ? 'Fechou com −3h → desconta 3h na folha e o banco zera.'
+                            : 'Fechou com −3h → começa o mês seguinte devendo 3h. Se fechar positivo depois, abate antes de pagar.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <p className={css.exp} style={{ marginTop: 10 }}>
+              Para o <strong>contrato de horas</strong> (chega e sai em qualquer horário), use “Compensa no mês” com uma escala marcada como <strong>horário flexível</strong> em Escalas.
+            </p>
             {cfg.banco.bancoModo === 'ATIVO' && (
               <div className={css.dupla}>
                 <label className={css.campo}>
@@ -218,8 +261,10 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
                     <option value="COLETIVO">Coletivo (com o sindicato)</option>
                   </select>
                 </label>
-                <Num rot="Prazo para compensar (meses)" v={cfg.banco.bancoPrazoMeses ?? 6}
-                  on={(n) => setBloco('banco', { ...cfg.banco!, bancoPrazoMeses: n })} />
+                {cfg.banco.formaCalculo !== 'INTRA_MES' && (
+                  <Num rot="Prazo para compensar (meses)" v={cfg.banco.bancoPrazoMeses ?? 6}
+                    on={(n) => setBloco('banco', { ...cfg.banco!, bancoPrazoMeses: n })} />
+                )}
               </div>
             )}
           </>

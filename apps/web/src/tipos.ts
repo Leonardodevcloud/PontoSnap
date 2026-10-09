@@ -276,6 +276,8 @@ export interface ApuracaoResp {
   destinacao?: Destinacao;
   /** Banco de horas no contexto do período: anterior + mês = acumulado. Null = sem banco. */
   banco?: BancoPeriodo | null;
+  /** Banco que compensa no mês: o acerto em R$ (já dentro de valores.liquidoProventosCentavos). */
+  acertoBanco?: AcertoBancoValores | null;
   /** Batidas de cada dia (chave = YYYY-MM-DD) com a origem de cada uma. */
   batidas?: Record<string, BatidaDia[]>;
   /** Batidas previstas pelo horário contratual (2 por par). */
@@ -350,6 +352,30 @@ export interface BancoPeriodo {
   saldoAcumuladoMin: number;
   /** Fechado com valor diferente do que a apuração dá hoje → refazer o mês. */
   desatualizado: boolean;
+  /**
+   * Regra "compensa no mês e paga a diferença": acertoMin > 0 pago na folha,
+   * < 0 descontado; passaMin < 0 é o devendo que vai pro mês seguinte.
+   * Null nas outras regras e em meses fechados antes da regra existir.
+   */
+  acerto?: { acertoMin: number; passaMin: number; negativoMes: NegativoMes } | null;
+}
+
+export type NegativoMes = 'DESCONTA' | 'CARREGA';
+
+/** Acerto do banco que compensa no mês, valorizado (já somado no resultado parcial). */
+export interface AcertoBancoValores {
+  acertoMin: number;
+  porAdicionalMin: Record<string, number>;
+  extrasCentavos: number;
+  reflexoDsrCentavos: number;
+  descontoCentavos: number;
+}
+
+/** Quem ainda tem saldo de abertura (migração) a baixar. */
+export interface AberturaBanco {
+  empregadoId: string; nome: string; matricula: string | null;
+  aberturaMin: number; aberturaData: string; baixadoMin: number; restanteMin: number;
+  bancoAtivo: boolean; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes: NegativoMes;
 }
 
 export interface MovimentoBanco {
@@ -366,6 +392,7 @@ export interface FechamentoBanco {
   totalMin: number;
   fechadoEm: string;
   origem: 'AUTO' | 'MANUAL';
+  acertoMin?: number | null;
 }
 
 export interface BancoResp {
@@ -373,6 +400,7 @@ export interface BancoResp {
   tipoAcordo: TipoAcordoBanco;
   prazoMeses: number | null;
   formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
+  negativoMes?: NegativoMes;
   saldo: SaldoBanco | null;
   extrato: MovimentoBanco[];
   /** Mês em andamento, ainda não fechado. */
@@ -614,6 +642,7 @@ export type LinhaResumoBanco =
   | {
       empregadoId: string; nome: string; matricula: string | null; ativo: true;
       tipoAcordo: TipoAcordoBanco; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; prazoMeses: number | null;
+      negativoMes?: NegativoMes;
       saldoMin: number; mesCorrenteMin: number; projetadoMin: number;
       creditadoMin: number; compensadoMin: number; pagoMin: number;
       devedorMin: number; vencidoMin: number; aVencerMin: number; proximoVencimento: string | null;
@@ -656,6 +685,8 @@ export interface PessoalLinhaClt {
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   /** Hora extra (sem indenização) e quanto dela foi pro banco de horas. */
   heMin: number; heNoBancoMin: number;
+  /** Banco que compensa no mês: horas acertadas (> 0 pagas, < 0 descontadas), valor (já em proventos/descontos) e devendo que passou. */
+  bancoAcertoMin?: number; bancoAcertoCent?: number; bancoPassaMin?: number;
   /** Indenização de intervalo/interjornada (Art. 71 §4º): sempre paga, não é hora extra. */
   indenizacaoMin: number; indenizacaoCent: number;
   proventosCent: number;

@@ -48,7 +48,7 @@
 .crumb{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ash); margin-bottom:12px; flex-wrap:wrap; }
 .crumb button{ background:none; border:none; padding:0; color:var(--coral-dark); font:inherit; font-weight:800; cursor:pointer; }
 .crumb button:hover{ text-decoration:underline; }
-.busca{ background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:10px 14px; font-family:var(--ff-body); font-weight:600; font-size:14.5px; color:var(--ink); outline:none; min-width:220px; }
+.busca{ background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:10px 14px; font-family:var(--ff-body); font-weight:600; font-size:14.5px; color:var(--ink); outline:none; min-width:min(300px, 100%); }
 .busca:focus{ border-color:var(--coral); }
 .acoes{ display:flex; gap:8px; flex-wrap:wrap; }
 .btn{ width:auto; }

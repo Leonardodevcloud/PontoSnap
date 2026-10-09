@@ -4,7 +4,9 @@ export type ConfigExtra = { extraDiaUtilPct: number; extraDomingoFeriadoPct: num
 export type ConfigTolerancia = { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number };
 export type ConfigNoturno = { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number };
 export type ConfigJornada = { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number };
-export type ConfigBanco = { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' };
+export type ConfigBanco = { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
+  /** Só no INTRA_MES: mês que fecha devendo desconta na folha (padrão) ou passa pro seguinte. */
+  negativoMes?: 'DESCONTA' | 'CARREGA' };
 export type ConfigDestinacao = { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' };
 
 /** Os 6 itens já resolvidos (nulo = usa o padrão CLT daquele item). */

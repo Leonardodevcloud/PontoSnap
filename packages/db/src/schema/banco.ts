@@ -42,6 +42,11 @@ export const pontoBancoFechamento = pgTable('ponto_banco_fechamento', {
   lancamentos: integer('lancamentos').notNull().default(0),
   /** AUTO (sincronização) | MANUAL (RH lançou) */
   origem: varchar('origem', { length: 8 }).notNull().default('AUTO'),
+  /**
+   * Regra "compensa no mês" (migration 0047): saldo acertado no fechamento.
+   * > 0 pago na folha · < 0 descontado · 0 nada/passou devendo. NULL = sem acerto.
+   */
+  acertoMin: integer('acerto_min'),
   fechadoEm: timestamp('fechado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   porEmpregado: index('idx_banco_fechamento_empregado').on(t.tenantId, t.empregadoId),

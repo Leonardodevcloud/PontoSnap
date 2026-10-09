@@ -56,9 +56,11 @@ function textoExtras(l: PessoalLinhaClt): { valor: string | null; detalhe: strin
   const pagasMin = Math.max(0, l.heMin - l.heNoBancoMin);
   const partes: string[] = [];
   if (pagasMin > 0) partes.push(`${minutosParaHhMm(pagasMin)} extra paga`);
-  if (l.heNoBancoMin > 0) partes.push(`${minutosParaHhMm(l.heNoBancoMin)} no banco`);
+  const acerto = l.bancoAcertoMin ?? 0;
+  if (l.heNoBancoMin > 0 && acerto <= 0) partes.push(`${minutosParaHhMm(l.heNoBancoMin)} no banco`);
+  if (acerto > 0) partes.push(`${minutosParaHhMm(acerto)} sobra do banco`);
   if (l.indenizacaoCent > 0) partes.push(`intervalo ${brl(l.indenizacaoCent)}`);
-  return { valor: l.proventosCent > 0 ? brl(l.proventosCent) : null, detalhe: partes.join(' · '), soBanco: l.proventosCent === 0 && l.heNoBancoMin > 0 };
+  return { valor: l.proventosCent > 0 ? brl(l.proventosCent) : null, detalhe: partes.join(' · '), soBanco: l.proventosCent === 0 && l.heNoBancoMin > 0 && acerto <= 0 };
 }
 
 /** Mesma conta do servidor (calcularMei), pra prévia ao vivo no painel. */
@@ -881,8 +883,17 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
 
         <section className={css.bloco}>
           <span className={css.lb}>Do ponto</span>
-          <Linha2 k="Horas extras" v={l.heMin === 0 ? '—' : l.heNoBancoMin >= l.heMin ? `${minutosParaHhMm(l.heMin)} · no banco` : brl(Math.max(0, l.proventosCent - l.indenizacaoCent))} />
-          {l.heNoBancoMin > 0 && <p className={css.formula}>{minutosParaHhMm(l.heNoBancoMin)} foram pro banco de horas — não são pagas nesta folha.</p>}
+          <Linha2 k="Horas extras" v={l.heMin === 0 && !(l.bancoAcertoMin! > 0) ? '—' : l.heNoBancoMin >= l.heMin && !(l.bancoAcertoMin! > 0) ? `${minutosParaHhMm(l.heMin)} · no banco` : brl(Math.max(0, l.proventosCent - l.indenizacaoCent))} />
+          {l.heNoBancoMin > 0 && !l.bancoAcertoMin && !l.bancoPassaMin && <p className={css.formula}>{minutosParaHhMm(l.heNoBancoMin)} foram pro banco de horas — não são pagas nesta folha.</p>}
+          {(l.bancoAcertoMin ?? 0) > 0 && <>
+            <Linha2 k="Sobra do banco paga como extra" v={brl(l.bancoAcertoCent ?? 0)} />
+            <p className={css.formula}>Banco que compensa no mês: extras e atrasos se compensaram e sobraram {minutosParaHhMm(l.bancoAcertoMin!)}, pagas com adicional e reflexo no DSR (já dentro de “Horas extras”).</p>
+          </>}
+          {(l.bancoAcertoMin ?? 0) < 0 && <>
+            <Linha2 k="Banco fechou devendo" v={brl(l.bancoAcertoCent ?? 0)} cls={css.neg} />
+            <p className={css.formula}>Faltaram {minutosParaHhMm(-l.bancoAcertoMin!)} no mês: descontadas pela hora, sem adicional (já dentro de “Descontos”).</p>
+          </>}
+          {(l.bancoPassaMin ?? 0) < 0 && <p className={css.formula}>Fechou devendo {minutosParaHhMm(-l.bancoPassaMin!)}: pela regra do perfil, passa para o mês seguinte (não desconta agora).</p>}
           {l.indenizacaoCent > 0 && <>
             <Linha2 k="Indenização de intervalo (Art. 71)" v={brl(l.indenizacaoCent)} />
             <p className={css.formula}>{minutosParaHhMm(l.indenizacaoMin)} de almoço abaixo do mínimo legal, pagos com 50%. Não é hora extra: é indenização obrigatória e não pode ir pro banco. Os dias aparecem com "intervalo curto" na apuração.</p>

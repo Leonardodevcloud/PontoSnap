@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, min, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, isNotNull, min, sql } from 'drizzle-orm';
 import {
   pontoBancoMov, pontoBancoFechamento, pontoAusencia, pontoHorarioContratual, pontoMarcacao,
   tenant, empregado, pontoPerfilRegra, comTenant, comoMaster, type Db,
@@ -11,6 +11,9 @@ import type { ItensResolvidos } from '../tratamento/montar-regras';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { competenciaDe, reabrirCompetencia } from './fechamento';
+import {
+  acertoDoMes, ehDaApuracao, inicioJanela, rotuloComp, DESC_ABERTURA, SUFIXO_BAIXA_ABERTURA, type NegativoMes,
+} from './acerto-mes';
 
 /** Prazos-base da CLT. Acordo coletivo pode dispor outro — por isso é editável. */
 const PRAZO_PADRAO: Record<string, number> = { INDIVIDUAL: 6, COLETIVO: 12 };
@@ -32,6 +35,8 @@ export interface SaldoResp {
   tipoAcordo: TipoAcordo;
   prazoMeses: number | null;
   formaCalculo: FormaCalculo;
+  /** Só no INTRA_MES: o que acontece quando o mês fecha devendo. */
+  negativoMes: NegativoMes;
   saldo: SaldoBanco | null;
   extrato: (MovimentoBanco & { id: string; competencia?: string | null })[];
   /** Mês em andamento (ainda não fechado). Null quando o banco está inativo. */
@@ -39,8 +44,14 @@ export interface SaldoResp {
   /** Saldo oficial + mês em andamento: o número que a pessoa quer ver. */
   saldoProjetadoMin: number | null;
   /** Competências fechadas pra este funcionário (mais recente primeiro). */
-  fechamentos: { competencia: string; totalMin: number; fechadoEm: Date; origem: string }[];
+  fechamentos: { competencia: string; totalMin: number; fechadoEm: Date; origem: string; acertoMin: number | null }[];
 }
+
+type CfgBanco = {
+  ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null;
+  destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso;
+  formaCalculo: FormaCalculo; negativoMes: NegativoMes;
+};
 
 /** Soma meses a uma competência YYYY-MM. */
 function somarMesesComp(comp: string, n: number): string {
@@ -125,6 +136,9 @@ export class BancoService {
    * Lançamentos de fechamento não saem por aqui (são refeitos ao refazer o mês).
    */
   async removerMovimento(tenantId: string, movimentoId: string) {
+    const achado = await comTenant(this.db, tenantId, (tx) => tx.select({ empregadoId: pontoBancoMov.empregadoId })
+      .from(pontoBancoMov).where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId))).limit(1));
+    const cfgEmp = achado[0] ? await this.configBanco(tenantId, achado[0].empregadoId) : null;
     return comTenant(this.db, tenantId, async (tx) => {
       const mov = (await tx.select().from(pontoBancoMov)
         .where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId))).limit(1))[0];
@@ -139,6 +153,10 @@ export class BancoService {
         await reabrirCompetencia(tx as never, tenantId, mov.empregadoId, competenciaDe(mov.data));
       }
       await tx.delete(pontoBancoMov).where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId)));
+      // Compensa no mês: o avulso entrava no acerto daquele mês — refaz.
+      if (cfgEmp?.formaCalculo === 'INTRA_MES') {
+        await reabrirCompetencia(tx as never, tenantId, mov.empregadoId, competenciaDe(mov.data));
+      }
       return { removido: true };
     });
   }
@@ -152,7 +170,7 @@ export class BancoService {
     const cfg = await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo || cfg.prazoMeses == null) {
       return {
-        ativo: false, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, formaCalculo: cfg.formaCalculo,
+        ativo: false, tipoAcordo: cfg.tipoAcordo, prazoMeses: null, formaCalculo: cfg.formaCalculo, negativoMes: cfg.negativoMes,
         saldo: null, extrato: [], mesCorrente: null, saldoProjetadoMin: null, fechamentos: [],
       };
     }
@@ -161,22 +179,26 @@ export class BancoService {
 
     let movs = await this.extrato(tenantId, empregadoId);
     const compAtual = competenciaDe(hoje);
-    // Intra-mês: compensa só dentro do mês corrente — não carrega saldo entre meses.
+    // Compensa no mês: cada fechamento acerta o saldo (paga, desconta ou passa
+    // devendo). A conta começa no primeiro mês fechado com acerto — antes
+    // disso nada passava de um mês pro outro.
     if (cfg.formaCalculo === 'INTRA_MES') {
-      movs = movs.filter((m) => competenciaDe(m.data) === compAtual);
+      const desde = inicioJanela(await this.compsComAcerto(tenantId, empregadoId), compAtual);
+      movs = movs.filter((m) => m.data >= desde);
     }
     const saldo = calcularBanco(movs, cfg.prazoMeses, hoje);
 
     // Mês em andamento: o que a apuração de hoje lançaria, descontando o que
     // por acaso já foi lançado pra esta competência (refazer manual, p.ex.).
     const estimadoBruto = await this.saldoApuradoDaCompetencia(tenantId, empregadoId, compAtual, cfg);
-    const jaLancado = movs.filter((m) => m.competencia === compAtual).reduce((s, m) => s + m.minutos, 0);
+    const jaLancado = movs.filter((m) => m.competencia === compAtual && ehDaApuracao(m)).reduce((s, m) => s + m.minutos, 0);
     const mesCorrente: MesCorrente = { competencia: compAtual, estimadoMin: estimadoBruto - jaLancado };
 
     const fechamentos = await comTenant(this.db, tenantId, (tx) =>
       tx.select({
         competencia: pontoBancoFechamento.competencia, totalMin: pontoBancoFechamento.totalMin,
         fechadoEm: pontoBancoFechamento.fechadoEm, origem: pontoBancoFechamento.origem,
+        acertoMin: pontoBancoFechamento.acertoMin,
       }).from(pontoBancoFechamento).where(and(
         eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
       )).orderBy(sql`${pontoBancoFechamento.competencia} desc`));
@@ -186,6 +208,7 @@ export class BancoService {
       tipoAcordo: cfg.tipoAcordo,
       prazoMeses: cfg.formaCalculo === 'INTRA_MES' ? 1 : cfg.prazoMeses,
       formaCalculo: cfg.formaCalculo,
+      negativoMes: cfg.negativoMes,
       saldo,
       extrato: [...movs].reverse(), // o mais recente primeiro, como extrato de banco
       mesCorrente,
@@ -202,9 +225,13 @@ export class BancoService {
   async saldoAte(tenantId: string, empregadoId: string, dataCorte: string, hoje: string): Promise<number | null> {
     const cfg = await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo || cfg.prazoMeses == null) return null;
-    if (cfg.formaCalculo === 'INTRA_MES') return 0; // não carrega nada entre meses
     await this.sincronizar(tenantId, empregadoId, hoje, cfg);
-    const movs = (await this.extrato(tenantId, empregadoId)).filter((m) => m.data <= dataCorte);
+    let movs = (await this.extrato(tenantId, empregadoId)).filter((m) => m.data <= dataCorte);
+    if (cfg.formaCalculo === 'INTRA_MES') {
+      // Só o que passou devendo (o positivo é pago todo mês).
+      const desde = inicioJanela(await this.compsComAcerto(tenantId, empregadoId), competenciaDe(dataCorte));
+      movs = movs.filter((m) => m.data >= desde);
+    }
     return calcularBanco(movs, cfg.prazoMeses, dataCorte).saldoMin;
   }
 
@@ -212,7 +239,7 @@ export class BancoService {
    * Config de banco QUE VALE pro funcionário, montada a partir dos itens (BANCO
    * e DESTINACAO). Se o item de banco herda (ou não há), usa a empresa.
    */
-  async configBanco(tenantId: string, empregadoId: string): Promise<{ ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; formaCalculo: FormaCalculo }> {
+  async configBanco(tenantId: string, empregadoId: string): Promise<CfgBanco> {
     const empresa = await this.obterConfig(tenantId);
     const itens = await comTenant(this.db, tenantId, async (tx) => {
       const emp = (await tx.select({ perfilRegraId: empregado.perfilRegraId })
@@ -223,6 +250,7 @@ export class BancoService {
     const destinacaoFaltas = itens.destinacao?.destinacaoFaltas ?? 'DESCONTA';
     const destinacaoAtrasos = itens.destinacao?.destinacaoAtrasos ?? 'BANCO';
     const formaCalculo = banco?.formaCalculo ?? 'BANCO_HORAS';
+    const negativoMes: NegativoMes = banco?.negativoMes === 'CARREGA' ? 'CARREGA' : 'DESCONTA';
     if (banco && banco.bancoModo !== 'HERDA') {
       const ativo = banco.bancoModo === 'ATIVO';
       const tipo = (banco.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
@@ -230,10 +258,19 @@ export class BancoService {
         ativo,
         tipoAcordo: ativo ? tipo : 'NENHUM',
         prazoMeses: ativo ? (banco.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
-        destinacaoFaltas, destinacaoAtrasos, formaCalculo,
+        destinacaoFaltas, destinacaoAtrasos, formaCalculo, negativoMes,
       };
     }
-    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo }; // HERDA
+    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo, negativoMes }; // HERDA
+  }
+
+  /** Competências já fechadas COM acerto (regra compensa no mês). */
+  private async compsComAcerto(tenantId: string, empregadoId: string): Promise<string[]> {
+    const r = await comTenant(this.db, tenantId, (tx) => tx.select({ c: pontoBancoFechamento.competencia })
+      .from(pontoBancoFechamento).where(and(
+        eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
+        isNotNull(pontoBancoFechamento.acertoMin))));
+    return r.map((x) => x.c);
   }
 
   /**
@@ -268,12 +305,15 @@ export class BancoService {
   async lancarMovimento(tenantId: string, p: {
     empregadoId: string; data: string; minutos: number;
     tipo: TipoMovBanco; descricao?: string;
-  }) {
+  }, opc: { exigeBancoAtivo?: boolean } = {}) {
     const cfg = await this.configBanco(tenantId, p.empregadoId);
-    if (!cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
+    if ((opc.exigeBancoAtivo ?? true) && !cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
     if (p.minutos === 0) throw new BadRequestException('Movimento de zero minuto não faz sentido');
     if (p.tipo === 'AJUSTE' && !p.descricao?.trim()) {
       throw new BadRequestException('Ajuste manual precisa de justificativa');
+    }
+    if (p.tipo === 'PAGAMENTO' && p.minutos > 0) {
+      throw new BadRequestException('Pagamento tira horas do banco: informe minutos negativos');
     }
     return comTenant(this.db, tenantId, async (tx) => {
       const e = (await tx.select().from(empregado).where(and(
@@ -283,8 +323,85 @@ export class BancoService {
         tenantId, empregadoId: p.empregadoId, data: p.data,
         minutos: p.minutos, tipo: p.tipo, descricao: p.descricao?.trim() || null,
       }).returning();
+      // Compensa no mês: o avulso entra no acerto daquele mês — refaz.
+      if (cfg.formaCalculo === 'INTRA_MES') {
+        await reabrirCompetencia(tx as never, tenantId, p.empregadoId, competenciaDe(p.data));
+      }
       return mov;
     });
+  }
+
+  /**
+   * Quem ainda tem saldo de abertura (migração) no banco: o que entrou, o que
+   * já foi baixado como pago e o que falta. Base da baixa em lote.
+   */
+  async aberturas(tenantId: string) {
+    const linhas = await comTenant(this.db, tenantId, async (tx) => {
+      const movs = await tx.select({
+        empregadoId: pontoBancoMov.empregadoId, data: pontoBancoMov.data, minutos: pontoBancoMov.minutos,
+        tipo: pontoBancoMov.tipo, descricao: pontoBancoMov.descricao,
+      }).from(pontoBancoMov).where(and(
+        eq(pontoBancoMov.tenantId, tenantId), sql`${pontoBancoMov.competencia} is null`,
+        sql`(${pontoBancoMov.descricao} = ${DESC_ABERTURA} or ${pontoBancoMov.descricao} like ${'%' + SUFIXO_BAIXA_ABERTURA})`,
+      ));
+      const emps = await tx.select({ id: empregado.id, nome: empregado.nome, matricula: empregado.matricula, ativo: empregado.ativo })
+        .from(empregado).where(eq(empregado.tenantId, tenantId));
+      const porEmp = new Map<string, { aberturaMin: number; aberturaData: string; baixadoMin: number }>();
+      for (const m of movs) {
+        const g = porEmp.get(m.empregadoId) ?? { aberturaMin: 0, aberturaData: m.data, baixadoMin: 0 };
+        if (m.descricao === DESC_ABERTURA) {
+          g.aberturaMin += m.minutos;
+          if (m.data < g.aberturaData) g.aberturaData = m.data;
+        } else {
+          g.baixadoMin += -m.minutos;
+        }
+        porEmp.set(m.empregadoId, g);
+      }
+      return emps.filter((e) => e.ativo && porEmp.has(e.id) && porEmp.get(e.id)!.aberturaMin !== 0)
+        .map((e) => ({ empregadoId: e.id, nome: e.nome, matricula: e.matricula, ...porEmp.get(e.id)! }))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+    });
+    const out = [];
+    for (const l of linhas) {
+      const cfg = await this.configBanco(tenantId, l.empregadoId);
+      out.push({
+        ...l,
+        restanteMin: Math.max(0, l.aberturaMin - l.baixadoMin),
+        bancoAtivo: cfg.ativo, formaCalculo: cfg.formaCalculo, negativoMes: cfg.negativoMes,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Baixa em lote do saldo de abertura que já foi pago em dinheiro. Cada
+   * baixa é um PAGAMENTO na MESMA data do saldo de abertura — assim, na regra
+   * que compensa no mês, ela se anula no próprio mês da abertura e não vira
+   * desconto num mês atual. Vale também pra quem está sem banco ativo: o
+   * saldo importado não pode ficar preso.
+   */
+  async baixarAberturas(tenantId: string, p: { competenciaFolha: string; itens: { empregadoId: string; minutos: number }[] }) {
+    if (!/^\d{4}-\d{2}$/.test(p.competenciaFolha)) throw new BadRequestException('Mês da folha deve ser AAAA-MM');
+    if (!p.itens.length) throw new BadRequestException('Marque ao menos um funcionário');
+    const disponiveis = new Map((await this.aberturas(tenantId)).map((a) => [a.empregadoId, a]));
+    const feitos: { empregadoId: string; minutos: number }[] = [];
+    for (const it of p.itens) {
+      const a = disponiveis.get(it.empregadoId);
+      if (!a) throw new BadRequestException('Funcionário sem saldo de abertura a baixar');
+      if (!Number.isInteger(it.minutos) || it.minutos <= 0) throw new BadRequestException(`Horas inválidas para ${a.nome}`);
+      if (it.minutos > a.restanteMin) {
+        throw new BadRequestException(`${a.nome}: só restam ${Math.floor(a.restanteMin / 60)}h${String(a.restanteMin % 60).padStart(2, '0')} do saldo de abertura`);
+      }
+    }
+    for (const it of p.itens) {
+      const a = disponiveis.get(it.empregadoId)!;
+      await this.lancarMovimento(tenantId, {
+        empregadoId: it.empregadoId, data: a.aberturaData, minutos: -it.minutos, tipo: 'PAGAMENTO',
+        descricao: `Horas pagas na folha de ${rotuloComp(p.competenciaFolha)} ${SUFIXO_BAIXA_ABERTURA}`,
+      }, { exigeBancoAtivo: false });
+      feitos.push({ empregadoId: it.empregadoId, minutos: it.minutos });
+    }
+    return { baixados: feitos.length, totalMin: feitos.reduce((s, f) => s + f.minutos, 0) };
   }
 
   /** Movimentos que a apuração de uma competência geraria, segundo a regra do funcionário. */
@@ -336,6 +453,8 @@ export class BancoService {
     if (!/^\d{4}-\d{2}$/.test(competencia)) throw new BadRequestException('Competência deve ser YYYY-MM');
 
     const novos = await this.movimentosDaCompetencia(tenantId, empregadoId, competencia, cfg);
+    const intraMes = cfg.formaCalculo === 'INTRA_MES';
+    const janela = intraMes ? inicioJanela(await this.compsComAcerto(tenantId, empregadoId), competencia) : null;
 
     return comTenant(this.db, tenantId, async (tx) => {
       await tx.delete(pontoBancoMov).where(and(
@@ -345,13 +464,53 @@ export class BancoService {
       ));
       if (novos.length > 0) await tx.insert(pontoBancoMov).values(novos);
       const totalMin = novos.reduce((s, n) => s + n.minutos, 0);
+
+      // Compensa no mês: acerta o saldo final (veio devendo + mês + avulsos).
+      let acertoMin: number | null = null;
+      let passaMin = 0;
+      const reabertas: string[] = [];
+      if (intraMes) {
+        const inicio = `${competencia}-01`;
+        const fim = ultimoDiaDe(competencia);
+        const resto = await tx.select({ data: pontoBancoMov.data, minutos: pontoBancoMov.minutos }).from(pontoBancoMov).where(and(
+          eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, empregadoId),
+          sql`${pontoBancoMov.data} >= ${janela!}`, sql`${pontoBancoMov.data} <= ${fim}`,
+          sql`(${pontoBancoMov.competencia} is null or ${pontoBancoMov.competencia} <> ${competencia})`,
+        ));
+        const veioMin = resto.filter((m) => m.data < inicio).reduce((s, m) => s + m.minutos, 0);
+        const avulsoMin = resto.filter((m) => m.data >= inicio).reduce((s, m) => s + m.minutos, 0);
+        const ac = acertoDoMes(veioMin + totalMin + avulsoMin, cfg.negativoMes);
+        acertoMin = ac.acertoMin;
+        passaMin = ac.passaMin;
+        if (ac.acertoMin > 0) {
+          await tx.insert(pontoBancoMov).values({
+            tenantId, empregadoId, data: fim, minutos: -ac.acertoMin, tipo: 'PAGAMENTO', competencia,
+            descricao: `Saldo do mês pago na folha de ${rotuloComp(competencia)}`,
+          });
+        } else if (ac.acertoMin < 0) {
+          await tx.insert(pontoBancoMov).values({
+            tenantId, empregadoId, data: fim, minutos: -ac.acertoMin, tipo: 'AJUSTE', competencia,
+            descricao: `Saldo negativo descontado na folha de ${rotuloComp(competencia)}`,
+          });
+        }
+        // Meses seguintes já fechados que dependem deste: os antigos (sem
+        // acerto, senão o saldo deles vazaria pra conta) e, quando o devendo
+        // passa adiante, todos — o que veio deste mês pode ter mudado.
+        const depois = await tx.delete(pontoBancoFechamento).where(and(
+          eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
+          gt(pontoBancoFechamento.competencia, competencia),
+          cfg.negativoMes === 'CARREGA' ? sql`true` : sql`${pontoBancoFechamento.acertoMin} is null`,
+        )).returning({ c: pontoBancoFechamento.competencia });
+        reabertas.push(...depois.map((d) => d.c));
+      }
+
       await tx.insert(pontoBancoFechamento).values({
-        tenantId, empregadoId, competencia, totalMin, lancamentos: novos.length, origem,
+        tenantId, empregadoId, competencia, totalMin, lancamentos: novos.length, origem, acertoMin,
       }).onConflictDoUpdate({
         target: [pontoBancoFechamento.tenantId, pontoBancoFechamento.empregadoId, pontoBancoFechamento.competencia],
-        set: { totalMin, lancamentos: novos.length, origem, fechadoEm: new Date() },
+        set: { totalMin, lancamentos: novos.length, origem, acertoMin, fechadoEm: new Date() },
       });
-      return { competencia, lancados: novos.length, totalMin };
+      return { competencia, lancados: novos.length, totalMin, acertoMin, passaMin, reabertas };
     });
   }
 
@@ -389,7 +548,7 @@ export class BancoService {
    */
   async sincronizar(
     tenantId: string, empregadoId: string, hoje: string,
-    cfgPronta?: { ativo: boolean; destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso },
+    cfgPronta?: { ativo: boolean },
   ): Promise<{ fechadas: string[] }> {
     const cfg = cfgPronta ?? await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo) return { fechadas: [] };
@@ -406,23 +565,25 @@ export class BancoService {
         eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId),
       )))).map((f) => f.competencia));
 
-    const pendentes: string[] = [];
+    // Em ordem: na regra que compensa no mês, fechar um mês pode reabrir os
+    // seguintes (o devendo que passa mudou) — o conjunto é consultado a cada
+    // passo pra esses meses serem refeitos na mesma rodada.
+    const fechadas: string[] = [];
     let comp = primeira > somarMesesComp(ultimaFechavel, -LIMITE_MESES_SINCRONIZACAO)
       ? primeira : somarMesesComp(ultimaFechavel, -LIMITE_MESES_SINCRONIZACAO);
     while (comp <= ultimaFechavel) {
-      if (!jaFechadas.has(comp)) pendentes.push(comp);
-      comp = somarMesesComp(comp, 1);
-    }
-
-    const fechadas: string[] = [];
-    for (const c of pendentes) {
-      try {
-        await this.lancarCompetencia(tenantId, empregadoId, c, 'AUTO');
-        fechadas.push(c);
-      } catch (e) {
-        // Um mês que não dá pra apurar (sem REP, p.ex.) não pode travar os outros.
-        this.log.warn(`Fechamento automático ${c} do empregado ${empregadoId} falhou: ${(e as Error).message}`);
+      if (!jaFechadas.has(comp)) {
+        try {
+          const r = await this.lancarCompetencia(tenantId, empregadoId, comp, 'AUTO');
+          for (const c of r.reabertas) jaFechadas.delete(c);
+          jaFechadas.add(comp);
+          fechadas.push(comp);
+        } catch (e) {
+          // Um mês que não dá pra apurar (sem REP, p.ex.) não pode travar os outros.
+          this.log.warn(`Fechamento automático ${comp} do empregado ${empregadoId} falhou: ${(e as Error).message}`);
+        }
       }
+      comp = somarMesesComp(comp, 1);
     }
     return { fechadas };
   }
@@ -449,7 +610,7 @@ export class BancoService {
       const ultimo = r.extrato[0];
       linhas.push({
         empregadoId: e.id, nome: e.nome, matricula: e.matricula, ativo: true as const,
-        tipoAcordo: r.tipoAcordo, formaCalculo: r.formaCalculo, prazoMeses: r.prazoMeses,
+        tipoAcordo: r.tipoAcordo, formaCalculo: r.formaCalculo, negativoMes: r.negativoMes, prazoMeses: r.prazoMeses,
         saldoMin: r.saldo.saldoMin, mesCorrenteMin: r.mesCorrente?.estimadoMin ?? 0, projetadoMin: r.saldoProjetadoMin ?? r.saldo.saldoMin,
         creditadoMin: r.saldo.creditadoMin, compensadoMin: r.saldo.compensadoMin, pagoMin: r.saldo.pagoMin,
         devedorMin: r.saldo.devedorMin, vencidoMin: r.saldo.vencidoMin, aVencerMin: r.saldo.aVencerMin, proximoVencimento: r.saldo.proximoVencimento,

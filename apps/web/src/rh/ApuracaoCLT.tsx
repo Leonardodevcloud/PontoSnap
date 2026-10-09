@@ -276,9 +276,18 @@ export function ApuracaoCLT() {
             <div className={css.destinacao}>
               <h3>Banco de horas — de onde vem o saldo</h3>
               {ap!.banco.formaCalculo === 'INTRA_MES' ? (
-                <p className={css.destNota} style={{ marginTop: 0 }}>
-                  Regra <strong>intra-mês</strong>: compensa só dentro do mês. Nada passa de um mês pro outro.
-                </p>
+                <>
+                  <p className={css.destNota} style={{ marginTop: 0 }}>
+                    Regra <strong>compensa no mês e paga a diferença</strong>: sobra positiva é paga na folha; devendo
+                    {ap!.banco.acerto?.negativoMes === 'CARREGA' ? ' passa para o mês seguinte.' : ' é descontado na folha.'}
+                  </p>
+                  {ap!.banco.saldoAnteriorMin !== 0 && (
+                    <div className={css.destLinha}>
+                      <span>Veio devendo do mês anterior</span>
+                      <span className={`${css.mono} ${css.neg}`}>{comSinal(ap!.banco.saldoAnteriorMin)}</span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className={css.destLinha}>
                   <span>Saldo que veio dos meses anteriores</span>
@@ -300,9 +309,33 @@ export function ApuracaoCLT() {
                 </div>
               )}
               <div className={`${css.destLinha} ${css.destTotal}`}>
-                <span>{ap!.banco.fechada ? 'Saldo acumulado ao fim do mês' : 'Previsão ao fechar o mês (ainda não entrou no banco)'}</span>
+                <span>{ap!.banco.acerto ? (ap!.banco.fechada ? 'Saldo do mês' : 'Saldo do mês até agora') : ap!.banco.fechada ? 'Saldo acumulado ao fim do mês' : 'Previsão ao fechar o mês (ainda não entrou no banco)'}</span>
                 <span className={`${css.mono} ${ap!.banco.saldoAcumuladoMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.saldoAcumuladoMin)}</span>
               </div>
+              {ap!.banco.acerto && ap!.banco.acerto.acertoMin > 0 && (
+                <div className={css.destLinha}>
+                  <span>{ap!.banco.fechada ? 'Pago na folha como hora extra' : 'Vai ser pago na folha (prévia)'} <span className={`${css.destBadge} ${css.destBanco}`}>hora extra</span></span>
+                  <span className={`${css.mono} ${css.neg}`}>{comSinal(-ap!.banco.acerto.acertoMin)}</span>
+                </div>
+              )}
+              {ap!.banco.acerto && ap!.banco.acerto.acertoMin < 0 && (
+                <div className={css.destLinha}>
+                  <span>{ap!.banco.fechada ? 'Descontado na folha' : 'Vai ser descontado na folha (prévia)'} <span className={`${css.destBadge} ${css.destDesc}`}>desconto</span></span>
+                  <span className={css.mono}>{comSinal(-ap!.banco.acerto.acertoMin)}</span>
+                </div>
+              )}
+              {ap!.banco.acerto && ap!.banco.acerto.passaMin < 0 && (
+                <div className={css.destLinha}>
+                  <span>Passa para o mês seguinte <span className={`${css.destBadge} ${css.destDesc}`}>a compensar</span></span>
+                  <span className={`${css.mono} ${css.neg}`}>{comSinal(ap!.banco.acerto.passaMin)}</span>
+                </div>
+              )}
+              {ap!.banco.acerto && (
+                <div className={`${css.destLinha} ${css.destTotal}`}>
+                  <span>Fica no banco</span>
+                  <span className={`${css.mono} ${ap!.banco.acerto.passaMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.acerto.passaMin)}</span>
+                </div>
+              )}
               {ap!.banco.desatualizado && (
                 <div className={css.destAviso}>
                   <span>Este mês estava fechado com outro valor (algo mudou depois). Foi reaberto e será refeito sozinho — ou refaça agora.</span>
@@ -371,6 +404,13 @@ export function ApuracaoCLT() {
                 {ap!.valores.descontoFaltasCentavos > 0 && <VLinha k="(–) Faltas" v={`- ${reaisDeCentavos(ap!.valores.descontoFaltasCentavos)}`} desc />}
                 {ap!.valores.descontoAtrasosCentavos > 0 && <VLinha k="(–) Atrasos" v={`- ${reaisDeCentavos(ap!.valores.descontoAtrasosCentavos)}`} desc />}
                 {ap!.valores.descontoDsrPerdidoCentavos > 0 && <VLinha k="(–) DSR perdido" v={`- ${reaisDeCentavos(ap!.valores.descontoDsrPerdidoCentavos)}`} desc />}
+                {ap!.acertoBanco && ap!.acertoBanco.acertoMin > 0 && (
+                  <VLinha k={`Sobra do banco paga como extra — ${minutosParaHhMm(ap!.acertoBanco.acertoMin)} (com adicional e reflexo no DSR)`}
+                    v={reaisDeCentavos(ap!.acertoBanco.extrasCentavos + ap!.acertoBanco.reflexoDsrCentavos)} />
+                )}
+                {ap!.acertoBanco && ap!.acertoBanco.acertoMin < 0 && (
+                  <VLinha k={`(–) Banco fechou devendo — ${minutosParaHhMm(-ap!.acertoBanco.acertoMin)}`} v={`- ${reaisDeCentavos(ap!.acertoBanco.descontoCentavos)}`} desc />
+                )}
                 <VLinha k="Resultado parcial da jornada" v={reaisDeCentavos(ap!.valores.liquidoProventosCentavos)} forte />
               </div>
             </div>

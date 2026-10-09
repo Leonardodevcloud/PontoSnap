@@ -19,7 +19,8 @@ const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c?'OK  
 const hoje = '2026-08-27';
 
 async function main() {
-  const { tenant:t } = await tenants.criar({ cnpj:'77889900000111', razaoSocial:'IG', localPrestacao:'BA', adminEmail:'a@ig.com' });
+  const U = String(Date.now()).slice(-12); // único por execução
+  const { tenant:t } = await tenants.criar({ cnpj:`77${U}`, razaoSocial:'IG', localPrestacao:'BA', adminEmail:`a${U}@ig.com` });
   await banco.definirConfig(t.id, { tipoAcordo:'INDIVIDUAL', prazoMeses:6 });
   const esc = (await trat.criarHorario(t.id, { codigo:'E', durJornadaMin:540, diasSemana:[1,2,3,4,5], pares:[{entrada:'0800',saida:'1200'},{entrada:'1300',saida:'1800'}] } as never))!;
   const vittor = await empSvc.criar(t.id, { cpf:'77889900011', nome:'Vittor' } as never);

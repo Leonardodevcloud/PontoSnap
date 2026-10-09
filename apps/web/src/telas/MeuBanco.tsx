@@ -66,12 +66,19 @@ export function MeuBanco() {
     <div className="appshell">
       <div className={css.h}>Banco de horas</div>
       <div className={css.s}>
-        {acordo} · {intraMes ? 'compensa dentro do mês' : `compensar em até ${dados.prazoMeses} meses`}
+        {acordo} · {intraMes ? 'compensa no mês e paga a diferença' : `compensar em até ${dados.prazoMeses} meses`}
       </div>
 
       <div className={css.resumo}>
-        <div className={css.rL}>{intraMes ? 'Saldo deste mês' : 'Saldo do banco'}</div>
-        <div className={`${css.rV} ${s.saldoMin < 0 ? css.rVneg : ''}`}>{comSinal(s.saldoMin)}</div>
+        <div className={css.rL}>{intraMes ? `Saldo de ${rotuloMes || 'este mês'} até agora` : 'Saldo do banco'}</div>
+        <div className={`${css.rV} ${(intraMes ? projetado : s.saldoMin) < 0 ? css.rVneg : ''}`}>{comSinal(intraMes ? projetado : s.saldoMin)}</div>
+        {intraMes && (
+          <div className={css.estAviso}>
+            {s.saldoMin < 0 && <>Veio devendo do mês anterior: <b>{comSinal(s.saldoMin)}</b> (já está na conta). </>}
+            No fim do mês, o que sobrar é <b>pago na folha</b> como hora extra; se faltar,
+            {dados.negativoMes === 'CARREGA' ? ' passa para o mês seguinte.' : ' é descontado na folha.'}
+          </div>
+        )}
         {mesCorrente && !intraMes && (
           <div className={css.estAviso}>
             {rotuloMes} até agora: <b>{comSinal(mesCorrente.estimadoMin)}</b>

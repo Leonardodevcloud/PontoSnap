@@ -6,7 +6,7 @@ import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import type {
   BancoResp, ConfigBanco, Empregado, TipoAcordoBanco,
-  CompetenciaLancada, LoteResultado, ResumoBanco, LinhaResumoBanco,
+  CompetenciaLancada, LoteResultado, ResumoBanco, LinhaResumoBanco, AberturaBanco,
 } from '../tipos';
 import css from './BancoHoras.module.css';
 import vt from './VisaoTodos.module.css';
@@ -23,6 +23,37 @@ const ACORDOS: { v: TipoAcordoBanco; t: string; d: string }[] = [
   { v: 'COLETIVO', t: 'Acordo coletivo', d: 'Via sindicato. Compensar em até 12 meses.' },
 ];
 const rotuloAcordo = (t: TipoAcordoBanco) => ACORDOS.find((a) => a.v === t)?.t ?? '—';
+
+/** Mesmas descrições que a API grava (banco/acerto-mes.ts). */
+const DESC_ABERTURA = 'Saldo importado do sistema anterior';
+const SUFIXO_BAIXA_ABERTURA = '(saldo de abertura)';
+
+/** "12:30", "12h30" ou "12" → minutos. Null se inválido. */
+function hhmmParaMin(v: string): number | null {
+  const limpo = v.trim().replace('h', ':').replace(/[^\d:]/g, '');
+  if (!limpo) return null;
+  const [h, m] = limpo.split(':');
+  const horas = Number(h || 0);
+  const mins = Number(m || 0);
+  if (Number.isNaN(horas) || Number.isNaN(mins) || mins >= 60) return null;
+  return horas * 60 + mins;
+}
+const minParaHhmm = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+
+/** Últimos meses (AAAA-MM), do atual pra trás. */
+function ultimosMeses(n: number): string[] {
+  const [a, m] = hojeSP().slice(0, 7).split('-').map(Number);
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(Date.UTC(a!, m! - 1 - i, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  });
+}
+
+/** Resumo curto da regra do banco de um funcionário. */
+const regraCurta = (l: { formaCalculo: string; negativoMes?: string; tipoAcordo: TipoAcordoBanco; prazoMeses?: number | null }) =>
+  l.formaCalculo === 'INTRA_MES'
+    ? `paga a diferença no mês · devendo ${l.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}`
+    : `${l.tipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'} · ${l.prazoMeses}m`;
 
 interface Cobertura { total: number; comRegraPropria: number; seguindoEmpresa: number; comBanco: number; semBanco: number; opcoesBanco: number }
 
@@ -75,7 +106,7 @@ export function BancoHoras() {
 
   // Organização da tela: aba ativa e qual ação (folga/abertura) está aberta.
   const [aba, setAba] = useState<'empresa' | 'funcionario'>('funcionario');
-  const [acao, setAcao] = useState<'folga' | 'abertura' | null>(null);
+  const [acao, setAcao] = useState<'folga' | 'abertura' | 'baixa' | null>(null);
   const [removendo, setRemovendo] = useState<string | null>(null);
 
   const [erro, setErro] = useState<string | null>(null);
@@ -193,28 +224,17 @@ export function BancoHoras() {
     } catch (e) { setErro((e as Error).message); }
   }
 
-  // Converte "12:30" ou "12h30" ou "12" em minutos. Retorna null se inválido.
-  function horasParaMin(v: string): number | null {
-    const limpo = v.trim().replace('h', ':').replace(/[^\d:]/g, '');
-    if (!limpo) return null;
-    const [h, m] = limpo.split(':');
-    const horas = Number(h || 0);
-    const mins = Number(m || 0);
-    if (Number.isNaN(horas) || Number.isNaN(mins) || mins >= 60) return null;
-    return horas * 60 + mins;
-  }
-
   async function lancarAbertura() {
     if (!sel) return;
     setAbMsg(null); setErro(null);
-    const min = horasParaMin(abHoras);
+    const min = hhmmParaMin(abHoras);
     if (min == null || min === 0) { setErro('Informe o saldo no formato HH:MM (ex.: 12:30).'); return; }
     setAbEnviando(true);
     try {
       const minutos = abSinal === 'menos' ? -min : min;
       await api.post('/banco/movimento', {
         empregadoId: sel, data: abData, minutos,
-        tipo: 'AJUSTE', descricao: 'Saldo importado do sistema anterior',
+        tipo: 'AJUSTE', descricao: DESC_ABERTURA,
       });
       const nome = emps.find((e) => e.id === sel)?.nome ?? 'funcionário';
       setAbMsg(`Saldo de abertura de ${abSinal === 'menos' ? '−' : '+'}${minutosParaHhMm(min)} lançado para ${nome}.`);
@@ -422,7 +442,7 @@ export function BancoHoras() {
 
       {aba === 'funcionario' && !sel && (
         <TodosFuncionarios resumo={resumo} carregando={resumoCarregando} busca={busca} setBusca={setBusca}
-          semBancoEmpresa={!!cfg && !cfg.ativo} onAbrir={setSel} />
+          semBancoEmpresa={!!cfg && !cfg.ativo} onAbrir={setSel} onRecarregar={() => void carregarResumo()} />
       )}
 
       {aba === 'funcionario' && sel && (
@@ -472,6 +492,12 @@ export function BancoHoras() {
               </div>
             )}
 
+            {sel && banco?.ativo && banco.saldo && (
+              <CardBaixa key={sel} empregadoId={sel} banco={banco}
+                aberto={acao === 'baixa'} onToggle={() => setAcao(acao === 'baixa' ? null : 'baixa')}
+                onFeito={() => carregarBanco(sel)} />
+            )}
+
             {sel && (
               <div className={css.acaoBox}>
                 <button className={`${css.acaoH} ${acao === 'abertura' ? css.acaoHOn : ''}`}
@@ -517,7 +543,7 @@ export function BancoHoras() {
               <>
                 <div className={css.cards}>
                   <div className={css.card}>
-                    <div className={css.cL}>Saldo (meses fechados)</div>
+                    <div className={css.cL}>{banco!.formaCalculo === 'INTRA_MES' ? (banco!.negativoMes === 'CARREGA' ? 'Devendo de meses anteriores' : 'Saldo (acertado todo mês)') : 'Saldo (meses fechados)'}</div>
                     <div className={css.cV}>{comSinal(s.saldoMin)}</div>
                     {banco!.mesCorrente && (
                       <div className={css.cSub}>
@@ -525,8 +551,23 @@ export function BancoHoras() {
                       </div>
                     )}
                   </div>
+                  {banco!.formaCalculo === 'INTRA_MES' ? (() => {
+                    const ult = banco!.fechamentos.find((f) => f.acertoMin != null);
+                    return (
+                      <div className={css.card} style={{ gridColumn: 'span 2' }}>
+                        <div className={css.cL}>Último acerto{ult ? ` · ${ult.competencia.slice(5)}/${ult.competencia.slice(0, 4)}` : ''}</div>
+                        <div className={`${css.cV} ${ult && ult.acertoMin! < 0 ? css.neg : ''}`}>
+                          {!ult ? '—' : ult.acertoMin! > 0 ? `${minutosParaHhMm(ult.acertoMin!)} pagas` : ult.acertoMin! < 0 ? `${minutosParaHhMm(-ult.acertoMin!)} descontadas` : 'nada a acertar'}
+                        </div>
+                        <div className={css.cSub}>Regra: compensa no mês e paga a diferença · devendo {banco!.negativoMes === 'CARREGA' ? 'passa para o mês seguinte' : 'desconta na folha'}</div>
+                      </div>
+                    );
+                  })() : (
+                    <>
                   <div className={css.card}><div className={css.cL}>Vence em 30 dias</div><div className={css.cV}>{s.aVencerMin > 0 ? minutosParaHhMm(s.aVencerMin) : '—'}</div></div>
                   <div className={`${css.card} ${s.vencidoMin > 0 ? css.cardAlerta : ''}`}><div className={css.cL}>Vencido</div><div className={css.cV}>{s.vencidoMin > 0 ? minutosParaHhMm(s.vencidoMin) : '—'}</div></div>
+                    </>
+                  )}
                 </div>
 
                 {s.vencidoMin > 0 && (
@@ -544,7 +585,10 @@ export function BancoHoras() {
                 {banco!.extrato.map((m, i) => (
                   <div key={`${m.data}-${i}`} className={css.ext}>
                     <span className={css.extD}>{fmtData(m.data)}</span>
-                    <span className={css.extE}>{m.descricao || m.tipo}{m.competencia && <em className={css.extTag}>fechamento {m.competencia}</em>}</span>
+                    <span className={css.extE}>{m.descricao || m.tipo}{m.competencia && (m.tipo === 'PAGAMENTO' || m.tipo === 'AJUSTE'
+                      ? <em className={`${css.extTag} ${css.extTagPago}`}>acerto {m.competencia}</em>
+                      : <em className={css.extTag}>fechamento {m.competencia}</em>)}
+                      {!m.competencia && m.tipo === 'PAGAMENTO' && <em className={`${css.extTag} ${css.extTagPago}`}>pagamento</em>}</span>
                     <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
                     <span className={css.extAcao}>
                       {/* Só lançamento avulso sai daqui; o de fechamento é refeito junto com o mês. */}
@@ -574,9 +618,9 @@ const fmtComp2 = (c: string) => {
   return `${mes}/${c.slice(0, 4)}`;
 };
 
-function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpresa, onAbrir }: {
+function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpresa, onAbrir, onRecarregar }: {
   resumo: ResumoBanco | null; carregando: boolean; busca: string; setBusca: (v: string) => void;
-  semBancoEmpresa: boolean; onAbrir: (id: string) => void;
+  semBancoEmpresa: boolean; onAbrir: (id: string) => void; onRecarregar: () => void;
 }) {
   const [ord, setOrd] = useState<{ k: string; asc: boolean }>({ k: 'nome', asc: true });
   const t = resumo?.totais;
@@ -611,6 +655,8 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
         <input className={vt.busca} placeholder="Buscar por nome ou matrícula" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar funcionário" />
       </div>
 
+      <BaixaAberturas onFeito={onRecarregar} />
+
       {carregando && !resumo && <p className={css.vazio}>Calculando o banco de todo mundo…</p>}
 
       {resumo && t && (
@@ -641,7 +687,7 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
                     <tr key={l.empregadoId} className={vt.row} tabIndex={0} role="button"
                       onClick={() => onAbrir(l.empregadoId)}
                       onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(l.empregadoId); } }}>
-                      <td><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? (l.formaCalculo === 'INTRA_MES' ? 'intra-mês' : `${l.tipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'} · ${l.prazoMeses}m`) : 'sem banco'}</small></span></td>
+                      <td><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? regraCurta(l) : 'sem banco'}</small></span></td>
                       {l.ativo ? (
                         <>
                           <td className={`${vt.n} ${sinal(l.saldoMin)}`}><b>{comSinal(l.saldoMin)}</b></td>
@@ -682,11 +728,268 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
             </div>
           </div>
           <div className={vt.legenda}>
-            <span>Clique no funcionário pra registrar folga, lançar saldo de abertura, pagar vencido e ver o extrato.</span>
+            <span>Clique no funcionário pra registrar folga, baixar ou corrigir saldo, lançar saldo de abertura e ver o extrato.</span>
             <span>Saldo = só meses fechados. {mesNome} ainda está em andamento e fecha sozinho no dia 1 — até lá é previsão, não saldo.</span>
           </div>
         </>
       )}
     </>
+  );
+}
+
+/* ---------------- Baixar ou corrigir saldo (um funcionário) ---------------- */
+
+function CardBaixa({ empregadoId, banco, aberto, onToggle, onFeito }: {
+  empregadoId: string; banco: BancoResp; aberto: boolean; onToggle: () => void; onFeito: () => Promise<void> | void;
+}) {
+  // Saldo de abertura que ainda não saiu do banco (pra sugerir a baixa).
+  const ab = banco.extrato.filter((m) => !m.competencia && m.descricao === DESC_ABERTURA);
+  const aberturaMin = ab.reduce((s, m) => s + m.minutos, 0);
+  const aberturaData = ab.map((m) => m.data).sort()[0] ?? null;
+  const baixadoMin = banco.extrato.filter((m) => !m.competencia && (m.descricao ?? '').endsWith(SUFIXO_BAIXA_ABERTURA))
+    .reduce((s, m) => s - m.minutos, 0);
+  const restanteAbertura = Math.max(0, aberturaMin - baixadoMin);
+
+  const meses = ultimosMeses(7);
+  const [modo, setModo] = useState<'pago' | 'corr'>('pago');
+  const [horas, setHoras] = useState(restanteAbertura > 0 ? minParaHhmm(restanteAbertura) : '');
+  const [comp, setComp] = useState(meses[1]!);
+  const [data, setData] = useState(hojeSP());
+  const [deAbertura, setDeAbertura] = useState(restanteAbertura > 0);
+  const [sinal, setSinal] = useState<'mais' | 'menos'>('menos');
+  const [motivo, setMotivo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [ok, setOk] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const min = hhmmParaMin(horas);
+  const saldo = banco.saldo?.saldoMin ?? 0;
+  const delta = min == null ? 0 : modo === 'pago' ? -min : sinal === 'mais' ? min : -min;
+  const desc = modo === 'pago'
+    ? `Horas pagas na folha de ${fmtComp2(comp)}${deAbertura ? ` ${SUFIXO_BAIXA_ABERTURA}` : ''}`
+    : (motivo.trim() || '(seu motivo)');
+  const hh = min != null ? minutosParaHhMm(min) : '';
+
+  async function enviar() {
+    setErro(null); setOk(null);
+    if (min == null || min === 0) { setErro('Informe as horas no formato HH:MM (ex.: 12:30).'); return; }
+    if (modo === 'pago' && deAbertura && min > restanteAbertura) {
+      setErro(`Do saldo de abertura só restam ${minutosParaHhMm(restanteAbertura)} para baixar.`); return;
+    }
+    if (modo === 'corr' && motivo.trim().length < 5) { setErro('Escreva o motivo da correção: ele aparece no extrato e no app do funcionário.'); return; }
+    setEnviando(true);
+    try {
+      await api.post('/banco/movimento', {
+        empregadoId,
+        data: modo === 'pago' && deAbertura && aberturaData ? aberturaData : data,
+        minutos: delta,
+        tipo: modo === 'pago' ? 'PAGAMENTO' : 'AJUSTE',
+        descricao: modo === 'pago' ? desc : motivo.trim(),
+      });
+      setOk(modo === 'pago' ? `${hh} baixadas como pagas na folha de ${fmtComp2(comp)}.` : `Correção de ${delta > 0 ? '+' : '−'}${hh} lançada.`);
+      setHoras(''); setMotivo(''); setDeAbertura(false);
+      await onFeito();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setEnviando(false); }
+  }
+
+  return (
+    <div className={css.acaoBox}>
+      <button className={`${css.acaoH} ${aberto ? css.acaoHOn : ''}`} onClick={onToggle} aria-expanded={aberto}>
+        <span>Baixar ou corrigir saldo</span>
+        <span className={css.acaoChev}>{aberto ? '▴' : '▾'}</span>
+      </button>
+      {aberto && (
+        <div className={css.acaoBody}>
+          <div className={css.modos} role="radiogroup" aria-label="Tipo de lançamento">
+            <button type="button" role="radio" aria-checked={modo === 'pago'} className={`${css.modo} ${modo === 'pago' ? css.modoOn : ''}`}
+              onClick={() => { setModo('pago'); setOk(null); }}>
+              <b>Pago na folha</b><span>As horas foram (ou serão) pagas em dinheiro. Saem do banco como pagamento.</span>
+            </button>
+            <button type="button" role="radio" aria-checked={modo === 'corr'} className={`${css.modo} ${modo === 'corr' ? css.modoOn : ''}`}
+              onClick={() => { setModo('corr'); setDeAbertura(false); setOk(null); }}>
+              <b>Correção de erro</b><span>Lançamento errado. Ajusta o saldo com motivo obrigatório.</span>
+            </button>
+          </div>
+
+          <div className={css.campos3}>
+            <label className={css.campoB}><span>Horas</span>
+              <input className={`${css.folgaH} ${css.mono}`} inputMode="numeric" placeholder="HH:MM" value={horas} onChange={(e) => setHoras(e.target.value)} />
+            </label>
+            {modo === 'pago' ? (
+              <label className={css.campoB}><span>Pago na folha de</span>
+                <select className={css.select} value={comp} onChange={(e) => setComp(e.target.value)}>
+                  {meses.map((m) => <option key={m} value={m}>{fmtComp(m)}</option>)}
+                </select>
+              </label>
+            ) : (
+              <div className={css.campoB}><span>Somar ou tirar</span>
+                <div className={css.abSinal} style={{ margin: 0 }}>
+                  <button type="button" className={`${css.abSinalBtn} ${sinal === 'mais' ? css.abSinalOn : ''}`} onClick={() => setSinal('mais')} aria-pressed={sinal === 'mais'}>Somar (+)</button>
+                  <button type="button" className={`${css.abSinalBtn} ${sinal === 'menos' ? css.abSinalOnNeg : ''}`} onClick={() => setSinal('menos')} aria-pressed={sinal === 'menos'}>Tirar (−)</button>
+                </div>
+              </div>
+            )}
+            <label className={css.campoB}><span>Data</span>
+              <input className={css.mes} type="date" value={modo === 'pago' && deAbertura && aberturaData ? aberturaData : data}
+                disabled={modo === 'pago' && deAbertura} max={hojeSP()}
+                onChange={(e) => e.target.value && setData(e.target.value)} />
+            </label>
+          </div>
+
+          {modo === 'pago' && restanteAbertura > 0 && (
+            <label className={css.chkAb}>
+              <input type="checkbox" checked={deAbertura} onChange={(e) => {
+                setDeAbertura(e.target.checked);
+                if (e.target.checked && !horas) setHoras(minParaHhmm(restanteAbertura));
+              }} />
+              <span>É o <strong>saldo de abertura</strong> ({minutosParaHhMm(restanteAbertura)} ainda no banco, importado em {fmtData(aberturaData!)}). A baixa entra na mesma data dele.</span>
+            </label>
+          )}
+          {modo === 'corr' && (
+            <label className={css.campoB} style={{ marginTop: 10 }}><span>Motivo (aparece no extrato e no app do funcionário)</span>
+              <textarea className={css.motivo} rows={2} maxLength={160} value={motivo} placeholder="ex.: saldo de abertura lançado em dobro na migração"
+                onChange={(e) => setMotivo(e.target.value)} />
+            </label>
+          )}
+
+          <div className={css.prev}>
+            <div><div className={css.prevK}>Saldo hoje</div><div className={css.prevV}>{comSinal(saldo)}</div></div>
+            <div className={css.prevSeta} aria-hidden>→</div>
+            <div><div className={css.prevK}>Depois</div><div className={css.prevV}>{comSinal(saldo + delta)}</div></div>
+            <div className={css.prevDesc}>No extrato:<br /><b>“{desc}”</b></div>
+          </div>
+          <Botao variante="coral" onClick={enviar} disabled={enviando || !horas}>
+            {enviando ? 'Lançando…' : modo === 'pago' ? `Baixar ${hh || 'horas'} como pago` : `${sinal === 'mais' ? 'Somar' : 'Tirar'} ${hh || 'horas'} ${sinal === 'mais' ? 'ao' : 'do'} banco`}
+          </Botao>
+          {ok && <p className={css.abOk}>{ok}</p>}
+          {erro && <p className={css.erro} role="alert">{erro}</p>}
+          <p className={css.dica}>Fica registrado na auditoria quem lançou. Dá para desfazer pelo × do extrato.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Baixa em lote do saldo de abertura ---------------- */
+
+function BaixaAberturas({ onFeito }: { onFeito: () => void }) {
+  const [lista, setLista] = useState<AberturaBanco[] | null>(null);
+  const [aberto, setAberto] = useState(false);
+  const meses = ultimosMeses(7);
+  const [comp, setComp] = useState(meses[1]!);
+  const [marcados, setMarcados] = useState<Record<string, boolean>>({});
+  const [valores, setValores] = useState<Record<string, string>>({});
+  const [enviando, setEnviando] = useState(false);
+  const [ok, setOk] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    try {
+      const l = await api.get<AberturaBanco[]>('/banco/aberturas');
+      setLista(l);
+      setMarcados(Object.fromEntries(l.filter((a) => a.restanteMin > 0).map((a) => [a.empregadoId, true])));
+      setValores(Object.fromEntries(l.map((a) => [a.empregadoId, minParaHhmm(a.restanteMin)])));
+    } catch { setLista([]); }
+  }, []);
+  useEffect(() => { void carregar(); }, [carregar]);
+
+  const pendentes = (lista ?? []).filter((a) => a.restanteMin > 0);
+  if (!lista || (pendentes.length === 0 && !ok)) return null;
+
+  const itens = pendentes.filter((a) => marcados[a.empregadoId]).map((a) => ({ a, min: hhmmParaMin(valores[a.empregadoId] ?? '') }));
+  const invalido = itens.find((i) => i.min == null || i.min <= 0 || i.min > i.a.restanteMin);
+  const total = itens.reduce((s, i) => s + (i.min ?? 0), 0);
+  const todos = pendentes.length > 0 && pendentes.every((a) => marcados[a.empregadoId]);
+
+  async function baixar() {
+    setErro(null); setOk(null);
+    if (invalido) { setErro(`${invalido.a.nome}: informe até ${minutosParaHhMm(invalido.a.restanteMin)} (HH:MM).`); return; }
+    if (!itens.length) return;
+    if (!confirm(`Baixar ${minutosParaHhMm(total)} de ${itens.length} funcionário${itens.length === 1 ? '' : 's'} como pago na folha de ${fmtComp(comp)}?`)) return;
+    setEnviando(true);
+    try {
+      const r = await api.post<{ baixados: number; totalMin: number }>('/banco/baixa-abertura', {
+        competenciaFolha: comp, itens: itens.map((i) => ({ empregadoId: i.a.empregadoId, minutos: i.min! })),
+      });
+      setOk(`${r.baixados} funcionário${r.baixados === 1 ? '' : 's'} · ${minutosParaHhMm(r.totalMin)} baixadas como pagas na folha de ${fmtComp2(comp)}.`);
+      await carregar();
+      onFeito();
+    } catch (e) { setErro((e as Error).message); }
+    finally { setEnviando(false); }
+  }
+
+  return (
+    <div className={css.acaoBox} style={{ marginTop: 0, marginBottom: 14 }}>
+      <button className={`${css.acaoH} ${aberto ? css.acaoHOn : ''}`} onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
+        <span>Baixar saldos de abertura pagos na folha · {pendentes.length} funcionário{pendentes.length === 1 ? '' : 's'}</span>
+        <span className={css.acaoChev}>{aberto ? '▴' : '▾'}</span>
+      </button>
+      {aberto && (
+        <div className={css.acaoBody}>
+          <p className={css.loteAviso}>
+            Lista quem ainda tem <strong>saldo de abertura</strong> (importado do sistema anterior) no banco. Marque quem já recebeu essas horas
+            em dinheiro: elas saem do banco como <strong>pagamento</strong>, na data do saldo de abertura, sem mexer nas horas dos meses fechados no PontoSnap.
+          </p>
+          <div className={css.loteTopo}>
+            <label className={css.campoB}><span>Pago na folha de</span>
+              <select className={css.select} value={comp} onChange={(e) => setComp(e.target.value)}>
+                {meses.map((m) => <option key={m} value={m}>{fmtComp(m)}</option>)}
+              </select>
+            </label>
+            <label className={css.chkTodos}>
+              <input type="checkbox" checked={todos}
+                onChange={(e) => setMarcados(Object.fromEntries(pendentes.map((a) => [a.empregadoId, e.target.checked])))} />
+              Marcar todos
+            </label>
+          </div>
+          <div className={vt.tab}>
+            <div className={vt.scroll}>
+              <table className={vt.table} style={{ minWidth: 680 }}>
+                <thead><tr>
+                  <th style={{ width: 36 }}><span className={vt.srOnly}>Marcar</span></th>
+                  <th>Funcionário</th>
+                  <th className={vt.n}>Abertura</th>
+                  <th className={vt.n}>Já baixado</th>
+                  <th className={vt.n}>Baixar</th>
+                  <th className={vt.n}>Fica</th>
+                </tr></thead>
+                <tbody>
+                  {pendentes.map((a) => {
+                    const on = !!marcados[a.empregadoId];
+                    const v = hhmmParaMin(valores[a.empregadoId] ?? '');
+                    const fica = a.restanteMin - (on && v != null ? v : 0);
+                    const ruim = on && (v == null || v <= 0 || v > a.restanteMin);
+                    return (
+                      <tr key={a.empregadoId} className={on ? '' : css.loteOff}>
+                        <td><input type="checkbox" checked={on} aria-label={`Baixar ${a.nome}`}
+                          onChange={(e) => setMarcados({ ...marcados, [a.empregadoId]: e.target.checked })} /></td>
+                        <td><span className={vt.nome}>{a.nome}<small>{!a.bancoAtivo ? 'sem banco ativo' : a.formaCalculo === 'INTRA_MES' ? `paga a diferença no mês · devendo ${a.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}` : 'acumula no banco'} · importado em {fmtData(a.aberturaData)}</small></span></td>
+                        <td className={vt.n}>{comSinal(a.aberturaMin)}</td>
+                        <td className={`${vt.n} ${a.baixadoMin ? '' : vt.mute}`}>{a.baixadoMin ? minutosParaHhMm(a.baixadoMin) : '—'}</td>
+                        <td className={vt.n}>
+                          {on ? <input className={`${css.loteInp} ${ruim ? css.loteInpErr : ''}`} inputMode="numeric" aria-label={`Horas a baixar de ${a.nome}`}
+                            value={valores[a.empregadoId] ?? ''} onChange={(e) => setValores({ ...valores, [a.empregadoId]: e.target.value })} /> : '—'}
+                        </td>
+                        <td className={`${vt.n} ${fica === 0 ? vt.mute : ''}`}>{minutosParaHhMm(Math.max(0, fica))}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className={css.loteRod}>
+            <span><b>{itens.length}</b> funcionário{itens.length === 1 ? '' : 's'} · <b className={css.mono}>{minutosParaHhMm(total)}</b> saem do banco</span>
+            <Botao variante="coral" onClick={baixar} disabled={enviando || itens.length === 0}>
+              {enviando ? 'Baixando…' : `Baixar ${itens.length} como pago na folha de ${fmtComp2(comp)}`}
+            </Botao>
+          </div>
+          {ok && <p className={css.abOk}>{ok}</p>}
+          {erro && <p className={css.erro} role="alert">{erro}</p>}
+          <p className={css.dica}>Cada baixa entra no extrato do funcionário como “Horas pagas na folha de {fmtComp2(comp)} (saldo de abertura)” e pode ser desfeita no × do extrato dele.</p>
+        </div>
+      )}
+    </div>
   );
 }

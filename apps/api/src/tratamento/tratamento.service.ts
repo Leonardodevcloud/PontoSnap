@@ -8,12 +8,13 @@ import {
 import { foraDoRaio } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
-import { apurarPeriodo, valorizarComSalarios, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente } from '@ponto/apuracao-clt';
+import { apurarPeriodo, valorizarComSalarios, valorizarAcertoBanco, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente, type AcertoBancoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
 import { montarRegrasApuracao, type ItensResolvidos } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
 import { resumirDestinacao, movimentosBancoDoDia } from './destinacao';
+import { acertoDoMes, ehDaApuracao, inicioJanela } from '../banco/acerto-mes';
 import { PushService } from '../notificacao/push.service';
 import ExcelJS from 'exceljs';
 
@@ -699,6 +700,14 @@ export class TratamentoService {
         ? await this.resumoBancoDoPeriodo(tx, tenantId, empregadoId, inicioStr, fimStr, itens, tipoEmpresa, tBanco?.prazo ?? null, resultado)
         : null;
 
+      // Compensa no mês e paga a diferença: o acerto do mês vira R$ nesta folha
+      // (sobra paga como hora extra; devendo descontado, se a regra mandar).
+      let acertoBanco: AcertoBancoValores | null = null;
+      if (banco?.acerto && valores) {
+        acertoBanco = valorizarAcertoBanco(resultado, valores.valorHoraCentavos, banco.acerto.acertoMin, regras);
+        valores.liquidoProventosCentavos += acertoBanco.extrasCentavos + acertoBanco.reflexoDsrCentavos - acertoBanco.descontoCentavos;
+      }
+
       // Batidas de cada dia com a origem: o RH precisa ver o dia inteiro,
       // inclusive a que foi desconsiderada (que continua no AFD) e a que
       // entrou por ajuste aprovado.
@@ -725,6 +734,8 @@ export class TratamentoService {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
         afastamentos, destinacao, batidas, banco,
+        /** Acerto do banco que compensa no mês, em R$ (já somado em valores.liquidoProventosCentavos). */
+        acertoBanco,
         /** Histórico de salário usado na valorização (vigência por data). */
         salarios,
         /** Calendário da escala no período (inclui dias que ainda não chegaram). */
@@ -757,20 +768,30 @@ export class TratamentoService {
     const tipo = cfgBanco?.bancoTipoAcordo ?? (tipoEmpresa === 'NENHUM' ? 'INDIVIDUAL' : tipoEmpresa);
     const prazoMeses = cfgBanco?.bancoPrazoMeses ?? prazoEmpresa ?? PRAZO_PADRAO[tipo] ?? 6;
     const formaCalculo = (cfgBanco?.formaCalculo ?? 'BANCO_HORAS') as 'BANCO_HORAS' | 'INTRA_MES';
+    const negativoMes = cfgBanco?.negativoMes === 'CARREGA' ? 'CARREGA' as const : 'DESCONTA' as const;
+    const intraMes = formaCalculo === 'INTRA_MES';
 
     const movs = await tx.select().from(pontoBancoMov).where(and(
       eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, empregadoId),
     )).orderBy(asc(pontoBancoMov.data));
+    const fechs = await tx.select({ competencia: pontoBancoFechamento.competencia, acertoMin: pontoBancoFechamento.acertoMin })
+      .from(pontoBancoFechamento).where(and(
+        eq(pontoBancoFechamento.tenantId, tenantId), eq(pontoBancoFechamento.empregadoId, empregadoId)));
 
     const corte = TratamentoService.somarDias(inicioStr, -1);
     const competencia = inicioStr.slice(0, 7);
-    const anteriores = movs.filter((m) => m.data <= corte);
-    const saldoAnteriorMin = formaCalculo === 'INTRA_MES'
-      ? 0
+    // Compensa no mês: só conta o que veio de meses fechados com acerto (o
+    // devendo que passou). Antes disso nada passava de um mês pro outro.
+    const janela = intraMes
+      ? inicioJanela(fechs.filter((f) => f.acertoMin != null).map((f) => f.competencia), competencia)
+      : '0000-01-01';
+    const anteriores = movs.filter((m) => m.data <= corte && m.data >= janela);
+    const saldoAnteriorMin = intraMes
+      ? anteriores.reduce((s, m) => s + m.minutos, 0)
       : calcularBanco(anteriores.map((m) => ({ data: m.data, minutos: m.minutos, tipo: m.tipo as never })), prazoMeses, corte).saldoMin;
 
     const noPeriodo = movs.filter((m) => m.data >= inicioStr && m.data <= fimStr);
-    const lancadoMin = noPeriodo.filter((m) => m.competencia != null).reduce((s, m) => s + m.minutos, 0);
+    const lancadoMin = noPeriodo.filter((m) => ehDaApuracao(m)).reduce((s, m) => s + m.minutos, 0);
     // Folgas, pagamentos e ajustes do RH no período: não vêm da apuração, mas
     // mexem no saldo e precisam entrar no acumulado.
     const avulsoMin = noPeriodo.filter((m) => m.competencia == null).reduce((s, m) => s + m.minutos, 0);
@@ -804,13 +825,26 @@ export class TratamentoService {
 
     // Mês fechado: vale o que está lançado. Em andamento (ou reaberto): a apuração de agora.
     const saldoMesMin = fechada ? lancadoMin : apuradoMin;
+    const saldoAcumuladoMin = saldoAnteriorMin + saldoMesMin + avulsoMin;
+
+    // Acerto do mês (compensa no mês): só no mês inteiro, e não em fechamento
+    // antigo (sem acerto) — esse continua como estava.
+    const fechAntigo = fechada && fechs.find((f) => f.competencia === competencia)?.acertoMin == null;
+    const acerto = intraMes && ehMesInteiro && !fechAntigo
+      ? { ...acertoDoMes(saldoAcumuladoMin, negativoMes), negativoMes }
+      : null;
     return {
       ativo: true as const,
       formaCalculo, prazoMeses, competencia, fechada,
       saldoAnteriorMin,
       saldoMesMin,
       avulsoMin,
-      saldoAcumuladoMin: saldoAnteriorMin + saldoMesMin + avulsoMin,
+      saldoAcumuladoMin,
+      /**
+       * Compensa no mês: acertoMin > 0 é pago na folha, < 0 descontado;
+       * passaMin < 0 é o devendo que vai para o mês seguinte. Null nas outras regras.
+       */
+      acerto,
       /** Estava fechado com valor diferente e foi reaberto agora — refaz sozinho. */
       desatualizado: refeito,
     };
