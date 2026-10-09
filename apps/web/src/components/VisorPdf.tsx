@@ -39,6 +39,7 @@ export function VisorPdf({ titulo, sub, nomeArquivo, carregar, onFechar }: {
         <div className={css.topo}>
           <div><h3 id="visor-pdf-titulo">{titulo}</h3>{sub && <p>{sub}</p>}</div>
           <div className={css.acoes}>
+            <button type="button" className={css.link} disabled={!url} onClick={() => url && window.open(url, '_blank', 'noopener')}>Abrir em nova aba</button>
             <Botao variante="lime" className={css.btn} disabled={!blob} onClick={() => blob && salvarBlob(blob, nomeArquivo)}>Baixar PDF</Botao>
             <button ref={fechar} type="button" className={css.x} onClick={onFechar} aria-label="Fechar">✕</button>
           </div>
@@ -46,7 +47,7 @@ export function VisorPdf({ titulo, sub, nomeArquivo, carregar, onFechar }: {
         <div className={css.corpo}>
           {erro ? <p className={css.erro}>Não deu pra gerar o PDF: {erro}</p>
             : !url ? <p className={css.carregando}>Gerando o espelho…</p>
-            : <iframe title={titulo} src={url} className={css.pdf} />}
+            : <iframe title={titulo} src={`${url}#view=FitH&navpanes=0&pagemode=none`} className={css.pdf} />}
         </div>
       </div>
     </div>

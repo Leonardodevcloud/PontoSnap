@@ -1765,7 +1765,7 @@ function VisualizarNf({ arquivo, titulo, onBaixar, onFechar }: { arquivo: Pessoa
           {erro ? <p className={css.alerta}>{erro}</p>
             : texto !== null ? <pre className={css.visorXml}>{texto}</pre>
             : !url ? <p className={css.hint}>Carregando…</p>
-            : arquivo.mime === 'application/pdf' ? <iframe title={arquivo.nome} src={url} className={css.visorPdf} />
+            : arquivo.mime === 'application/pdf' ? <iframe title={arquivo.nome} src={`${url}#view=FitH&navpanes=0&pagemode=none`} className={css.visorPdf} />
             : <img src={url} alt={arquivo.nome} className={css.visorImg} />}
         </div>
       </div>
