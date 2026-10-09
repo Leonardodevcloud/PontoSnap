@@ -8,7 +8,7 @@ import { arquivoParaBase64, salvarBlob } from '../lib/download';
 import { brCodePix, normalizarChave } from '../lib/pix';
 import { Botao } from '../components/Botao';
 import type {
-  BaseDias, PessoaTipo, PessoalCompetencia, PessoalDebito, PessoalNfArquivo, PessoalPagamentoMes, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
+  BaseDias, PessoaTipo, PessoalCompetencia, PessoalDebito, PessoalHistorico, PessoalPessoaHistorico, PessoalNfArquivo, PessoalPagamentoMes, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
 import css from './GestaoPessoal.module.css';
@@ -19,8 +19,8 @@ import css from './GestaoPessoal.module.css';
  * Estado de navegação na URL: ?mes=YYYY-MM&aba=...&novo=MEI|MOTORISTA
  */
 
-type Aba = 'folha' | 'beneficios' | 'mei' | 'motoristas' | 'debitos';
-const ABAS: Aba[] = ['folha', 'beneficios', 'mei', 'motoristas', 'debitos'];
+type Aba = 'folha' | 'beneficios' | 'mei' | 'motoristas' | 'debitos' | 'historico';
+const ABAS: Aba[] = ['folha', 'beneficios', 'mei', 'motoristas', 'debitos', 'historico'];
 
 // ---------- formatação ----------
 const brl = (c: number) => `${c < 0 ? '−' : ''}R$ ${(Math.abs(c) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -88,9 +88,10 @@ export function GestaoPessoal() {
   const abaParam = params.get('aba') as Aba | null;
   const aba: Aba = abaParam && ABAS.includes(abaParam) ? abaParam : 'folha';
   const novo = params.get('novo') as 'MEI' | 'MOTORISTA' | null;
-  const ir = useCallback((p: { mes?: string; aba?: Aba; novo?: string | null }) => {
+  const ir = useCallback((p: { mes?: string; aba?: Aba; novo?: string | null; pessoa?: string | null }) => {
     setParams((at) => {
       const n = new URLSearchParams(at);
+      if (p.pessoa !== undefined) { if (p.pessoa) n.set('pessoa', p.pessoa); else n.delete('pessoa'); }
       if (p.mes) n.set('mes', p.mes);
       if (p.aba) n.set('aba', p.aba);
       if (p.novo !== undefined) { if (p.novo) n.set('novo', p.novo); else n.delete('novo'); }
@@ -268,7 +269,7 @@ export function GestaoPessoal() {
       <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
         {([
           ['folha', 'Folha CLT', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length], ['mei', 'MEI', d?.mei.length],
-          ['motoristas', 'Motoristas', d?.motoristas.length], ['debitos', 'Débitos', d?.debitos.length],
+          ['motoristas', 'Motoristas', d?.motoristas.length], ['debitos', 'Débitos', d?.debitos.length], ['historico', 'Histórico', undefined],
         ] as [Aba, string, number | undefined][]).map(([k, t, n]) => (
           <button key={k} role="tab" aria-selected={aba === k} className={`${css.aba} ${aba === k ? css.abaOn : ''}`} onClick={() => ir({ aba: k })}>
             {t} {n != null && <span className={css.cont}>{n}</span>}
@@ -277,7 +278,12 @@ export function GestaoPessoal() {
         ))}
       </div>
 
-      <div className={css.barra}>
+      {aba === 'historico' && (
+        <AbaHistorico sel={params.get('pessoa')} onSel={(k) => ir({ pessoa: k })} onVerNf={(arquivo, titulo) => setVerNf({ arquivo, titulo })}
+          onAbrirMes={(comp, tipo, id) => { ir({ mes: comp, aba: tipo === 'CLT' ? 'folha' : tipo === 'MEI' ? 'mei' : 'motoristas' }); abrir({ tipo: tipo === 'CLT' ? 'clt' : tipo === 'MEI' ? 'mei' : 'mot', id }); }} />
+      )}
+
+      {aba !== 'historico' && <div className={css.barra}>
         <input className={vt.busca} type="search" placeholder="Buscar pessoa" aria-label="Buscar pessoa" value={busca} onChange={(e) => setBusca(e.target.value)} />
         <span className={css.legenda}>
           {d && aba === 'beneficios' && `Dias de ${mesCurto(d.proxima)} já sem feriados · acerto de ${mesCurto(mes)} vem do ponto`}
@@ -287,7 +293,7 @@ export function GestaoPessoal() {
         </span>
         {aba === 'beneficios' && !fechado && d && <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'padrao' }, e.currentTarget)}>{d.padrao ? 'Alterar padrão da empresa' : 'Definir padrão da empresa'}</Botao>}
         {aba === 'debitos' && !fechado && <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'debito' }, e.currentTarget)}>Adicionar débito</Botao>}
-      </div>
+      </div>}
 
       {d && aba === 'beneficios' && (
         <div className={css.padraoBar}>
@@ -1696,4 +1702,267 @@ function CampoEmpresa({ id, valor, empresas, onChange }: { id: string; valor: st
       <small>{empresas.length ? 'Escolha uma das que já usou ou digite uma nova.' : 'Opcional. Aparece na tabela, depois do nome.'}</small>
     </label>
   );
+}
+
+// =================== histórico da pessoa ===================
+
+const ROT_GRUPO: Record<PessoaTipo, string> = { CLT: 'CLT', MEI: 'MEI', MOTORISTA: 'Motoristas' };
+const chaveP = (p: { pessoaTipo: PessoaTipo; pessoaId: string }) => `${p.pessoaTipo}:${p.pessoaId}`;
+const mesAbrev = (c: string) => `${(MESES[Number(c.slice(5, 7)) - 1] ?? '').slice(0, 3)}/${c.slice(0, 4)}`;
+
+function AbaHistorico({ sel, onSel, onAbrirMes, onVerNf }: {
+  sel: string | null; onSel: (k: string | null) => void;
+  onAbrirMes: (comp: string, tipo: PessoaTipo, id: string) => void; onVerNf: (a: PessoalNfArquivo, titulo: string) => void;
+}) {
+  const [pessoas, setPessoas] = useState<PessoalPessoaHistorico[] | null>(null);
+  const [q, setQ] = useState('');
+  const [aberto, setAberto] = useState(false);
+  const [ativo, setAtivo] = useState(0);
+  const [hist, setHist] = useState<PessoalHistorico | null>(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [notasMot, setNotasMot] = useState<{ nome: string; comp: string; semanas: PessoalLinhaMot['semanas'] } | null>(null);
+  const caixa = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { api.get<PessoalPessoaHistorico[]>('/pessoal/historico/pessoas').then(setPessoas).catch((e) => setErro((e as Error).message)); }, []);
+  useEffect(() => {
+    if (!sel) { setHist(null); return; }
+    const [tipo, id] = sel.split(':');
+    let vivo = true;
+    setCarregando(true); setErro(null);
+    api.get<PessoalHistorico>(`/pessoal/historico/${tipo}/${id}`)
+      .then((h) => { if (vivo) setHist(h); }).catch((e) => { if (vivo) setErro((e as Error).message); })
+      .finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [sel]);
+  useEffect(() => {
+    if (!notasMot) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelectorAll('[data-dialogo]')[1]) setNotasMot(null); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [notasMot]);
+  useEffect(() => {
+    const fora = (e: MouseEvent) => { if (!caixa.current?.contains(e.target as Node)) setAberto(false); };
+    document.addEventListener('mousedown', fora);
+    return () => document.removeEventListener('mousedown', fora);
+  }, []);
+
+  const pessoa = pessoas?.find((p) => chaveP(p) === sel) ?? null;
+  const termo = q.trim().toLowerCase();
+  const filtradas = (pessoas ?? []).filter((p) => !termo || `${p.nome} ${p.detalhe ?? ''}`.toLowerCase().includes(termo));
+  const grupos: [string, PessoalPessoaHistorico[]][] = [
+    ...(['MEI', 'MOTORISTA', 'CLT'] as PessoaTipo[]).map((t) => [ROT_GRUPO[t], filtradas.filter((p) => p.pessoaTipo === t && !p.inativo)] as [string, PessoalPessoaHistorico[]]),
+    ['Inativos', filtradas.filter((p) => p.inativo)],
+  ];
+  const ordem = grupos.flatMap(([, l]) => l);
+  const escolher = (p: PessoalPessoaHistorico) => { onSel(chaveP(p)); setQ(''); setAberto(false); };
+
+  return (
+    <div className={css.hist}>
+      <div className={css.histBusca} ref={caixa}>
+        <label htmlFor="hist-q" className={css.histRot}>Pessoa</label>
+        <div className={css.combo}>
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2.2" /><path d="m20 20-4-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+          <input id="hist-q" role="combobox" aria-expanded={aberto} aria-controls="hist-lista" aria-autocomplete="list" autoComplete="off"
+            aria-activedescendant={aberto && ordem[ativo] ? `hist-op-${ativo}` : undefined}
+            placeholder={pessoas ? 'Digite o nome ou escolha na lista' : 'Carregando pessoas…'}
+            value={aberto ? q : (pessoa?.nome ?? q)}
+            onFocus={() => { setAberto(true); setAtivo(0); }}
+            onChange={(e) => { setQ(e.target.value); setAberto(true); setAtivo(0); }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setAberto(true); setAtivo((a) => Math.min(a + 1, ordem.length - 1)); }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setAtivo((a) => Math.max(a - 1, 0)); }
+              else if (e.key === 'Enter' && aberto && ordem[ativo]) { e.preventDefault(); escolher(ordem[ativo]!); }
+              else if (e.key === 'Escape') setAberto(false);
+            }} />
+          {aberto && pessoas && (
+            <div className={css.comboLista} id="hist-lista" role="listbox" aria-label="Pessoas">
+              {ordem.length === 0 && <p className={css.hint} style={{ padding: '10px 12px', margin: 0 }}>Ninguém com "{q}".</p>}
+              {grupos.map(([g, l]) => l.length > 0 && (
+                <div key={g} role="group" aria-label={g}>
+                  <div className={css.comboGrupo}>{g}</div>
+                  {l.map((p) => {
+                    const i = ordem.indexOf(p);
+                    return (
+                      <div key={chaveP(p)} id={`hist-op-${i}`} role="option" aria-selected={i === ativo}
+                        className={`${css.comboOp} ${i === ativo ? css.comboOpAt : ''}`}
+                        onMouseEnter={() => setAtivo(i)} onMouseDown={(e) => { e.preventDefault(); escolher(p); }}>
+                        <span>{p.nome}{p.inativo && <small> · {ROT_TIPO[p.pessoaTipo]}</small>}</span>
+                        <small>{p.inativo && p.desde ? `saiu em ${mesAbrev(p.desde)}` : p.inativo ? 'inativo' : p.detalhe ?? ''}</small>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {erro && <p className={css.erro} role="alert">{erro}</p>}
+      {!sel && !erro && (
+        <div className={css.histVazio}><b>Escolha uma pessoa</b>Aparecem todos os meses dela: os fechados, com o retrato do fechamento, e o mês em aberto, com os números de agora.</div>
+      )}
+      {sel && carregando && !hist && <p className={css.carregando}>Montando o histórico…</p>}
+      {hist && sel === chaveP(hist) && <HistoricoPessoa h={hist} pessoa={pessoa} onAbrirMes={onAbrirMes} onVerNf={onVerNf}
+        onNotasMot={(nome, comp, semanas) => setNotasMot({ nome, comp, semanas })} />}
+
+      {notasMot && (
+        <div className={css.dFundo} data-dialogo onClick={() => setNotasMot(null)}>
+          <div className={css.dialogo} role="dialog" aria-modal="true" aria-labelledby="nm-t" onClick={(e) => e.stopPropagation()}>
+            <div className={css.pixTopo}><div><h3 id="nm-t">Notas de {notasMot.nome}</h3><p className={css.hint} style={{ margin: '4px 0 0' }}>{mesLongo(notasMot.comp)} · por semana</p></div>
+              <button className={css.pX} onClick={() => setNotasMot(null)} aria-label="Fechar" autoFocus>✕</button></div>
+            {notasMot.semanas.filter((x) => x.dias > 0).map((x) => (
+              <div key={x.inicio} className={css.l2}>
+                <span>Semana {fmtDia(x.inicio)} a {fmtDia(x.fim)}<small className={css.sub}>{x.dias} dia{x.dias > 1 ? 's' : ''} · {brl(x.totalCent)}{x.pago ? ' · paga' : ''}</small></span>
+                <strong><CelulaNf numero={x.nfNumero} arquivo={x.nfArquivo} onVer={(a) => onVerNf(a, `Nota de ${notasMot.nome} · semana ${fmtDia(x.inicio)}`)} /></strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf, onNotasMot }: {
+  h: PessoalHistorico; pessoa: PessoalPessoaHistorico | null;
+  onAbrirMes: (comp: string, tipo: PessoaTipo, id: string) => void; onVerNf: (a: PessoalNfArquivo, titulo: string) => void;
+  onNotasMot: (nome: string, comp: string, semanas: PessoalLinhaMot['semanas']) => void;
+}) {
+  const meses = h.meses;
+  const fech = meses.filter((m) => m.fechado).length;
+  const kMeses = { k: 'Meses', v: String(meses.length), s: `${fech} fechado${fech === 1 ? '' : 's'} · ${meses.length - fech} em aberto` };
+  if (meses.length === 0) {
+    return <div className={css.histVazio}><b>Nada por aqui ainda</b>{pessoa?.nome ?? 'Essa pessoa'} não aparece em nenhum mês fechado nem no mês atual.</div>;
+  }
+  const abrir = (comp: string) => <button type="button" className={css.link} onClick={() => onAbrirMes(comp, h.pessoaTipo, h.pessoaId)}>Abrir mês</button>;
+  const compCel = (m: (typeof meses)[number]) => (
+    <td className={css.histComp}>{mesAbrev(m.competencia)}
+      <small>{m.fechado ? <span className={`${vt.pill} ${vt.pillOk}`}>fechado</span> : <span className={`${vt.pill} ${vt.pillWarn}`}>em aberto</span>}</small></td>
+  );
+  let perfil: { tipo: string; nome: string; info: [string, ReactNode][] };
+  let kpis: { k: string; v: string; s: string; dark?: boolean }[];
+  let tabela: ReactNode;
+
+  if (h.pessoaTipo === 'MEI') {
+    const ls = meses.map((m) => ({ m, l: m.linha as PessoalLinhaMei }));
+    const ult = ls[0]!.l;
+    const pagos = ls.filter((x) => x.l.lanc.pago);
+    const semNf = ls.filter((x) => !x.l.lanc.nfNumero && !x.l.lanc.nfArquivo).length;
+    const naoPagos = ls.length - pagos.length;
+    perfil = { tipo: 'MEI', nome: ult.nome, info: [['Empresa', ult.empresa ?? '—'], ['CNPJ', fmtDoc(ult.documento) ?? '—'], ['Contrato atual', `${brl(ult.valorCent)} desde ${mesAbrev(ult.valorDesde)}`], ['Pix', ult.chavePix ?? '—']] };
+    kpis = [kMeses,
+      { k: 'Total pago', v: brl(pagos.reduce((a, x) => a + (x.l.lanc.valorPagoCent ?? 0), 0)), s: pagos.length ? `em ${pagos.length} pagamento${pagos.length === 1 ? '' : 's'}` : 'nenhum pagamento ainda', dark: true },
+      { k: 'Bruto (NFs)', v: brl(ls.reduce((a, x) => a + x.l.brutoCent, 0)), s: 'soma das notas' },
+      { k: 'Pendências', v: semNf || naoPagos ? [semNf ? `${semNf} NF` : '', naoPagos ? `${naoPagos} a pagar` : ''].filter(Boolean).join(' · ') : 'nenhuma', s: semNf ? 'meses sem nota' : 'tudo em dia' }];
+    tabela = (
+      <table className={`${vt.table} ${css.compacta}`}>
+        <thead><tr><th>Competência</th><th className={vt.n}>Contrato</th><th className={vt.n}>Extras</th><th className={vt.n}>Faltas</th><th className={vt.n}>Meta</th>
+          <th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={vt.n}>Pagamento</th><th aria-label="Abrir mês" /></tr></thead>
+        <tbody>{ls.map(({ m, l }) => (
+          <tr key={m.competencia} className={m.fechado ? '' : css.histAberto}>
+            {compCel(m)}
+            <td className={vt.n}>{brl(l.valorCent)}</td>
+            <td className={vt.n}>{l.heCent + l.feriadosCent ? <span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span> : '—'}</td>
+            <td className={vt.n}>{l.faltasCent ? <><span className={vt.neg}>{brl(-l.faltasCent)}</span><small className={css.sub}>{l.lanc.faltas} falta{l.lanc.faltas > 1 ? 's' : ''}</small></> : '—'}</td>
+            <td className={vt.n}>{!l.lanc.metaCent ? '—' : <>{brl(l.lanc.metaCent)}<small className={`${css.sub} ${l.lanc.metaPaga ? css.subOk : css.subWarn}`}>{l.lanc.metaPaga ? 'já paga' : 'a pagar'}</small></>}</td>
+            <td className={`${vt.n} ${css.forte}`}>{brl(l.brutoCent)}<CelulaNf numero={l.lanc.nfNumero} arquivo={l.lanc.nfArquivo} onVer={(a) => onVerNf(a, `Nota de ${l.nome} · ${mesLongo(m.competencia)}`)} /></td>
+            <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
+            <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
+            <td className={vt.n}><PagoInfo pago={l.lanc.pago} valorPagoCent={l.lanc.valorPagoCent} pagoEm={l.lanc.pagoEm} /></td>
+            <td className={vt.n}>{abrir(m.competencia)}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    );
+  } else if (h.pessoaTipo === 'MOTORISTA') {
+    const ls = meses.map((m) => ({ m, l: m.linha as PessoalLinhaMot }));
+    const ult = ls[0]!.l;
+    const pagoDe = (l: PessoalLinhaMot) => l.pagamento.pago || (l.semanas.some((x) => x.dias > 0) && l.semanas.filter((x) => x.dias > 0).every((x) => x.pago));
+    const pagos = ls.filter((x) => pagoDe(x.l));
+    const semNf = ls.reduce((a, x) => a + x.l.semanas.filter((s) => s.dias > 0 && !s.nfNumero && !s.nfArquivo).length, 0);
+    perfil = { tipo: 'Motorista', nome: ult.nome, info: [['Empresa', ult.empresa ?? '—'], ['Documento', fmtDoc(ult.documento) ?? '—'], ['Contrato atual', `${brl(ult.valorCent)} · ${ult.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}`], ['Pix', ult.chavePix ?? '—']] };
+    kpis = [kMeses,
+      { k: 'Total pago', v: brl(pagos.reduce((a, x) => a + (x.l.pagamento.valorPagoCent ?? 0), 0)), s: pagos.length ? `em ${pagos.length} ${pagos.length === 1 ? 'mês pago' : 'meses pagos'}` : 'nenhum mês pago ainda', dark: true },
+      { k: 'Total das NFs', v: brl(ls.reduce((a, x) => a + x.l.totalCent, 0)), s: 'soma das semanas' },
+      { k: 'Pendências', v: semNf ? `${semNf} semana${semNf > 1 ? 's' : ''}` : 'nenhuma', s: semNf ? 'sem nota fiscal' : 'notas em dia' }];
+    tabela = (
+      <table className={`${vt.table} ${css.compacta}`}>
+        <thead><tr><th>Competência</th><th className={vt.n}>Dias</th><th className={vt.n}>Adicionais</th><th className={vt.n}>Total das NFs</th><th className={vt.n}>Débitos</th>
+          <th className={vt.n}>Líquido</th><th className={vt.n}>Notas</th><th className={vt.n}>Pagamento</th><th aria-label="Abrir mês" /></tr></thead>
+        <tbody>{ls.map(({ m, l }) => {
+          const com = l.semanas.filter((x) => x.dias > 0);
+          const comNf = com.filter((x) => x.nfNumero || x.nfArquivo).length;
+          return (
+            <tr key={m.competencia} className={m.fechado ? '' : css.histAberto}>
+              {compCel(m)}
+              <td className={vt.n}>{l.semanas.reduce((a, x) => a + x.dias, 0)}</td>
+              <td className={vt.n}>{l.semanas.some((x) => x.adicionalCent) ? brl(l.semanas.reduce((a, x) => a + x.adicionalCent, 0)) : '—'}</td>
+              <td className={`${vt.n} ${css.forte}`}>{brl(l.totalCent)}</td>
+              <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
+              <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
+              <td className={vt.n}>{com.length === 0 ? '—' : <>
+                <small className={`${css.sub} ${comNf < com.length ? css.subErr : ''}`}>{comNf} de {com.length} com NF</small>
+                <button type="button" className={css.nfLink} onClick={() => onNotasMot(l.nome, m.competencia, l.semanas)}>ver notas</button></>}</td>
+              <td className={vt.n}><PagoInfo pago={pagoDe(l)} valorPagoCent={l.pagamento.valorPagoCent} pagoEm={l.pagamento.pagoEm} /></td>
+              <td className={vt.n}>{abrir(m.competencia)}</td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    );
+  } else {
+    const ls = meses.map((m) => ({ m, l: m.linha as PessoalLinhaClt }));
+    const ult = ls[0]!.l;
+    const faltas = ls.reduce((a, x) => a + x.l.faltasDias.length, 0);
+    perfil = { tipo: 'CLT', nome: ult.nome, info: [['Matrícula', ult.matricula ? `#${ult.matricula}` : '—'], ['Cargo', ult.config.cargo ?? '—'],
+      ['Salário atual', ult.salarioCent == null ? '—' : brl(ult.salarioCent)], ['Benefício', ult.config.origem === 'PROPRIO' ? 'valor próprio' : ult.config.origem === 'PADRAO' ? 'padrão da empresa' : 'sem benefício'], ['Pix', ult.config.chavePix ?? '—']] };
+    kpis = [kMeses,
+      { k: 'Líquido (prévia)', v: brl(ls.reduce((a, x) => a + x.l.liquidoSalarioCent, 0)), s: 'soma dos meses, sem encargos', dark: true },
+      { k: 'Faltas', v: `${faltas} dia${faltas === 1 ? '' : 's'}`, s: ls.filter((x) => x.l.faltasDias.length).map((x) => `${x.l.faltasDias.length} em ${mesAbrev(x.m.competencia).slice(0, 3)}`).join(' · ') || 'nenhuma' },
+      { k: 'Benefícios carregados', v: brl(ls.reduce((a, x) => a + x.l.beneficios.cargaCent, 0)), s: 'VR/VA, cesta e VT, já com acerto' }];
+    tabela = (
+      <table className={`${vt.table} ${css.compacta}`}>
+        <thead><tr><th>Competência</th><th className={vt.n}>Salário</th><th className={vt.n} title="Hora extra paga + indenização de intervalo">Extras</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th>
+          <th className={vt.n}>Líquido (prévia)</th><th className={vt.n}>Benefícios</th><th className={vt.n} title="Horas extras que foram pro banco">Banco</th><th className={vt.n}>Custo bruto</th><th aria-label="Abrir mês" /></tr></thead>
+        <tbody>{ls.map(({ m, l }) => (
+          <tr key={m.competencia} className={m.fechado ? '' : css.histAberto}>
+            {compCel(m)}
+            <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub}>proporcional</small>}</td>
+            <td className={vt.n}>{l.proventosCent ? <span className={vt.pos}>{brl(l.proventosCent)}</span> : '—'}</td>
+            <td className={vt.n}>{l.descontosCent ? <><span className={vt.neg}>{brl(-l.descontosCent)}</span><small className={css.sub}>{l.faltasDias.length ? `${l.faltasDias.length} falta${l.faltasDias.length > 1 ? 's' : ''}` : 'atrasos'}</small></> : '—'}</td>
+            <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
+            <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoSalarioCent)}</td>
+            <td className={vt.n}>{l.beneficios.cargaCent ? brl(l.beneficios.cargaCent) : '—'}<small className={css.sub}>carga de {mesAbrev(somarMes(m.competencia, 1)).slice(0, 3)}</small></td>
+            <td className={vt.n}>{l.heNoBancoMin ? minutosParaHhMm(l.heNoBancoMin) : '—'}</td>
+            <td className={vt.n}>{brl(l.custoBrutoCent)}</td>
+            <td className={vt.n}>{abrir(m.competencia)}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    );
+  }
+
+  return (
+    <>
+      <div className={css.histPerfil}>
+        <div><span className={css.histTag}>{perfil.tipo}</span><h3>{perfil.nome}</h3></div>
+        <dl>{perfil.info.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      </div>
+      {h.pessoaTipo === 'CLT' && <AvisoPrevia />}
+      <div className={`${vt.kpis} ${css.kpis}`}>
+        {kpis.map((x) => (
+          <div key={x.k} className={`${vt.kpi} ${x.dark ? vt.kpiInk : ''}`}><div className={vt.kpiK}>{x.k}</div><div className={vt.kpiV}>{x.v}</div><div className={vt.kpiS}>{x.s}</div></div>
+        ))}
+      </div>
+      <div className={vt.tab}><div className={vt.scroll}>{tabela}</div></div>
+      <p className={css.hint}>Mês fechado mostra o retrato do fechamento; o mês em aberto (em amarelo) mostra os números de agora. Nota e pagamento são sempre os atuais. "Abrir mês" leva ao fechamento daquela competência com a pessoa aberta.</p>
+    </>
+  );
+}
+
+function PagoInfo({ pago, valorPagoCent, pagoEm }: { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }) {
+  if (!pago) return <small className={`${css.sub} ${css.subWarn}`}>a pagar</small>;
+  return <>{valorPagoCent != null ? <b>{brl(valorPagoCent)}</b> : <b>pago</b>}{pagoEm && <small className={css.sub}>{fmtPagoEm(pagoEm)}</small>}</>;
 }

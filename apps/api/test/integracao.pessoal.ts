@@ -28,9 +28,9 @@ const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
-  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000155', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000166', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
   const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
-    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000155', razaoSocial: 'PESSOAL LTDA',
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000166', razaoSocial: 'PESSOAL LTDA',
     numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
   }).returning()))[0]!;
   const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
@@ -190,6 +190,18 @@ async function main() {
   await pes.registrarPagamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', pago: true, valorPago: 2346 });
   const fech2 = await pes.competencia(t.id, '2026-09');
   ok(fech2.mei.find((x) => x.id === mei!.id)!.lanc.valorPagoCent === 234600, 'mês fechado: registrar pagamento funciona e aparece no retrato');
+  // ── histórico da pessoa ──
+  const hm = await pes.historico(t.id, 'MEI', mei!.id);
+  const hSet = hm.meses.find((x) => x.competencia === '2026-09');
+  ok(!!hSet && hSet.fechado, 'histórico do MEI traz setembro fechado');
+  ok((hSet!.linha as { lanc: { nfArquivo: unknown; valorPagoCent: number | null } }).lanc.nfArquivo !== null
+    && (hSet!.linha as { lanc: { valorPagoCent: number | null } }).lanc.valorPagoCent === 234600, 'histórico mostra NF e pagamento atuais do mês fechado');
+  ok(hm.meses.every((x, i, a) => i === 0 || a[i - 1]!.competencia > x.competencia), 'meses do mais recente pro mais antigo');
+  const hc = await pes.historico(t.id, 'CLT', ana.id);
+  ok(hc.meses.some((x) => x.competencia === '2026-09' && x.fechado && (x.linha as { faltasDias: string[] }).faltasDias.includes('2026-09-15')), 'histórico CLT traz setembro com a falta');
+  const pessoasH = await pes.pessoasHistorico(t.id);
+  ok(pessoasH.some((x) => x.pessoaId === mei!.id && x.detalhe === 'Fiix Peças') && pessoasH.some((x) => x.pessoaId === ana.id), 'lista do histórico tem MEI (com empresa) e CLT');
+  ok(pessoasH.find((x) => x.nome === 'Rui Mot')?.inativo === true, 'quem saiu aparece como inativo');
   const mf = fech2.mei.find((x) => x.id === mei!.id)!;
   ok(mf.lanc.pago && mf.lanc.nfNumero === '123', 'retrato fechado mostra pago e NF ao vivo');
   ok(mf.lanc.nfArquivo?.id === nf!.id && mf.lanc.nfArquivo.nome === 'nf-123.pdf', 'metadados do arquivo da NF aparecem no lançamento');

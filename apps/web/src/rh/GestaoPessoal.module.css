@@ -260,3 +260,28 @@ label.pixItem:hover{ background:var(--cream); }
 .pixLado .pixQr{ min-height:0; }
 .compacta th, .compacta td{ padding-left:10px !important; padding-right:10px !important; }
 .compacta th:first-child, .compacta td:first-child{ padding-left:16px !important; }
+
+/* ---------- histórico ---------- */
+.hist{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.histBusca{ display:flex; flex-direction:column; gap:6px; max-width:520px; }
+.histRot{ font-weight:800; font-size:14px; }
+.combo{ position:relative; }
+.combo > svg{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--ash); pointer-events:none; }
+.combo input{ width:100%; border:1px solid rgba(var(--ink-rgb),.16); border-radius:12px; padding:12px 14px 12px 40px; font:inherit; font-weight:700; background:var(--white); color:var(--ink); }
+.combo input:focus-visible{ outline:2px solid var(--coral); outline-offset:1px; }
+.comboLista{ position:absolute; z-index:30; left:0; right:0; top:calc(100% + 6px); background:var(--white); border:1px solid rgba(var(--ink-rgb),.12); border-radius:12px; box-shadow:0 18px 40px rgba(var(--ink-rgb),.18); padding:6px; max-height:340px; overflow:auto; }
+.comboGrupo{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); padding:8px 10px 4px; }
+.comboOp{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:9px 10px; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; }
+.comboOp small{ font-weight:600; color:var(--ash); font-size:12px; white-space:nowrap; }
+.comboOpAt{ background:var(--cream); }
+.histVazio{ text-align:center; padding:48px 16px; color:var(--ash); background:var(--white); border:1px dashed rgba(var(--ink-rgb),.18); border-radius:var(--r-md); }
+.histVazio b{ display:block; color:var(--ink); font-family:var(--ff-display); font-size:18px; margin-bottom:4px; }
+.histPerfil{ display:flex; flex-wrap:wrap; gap:14px 32px; align-items:center; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:16px 18px; }
+.histPerfil h3{ font-family:var(--ff-display); font-size:22px; margin:6px 0 0; }
+.histTag{ font-family:var(--ff-mono); font-size:11px; background:var(--peach); color:var(--coral-dark); border-radius:999px; padding:3px 9px; font-weight:700; }
+.histPerfil dl{ display:flex; flex-wrap:wrap; gap:6px 24px; margin:0; }
+.histPerfil dt{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ash); }
+.histPerfil dd{ margin:0; font-weight:700; font-size:14px; }
+.histComp{ font-weight:800; white-space:nowrap; }
+.histComp small{ display:block; margin-top:3px; }
+.histAberto td{ background:#FFF8E8; }

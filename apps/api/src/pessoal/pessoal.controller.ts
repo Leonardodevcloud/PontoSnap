@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Patch, Post, Put, Query, StreamableFile, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -21,6 +21,14 @@ export class PessoalController {
 
   @Get('competencia') competencia(@UsuarioAtual() u: PayloadAcesso, @Query('comp') comp: string) {
     return this.pessoal.competencia(this.tenant(u), comp);
+  }
+  /** Histórico: pessoas (ativas e inativas) e os meses de uma pessoa. */
+  @Get('historico/pessoas') pessoasHistorico(@UsuarioAtual() u: PayloadAcesso) {
+    return this.pessoal.pessoasHistorico(this.tenant(u));
+  }
+  @Get('historico/:tipo/:id') historico(@UsuarioAtual() u: PayloadAcesso, @Param('tipo') tipo: string, @Param('id', new ParseUUIDPipe()) id: string) {
+    if (!['CLT', 'MEI', 'MOTORISTA'].includes(tipo)) throw new BadRequestException('Tipo inválido');
+    return this.pessoal.historico(this.tenant(u), tipo as 'CLT' | 'MEI' | 'MOTORISTA', id);
   }
   @Get('pessoas') pessoas(@UsuarioAtual() u: PayloadAcesso) {
     return this.pessoal.pessoas(this.tenant(u));

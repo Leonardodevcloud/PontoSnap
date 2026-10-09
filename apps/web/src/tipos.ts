@@ -717,3 +717,10 @@ export interface PessoalCompetencia {
 }
 export interface PessoalPadrao { vigenteDesde: string; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number }
 export interface PessoalPessoa { pessoaTipo: PessoaTipo; pessoaId: string; nome: string }
+
+/** Histórico de uma pessoa na Gestão de pessoal (um item por mês, mais recente primeiro). */
+export interface PessoalPessoaHistorico { pessoaTipo: PessoaTipo; pessoaId: string; nome: string; detalhe: string | null; inativo: boolean; desde: string | null }
+export interface PessoalHistorico {
+  pessoaTipo: PessoaTipo; pessoaId: string;
+  meses: { competencia: string; fechado: boolean; fechadoEm: string | null; linha: PessoalLinhaClt | PessoalLinhaMei | PessoalLinhaMot }[];
+}

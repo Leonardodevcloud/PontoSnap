@@ -5,6 +5,9 @@ import {
   pessoalDebito, pessoalFechamento, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
+
+/** Competência corrente no fuso de Brasília. */
+const mesCorrente = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
 import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
@@ -788,5 +791,88 @@ export class PessoalService {
         ...prest.map((p) => ({ pessoaTipo: p.tipo as PessoaTipo, pessoaId: p.id, nome: p.nome })),
       ];
     });
+  }
+
+  // ======================= histórico da pessoa =======================
+
+  /** Todas as pessoas que já passaram pelo módulo (ativas e inativas), para a busca do histórico. */
+  async pessoasHistorico(tenantId: string) {
+    const hoje = mesCorrente();
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emps = await tx.select({ id: empregado.id, nome: empregado.nome, matricula: empregado.matricula, ativo: empregado.ativo })
+        .from(empregado).where(eq(empregado.tenantId, tenantId)).orderBy(asc(empregado.nome));
+      const prest = await tx.select().from(pessoalPrestador)
+        .where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.tipo, ['MEI', 'MOTORISTA']))).orderBy(asc(pessoalPrestador.nome));
+      const desligados = await tx.select().from(pessoalExclusao)
+        .where(and(eq(pessoalExclusao.tenantId, tenantId), eq(pessoalExclusao.escopo, 'DIANTE'), lte(pessoalExclusao.competencia, hoje)));
+      return [
+        ...emps.map((e) => ({ pessoaTipo: 'CLT' as PessoaTipo, pessoaId: e.id, nome: e.nome, detalhe: e.matricula ? `#${e.matricula}` : null, inativo: !e.ativo, desde: null as string | null })),
+        ...prest.map((p) => {
+          const fora = desligados.filter((x) => x.pessoaTipo === p.tipo && x.pessoaId === p.id).sort((a, b) => a.competencia.localeCompare(b.competencia))[0];
+          return { pessoaTipo: p.tipo as PessoaTipo, pessoaId: p.id, nome: p.nome, detalhe: p.empresa, inativo: !!fora, desde: fora?.competencia ?? null };
+        }),
+      ];
+    });
+  }
+
+  /**
+   * Histórico de uma pessoa: um item por mês. Mês fechado vem do retrato do
+   * fechamento (com NF e pagamento ao vivo por cima); os meses em aberto mais
+   * recentes (até 3, terminando no mês atual) são calculados na hora.
+   */
+  async historico(tenantId: string, tipo: PessoaTipo, id: string) {
+    const hoje = mesCorrente();
+    const { fechs, lancs, nfs } = await comTenant(this.db, tenantId, async (tx) => ({
+      fechs: await tx.select().from(pessoalFechamento).where(eq(pessoalFechamento.tenantId, tenantId)),
+      lancs: tipo === 'CLT' ? [] : await tx.select().from(pessoalLancamento)
+        .where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.pessoaTipo, tipo), eq(pessoalLancamento.pessoaId, id))),
+      nfs: tipo === 'CLT' ? [] : await tx.select({
+        id: pessoalNfArquivo.id, competencia: pessoalNfArquivo.competencia, periodo: pessoalNfArquivo.periodo,
+        nome: pessoalNfArquivo.arquivoNome, mime: pessoalNfArquivo.arquivoMime, bytes: pessoalNfArquivo.arquivoBytes, criadoEm: pessoalNfArquivo.criadoEm,
+      }).from(pessoalNfArquivo).where(and(eq(pessoalNfArquivo.tenantId, tenantId), eq(pessoalNfArquivo.pessoaTipo, tipo), eq(pessoalNfArquivo.pessoaId, id))),
+    }));
+    const nfDe = (comp: string, per: string): NfArquivo | null => {
+      const r = nfs.find((x) => x.competencia === comp && x.periodo === per);
+      return r ? { id: r.id, nome: r.nome, mime: r.mime, bytes: r.bytes, enviadoEm: r.criadoEm.toISOString() } : null;
+    };
+    const lancDe = (comp: string, per: string) => lancs.find((x) => x.competencia === comp && x.periodo === per);
+    const pg = (x?: { pago: boolean; valorPago: string | null; pagoEm: Date | null }) => ({
+      valorPagoCent: x?.pago && x.valorPago != null ? centavos(x.valorPago) : null,
+      pagoEm: x?.pago && x.pagoEm ? x.pagoEm.toISOString() : null,
+    });
+    type Item = { competencia: string; fechado: boolean; fechadoEm: string | null; linha: LinhaClt | LinhaMei | LinhaMot };
+    const meses: Item[] = [];
+    const extrair = (snap: CompetenciaPessoal) =>
+      tipo === 'CLT' ? snap.clt.find((c) => c.empregadoId === id)
+        : tipo === 'MEI' ? snap.mei.find((m) => m.id === id) : snap.motoristas.find((m) => m.id === id);
+
+    for (const f of fechs) {
+      const snap = f.snapshot as CompetenciaPessoal;
+      const linha = extrair(snap);
+      if (!linha) continue;
+      const comp = f.competencia;
+      let viva: LinhaClt | LinhaMei | LinhaMot = linha;
+      if (tipo === 'MEI') {
+        const m = linha as LinhaMei; const x = lancDe(comp, 'MES');
+        viva = { ...m, lanc: { ...m.lanc, nfNumero: x?.nfNumero ?? null, nfData: x?.nfData ?? null, pago: x?.pago ?? false, ...pg(x), nfArquivo: nfDe(comp, 'MES') } };
+      } else if (tipo === 'MOTORISTA') {
+        const m = linha as LinhaMot; const x = lancDe(comp, 'MES');
+        viva = {
+          ...m, pagamento: { pago: x?.pago ?? false, ...pg(x) },
+          semanas: m.semanas.map((sm) => { const y = lancDe(comp, sm.inicio); return { ...sm, nfNumero: y?.nfNumero ?? null, pago: y?.pago ?? false, nfArquivo: nfDe(comp, sm.inicio) }; }),
+        };
+      }
+      meses.push({ competencia: comp, fechado: true, fechadoEm: f.fechadoEm.toISOString(), linha: viva });
+    }
+    // Meses em aberto recentes (o atual e até dois antes), se não estiverem fechados.
+    const fechados = new Set(fechs.map((f) => f.competencia));
+    for (const comp of [hoje, somarMeses(hoje, -1), somarMeses(hoje, -2)]) {
+      if (fechados.has(comp)) continue;
+      if (fechs.length && comp < fechs.map((f) => f.competencia).sort()[0]!) continue;
+      const linha = extrair(await this.calcular(tenantId, comp));
+      if (linha) meses.push({ competencia: comp, fechado: false, fechadoEm: null, linha });
+    }
+    meses.sort((a, b) => b.competencia.localeCompare(a.competencia));
+    return { pessoaTipo: tipo, pessoaId: id, meses };
   }
 }
