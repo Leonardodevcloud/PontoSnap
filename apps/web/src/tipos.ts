@@ -64,6 +64,8 @@ export interface Empregado {
   matriculaEsocial?: string | null;
   horarioContratualId?: string | null;
   escalaCodigo?: string | null;
+  /** Escala marcada como contrato de horas (legado: hoje isso é do perfil). */
+  escalaFlexivel?: boolean;
   cctId?: string | null;
   perfilRegraId?: string | null;
   dataInicioPonto?: string | null;

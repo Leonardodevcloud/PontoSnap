@@ -10,7 +10,7 @@ import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarComSalarios, valorizarAcertoBanco, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente, type AcertoBancoValores } from '@ponto/apuracao-clt';
 import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
-import { montarRegrasApuracao, type ItensResolvidos } from './montar-regras';
+import { montarRegrasApuracao, jornadaFlexivel, type ItensResolvidos } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
 import { resumirDestinacao, movimentosBancoDoDia } from './destinacao';
@@ -593,8 +593,8 @@ export class TratamentoService {
             ehDescanso: (escalaSet.size > 0 ? !trabalhaHoje : false) || descansoPorAusencia.has(data),
             regime: 'r12x36',
             // Contrato de horas: sem janela — vale só a carga do dia.
-            janelaPrevista: horario?.flexivel ? undefined : horario?.pares,
-            jornadaFlexivel: !!horario?.flexivel,
+            janelaPrevista: jornadaFlexivel(itens, horario) ? undefined : horario?.pares,
+            jornadaFlexivel: jornadaFlexivel(itens, horario),
             // Atestado de dia inteiro abate a jornada daquele dia — é isso que
             // impede o dia de virar falta na apuração.
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
@@ -649,8 +649,8 @@ export class TratamentoService {
             ehDomingo, ehFeriado, ehDescanso,
             regime: 'normal',
             // Contrato de horas (flexível): sem janela — só a carga do dia conta.
-            janelaPrevista: (ehUtil && !jornadaCustomizada && !escDia?.flexivel) ? escDia?.pares : undefined,
-            jornadaFlexivel: !!escDia?.flexivel,
+            janelaPrevista: (ehUtil && !jornadaCustomizada && !jornadaFlexivel(itens, escDia)) ? escDia?.pares : undefined,
+            jornadaFlexivel: jornadaFlexivel(itens, escDia),
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -748,7 +748,7 @@ export class TratamentoService {
         horarioDurMin: horario?.durJornadaMin ?? 0,
         jornadaPorDia: horario?.jornadaPorDia ?? null,
         /** Contrato de horas: a jornada é só a carga, sem horário fixo. */
-        horarioFlexivel: horario?.flexivel ?? false,
+        horarioFlexivel: jornadaFlexivel(itens, horario),
       };
     });
   }

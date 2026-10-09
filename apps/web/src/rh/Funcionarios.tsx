@@ -17,6 +17,7 @@ interface ConfigRegra {
   jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
   banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA' } | null;
   destinacao?: { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' } | null;
+  contrato?: { tipoJornada: 'FIXO' | 'CONTRATO_HORAS' } | null;
 }
 interface PerfilResumo { id: string; nome: string; padrao: boolean; config?: ConfigRegra; usadoPor?: number; }
 
@@ -27,6 +28,14 @@ function resumoBanco(b: ConfigRegra['banco']): string {
   if (b.formaCalculo === 'INTRA_MES') return `paga a diferença no mês · devendo ${b.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}`;
   return `acumula no banco · ${b.bancoPrazoMeses ?? 6}m`;
 }
+
+/** A jornada é contrato de horas? O perfil manda; sem definição, vale a escala (legado). */
+const ehContratoHoras = (c: ConfigRegra | undefined, escalaFlexivel?: boolean) =>
+  c?.contrato ? c.contrato.tipoJornada === 'CONTRATO_HORAS' : !!escalaFlexivel;
+
+/** O banco desta regra acumula entre meses? (herda = segue a empresa) */
+const bancoAcumula = (b: ConfigRegra['banco'], empresaAtiva: boolean) =>
+  !b || b.bancoModo === 'HERDA' ? empresaAtiva : b.bancoModo === 'ATIVO' && b.formaCalculo !== 'INTRA_MES';
 
 const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
@@ -47,12 +56,17 @@ export function Funcionarios() {
   const [dataInicioPara, setDataInicioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
   const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
+  const [bancoEmpresaAtivo, setBancoEmpresaAtivo] = useState(false);
 
   async function carregar() {
     try { setLista(await api.get<Empregado[]>('/empregados')); }
     catch (e) { setErro((e as Error).message); }
   }
   useEffect(() => { void carregar(); }, []);
+  useEffect(() => {
+    api.get<{ ativo?: boolean; tipoAcordo?: string }>('/banco/config')
+      .then((c) => setBancoEmpresaAtivo(c.ativo ?? (!!c.tipoAcordo && c.tipoAcordo !== 'NENHUM'))).catch(() => {});
+  }, []);
   useEffect(() => {
     api.get<PerfilResumo[]>('/perfis-regra').then(setPerfis).catch(() => {});
   }, [perfilPara]);
@@ -65,6 +79,15 @@ export function Funcionarios() {
   const ativos = lista?.filter((e) => e.ativo).length ?? 0;
 
   const temPerfil = (e: Empregado) => !!e.perfilRegraId;
+
+  /** Perfil que vale pro funcionário (o dele ou o padrão da empresa). */
+  const perfilEfetivo = (e: Empregado) => (e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined) ?? perfis.find((x) => x.padrao);
+  /** Contrato de horas com banco que acumula: quase sempre é perfil esquecido. */
+  const desencontrado = (e: Empregado) => {
+    const c = perfilEfetivo(e)?.config;
+    return e.ativo && ehContratoHoras(c, e.escalaFlexivel) && bancoAcumula(c?.banco, bancoEmpresaAtivo);
+  };
+  const nDesencontrados = lista?.filter(desencontrado).length ?? 0;
 
   const visiveis = lista?.filter((e) => {
     const q = busca.trim().toLowerCase();
@@ -94,6 +117,13 @@ export function Funcionarios() {
           <button key={k} className={`${css.chipF} ${filtro === k ? css.chipFOn : ''}`} onClick={() => setFiltro(k)}>{rot}</button>
         ))}
       </div>
+
+      {nDesencontrados > 0 && (
+        <div className={css.avisoContrato}>
+          <b>{nDesencontrados === 1 ? '1 funcionário' : `${nDesencontrados} funcionários`} em contrato de horas com banco que acumula.</b>{' '}
+          Para compensar no mês e pagar a diferença, coloque {nDesencontrados === 1 ? 'ele' : 'eles'} num perfil com “Tipo de jornada: contrato de horas” (em <strong>Perfis de regra</strong>).
+        </div>
+      )}
 
       <div className={css.cards}>
         {visiveis?.length === 0 && <div className={css.vazio}>{lista?.length === 0 ? 'Ninguém cadastrado ainda. Adiciona o primeiro funcionário.' : 'Nenhum funcionário com esse filtro.'}</div>}
@@ -134,7 +164,15 @@ export function Funcionarios() {
                     {p && <button type="button" className={css.perfilBadge} onClick={() => setRegrasDe(p)} title="Ver as regras deste perfil">⚙ {p.nome}</button>}
                     {!p && padrao && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(padrao)} title="Ver as regras deste perfil">⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></button>}
                     {!efetivo && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(null)} title="Ver as regras aplicadas">CLT padrão</button>}
+                    {ehContratoHoras(efetivo?.config, e.escalaFlexivel)
+                      ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
+                      : <span className={css.bancoResumo}>horário fixo</span>}
                     <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco)}</span>
+                    {desencontrado(e) && (
+                      <span className={css.alertaContrato} title="Contrato de horas costuma compensar no mês. Este perfil acumula as horas no banco.">
+                        ⚠ contrato de horas com banco que acumula: confira o perfil
+                      </span>
+                    )}
                   </>
                 );
               })()}
@@ -444,7 +482,9 @@ function ModalPerfil({ empregado, perfis, onFechar, onSalvo }: {
         const escolhido = sel ? perfis.find((p) => p.id === sel) : padrao;
         return (
           <p className={css.bancoPrev}>
-            <span className={css.bancoPrevLb}>Banco de horas</span>
+            <span className={css.bancoPrevLb}>Jornada</span>
+            {ehContratoHoras(escolhido?.config, empregado.escalaFlexivel) ? 'contrato de horas' : 'horário fixo'}
+            <span className={css.bancoPrevLb} style={{ marginLeft: 10 }}>Banco de horas</span>
             {resumoBanco(escolhido?.config?.banco)}
           </p>
         );
@@ -670,6 +710,8 @@ function ModalRegras({ perfil, onFechar }: { perfil: PerfilResumo | null; onFech
       r: c.tolerancia ? val(`${c.tolerancia.toleranciaDiariaMin} min/dia`) : clt('10 min/dia') },
     { nome: 'Adicional noturno', desc: 'A mais nas horas de madrugada',
       r: c.noturno ? val(`${c.noturno.noturnoAdicionalPct}%`) : clt('20%') },
+    { nome: 'Tipo de jornada', desc: 'Como o dia de trabalho é contado',
+      r: !c.contrato ? { custom: false as const, texto: 'Como a escala do funcionário' } : val(c.contrato.tipoJornada === 'CONTRATO_HORAS' ? 'Contrato de horas (sem horário fixo)' : 'Horário fixo') },
     { nome: 'Jornada semanal', desc: 'Horas normais antes de virar extra',
       r: c.jornada ? val(`${h(c.jornada.jornadaSemanalMin)}h/semana`) : clt('44h') },
     { nome: 'Banco de horas', desc: 'Como as horas extras são tratadas', r: bancoTxt() },

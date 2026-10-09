@@ -9,6 +9,8 @@ interface Config {
   jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
   banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA' } | null;
   destinacao?: { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' } | null;
+  /** Tipo de jornada. Nulo = segue a escala (escalas antigas marcadas como flexíveis). */
+  contrato?: { tipoJornada: 'FIXO' | 'CONTRATO_HORAS' } | null;
 }
 interface PerfilLista {
   id: string; nome: string; config: Config; padrao: boolean; usadoPor: number; temPdf: boolean;
@@ -74,6 +76,7 @@ export default function Perfis() {
 function resumo(c: Config): { lb: string; valor: string }[] {
   const h = (min: number) => Math.round(min / 60);
   return [
+    { lb: 'jornada do dia', valor: !c.contrato ? 'como a escala' : c.contrato.tipoJornada === 'CONTRATO_HORAS' ? 'contrato de horas' : 'horário fixo' },
     { lb: 'hora extra', valor: c.extra ? `${c.extra.extraDiaUtilPct}% / ${c.extra.extraDomingoFeriadoPct}%` : 'CLT' },
     { lb: 'tolerância', valor: c.tolerancia ? `${c.tolerancia.toleranciaDiariaMin} min/dia` : 'CLT' },
     { lb: 'noturno', valor: c.noturno ? `${c.noturno.noturnoAdicionalPct}%` : 'CLT' },
@@ -95,6 +98,10 @@ const OPCOES_BANCO: { k: ModoBanco; t: string; d: string; ex?: string }[] = [
   { k: 'MES', t: 'Compensa no mês e paga a diferença', d: 'Extra e atraso do mês se compensam. Se o mês fechar positivo, a diferença é paga como hora extra na folha e o banco zera.', ex: '+8h extra −3h atraso → paga 5h' },
   { k: 'NAO', t: 'Não usa banco: toda hora extra é paga', d: 'Hora extra paga cheia; atraso e falta seguem a regra de desconto. Nada se compensa.' },
 ];
+const OPCOES_JORNADA: { k: 'FIXO' | 'CONTRATO_HORAS'; t: string; d: string; ex: string }[] = [
+  { k: 'FIXO', t: 'Horário fixo', d: 'Tem hora para entrar e sair. Chegar depois é atraso, sair depois é extra.', ex: 'escala 8h–18h · chegou 9h → 1h de atraso' },
+  { k: 'CONTRATO_HORAS', t: 'Contrato de horas', d: 'Entra e sai na hora que quiser. Conta só se cumpriu a carga do dia da escala.', ex: 'carga 8h · fez das 12h às 21h → cumpriu' },
+];
 const faltaTxt = (f: string) => f === 'DESCONTA' ? 'descontam' : f === 'BANCO' ? 'abatem do banco' : 'abonadas';
 
 // ---------------------------------------------------------------------------
@@ -111,6 +118,22 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
 
   // helpers pra ligar/desligar cada bloco e editar campos
   const setBloco = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
+  const [sugestao, setSugestao] = useState<string | null>(null);
+
+  /** Contrato de horas costuma compensar no mês: ajusta o banco junto (dá pra mudar). */
+  function escolherJornada(k: 'FIXO' | 'CONTRATO_HORAS') {
+    setSugestao(null);
+    setCfg((c) => {
+      const novo: Config = { ...c, contrato: { tipoJornada: k } };
+      const b = c.banco;
+      const acumulaOuHerda = !b || b.bancoModo === 'HERDA' || (b.bancoModo === 'ATIVO' && b.formaCalculo !== 'INTRA_MES');
+      if (k === 'CONTRATO_HORAS' && acumulaOuHerda) {
+        novo.banco = { bancoModo: 'ATIVO', bancoTipoAcordo: b?.bancoTipoAcordo ?? 'INDIVIDUAL', bancoPrazoMeses: b?.bancoPrazoMeses ?? 6, formaCalculo: 'INTRA_MES', negativoMes: 'CARREGA' };
+        setSugestao('Contrato de horas costuma compensar no mês: o banco de horas abaixo foi ajustado para “compensa no mês · devendo passa para o mês seguinte”. Pode mudar.');
+      }
+      return novo;
+    });
+  }
 
   async function salvar() {
     if (nome.trim().length < 2) { setErro('Dê um nome ao perfil.'); return; }
@@ -155,6 +178,29 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
           <input type="checkbox" checked={padrao} onChange={(e) => setPadrao(e.target.checked)} />
           <span>Usar este perfil para quem não tiver perfil escolhido</span>
         </label>
+      </div>
+
+      <div className={css.card}>
+        <p className={css.secaoTit}>Tipo de jornada</p>
+        <p className={css.exp}>Como o dia de trabalho é contado. A carga de cada dia vem da escala do funcionário.</p>
+        <div className={`${css.opBanco} ${css.opDuas}`} role="radiogroup" aria-label="Tipo de jornada">
+          {OPCOES_JORNADA.map((o) => {
+            const on = cfg.contrato?.tipoJornada === o.k;
+            return (
+              <button key={o.k} type="button" role="radio" aria-checked={on}
+                className={`${css.opB} ${on ? css.opBOn : ''}`} onClick={() => escolherJornada(o.k)}>
+                <i className={css.opRd} aria-hidden />
+                <span><b>{o.t}</b><span>{o.d}</span><em className={css.opEx}>{o.ex}</em></span>
+              </button>
+            );
+          })}
+        </div>
+        {!cfg.contrato && (
+          <p className={css.exp} style={{ marginTop: 10 }}>
+            Ainda não definido: vale o que a <strong>escala</strong> de cada funcionário diz (escalas antigas marcadas como “horário flexível” contam como contrato de horas). Escolha uma opção para o perfil mandar.
+          </p>
+        )}
+        {sugestao && <p className={css.sugestao}>{sugestao}</p>}
       </div>
 
       <Secao titulo="Horas extras"
@@ -248,9 +294,6 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
                 );
               })}
             </div>
-            <p className={css.exp} style={{ marginTop: 10 }}>
-              Para o <strong>contrato de horas</strong> (chega e sai em qualquer horário), use “Compensa no mês” com uma escala marcada como <strong>horário flexível</strong> em Escalas.
-            </p>
             {cfg.banco.bancoModo === 'ATIVO' && (
               <div className={css.dupla}>
                 <label className={css.campo}>

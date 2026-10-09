@@ -137,13 +137,16 @@ export class EmpregadoService {
       // Buscar códigos das escalas vinculadas
       const horIds = [...new Set(emps.map((e) => e.horarioContratualId).filter((x): x is string => !!x))];
       const horarios = horIds.length > 0
-        ? await tx.select({ id: pontoHorarioContratual.id, codigo: pontoHorarioContratual.codigo })
+        ? await tx.select({ id: pontoHorarioContratual.id, codigo: pontoHorarioContratual.codigo, flexivel: pontoHorarioContratual.flexivel })
             .from(pontoHorarioContratual).where(inArray(pontoHorarioContratual.id, horIds))
         : [];
       const mapCodigo = new Map(horarios.map((h) => [h.id, h.codigo]));
+      const mapFlex = new Map(horarios.map((h) => [h.id, h.flexivel]));
       return emps.map((e) => ({
         ...this.semSegredos(e),
         escalaCodigo: e.horarioContratualId ? (mapCodigo.get(e.horarioContratualId) ?? null) : null,
+        /** Escala marcada como contrato de horas (legado: hoje isso é do perfil). */
+        escalaFlexivel: e.horarioContratualId ? (mapFlex.get(e.horarioContratualId) ?? false) : false,
       }));
     });
     return rows;

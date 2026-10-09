@@ -143,3 +143,7 @@
 .bancoResumo{ font-family:var(--ff-mono); font-size:11px; color:var(--ash); background:var(--cream); border-radius:6px; padding:4px 8px; }
 .bancoPrev{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; font-weight:700; background:var(--cream); border-radius:10px; padding:10px 12px; margin:0 0 14px; }
 .bancoPrevLb{ font-family:var(--ff-mono); font-size:10px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }
+
+.tagContrato{ background:var(--ink); color:var(--lime); }
+.alertaContrato{ font-size:12px; font-weight:700; color:var(--coral-dark); background:var(--peach); border-radius:6px; padding:4px 8px; }
+.avisoContrato{ background:var(--peach); border-radius:12px; padding:12px 14px; font-size:13.5px; line-height:1.5; margin:0 0 14px; color:var(--ink); }

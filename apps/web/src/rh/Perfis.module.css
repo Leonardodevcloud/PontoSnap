@@ -71,3 +71,7 @@
 .pill{ padding:8px 14px; border-radius:999px; border:1px solid rgba(var(--ink-rgb),.2); font:inherit; font-size:13px; font-weight:700; background:var(--white); color:var(--ink); cursor:pointer; }
 .pill:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
 .pillOn{ background:var(--ink); color:var(--cream); border-color:transparent; }
+
+.opDuas{ grid-template-columns:1fr 1fr; }
+@media(max-width:640px){ .opDuas{ grid-template-columns:1fr; } }
+.sugestao{ background:var(--peach); border-radius:10px; padding:10px 12px; font-size:13px; line-height:1.5; margin:12px 0 0; }

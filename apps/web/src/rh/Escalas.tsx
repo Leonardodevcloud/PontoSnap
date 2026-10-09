@@ -132,13 +132,20 @@ export function Escalas() {
           </select>
         </div>
 
+        {!flexivel && (
+          <p className={css.hint} style={{ margin: '4px 0 16px' }}>
+            <strong>Contrato de horas</strong> (entra e sai em qualquer horário, vale só a carga do dia) agora é escolhido no{' '}
+            <strong>perfil de regra</strong>, junto com o banco de horas. Aqui fica só quais dias e quantas horas.
+          </p>
+        )}
+        {flexivel && (
         <div className={css.porDiaBox}>
           <label className={css.porDiaToggle}>
             <input type="checkbox" checked={flexivel} onChange={(e) => setFlexivel(e.target.checked)} />
             <span>
-              <strong>Contrato de horas (horário flexível)</strong> — o funcionário tem uma carga por dia, não um horário de entrada e saída.
-              Quem chega mais tarde e sai mais tarde cumpriu a jornada: <strong>extra só acima da carga, atraso só abaixo</strong>.
-              Vale também para os meses já apurados.
+              <strong>Contrato de horas (horário flexível): forma antiga</strong>. Esta escala ainda está marcada assim e continua valendo
+              para quem tem perfil sem “Tipo de jornada” definido. O certo agora é escolher <strong>contrato de horas no perfil de regra</strong>;
+              depois de mover as pessoas, pode desmarcar aqui.
             </span>
           </label>
           {flexivel && (
@@ -152,6 +159,7 @@ export function Escalas() {
             </div>
           )}
         </div>
+        )}
 
         <div className={css.bloco}>
           <span className={css.lb}>{flexivel ? 'Horário de referência (opcional)' : 'Horários de trabalho'}</span>

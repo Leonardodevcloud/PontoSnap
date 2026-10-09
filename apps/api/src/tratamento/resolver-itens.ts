@@ -29,6 +29,7 @@ export async function resolverItens(
     jornada: cfg.jornada ?? null,
     banco: cfg.banco ?? null,
     destinacao: cfg.destinacao ?? null,
+    contrato: cfg.contrato ?? null,
   };
 }
 
