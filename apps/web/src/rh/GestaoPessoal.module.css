@@ -322,3 +322,8 @@ label.pixItem:hover{ background:var(--cream); }
 .linhaCampo .campo{ flex:1; min-width:160px; }
 .histPerfil dd small{ display:block; font-weight:600; color:var(--ash); font-size:12px; }
 .subCorta{ max-width:190px; margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tagTipo{ display:inline-block; font-family:var(--ff-mono); font-size:10px; font-weight:700; border-radius:var(--r-pill); padding:2px 7px; margin-left:6px; vertical-align:1px; background:rgba(var(--ink-rgb),.08); color:var(--ink); white-space:nowrap; }
+.tagMei{ background:var(--peach); color:var(--coral-dark); }
+.tagMot{ background:#E3F0EF; color:var(--ink); }
+.nomeLinha .tagTipo{ margin-left:0; }
+.rodapeTab{ margin:0; padding:10px 16px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13px; color:var(--ash); }
