@@ -28,9 +28,9 @@ const em = (data: string, hm: string) => new Date(`${data}T${hm}:00-0300`);
 const erroDe = async (f: () => Promise<unknown>) => { try { await f(); return ''; } catch (e) { return (e as Error).message; } };
 
 async function main() {
-  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000199', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
+  const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: '44444444000211', razaoSocial: 'PESSOAL LTDA' }).returning()))[0]!;
   const rep = (await comoMaster(db, (tx) => tx.insert(pontoRep).values({
-    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000199', razaoSocial: 'PESSOAL LTDA',
+    tenantId: t.id, tipoIdEmpregador: 1, documentoEmpregador: '44444444000211', razaoSocial: 'PESSOAL LTDA',
     numeroInpi: 'BR512024004444-4', tipoIdDesenvolvedor: 1, documentoDesenvolvedor: '98765432000188',
   }).returning()))[0]!;
   const hor = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
@@ -114,6 +114,21 @@ async function main() {
   ok((await erroDe(() => pes.definirAdmissao(t.id, caio.id, '2099-01-01'))).includes('futuro'), 'admissão no futuro é recusada');
   await pes.definirAdmissao(t.id, caio.id, null);
   await pes.definirInicioCesta(t.id, caio.id, '2026-09');
+
+  // ── sábado de meio turno: VT sim, VR não ──
+  const horSab = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
+    tenantId: t.id, codigo: 'SAB4', durJornadaMin: 480, diasSemana: [1, 2, 3, 4, 5, 6], regime: 'normal', jornadaPorDia: { 6: 240 },
+    pares: [{ entrada: '0800', saida: '1200' }, { entrada: '1300', saida: '1700' }],
+  } as never).returning()))[0]!;
+  const davi = (await comoMaster(db, (tx) => tx.insert(empregado).values({
+    tenantId: t.id, cpf: '40000000009', nome: 'Davi Sábado', horarioContratualId: horSab.id, salarioMensal: '1800.00',
+  }).returning()))[0]!;
+  await pes.salvarConfigClt(t.id, davi.id, { vrDia: 25, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-09' });
+  const dv = (await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === davi.id)!;
+  // outubro/2026: 22 dias úteis − 12/10 = 21; + 5 sábados (3,10,17,24,31) = 26
+  ok(dv.beneficios.diasProx === 26 && dv.beneficios.diasProxVr === 21, `VT em 26 dias, VR em 21 — sábado de 4h sem VR (${dv.beneficios.diasProx}/${dv.beneficios.diasProxVr})`);
+  ok(dv.beneficios.vrProxCent === 21 * 2500 && dv.beneficios.vtProxCent === 26 * 1000, 'carga: VR × 21 e VT × 26');
+  await pes.excluir(t.id, { pessoaTipo: 'CLT', pessoaId: davi.id, competencia: '2026-09', escopo: 'DIANTE' });
 
   // ── MEI ──
   const mei = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Igor MEI', documento: '60.874.544/0001-04', funcao: 'Vendedor', empresa: ' Fiix Peças ', inicioAtividade: '2023-03-01', valorMensal: 2600, baseDias: 'SEG_SAB', competenciaInicio: '2026-09' });

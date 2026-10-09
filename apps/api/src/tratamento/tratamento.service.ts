@@ -555,6 +555,9 @@ export class TratamentoService {
       const diasEscala: string[] = [];
       const diasUteisCal: string[] = [];
       const diasPrevistos: string[] = [];
+      // Jornada da escala em cada dia de diasEscala (minutos), mesmo em feriado.
+      // Serve pra saber se o dia é turno cheio ou meio turno (VR no sábado).
+      const jornadaEscala: Record<string, number> = {};
 
       if (regime === 'r12x36') {
         // escala 12x36 vem do calendário de dias trabalhados. Com escala, faltas
@@ -572,7 +575,7 @@ export class TratamentoService {
           const trabalhaHoje = (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data))
             && !descansoPorAusencia.has(data);
           const jornada = trabalhaHoje ? durJornada : 0;
-          if (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data)) { diasEscala.push(data); diasUteisCal.push(data); }
+          if (escalaSet.size > 0 ? escalaSet.has(data) : porDia.has(data)) { diasEscala.push(data); diasUteisCal.push(data); jornadaEscala[data] = durJornada; }
           if (trabalhaHoje && jornada > 0 && !abonoDiaInteiro.has(data)) diasPrevistos.push(data);
           if (naoChegou(data)) {
             // Dia futuro: não é apurado, mas entra no contratado do mês inteiro.
@@ -626,6 +629,7 @@ export class TratamentoService {
             && porDiaMap[String(dow)] !== escDia?.durJornadaMin;
           if (uteisDia.includes(dow)) {
             diasEscala.push(data);
+            jornadaEscala[data] = durDia;
             if (!ehFeriado) diasUteisCal.push(data);
           }
           if (ehUtil && jornada > 0 && !abonoDiaInteiro.has(data)) diasPrevistos.push(data);
@@ -724,7 +728,7 @@ export class TratamentoService {
         /** Histórico de salário usado na valorização (vigência por data). */
         salarios,
         /** Calendário da escala no período (inclui dias que ainda não chegaram). */
-        diasEscala, diasUteis: diasUteisCal, diasPrevistos,
+        diasEscala, diasUteis: diasUteisCal, diasPrevistos, jornadaEscala,
         /** Datas de feriado do período (calendário do cliente + parâmetro). */
         feriados: [...feriadoSet].filter((d) => d >= inicioStr && d <= fimStr).sort(),
         /** Batidas previstas pelo horário contratual (2 por par). */

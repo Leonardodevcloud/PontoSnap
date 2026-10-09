@@ -224,7 +224,7 @@ export function GestaoPessoal() {
   const comoTexto: Record<Exclude<Aba, 'historico'>, ReactNode> = {
     folha: <>Valor do dia = salário ÷ dias de trabalho de {mesCurto(mes)}. Extras, faltas e atrasos vêm do ponto. Hora extra de quem tem banco de horas vai pro banco e não entra em R$. Indenização de intervalo é paga sempre (não vai pro banco).</>,
     beneficios: d ? <>Hoje você carrega <b>{mesCurto(d.proxima)}</b>. O que foi pago para <b>{mesCurto(mes)}</b> e não foi usado (feriado, falta, férias, atestado) volta
-      como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos. A cesta só é paga sem falta no mês e depois da carência.
+      como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos. Sábado de meio turno recebe VT, mas não VR/VA. A cesta só é paga sem falta no mês e depois da carência.
       {d.clt.some((c) => c.beneficios.pagosEstimado) && <> Como {mesCurto(mes)} ainda não foi fechado no sistema, os dias pagos foram estimados pela escala.</>}</> : null,
     prestadores: <><b>MEI</b> é por mês, com uma nota fiscal no mês: <b>bruto</b> = contrato + extras + feriados trabalhados − faltas + meta (valor da NF);
       valor-hora = contrato ÷ (dias do mês × 8h), extra × 1,5. <b>Motorista</b> é por semana, com uma nota por semana: diária = valor mensal ÷ dias do mês (sem feriados),
@@ -479,7 +479,8 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
               <td className={vt.nome}>{l.nome}<small>{semCfg ? 'sem benefício' : resumoBen(c)}</small>
                 {semCfg ? <span className={`${vt.pill} ${vt.pillWarn}`}>configurar</span>
                   : <span className={`${vt.pill} ${c.origem === 'PROPRIO' ? vt.pillLime : vt.pillMute}`} title={c.vigenteDesde ? `Vale desde ${mesLongo(c.vigenteDesde)}` : undefined}>{c.origem === 'PROPRIO' ? 'valor próprio' : 'padrão'}</span>}</td>
-              <td className={vt.n}>{b.diasProx}</td>
+              <td className={vt.n}>{b.diasProx}{b.diasProxVr != null && b.diasProxVr !== b.diasProx
+                && <small className={css.sub} title="Sábado de meio turno recebe VT, mas não VR/VA">VR em {b.diasProxVr} · sáb. ½ turno</small>}</td>
               <td className={vt.n}>{b.vrProxCent ? brl(b.vrProxCent) : '—'}</td>
               <td className={vt.n}><StatusCesta l={l} /></td>
               <td className={vt.n}>{c.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)}<small className={css.sub}>{c.vtTipo === 'FIXO' ? 'combustível · fixo' : c.vtTipo === 'DIA' ? `VT ${brl(c.vtValorCent)}/dia` : ''}</small></td>
@@ -893,7 +894,8 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
 
         <section className={css.bloco}>
           <span className={css.lb}>Benefícios · carga de {mesCurto(d.proxima)}</span>
-          <Linha2 k={`VR/VA · ${b.diasProx} dias`} v={brl(b.vrProxCent)} />
+          <Linha2 k={`VR/VA · ${b.diasProxVr ?? b.diasProx} dias`} v={brl(b.vrProxCent)} />
+          {b.diasProxVr != null && b.diasProxVr !== b.diasProx && <p className={css.formula}>{b.diasProx - b.diasProxVr} sábado{b.diasProx - b.diasProxVr > 1 ? 's' : ''} de meio turno: recebe VT, mas não VR/VA.</p>}
           <Linha2 k={`Cesta básica de ${mesCurto(mes)}`} v={<StatusCesta l={l} />} />
           {b.cestaStatus === 'PERDIDA_FALTA' && <p className={css.formula}>Faltou em {l.faltasDias.map(fmtDia).join(', ')} — com falta no mês a cesta não é paga.</p>}
           <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível · fixo mensal' : l.config.vtTipo === 'DIA' ? `VT · ${b.diasProx} dias` : 'Transporte'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />

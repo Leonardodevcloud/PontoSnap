@@ -86,10 +86,14 @@ export interface EntradaBeneficio {
   cestaCent: number;
   vtTipo: VtTipo;
   vtValorCent: number;
-  /** Dias previstos de trabalho no mês da carga (próximo mês). */
+  /** Dias previstos de trabalho no mês da carga (próximo mês). Base do VT. */
   diasProx: number;
+  /** Dias da carga que dão VR/VA (sem sábado de meio turno). Ausente = diasProx. */
+  diasProxVr?: number;
   /** Dias que já foram pagos para o mês apurado (carga anterior). */
   pagos: string[];
+  /** Desses, os que foram pagos com VR/VA. Ausente = todos (regra antiga). */
+  pagosVr?: string[];
   /** Dias em que a pessoa devia trabalhar no mês apurado (sem feriado/afastamento). */
   previstosMes: Set<string>;
   /** Faltas (dia inteiro) do mês apurado, vindas do ponto. */
@@ -136,7 +140,7 @@ export interface ResultadoBeneficio {
  * afastamento abatem, a 1/30 do valor por dia.
  */
 export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
-  const vrProxCent = e.diasProx * e.vrDiaCent;
+  const vrProxCent = (e.diasProxVr ?? e.diasProx) * e.vrDiaCent;
   // Cesta = assiduidade: qualquer falta injustificada no mês apurado zera.
   const cestaStatus: StatusCesta = e.cestaCent <= 0 ? 'SEM_CESTA'
     : e.cestaLiberada === false ? 'CARENCIA'
@@ -153,7 +157,10 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
 
   const pg = e.pagoCom ?? { vrDiaCent: e.vrDiaCent, vtTipo: e.vtTipo, vtValorCent: e.vtValorCent };
   const n = naoUsados.length;
-  const acertoVrCent = pg.vrDiaCent > 0 ? n * pg.vrDiaCent : 0;
+  // VR só volta dos dias em que foi pago (sábado de meio turno não teve VR).
+  const pagosVr = e.pagosVr ? new Set(e.pagosVr) : null;
+  const nVr = pagosVr ? naoUsados.filter((x) => pagosVr.has(x.data)).length : n;
+  const acertoVrCent = pg.vrDiaCent > 0 ? nVr * pg.vrDiaCent : 0;
   const semFeriado = naoUsados.filter((x) => x.motivo !== 'feriado').length;
   const acertoVtCent = pg.vtTipo === 'DIA' ? n * pg.vtValorCent
     : pg.vtTipo === 'FIXO' ? Math.round((semFeriado * pg.vtValorCent) / 30) : 0;
@@ -217,4 +224,14 @@ export function calcularMei(e: EntradaMei): ResultadoMei {
 export function calcularSemanaMotorista(e: { mensalCent: number; diasMes: number; dias: number; adicionalCent: number }) {
   const diariaCent = Math.round(e.mensalCent / Math.max(1, e.diasMes));
   return { diariaCent, totalCent: Math.round((e.mensalCent / Math.max(1, e.diasMes)) * e.dias) + e.adicionalCent };
+}
+
+/**
+ * Dias que dão VR/VA: todo dia da escala, menos o sábado de meio turno
+ * (jornada do sábado menor que o turno cheio da semana). VT continua em todos.
+ */
+export function diasComVr(dias: string[], jornada: Record<string, number>): string[] {
+  const semana = Object.entries(jornada).filter(([d]) => { const w = diaSemana(d); return w >= 1 && w <= 5; }).map(([, m]) => m);
+  const cheio = semana.length ? Math.max(...semana) : Math.max(0, ...Object.values(jornada));
+  return dias.filter((d) => diaSemana(d) !== 6 || (jornada[d] ?? cheio) >= cheio);
 }

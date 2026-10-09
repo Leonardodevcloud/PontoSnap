@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calcularBeneficio, calcularMei, calcularSemanaMotorista, diasBase, parcelaNoMes, semanasDoMes, somarMeses,
+  calcularBeneficio, calcularMei, calcularSemanaMotorista, diasBase, diasComVr, parcelaNoMes, semanasDoMes, somarMeses,
 } from '../src/pessoal/calculo';
 
 describe('calendário', () => {
@@ -77,6 +77,28 @@ describe('benefícios com acerto do mês anterior', () => {
     const r = calcularBeneficio({ ...base, cestaCent: 8000, faltas: new Set(), cestaLiberada: false });
     expect(r.cestaStatus).toBe('CARENCIA');
     expect(r.cestaCent).toBe(0);
+  });
+});
+
+describe('VR no sábado de meio turno', () => {
+  // outubro/2026: 03/10 é sábado
+  const jornada = { '2026-10-01': 480, '2026-10-02': 480, '2026-10-03': 240, '2026-10-05': 480 };
+  it('sábado de 4h não dá VR; dia de semana dá', () => {
+    expect(diasComVr(Object.keys(jornada), jornada)).toEqual(['2026-10-01', '2026-10-02', '2026-10-05']);
+  });
+  it('sábado de turno cheio dá VR', () => {
+    expect(diasComVr(['2026-10-03'], { ...jornada, '2026-10-03': 480 })).toEqual(['2026-10-03']);
+  });
+  it('VT conta todos os dias, VR só os de turno cheio; acerto de VR só do que foi pago com VR', () => {
+    const r = calcularBeneficio({
+      vrDiaCent: 2500, cestaCent: 0, vtTipo: 'DIA', vtValorCent: 1000, diasProx: 25, diasProxVr: 21,
+      pagos: ['2026-10-03', '2026-10-12'], pagosVr: ['2026-10-12'],
+      previstosMes: new Set(), faltas: new Set(), feriados: new Set(['2026-10-12']),
+    });
+    expect(r.vrProxCent).toBe(21 * 2500);
+    expect(r.vtProxCent).toBe(25 * 1000);
+    expect(r.acertoVrCent).toBe(2500);      // só 12/10 tinha VR
+    expect(r.acertoVtCent).toBe(2 * 1000);  // VT dos dois dias
   });
 });
 

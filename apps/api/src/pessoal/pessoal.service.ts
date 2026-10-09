@@ -12,7 +12,7 @@ import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
 import {
-  calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, faixaDoMes, parcelaNoMes,
+  calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, faixaDoMes, parcelaNoMes,
   semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
 } from './calculo';
 
@@ -41,6 +41,8 @@ export interface LinhaClt {
   faltasDias: string[]; descontosCent: number; debitosCent: number;
   beneficios: {
     diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;
+    /** Dias da carga com VR/VA (sábado de meio turno fica fora; VT usa diasProxLista). */
+    diasProxVr: number; diasProxVrLista: string[];
     vrProxCent: number; vtProxCent: number;
     naoUsados: { data: string; motivo: MotivoNaoUso }[];
     acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;
@@ -277,11 +279,13 @@ export class PessoalService {
       let erro: string | null = null;
       let diasUteis: string[] = [], diasPrevistos: string[] = [], diasEscala: string[] = [];
       let diasProxLista: string[] = [];
+      let diasProxVrLista: string[] = [];
+      let jornadaMes: Record<string, number> = {};
       let heMin = 0, heNoBancoMin = 0, proventosCent = 0, descontosCent = 0, indenizacaoMin = 0, indenizacaoCent = 0;
       let faltasDias: string[] = [];
       try {
         const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim, feriadosLista);
-        diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala;
+        diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala; jornadaMes = ap.jornadaEscala;
         // Salário do mês com vigência: proporcional quando muda no meio.
         const sm = salarioDoMes(ap.salarios, comp);
         if (sm) { salarioCent = sm.totalCent; salarioPartes = sm.partes; salarioFimMesCent = salarioEm(ap.salarios, fim) ?? 0; }
@@ -297,6 +301,7 @@ export class PessoalService {
         }
         const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim, feriadosProx);
         diasProxLista = apProx.diasPrevistos;
+        diasProxVrLista = diasComVr(apProx.diasPrevistos, apProx.jornadaEscala);
       } catch (err) {
         erro = (err as Error).message || 'Sem escala ou REP configurado';
       }
@@ -307,6 +312,9 @@ export class PessoalService {
       const linhaAnt = snapAnt?.clt.find((x) => x.empregadoId === e.id);
       const pagosSnap = linhaAnt?.beneficios.diasProxLista;
       const pagos = pagosSnap ?? diasEscala;
+      // Dias pagos COM VR: o que o fechamento anterior gravou; fechamento antigo
+      // (sem a lista) pagou VR em todos; estimado segue a regra do sábado.
+      const pagosVr = linhaAnt ? (linhaAnt.beneficios.diasProxVrLista ?? pagosSnap) : diasComVr(diasEscala, jornadaMes);
       // O acerto devolve pelo valor que FOI PAGO para este mês: o do fechamento
       // anterior, ou (sem fechamento) o valor vigente neste mês.
       const pagoCom = linhaAnt?.config ?? beneficioEm(e.id, comp);
@@ -318,7 +326,7 @@ export class PessoalService {
       const cestaDesde = cestaManual ?? cestaAuto;
       const ben = calcularBeneficio({
         vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
-        diasProx: diasProxLista.length, pagos,
+        diasProx: diasProxLista.length, diasProxVr: diasProxVrLista.length, pagos, pagosVr: pagosVr ?? undefined,
         previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados,
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
@@ -339,7 +347,7 @@ export class PessoalService {
         valorHoraCent: Math.round(salarioFimMesCent / 220),
         heMin, heNoBancoMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
         beneficios: {
-          ...ben, diasProx: diasProxLista.length, diasProxLista, pagosEstimado: !pagosSnap,
+          ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, pagosEstimado: !pagosSnap,
           cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null,
         },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,

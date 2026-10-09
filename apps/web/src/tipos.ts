@@ -662,6 +662,8 @@ export interface PessoalLinhaClt {
   faltasDias: string[]; descontosCent: number; debitosCent: number;
   beneficios: {
     diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;
+    /** Dias da carga com VR/VA (sábado de meio turno fica fora). Fechamentos antigos não têm. */
+    diasProxVr?: number; diasProxVrLista?: string[];
     vrProxCent: number; vtProxCent: number;
     naoUsados: { data: string; motivo: MotivoNaoUso }[];
     acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;
