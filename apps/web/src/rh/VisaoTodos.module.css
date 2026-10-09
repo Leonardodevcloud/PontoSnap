@@ -52,3 +52,7 @@
 .busca:focus{ border-color:var(--coral); }
 .acoes{ display:flex; gap:8px; flex-wrap:wrap; }
 .btn{ width:auto; }
+.btnPdf{ display:inline-flex; align-items:center; gap:5px; border:1px solid rgba(var(--ink-rgb),.16); background:var(--white); color:var(--ink); border-radius:9px; padding:5px 10px; font-family:var(--ff-mono); font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.btnPdf:hover{ border-color:var(--ink); background:var(--lime); }
+.btnPdf:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.srOnly{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }

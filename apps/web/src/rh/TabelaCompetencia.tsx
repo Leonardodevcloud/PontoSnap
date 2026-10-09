@@ -102,12 +102,14 @@ function colunas(modo: ModoTabela, hoje: string): Col[] {
   return base;
 }
 
-export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir }: {
+export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir, onEspelho }: {
   rel: RelatorioCompetencia;
   modo: ModoTabela;
   busca?: string;
   filtro?: FiltroApuracao;
   onAbrir: (empregadoId: string) => void;
+  /** Se vier, cada linha ganha o botão de prévia do espelho em PDF. */
+  onEspelho?: (l: LinhaCompetencia) => void;
 }) {
   const [ord, setOrd] = useState<{ k: string; asc: boolean }>({ k: 'nome', asc: true });
   const cols = useMemo(() => colunas(modo, rel.hoje), [modo, rel.hoje]);
@@ -140,23 +142,33 @@ export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir }: {
                   {c.t}{ord.k === c.k ? (ord.asc ? ' ▴' : ' ▾') : ''}
                 </th>
               ))}
+              {onEspelho && <th className={vt.n}><span className={vt.srOnly}>Espelho</span></th>}
             </tr>
           </thead>
           <tbody>
             {linhas.length === 0 && (
-              <tr><td colSpan={cols.length}><div className={vt.vazio}>{rel.linhas.length === 0 ? 'Nenhum funcionário apurado nesta competência.' : 'Ninguém bate com o filtro.'}</div></td></tr>
+              <tr><td colSpan={cols.length + (onEspelho ? 1 : 0)}><div className={vt.vazio}>{rel.linhas.length === 0 ? 'Nenhum funcionário apurado nesta competência.' : 'Ninguém bate com o filtro.'}</div></td></tr>
             )}
             {linhas.map((l) => (
-              <tr key={l.empregadoId} className={vt.row} tabIndex={0} role="button"
+              <tr key={l.empregadoId} className={vt.row} tabIndex={0} aria-label={`Abrir o mês de ${l.nome}`}
                 onClick={() => onAbrir(l.empregadoId)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(l.empregadoId); } }}>
                 {cols.map((c) => <td key={c.k} className={`${c.n ? vt.n : ''} ${c.cls ? c.cls(l) : ''}`}>{c.cell(l)}</td>)}
+                {onEspelho && (
+                  <td className={vt.n}>
+                    <button type="button" className={vt.btnPdf} title={`Ver o espelho de ${l.nome} (PDF)`} aria-label={`Ver o espelho de ${l.nome} em PDF`}
+                      onClick={(ev) => { ev.stopPropagation(); onEspelho(l); }} onKeyDown={(ev) => ev.stopPropagation()}>
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" d="M14 3v5h5" /><path stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" d="M9 13h6M9 17h4" /></svg>
+                      PDF
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
           {!filtrado && rel.linhas.length > 1 && (
             <tfoot>
-              <tr className={vt.tot}>{cols.map((c) => <td key={c.k} className={c.n ? vt.n : ''}>{c.tot ? c.tot(rel) : ''}</td>)}</tr>
+              <tr className={vt.tot}>{cols.map((c) => <td key={c.k} className={c.n ? vt.n : ''}>{c.tot ? c.tot(rel) : ''}</td>)}{onEspelho && <td />}</tr>
             </tfoot>
           )}
         </table>

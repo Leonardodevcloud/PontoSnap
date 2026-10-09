@@ -6,6 +6,7 @@ import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
 import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, ResultadoDiaCLT, TipoAfastamento } from '../tipos';
 import { TabelaCompetencia } from './TabelaCompetencia';
+import { VisorPdf } from '../components/VisorPdf';
 import vt from './VisaoTodos.module.css';
 import css from './Espelhos.module.css';
 
@@ -109,6 +110,7 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState('');
   const [baixando, setBaixando] = useState<'zip' | 'xlsx' | null>(null);
+  const [espelho, setEspelho] = useState<{ id: string; nome: string } | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -180,16 +182,26 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
 
           <div className={vt.kpis}>
             <div className={vt.kpi}><div className={vt.kpiK}>Funcionários</div><div className={vt.kpiV}>{rel.linhas.length}</div><div className={vt.kpiS}>apurados no mês</div></div>
-            <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(t.trabalhadoMin)}</div><div className={vt.kpiS}>de {minutosParaHhMm(t.contratadoMin)} previstas</div></div>
+            <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(t.trabalhadoMin)}</div><div className={vt.kpiS} title="Previsto = horas da escala de cada um, somadas. Até hoje conta só os dias que já começaram.">
+              {t.contratadoMesMin != null && t.contratadoMesMin !== t.contratadoMin
+                ? <>de {minutosParaHhMm(t.contratadoMin)} previstas até hoje · {minutosParaHhMm(t.contratadoMesMin)} no mês</>
+                : <>de {minutosParaHhMm(t.contratadoMin)} previstas no mês</>}</div></div>
             <div className={`${vt.kpi} ${vt.kpiPeach}`}><div className={vt.kpiK}>Extras no mês</div><div className={vt.kpiV}>+{minutosParaHhMm(t.extrasMin)}</div><div className={vt.kpiS}>50% e 100%</div></div>
             <div className={`${vt.kpi} ${t.atrasoMin + t.faltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos e faltas</div><div className={vt.kpiV}>−{minutosParaHhMm(t.atrasoMin + t.faltaMin)}</div><div className={vt.kpiS}>{rel.linhas.filter((l) => l.atrasoMin + l.faltaMin > 0).length} funcionário{rel.linhas.filter((l) => l.atrasoMin + l.faltaMin > 0).length === 1 ? '' : 's'}</div></div>
             {t.comBanco > 0 && <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Banco · acumulado</div><div className={vt.kpiV}>{comSinal(t.bancoAcumuladoMin)}</div><div className={vt.kpiS}>saldo de {t.comBanco} com banco, até hoje</div></div>}
             <div className={vt.kpi}><div className={vt.kpiK}>Assinaturas</div><div className={vt.kpiV}>{t.assinadas} / {rel.linhas.length}</div><div className={vt.kpiS}>espelho de {rotuloMes(mes).split(' de ')[0]} assinado</div></div>
           </div>
 
-          <TabelaCompetencia rel={rel} modo="espelho" busca={busca} onAbrir={onAbrir} />
+          <TabelaCompetencia rel={rel} modo="espelho" busca={busca} onAbrir={onAbrir} onEspelho={(l) => setEspelho({ id: l.empregadoId, nome: l.nome })} />
+          {espelho && (
+            <VisorPdf titulo={`Espelho de ${espelho.nome}`}
+              sub={mes === hojeSP().slice(0, 7) ? `${rotuloMes(mes)} · prévia até ${fmtDia(hojeSP())}, com as batidas registradas até agora` : rotuloMes(mes)}
+              nomeArquivo={`espelho_${espelho.nome.split(' ')[0]!.toLowerCase()}_${mes}.pdf`}
+              carregar={() => api.baixar(`/espelho-assinatura/rh/pdf?empregadoId=${espelho.id}&competencia=${mes}`)}
+              onFechar={() => setEspelho(null)} />
+          )}
           <div className={vt.legenda}>
-            <span>Clique na linha pra ver o mês do funcionário.</span>
+            <span>Clique na linha pra ver o mês do funcionário · "PDF" abre a prévia do espelho.</span>
             <span>Banco anterior = saldo fechado até o mês passado · Acumulado = anterior + este mês + folgas/pagamentos.</span>
           </div>
         </>

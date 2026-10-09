@@ -1,0 +1,13 @@
+.fundo{ position:fixed; inset:0; background:rgba(var(--ink-rgb),.38); z-index:90; display:grid; place-items:center; padding:16px; }
+.visor{ background:var(--white); border-radius:var(--r-md); width:min(980px, 100%); height:min(92vh, 1100px); display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(var(--ink-rgb),.3); }
+.topo{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid rgba(var(--ink-rgb),.1); flex-wrap:wrap; }
+.topo h3{ font-family:var(--ff-display); font-size:19px; margin:0; color:var(--ink); }
+.topo p{ margin:2px 0 0; font-size:13px; color:var(--ash); }
+.acoes{ display:flex; align-items:center; gap:10px; }
+.btn{ width:auto; white-space:nowrap; padding:9px 18px; }
+.x{ width:38px; height:38px; border-radius:10px; border:1px solid rgba(var(--ink-rgb),.14); background:var(--white); color:var(--ink); font-size:16px; cursor:pointer; }
+.x:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+.corpo{ flex:1; min-height:0; background:var(--cream); display:grid; place-items:center; }
+.pdf{ width:100%; height:100%; border:0; background:var(--white); }
+.carregando, .erro{ margin:0; padding:24px; font-size:14px; color:var(--ash); }
+.erro{ color:var(--coral-dark); font-weight:700; }
