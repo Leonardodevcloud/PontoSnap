@@ -119,6 +119,10 @@ export class PagamentoDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) debitoAplicado?: number;
 }
 
+export class ClienteDto {
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(120) cliente!: string | null;
+}
+
 export class AdmissaoDto {
   @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(DATA) dataAdmissao!: string | null;
 }

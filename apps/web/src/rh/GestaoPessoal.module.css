@@ -364,3 +364,9 @@ label.pixItem:hover{ background:var(--cream); }
 .subTab td{ padding:8px 12px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13px; }
 .subTab td:first-child{ white-space:nowrap; }
 .subTab th:nth-child(2), .subTab th:nth-child(3), .subTab th:nth-child(4), .subTab th:nth-child(6), .subTab td:nth-child(2), .subTab td:nth-child(3), .subTab td:nth-child(4), .subTab td:nth-child(6){ text-align:right; font-family:var(--ff-mono); }
+
+/* Nome preso à esquerda ao rolar a tabela de lado */
+.compacta th:first-child, .compacta td:first-child:not([colspan]){ position:sticky; left:0; z-index:1; background:var(--white); box-shadow:inset -1px 0 0 rgba(var(--ink-rgb),.08); }
+.compacta thead th:first-child{ background:linear-gradient(var(--thead-bg), var(--thead-bg)), var(--white); z-index:2; }
+.compacta tfoot td:first-child:not([colspan]){ background:linear-gradient(var(--thead-bg), var(--thead-bg)), var(--white); }
+.compacta tr:hover td:first-child:not([colspan]){ background:linear-gradient(var(--field-bg), var(--field-bg)), var(--white); }

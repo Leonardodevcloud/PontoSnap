@@ -6,7 +6,7 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PessoalService } from './pessoal.service';
-import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PagamentoDto, AdmissaoDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
+import { CompetenciaDto, ConfigCltDto, InicioCestaDto, NfArquivoDto, PagamentoDto, AdmissaoDto, ClienteDto, PadraoDto, CriarPrestadorDto, DebitoDto, EditarPrestadorDto, ExclusaoDto, LancamentoDto } from './dto/pessoal.dto';
 
 /** Gestão de Pessoal: benefícios, prestadores, débitos e fechamento do mês. Escopo = empresa ativa. */
 @Controller('pessoal')
@@ -38,6 +38,9 @@ export class PessoalController {
   }
   @Put('clt/:empregadoId/admissao') admissao(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: AdmissaoDto) {
     return this.pessoal.definirAdmissao(this.tenant(u), id, dto.dataAdmissao ?? null);
+  }
+  @Put('clt/:empregadoId/cliente') cliente(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: ClienteDto) {
+    return this.pessoal.definirCliente(this.tenant(u), id, dto.cliente ?? null);
   }
   @Put('clt/:empregadoId/cesta') inicioCesta(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: InicioCestaDto) {
     return this.pessoal.definirInicioCesta(this.tenant(u), id, dto.cestaDesde ?? null);

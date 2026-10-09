@@ -21,6 +21,8 @@ const reais = (c: number) => (c / 100).toFixed(2);
 
 export interface LinhaClt {
   empregadoId: string; nome: string; matricula: string | null; admissao: string | null;
+  /** Cliente (loja/empresa atendida). Cadastro: em mês fechado vem o valor atual. */
+  cliente?: string | null;
   /**
    * Valores aplicados na carga do próximo mês. origem: PADRAO (segue o padrão
    * da empresa), PROPRIO (valor da pessoa) ou NENHUM (sem benefício).
@@ -164,10 +166,13 @@ export class PessoalService {
    */
   private async sobreporPagamento(tenantId: string, snap: CompetenciaPessoal): Promise<CompetenciaPessoal> {
     const comp = snap.competencia;
-    const { lancs, nfs } = await comTenant(this.db, tenantId, async (tx) => ({
+    const { lancs, nfs, clientes } = await comTenant(this.db, tenantId, async (tx) => ({
       lancs: await tx.select().from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.competencia, comp))),
       nfs: await this.nfsDoMes(tx, tenantId, comp),
+      clientes: new Map((await tx.select({ id: empregado.id, cliente: empregado.cliente }).from(empregado)
+        .where(eq(empregado.tenantId, tenantId))).map((e) => [e.id, e.cliente])),
     }));
+    const clt = snap.clt.map((c) => ({ ...c, cliente: clientes.get(c.empregadoId) ?? null }));
     const l = (tipo: string, id: string, per: string) => lancs.find((x) => x.pessoaTipo === tipo && x.pessoaId === id && x.periodo === per);
     const pg = (x?: { pago: boolean; valorPago: string | null; pagoEm: Date | null }) => ({
       valorPagoCent: x?.pago && x.valorPago != null ? centavos(x.valorPago) : null,
@@ -187,7 +192,7 @@ export class PessoalService {
       }),
     })).map((m) => ({ ...m, debitoPendenteCent: Math.max(0, m.debitosCent - m.semanas.reduce((a, s) => a + s.debitoAplicadoCent, 0)) }));
     return {
-      ...snap, mei, motoristas,
+      ...snap, clt, mei, motoristas,
       pendencias: {
         ...snap.pendencias,
         nfMei: mei.filter((m) => !m.lanc.nfNumero && !m.lanc.nfArquivo).length,
@@ -353,7 +358,7 @@ export class PessoalService {
       const custoBrutoCent = sal + proventosCent - descontosCent + ben.vrProxCent + ben.cestaCent + ben.vtProxCent;
       const abatimentosCent = debitosCent + ben.acertoCent;
       clt.push({
-        empregadoId: e.id, nome: e.nome, matricula: e.matricula, admissao: e.dataAdmissao ?? null, config, salarioCent, salarioPartes,
+        empregadoId: e.id, nome: e.nome, matricula: e.matricula, admissao: e.dataAdmissao ?? null, cliente: e.cliente ?? null, config, salarioCent, salarioPartes,
         diasMes,
         valorDiaMesCent: diasMes ? Math.round(sal / diasMes) : 0,
         // Base de falta e valor-hora: o salário vigente no fim do mês.
@@ -521,6 +526,17 @@ export class PessoalService {
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).returning({ id: empregado.id });
       if (!r) throw new NotFoundException('Funcionário não encontrado');
       return { dataAdmissao: data };
+    });
+  }
+
+  /** Cliente a que o CLT pertence (texto livre; vazio apaga). Cadastro, vale pra todos os meses. */
+  async definirCliente(tenantId: string, empregadoId: string, cliente: string | null) {
+    const v = cliente?.trim() || null;
+    return comTenant(this.db, tenantId, async (tx) => {
+      const [r] = await tx.update(empregado).set({ cliente: v })
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).returning({ id: empregado.id });
+      if (!r) throw new NotFoundException('Funcionário não encontrado');
+      return { cliente: v };
     });
   }
 

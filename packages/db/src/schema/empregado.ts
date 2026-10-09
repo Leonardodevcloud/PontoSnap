@@ -19,6 +19,8 @@ export const empregado = pgTable('empregado', {
   dataInicioPonto: date('data_inicio_ponto'),
   /** Admissão real (pode ser anterior ao uso do ponto). Base da carência da cesta. */
   dataAdmissao: date('data_admissao'),
+  /** Gestão de pessoal: cliente (loja/empresa atendida) a que o CLT pertence. Texto livre. */
+  cliente: varchar('cliente', { length: 120 }),
   salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

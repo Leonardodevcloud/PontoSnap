@@ -673,6 +673,8 @@ export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
 
 export interface PessoalLinhaClt {
   empregadoId: string; nome: string; matricula: string | null; admissao: string | null;
+  /** Cliente (loja/empresa atendida) a que o CLT pertence. */
+  cliente?: string | null;
   config: {
     cargo: string | null; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number; chavePix: string | null;
     /** PADRAO = segue o padrão da empresa · PROPRIO = valor da pessoa · NENHUM = sem benefício */

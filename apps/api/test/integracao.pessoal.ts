@@ -116,6 +116,13 @@ async function main() {
   await pes.definirAdmissao(t.id, caio.id, null);
   await pes.definirInicioCesta(t.id, caio.id, '2026-09');
 
+  // ── cliente do CLT (cadastro, aparece na linha) ──
+  await pes.definirCliente(t.id, caio.id, '  Auto Norte Maceió ');
+  ok((await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!.cliente === 'Auto Norte Maceió', 'cliente salvo (sem espaços) e na linha da folha');
+  await pes.definirCliente(t.id, caio.id, '');
+  ok((await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!.cliente === null, 'cliente vazio apaga');
+  await pes.definirCliente(t.id, caio.id, 'Auto Norte Maceió');
+
   // ── sábado de meio turno: VT sim, VR não ──
   const horSab = (await comoMaster(db, (tx) => tx.insert(pontoHorarioContratual).values({
     tenantId: t.id, codigo: 'SAB4', durJornadaMin: 480, diasSemana: [1, 2, 3, 4, 5, 6], regime: 'normal', jornadaPorDia: { 6: 240 },
@@ -220,6 +227,8 @@ async function main() {
 
   // ── fechar setembro ──
   await pes.fechar(t.id, '2026-09');
+  await pes.definirCliente(t.id, caio.id, 'Cliente Novo');
+  ok((await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!.cliente === 'Cliente Novo', 'mês fechado mostra o cliente atual (cadastro)');
   const fech = await pes.competencia(t.id, '2026-09');
   ok(fech.fechado, 'setembro fechado mostra o retrato');
   ok((await erroDe(() => pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: mei!.id, competencia: '2026-09', meta: 1 }))).includes('fechada'),

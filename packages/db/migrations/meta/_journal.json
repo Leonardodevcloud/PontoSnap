@@ -337,6 +337,13 @@
       "when": 1784602740000,
       "tag": "0047_banco_acerto_mes",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1784602800000,
+      "tag": "0048_empregado_cliente",
+      "breakpoints": true
     }
   ]
 }

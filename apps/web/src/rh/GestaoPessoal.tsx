@@ -177,8 +177,8 @@ export function GestaoPessoal() {
 
   const d = dados;
   const fechado = !!d?.fechado;
-  const filtra = <T extends { nome: string; empresa?: string | null }>(l: T[]) => (busca
-    ? l.filter((x) => `${x.nome} ${x.empresa ?? ''}`.toLowerCase().includes(busca.toLowerCase())) : l);
+  const filtra = <T extends { nome: string; empresa?: string | null; cliente?: string | null }>(l: T[]) => (busca
+    ? l.filter((x) => `${x.nome} ${x.empresa ?? ''} ${x.cliente ?? ''}`.toLowerCase().includes(busca.toLowerCase())) : l);
   const nfPend = (d?.pendencias.nfMei ?? 0) + (d?.pendencias.nfMotorista ?? 0);
   const semBeneficio = d?.clt.filter((c) => c.config.origem === 'NENHUM' || (c.config.vrDiaCent === 0 && c.config.vtTipo === 'NENHUM')).length ?? 0;
   const folhaPend = (d?.pendencias.semPonto ?? 0) + (d?.pendencias.semSalario ?? 0);
@@ -424,16 +424,17 @@ function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: Pessoal
   const t = linhas.reduce((a, l) => ({ sal: a.sal + (l.salarioCent ?? 0), pr: a.pr + l.proventosCent, de: a.de + l.descontosCent, db: a.db + l.debitosCent, li: a.li + l.liquidoSalarioCent, br: a.br + l.custoBrutoCent }), { sal: 0, pr: 0, de: 0, db: 0, li: 0, br: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Colaborador</th><th className={vt.n}>Salário</th><th className={vt.n} title={`Salário ÷ dias de trabalho de ${mesCurto(mes)}`}>Valor do dia</th>
+      <thead><tr><th>Colaborador</th><th>Cliente</th><th className={vt.n}>Salário</th><th className={vt.n} title={`Salário ÷ dias de trabalho de ${mesCurto(mes)}`}>Valor do dia</th>
         <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras e intervalo</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n} title="Simulação a partir do ponto, sem INSS, IRRF e encargos. O valor real vem da contabilidade.">Líquido (prévia)</th>
         <th className={vt.n} title="Salário − descontos + extras + benefícios, sem tirar débitos">Custo bruto</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={9}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
+        {linhas.length === 0 && <Vazio cols={10}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
         {linhas.map((l) => (
           <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
             <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
               {l.erro && <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro}>sem escala</span>}
               {l.salarioCent == null && <span className={`${vt.pill} ${vt.pillWarn}`}>sem salário</span>}</td>
+            <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
             <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub} title={l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ')}>proporcional · mudou {fmtDia(l.salarioPartes[1]!.desde)}</small>}</td>
             <td className={vt.n}>{l.diasMes ? brl(l.valorDiaMesCent) : '—'}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
             <td className={vt.n}>{(() => {
@@ -449,7 +450,7 @@ function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: Pessoal
           </Linha>
         ))}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td className={vt.n}>{brl(t.sal)}</td><td /><td className={vt.n}>{brl(t.pr)}</td>
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.sal)}</td><td /><td className={vt.n}>{brl(t.pr)}</td>
         <td className={vt.n}>{brl(-t.de)}</td><td className={vt.n}>{brl(-t.db)}</td><td className={vt.n}>{brl(t.li)}</td><td className={vt.n}>{brl(t.br)}</td><td /></tr></tfoot>}
     </table></div></div>
   );
@@ -468,11 +469,11 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
   const t = linhas.reduce((a, l) => ({ vr: a.vr + l.beneficios.vrProxCent, ce: a.ce + l.beneficios.cestaCent, vt: a.vt + l.beneficios.vtProxCent, ac: a.ac + l.beneficios.acertoCent, ca: a.ca + l.beneficios.cargaCent }), { vr: 0, ce: 0, vt: 0, ac: 0, ca: 0 });
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Colaborador</th><th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th>
+      <thead><tr><th>Colaborador</th><th>Cliente</th><th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th>
         <th className={vt.n} title={`Cesta de ${mesCurto(d.competencia)}: só pra quem não faltou no mês e já passou da carência`}>Cesta</th><th className={vt.n}>VT / combustível</th>
         <th className={vt.n}>Acerto de {mesCurto(d.competencia)}</th><th className={vt.n}>A carregar</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={8}>Nenhum funcionário ativo no ponto.</Vazio>}
+        {linhas.length === 0 && <Vazio cols={9}>Nenhum funcionário ativo no ponto.</Vazio>}
         {linhas.map((l) => {
           const b = l.beneficios, c = l.config;
           const semCfg = c.origem === 'NENHUM' || (c.vrDiaCent === 0 && c.vtTipo === 'NENHUM');
@@ -481,6 +482,7 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
               <td className={vt.nome}>{l.nome}<small>{semCfg ? 'sem benefício' : resumoBen(c)}</small>
                 {semCfg ? <span className={`${vt.pill} ${vt.pillWarn}`}>configurar</span>
                   : <span className={`${vt.pill} ${c.origem === 'PROPRIO' ? vt.pillLime : vt.pillMute}`} title={c.vigenteDesde ? `Vale desde ${mesLongo(c.vigenteDesde)}` : undefined}>{c.origem === 'PROPRIO' ? 'valor próprio' : 'padrão'}</span>}</td>
+              <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
               <td className={vt.n}>{b.diasProx}{b.diasProxVr != null && b.diasProxVr !== b.diasProx
                 && <small className={css.sub} title="Sábado de meio turno recebe VT, mas não VR/VA">VR em {b.diasProxVr} · sáb. ½ turno</small>}</td>
               <td className={vt.n}>{b.vrProxCent ? brl(b.vrProxCent) : '—'}</td>
@@ -493,7 +495,7 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.vr)}</td><td className={vt.n}>{brl(t.ce)}</td><td className={vt.n}>{brl(t.vt)}</td>
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td /><td className={vt.n}>{brl(t.vr)}</td><td className={vt.n}>{brl(t.ce)}</td><td className={vt.n}>{brl(t.vt)}</td>
         <td className={vt.n}>{brl(-t.ac)}</td><td className={vt.n}>{brl(t.ca)}</td><td /></tr></tfoot>}
     </table></div></div>
   );
@@ -935,6 +937,7 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
           {!fechado && <Botao variante="coral" className={css.btnPri} disabled={!mudou || salvando} onClick={salvar}>{salvando ? 'Salvando…' : `Salvar a partir de ${mesCurto(f.vig)}`}</Botao>}
         </section>
 
+        <ClienteClt l={l} clientes={[...new Set(d.clt.map((x) => x.cliente).filter((x): x is string => !!x))].sort()} onSalvo={onSalvo} onAviso={onAviso} />
         <Admissao l={l} onSalvo={onSalvo} onAviso={onAviso} />
         <InicioCesta l={l} fechado={fechado} onSalvo={onSalvo} onAviso={onAviso} />
 
@@ -2072,6 +2075,38 @@ function PagoInfo({ pago, valorPagoCent, liquidoCent, pagoEm }: { pago: boolean;
 }
 
 /** Admissão real do CLT (pode ser antes do ponto). Base da carência da cesta. */
+/** Cliente a que o CLT pertence: texto livre, com os já usados como sugestão. Vale pra todos os meses. */
+function ClienteClt({ l, clientes, onSalvo, onAviso }: { l: PessoalLinhaClt; clientes: string[]; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
+  const [valor, setValor] = useState(l.cliente ?? '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => { setValor(l.cliente ?? ''); }, [l.cliente]);
+  const mudou = valor.trim() !== (l.cliente ?? '');
+  async function salvar() {
+    setSalvando(true); setErro(null);
+    try {
+      await api.put(`/pessoal/clt/${l.empregadoId}/cliente`, { cliente: valor.trim() || null });
+      await onSalvo(); onAviso(valor.trim() ? `${l.nome}: cliente ${valor.trim()}.` : `Cliente de ${l.nome} apagado.`);
+    } catch (e) { setErro((e as Error).message); }
+    finally { setSalvando(false); }
+  }
+  return (
+    <section className={css.bloco}>
+      <span className={css.lb}>Cliente</span>
+      <div className={css.linhaCampo}>
+        <label className={css.campo} htmlFor="cli"><span>Trabalha para o cliente</span>
+          <span className={css.input}><input id="cli" value={valor} list="cli-lista" maxLength={120} autoComplete="off" placeholder="Ex.: Auto Norte Maceió"
+            onChange={(e) => setValor(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && mudou && !salvando) void salvar(); }} /></span>
+          <datalist id="cli-lista">{clientes.map((c) => <option key={c} value={c} />)}</datalist>
+          <small>{clientes.length ? 'Escolha um que já usou ou digite um novo.' : 'Aparece na tabela, depois do nome.'}</small>
+        </label>
+        <Botao variante="ghost" className={css.btnSec} disabled={salvando || !mudou} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar cliente'}</Botao>
+      </div>
+      {erro && <p className={css.alerta}>{erro}</p>}
+    </section>
+  );
+}
+
 function Admissao({ l, onSalvo, onAviso }: { l: PessoalLinhaClt; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
   const [valor, setValor] = useState(l.admissao ?? '');
   const [salvando, setSalvando] = useState(false);
