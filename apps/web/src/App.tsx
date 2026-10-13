@@ -15,7 +15,7 @@ import { MeusAtestados } from './telas/MeusAtestados';
 import { EspelhoDia } from './telas/EspelhoDia';
 import { NotificacaoPrefs } from './telas/NotificacaoPrefs';
 import { LayoutRH } from './rh/LayoutRH';
-import { PainelRH } from './rh/PainelRH';
+import { Inicio } from './rh/Inicio';
 import { Funcionarios } from './rh/Funcionarios';
 import { Escalas } from './rh/Escalas';
 import { Espelhos } from './rh/Espelhos';
@@ -100,7 +100,7 @@ export function App() {
 
       {/* RH / Admin (desktop) */}
       <Route path="/rh" element={<Protegida perfis={PERFIS_RH}><LayoutRH /></Protegida>}>
-        <Route index element={<PainelRH />} />
+        <Route index element={<Inicio />} />
         <Route path="funcionarios" element={<Funcionarios />} />
         <Route path="escalas" element={<Escalas />} />
         <Route path="espelhos" element={<Espelhos />} />

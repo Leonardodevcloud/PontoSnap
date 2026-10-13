@@ -64,7 +64,7 @@
 }
 
 .entrar{
-  width:100%; margin-top:6px; background:var(--coral); color:var(--white); border:none;
+  width:100%; margin-top:6px; background:var(--coral-acao); color:var(--on-coral); border:none;
   border-radius:var(--r-pill); padding:16px; font-family:var(--ff-body); font-weight:800;
   font-size:16.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px;
   transition:transform .12s, filter .12s;

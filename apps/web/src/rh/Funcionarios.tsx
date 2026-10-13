@@ -96,7 +96,7 @@ export function Funcionarios() {
       {erro && <p className={css.erro}>{erro}</p>}
 
       <div className={css.filtros}>
-        <input className={css.busca} placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
+        <input className={css.busca} aria-label="Buscar funcionário" placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
         {([['TODOS', 'Todos'], ['MONTADAS', 'Com perfil'], ['PADRAO', 'Sem perfil (CLT)'], ['INATIVOS', 'Inativos']] as const).map(([k, rot]) => (
           <button key={k} className={`${css.chipF} ${filtro === k ? css.chipFOn : ''}`} onClick={() => setFiltro(k)}>{rot}</button>
         ))}
@@ -578,7 +578,7 @@ function ModalEscala12x36({ empregado, onFechar, onSalvo }: { empregado: Emprega
       <p className={css.aviso}>Gera os dias trabalhados alternados (12h de trabalho, 36h de descanso) na competência.</p>
       <label className={css.selWrap}>
         <span className={css.selLb}>Competência</span>
-        <input className={css.select} type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
+        <input aria-label="Competência" className={css.select} type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
       </label>
       <label className={css.selWrap}>
         <span className={css.selLb}>Primeiro dia de trabalho do ciclo</span>

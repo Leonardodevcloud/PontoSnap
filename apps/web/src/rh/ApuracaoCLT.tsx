@@ -6,6 +6,7 @@ import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
 import type { ApuracaoResp, Empregado, ResultadoDiaCLT, BatidaDia, RelatorioCompetencia } from '../tipos';
 import { TabelaCompetencia, type FiltroApuracao } from './TabelaCompetencia';
+import { PorQue, type PedidoExplicacao } from './PorQue';
 import vt from './VisaoTodos.module.css';
 import css from './ApuracaoCLT.module.css';
 
@@ -64,6 +65,7 @@ export function ApuracaoCLT() {
   const [rel, setRel] = useState<RelatorioCompetencia | null>(null);
   const [relCarregando, setRelCarregando] = useState(false);
   const [filtro, setFiltro] = useState<FiltroApuracao>('todos');
+  const [porque, setPorque] = useState<PedidoExplicacao | null>(null);
   const [baixandoRel, setBaixandoRel] = useState<'pdf' | 'xlsx' | null>(null);
   useEffect(() => {
     if (visao !== 'todos') return;
@@ -177,7 +179,7 @@ export function ApuracaoCLT() {
         </div>
         <label className={css.sel}>
           <span className={css.lb}>Competência</span>
-          <input type="month" value={mes} max={mesAtual()} onChange={(e) => e.target.value && setMes(e.target.value)} />
+          <input aria-label="Competência" type="month" value={mes} max={mesAtual()} onChange={(e) => e.target.value && setMes(e.target.value)} />
         </label>
         {visao === 'um' && (
           <label className={css.sel}>
@@ -217,9 +219,11 @@ export function ApuracaoCLT() {
                 {rel.totais.comBanco > 0 && <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Banco · acumulado</div><div className={vt.kpiV}>{comSinal(rel.totais.bancoAcumuladoMin)}</div><div className={vt.kpiS}>anterior {comSinal(rel.totais.bancoAnteriorMin)} · mês {comSinal(rel.totais.saldoMesMin)}</div></div>}
                 <div className={vt.kpi}><div className={vt.kpiK}>Extras em R$</div><div className={vt.kpiV}>{reaisDeCentavos(rel.totais.extrasCentavos + rel.totais.adicionalNoturnoCentavos)}</div><div className={vt.kpiS}>(−) descontos {reaisDeCentavos(rel.totais.descontosCentavos)}</div></div>
               </div>
-              <TabelaCompetencia rel={rel} modo="apuracao" filtro={filtro} onAbrir={(id) => ir({ emp: id })} />
+              <TabelaCompetencia rel={rel} modo="apuracao" filtro={filtro} onAbrir={(id) => ir({ emp: id })}
+                onExplicar={(l, campo) => setPorque({ empregadoId: l.empregadoId, nome: l.nome, campo })} />
+              <PorQue pedido={porque} inicio={faixaDoMes(mes).inicio} fim={faixaDoMes(mes).fim} onFechar={() => setPorque(null)} onVerDias={(id) => ir({ emp: id })} />
               <div className={vt.legenda}>
-                <span>Clique na linha pra abrir a apuração completa.</span>
+                <span>Clique na linha pra abrir a apuração completa · clique num número sublinhado pra ver de onde ele veio.</span>
                 <span>Com banco de horas, extra vai pro <strong>saldo</strong> e não entra em R$; faltas e atrasos com destinação banco também não viram desconto. Dia com batida em aberto fica <strong>pendente</strong> (sem falta/atraso) até o ajuste. O desconto real é aplicado pela folha.</span>
               </div>
             </>

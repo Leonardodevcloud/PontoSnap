@@ -2,7 +2,7 @@
 .s{ font-size:12.5px; color:var(--ash); margin:2px 0 14px; }
 
 .enviar{
-  width:100%; background:var(--coral); color:var(--white); border:none; border-radius:var(--r-pill);
+  width:100%; background:var(--coral-acao); color:var(--on-coral); border:none; border-radius:var(--r-pill);
   padding:13px; font:inherit; font-weight:800; font-size:15px; cursor:pointer; margin-bottom:14px;
 }
 .enviar:hover{ background:var(--coral-dark); }
@@ -73,7 +73,7 @@
   flex:1; border:none; border-radius:var(--r-pill); padding:13px;
   font:inherit; font-weight:800; font-size:14.5px; cursor:pointer;
 }
-.bOk{ background:var(--coral); color:var(--white); }
+.bOk{ background:var(--coral-acao); color:var(--on-coral); }
 .bOk:disabled{ opacity:.6; cursor:wait; }
 .bNo{ background:transparent; border:1.5px solid rgba(var(--ink-rgb),.2); color:var(--ink); }
 

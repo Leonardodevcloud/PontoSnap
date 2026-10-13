@@ -373,7 +373,7 @@ export function BancoHoras() {
               <div className={css.lote} style={{ marginTop: 12 }}>
                 <label className={css.campoMes}>
                   <span className={css.mesLb}>Competência</span>
-                  <input className={css.mes} type="month" value={comp} max={maxMes}
+                  <input className={css.mes} aria-label="Competência" type="month" value={comp} max={maxMes}
                     onChange={(e) => e.target.value && setComp(e.target.value)} />
                 </label>
                 <select className={css.select} value={selLancar} onChange={(e) => setSelLancar(e.target.value)}>

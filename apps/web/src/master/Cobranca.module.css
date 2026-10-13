@@ -33,7 +33,7 @@
 .acoes{ display:flex; gap:6px; }
 .btnGhost, .btnCoral{ font:inherit; font-weight:800; font-size:12px; padding:6px 12px; border-radius:var(--r-pill); border:none; cursor:pointer; }
 .btnGhost{ background:transparent; border:1.5px solid rgba(var(--ink-rgb),.15); color:var(--ink); }
-.btnCoral{ background:var(--coral); color:var(--white); }
+.btnCoral{ background:var(--coral-acao); color:var(--on-coral); }
 .btnCoral:disabled{ opacity:.4; cursor:not-allowed; }
 
 .vazio{ padding:20px; color:var(--ash); text-align:center; font-size:14px; }

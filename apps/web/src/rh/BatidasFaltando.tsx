@@ -75,7 +75,7 @@ export function BatidasFaltando() {
     finally { setEnviando(false); }
   }
 
-  if (erro) return <div className="appshell"><p style={{ color: 'var(--coral)', padding: 24 }}>{erro}</p></div>;
+  if (erro) return <div className="appshell"><p style={{ color: 'var(--coral-dark)', padding: 24 }}>{erro}</p></div>;
   if (!dados) return <div className="appshell"><p style={{ padding: 24 }}>Carregando…</p></div>;
 
   return (

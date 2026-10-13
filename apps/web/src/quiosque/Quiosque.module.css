@@ -47,7 +47,7 @@
 }
 .tokenInput:focus{ border-color:var(--coral); }
 .ativar{
-  background:var(--coral); color:var(--white); border:none; border-radius:var(--r-pill);
+  background:var(--coral-acao); color:var(--on-coral); border:none; border-radius:var(--r-pill);
   padding:15px 32px; font-family:var(--ff-display); font-weight:600; font-size:16px; cursor:pointer;
 }
 .ativar:disabled{ opacity:.5; cursor:not-allowed; }

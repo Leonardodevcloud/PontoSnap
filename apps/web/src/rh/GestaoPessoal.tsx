@@ -289,7 +289,7 @@ export function GestaoPessoal() {
               aria-current={p.aba === aba ? 'step' : undefined}
               onClick={() => (p.aba ? ir({ aba: p.aba }) : !fechado && d && setDialogo({ tipo: 'fechar' }))}>
               <span className={`${css.bola} ${p.status === 'ok' ? css.bolaOk : p.status === 'aviso' ? css.bolaAviso : ''}`}>{p.status === 'ok' ? '✓' : p.status === 'aviso' ? '!' : i + 1}</span>
-              <b>{p.titulo}</b><span className={css.passoTxt} title={p.texto}>{p.texto}</span>
+              <span style={{ minWidth: 0 }}><b>{p.titulo}</b><span className={css.passoTxt}>{p.texto}</span></span>
             </button>
           ))}
         </nav>

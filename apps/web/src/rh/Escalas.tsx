@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PainelLateral } from '../components/PainelLateral';
 import { api } from '../lib/api';
 import { minutosParaHhMm } from '../lib/formato';
 import type { Horario, ParEntradaSaida } from '../tipos';
@@ -32,6 +33,7 @@ export function Escalas() {
   const [recalculados, setRecalculados] = useState<number | null>(null);
   // Compensa na semana: a carga vale pela semana, não por dia.
   const [compensa, setCompensa] = useState(false);
+  const [formAberto, setFormAberto] = useState(false);
 
   function editar(h: Horario) {
     setEditandoId(h.id);
@@ -50,9 +52,13 @@ export function Escalas() {
     } else {
       setPorDiaLigado(false); setJornadaDia({});
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setErro(null); setRecalculados(null); setFormAberto(true);
+  }
+  function novaEscala() {
+    cancelarEdicao(); setErro(null); setRecalculados(null); setFormAberto(true);
   }
   function cancelarEdicao() {
+    setFormAberto(false);
     setEditandoId(null); setCodigo(''); setDias([1, 2, 3, 4, 5]);
     setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
     setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00'); setCompensa(false);
@@ -84,6 +90,9 @@ export function Escalas() {
   }
 
   async function salvar() {
+    if (!codigo.trim()) { setErro('Dê um nome à escala no campo Código (ex.: 6x1 compensa sábado).'); return; }
+    if (dias.length === 0) { setErro('Marque pelo menos um dia de trabalho.'); return; }
+    if (durTotal === 0) { setErro(flexivel ? 'Informe a carga de trabalho por dia.' : 'Preencha os horários de trabalho (entrada e saída).'); return; }
     setErro(null); setSalvando(true); setRecalculados(null);
     try {
       // No flexível os períodos são opcionais: só entram os preenchidos.
@@ -101,7 +110,7 @@ export function Escalas() {
       } else {
         await api.post('/tratamento/horarios', corpo);
       }
-      setEditandoId(null);
+      setEditandoId(null); setFormAberto(false);
       setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal'); setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00'); setCompensa(false);
       void carregar();
     } catch (e) { setErro((e as Error).message); }
@@ -110,9 +119,49 @@ export function Escalas() {
 
   return (
     <div>
-      <div className={css.head}><h2>Escalas</h2><p>Jornada e dias úteis que a apuração usa por funcionário</p></div>
+      <div className={css.headLinha}>
+        <div className={css.head}><h2>Escalas</h2><p>Dias de trabalho, carga e horários que a apuração usa para cada funcionário</p></div>
+        <Botao variante="coral" className={css.btnAuto} onClick={novaEscala}>+ Nova escala</Botao>
+      </div>
 
-      <div className={css.form}>
+      {recalculados != null && (
+        <p className={css.okMsg} role="status">
+          Escala salva. {recalculados} funcionário{recalculados === 1 ? '' : 's'} {recalculados === 1 ? 'terá' : 'terão'} a apuração e o banco de horas refeitos com a nova regra (acontece sozinho, na próxima consulta).
+        </p>
+      )}
+      {erro && !formAberto && <p className={css.erro}>{erro}</p>}
+
+      <div className={css.table}>
+        <div className={`${css.row} ${css.thead}`}><span>Escala</span><span>Carga/dia</span><span>Dias</span><span>Como conta</span><span></span></div>
+        {lista?.length === 0 && (
+          <div className={css.vazio}>
+            Nenhuma escala ainda. Crie a primeira para dizer ao sistema os dias e as horas de trabalho.
+            <div style={{ marginTop: 12 }}><Botao variante="coral" className={css.btnAuto} onClick={novaEscala}>+ Nova escala</Botao></div>
+          </div>
+        )}
+        {lista?.map((h) => (
+          <div key={h.id} className={css.row}>
+            <span className={css.cod}>{h.codigo}</span>
+            <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
+            <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
+            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : h.flexivel ? 'contrato de horas' : 'horário fixo'}{h.compensaSemana ? ' · compensa na semana' : ''}</span>
+            <span className={css.acoes}>
+              <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
+              <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <PainelLateral aberto={formAberto} onFechar={cancelarEdicao} largura={600}
+        titulo={editandoId ? `Editar escala ${codigo}` : 'Nova escala'}
+        subtitulo={editandoId ? 'Mudar a escala refaz a apuração de quem usa' : 'Os dias, a carga e como o dia é contado'}
+        rodape={<>
+          <Botao variante="ghost" className={css.btnAuto} onClick={cancelarEdicao} disabled={salvando}>Cancelar</Botao>
+          <Botao variante="coral" className={css.btnAuto} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Criar escala'}</Botao>
+        </>}>
+        <div className={css.formLateral}>
+          {erro && <p className={css.erro} role="alert" style={{ margin: '0 0 14px' }}>{erro}</p>}
         <div className={css.linha1}>
           <Campo rotulo="Código" value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Ex.: CH-COMERCIAL" />
           <div className={css.dur}><span className={css.lb}>Jornada/dia</span><strong>{minutosParaHhMm(durTotal)}</strong></div>
@@ -152,7 +201,7 @@ export function Escalas() {
               <div className={css.porDiaGrade} style={{ marginTop: 10 }}>
                 <div className={css.porDiaLinha}>
                   <span className={css.porDiaNome} style={{ width: 'auto', minWidth: 72 }}>Carga/dia</span>
-                  <input type="time" className={css.porDiaInput} value={cargaFlex} onChange={(e) => setCargaFlex(e.target.value)} />
+                  <input type="time" aria-label="Carga de trabalho por dia" className={css.porDiaInput} value={cargaFlex} onChange={(e) => setCargaFlex(e.target.value)} />
                   <span className={css.porDiaUn}>de trabalho</span>
                 </div>
                 <p className={css.hint}>Tolerância, intervalo (Art. 71), interjornada e adicional noturno continuam valendo; só a janela de horário deixa de contar. O que fazer com o saldo (acumular no banco ou pagar) segue o banco de horas da empresa ou do perfil do funcionário.</p>
@@ -170,10 +219,10 @@ export function Escalas() {
           </p>
           {pares.map((p, i) => (
             <div key={i} className={css.par}>
-              <input type="time" value={p.entrada} onChange={(e) => setPar(i, 'entrada', e.target.value)} />
-              <span>→</span>
-              <input type="time" value={p.saida} onChange={(e) => setPar(i, 'saida', e.target.value)} />
-              {pares.length > 1 && <button className={css.rm} onClick={() => setPares((ps) => ps.filter((_, idx) => idx !== i))}>×</button>}
+              <input type="time" value={p.entrada} aria-label={`Entrada do período ${i + 1}`} onChange={(e) => setPar(i, 'entrada', e.target.value)} />
+              <span aria-hidden="true">→</span>
+              <input type="time" value={p.saida} aria-label={`Saída do período ${i + 1}`} onChange={(e) => setPar(i, 'saida', e.target.value)} />
+              {pares.length > 1 && <button className={css.rm} aria-label={`Remover o período ${i + 1}`} title="Remover período" onClick={() => setPares((ps) => ps.filter((_, idx) => idx !== i))}>×</button>}
             </div>
           ))}
           <button className={css.addPar} onClick={() => setPares((ps) => [...ps, { entrada: '', saida: '' }])}>+ período</button>
@@ -191,6 +240,7 @@ export function Escalas() {
                   <span className={css.porDiaNome}>{d.l}</span>
                   <input
                     type="time"
+                    aria-label={`Carga de ${d.l}`}
                     className={css.porDiaInput}
                     value={jornadaDia[d.n] ?? minParaHhmm(durTotal)}
                     onChange={(e) => setJornadaDia((jd) => ({ ...jd, [d.n]: e.target.value }))}
@@ -231,38 +281,8 @@ export function Escalas() {
           </div>
         )}
 
-        {erro && <p className={css.erro}>{erro}</p>}
-        {recalculados != null && (
-          <p className={css.hint} style={{ color: 'var(--ok-text)', fontWeight: 700 }}>
-            Escala salva. {recalculados} funcionário{recalculados === 1 ? '' : 's'} {recalculados === 1 ? 'terá' : 'terão'} a apuração e o banco de horas refeitos com a nova regra (acontece sozinho, na próxima consulta).
-          </p>
-        )}
-        <Botao variante="coral" className={css.salvar} onClick={salvar} disabled={salvando || !codigo || dias.length === 0 || durTotal === 0}>
-          {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Criar escala'}
-        </Botao>
-        {editandoId && (
-          <Botao variante="ghost" className={css.salvar} onClick={cancelarEdicao} disabled={salvando}>
-            Cancelar
-          </Botao>
-        )}
-      </div>
-
-      <div className={css.table}>
-        <div className={`${css.row} ${css.thead}`}><span>Código</span><span>Jornada</span><span>Dias</span><span>Regime</span><span></span></div>
-        {lista?.length === 0 && <div className={css.vazio}>Nenhuma escala ainda.</div>}
-        {lista?.map((h) => (
-          <div key={h.id} className={css.row}>
-            <span className={css.cod}>{h.codigo}</span>
-            <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
-            <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
-            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}{h.flexivel ? ' · contrato de horas' : ''}{h.compensaSemana ? ' · compensa na semana' : ''}</span>
-            <span className={css.acoes}>
-              <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
-              <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>
-            </span>
-          </div>
-        ))}
-      </div>
+        </div>
+      </PainelLateral>
     </div>
   );
 }

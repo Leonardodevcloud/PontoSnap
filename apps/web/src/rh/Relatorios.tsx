@@ -60,7 +60,7 @@ export function Relatorios() {
       <div className={css.head}>
         <div><h2>Relatórios</h2><p>Consolidado da competência por funcionário</p></div>
         <div className={css.controles}>
-          <input type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
+          <input aria-label="Competência" type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
           <Botao variante="coral" className={css.btn} onClick={gerar} disabled={carregando}>{carregando ? 'Apurando…' : 'Gerar'}</Botao>
           <Botao variante="ghost" className={css.btn} onClick={gerarBackground} disabled={carregando} title="Recomendado para muitos funcionários">2º plano</Botao>
           {rel && <Botao variante="ghost" className={css.btn} onClick={() => baixar('pdf')}>PDF</Botao>}

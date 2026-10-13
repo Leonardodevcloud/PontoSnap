@@ -214,7 +214,7 @@ export default function AjustesPonto() {
             )}
             {filtroStatus === 'RECUSADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--coral)', fontWeight: 700 }}>✗ Recusado{p.motivoDecisao ? ` — ${p.motivoDecisao}` : ''}</span>
+                <span style={{ fontSize: 12, color: 'var(--coral-dark)', fontWeight: 700 }}>✗ Recusado{p.motivoDecisao ? ` — ${p.motivoDecisao}` : ''}</span>
               </div>
             )}
             {filtroStatus === 'REVOGADO' && (

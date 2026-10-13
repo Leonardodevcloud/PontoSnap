@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { minutosParaHhMm, reaisDeCentavos } from '../lib/formato';
 import type { LinhaCompetencia, RelatorioCompetencia } from '../tipos';
+import type { CampoExplicavel } from '../lib/explicar';
 import vt from './VisaoTodos.module.css';
 
 /**
@@ -55,6 +56,11 @@ export function Situacao({ l, hoje, modo }: { l: LinhaCompetencia; hoje: string;
   return <>{pills}</>;
 }
 
+/** Colunas que abrem o "Por que deu esse número?". */
+const EXPLICA: Record<string, CampoExplicavel> = {
+  extras: 'extras', e50: 'extras', e100: 'extras', atrfal: 'atrfal', falta: 'faltas', atraso: 'atrasos', saldo: 'saldo', bant: 'banco', bacu: 'banco',
+};
+
 type Col = { k: string; t: string; n?: boolean; v: (l: LinhaCompetencia) => number | string; cell: (l: LinhaCompetencia) => JSX.Element | string; tot?: (r: RelatorioCompetencia) => string; cls?: (l: LinhaCompetencia) => string };
 
 function colunas(modo: ModoTabela, hoje: string): Col[] {
@@ -102,7 +108,7 @@ function colunas(modo: ModoTabela, hoje: string): Col[] {
   return base;
 }
 
-export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir, onEspelho }: {
+export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir, onEspelho, onExplicar }: {
   rel: RelatorioCompetencia;
   modo: ModoTabela;
   busca?: string;
@@ -110,6 +116,8 @@ export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir, onEspelho
   onAbrir: (empregadoId: string) => void;
   /** Se vier, cada linha ganha o botão de prévia do espelho em PDF. */
   onEspelho?: (l: LinhaCompetencia) => void;
+  /** Se vier, os totais da linha viram botões que abrem a conta explicada. */
+  onExplicar?: (l: LinhaCompetencia, campo: CampoExplicavel) => void;
 }) {
   const [ord, setOrd] = useState<{ k: string; asc: boolean }>({ k: 'nome', asc: true });
   const cols = useMemo(() => colunas(modo, rel.hoje), [modo, rel.hoje]);
@@ -153,7 +161,18 @@ export function TabelaCompetencia({ rel, modo, busca, filtro, onAbrir, onEspelho
               <tr key={l.empregadoId} className={vt.row} tabIndex={0} aria-label={`Abrir o mês de ${l.nome}`}
                 onClick={() => onAbrir(l.empregadoId)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(l.empregadoId); } }}>
-                {cols.map((c) => <td key={c.k} className={`${c.n ? vt.n : ''} ${c.cls ? c.cls(l) : ''}`}>{c.cell(l)}</td>)}
+                {cols.map((c) => {
+                  const campo = onExplicar ? EXPLICA[c.k] : undefined;
+                  const explica = campo && !(campo === 'banco' && !l.banco) && (campo === 'banco' || c.v(l) !== 0);
+                  return (
+                    <td key={c.k} className={`${c.n ? vt.n : ''} ${c.cls ? c.cls(l) : ''}`}>
+                      {explica
+                        ? <button type="button" className={vt.num} title="Por que deu esse número?" aria-label={`Por que ${c.t.toLowerCase()} de ${l.nome}?`}
+                            onClick={(ev) => { ev.stopPropagation(); onExplicar!(l, campo!); }} onKeyDown={(ev) => ev.stopPropagation()}>{c.cell(l)}</button>
+                        : c.cell(l)}
+                    </td>
+                  );
+                })}
                 {onEspelho && (
                   <td className={vt.n}>
                     <button type="button" className={vt.btnPdf} title={`Ver o espelho de ${l.nome} (PDF)`} aria-label={`Ver o espelho de ${l.nome} em PDF`}

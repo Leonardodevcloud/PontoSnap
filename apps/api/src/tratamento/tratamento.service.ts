@@ -1245,7 +1245,7 @@ export class TratamentoService {
           if (ini && data < ini) return false; // antes de entrar no ponto
           return true;
         })
-        .map(([k]) => { const [cpf, data] = k.split('|') as [string, string]; return { nome: nomePorCpf.get(cpf)?.nome ?? cpf, data }; })
+        .map(([k]) => { const [cpf, data] = k.split('|') as [string, string]; return { nome: nomePorCpf.get(cpf)?.nome ?? cpf, data, empregadoId: nomePorCpf.get(cpf)?.id ?? null }; })
         .sort((a, b) => (a.data < b.data ? 1 : -1));
 
       // 3) Quem já devia ter batido hoje e não bateu. Cruza com o horário: só

@@ -39,7 +39,7 @@ export function Fiscal() {
       <div className={css.filtro}>
         <label className={css.selpill}>
           <span className={css.cal}>competência</span>
-          <input type="month" value={competencia} onChange={(e) => setCompetencia(e.target.value)} className={css.mesInput} />
+          <input aria-label="Competência" type="month" value={competencia} onChange={(e) => setCompetencia(e.target.value)} className={css.mesInput} />
         </label>
       </div>
 

@@ -1,23 +1,27 @@
 :root{
-  --coral:#FF6B4A; --coral-dark:#E5502F; --ink:#10403F; --lime:#CBF54D;
+  --coral:#FF6B4A; --coral-dark:#B5391F;
+  /* Botão de ação: coral um tom abaixo para o texto branco passar 4,5:1 (WCAG AA) */
+  --coral-acao:#CC4426; --coral-acao-hover:#B5391F; --on-coral:#FFFFFF; --ink:#10403F; --lime:#CBF54D;
   --cream:#FFF8EE; --peach:#FFE2D1; --ash:#5C4F49; --white:#FFFFFF;
   --ink-rgb:16,64,63;
+  /* Superfície verde-escura fixa (menu, cartão de destaque): igual nos dois temas */
+  --fundo-escuro:#10403F; --sobre-escuro:#FFF8EE;
   --r-lg:28px; --r-md:16px; --r-pill:100px;
   --ff-display:'Fredoka', sans-serif;
   --ff-body:'Nunito Sans', sans-serif;
   --ff-mono:'JetBrains Mono', monospace;
   /* Cores semânticas de feedback */
-  --ok-bg:#EAF7EE; --ok-text:#0FA968; --ok-border:rgba(15,169,104,.3);
+  --ok-bg:#EAF7EE; --ok-text:#0B7A4B; --ok-border:rgba(15,169,104,.3);
   --erro-bg:#FFE9E3; --erro-text:var(--coral-dark);
   --aviso-bg:#FFF6E8; --aviso-border:rgba(255,107,74,.25);
   --info-bg:#EAF4F1;
   /* Superfícies de tabela e campos */
   --thead-bg:#fbf4e8; --row-border:#f4f1ec; --field-bg:#faf7f4;
-  --placeholder:#a8b3b0;
+  --placeholder:#7A8784;
   /* Tags de categoria */
   --tag-green-bg:#e6f3e6; --tag-green-text:#3a7a3a;
   --tag-blue-bg:#e9edff; --tag-blue-text:#3a4a9a;
-  --tag-yellow-bg:#FCEFCE; --tag-yellow-text:#B7791F;
+  --tag-yellow-bg:#FCEFCE; --tag-yellow-text:#8A5A12;
   --tag-purple-bg:#F3E5F5;
   --tag-orange-bg:#FFF3E0;
   --tag-ltblue-bg:#E3F2FD;
@@ -32,7 +36,9 @@
   --peach: #3D2A22;
   --coral: #FF7F63;
   --coral-dark: #FF6B4A;
+  --coral-acao:#FF7F63; --coral-acao-hover:#FF9479; --on-coral:#1C1C1B;
   --ink-rgb:237,232,225;
+  --fundo-escuro:#0F2524;
   --ok-bg:#1A2E1F; --ok-text:#4ADE80; --ok-border:rgba(74,222,128,.25);
   --erro-bg:#2E1A1A; --erro-text:#FF7F63;
   --aviso-bg:#2E2518; --aviso-border:rgba(255,127,99,.2);

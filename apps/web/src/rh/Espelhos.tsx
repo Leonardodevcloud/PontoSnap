@@ -6,6 +6,7 @@ import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
 import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, ResultadoDiaCLT, TipoAfastamento } from '../tipos';
 import { TabelaCompetencia } from './TabelaCompetencia';
+import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
 import vt from './VisaoTodos.module.css';
 import css from './Espelhos.module.css';
@@ -77,7 +78,7 @@ export function Espelhos() {
         </div>
         <label className={css.sel}>
           <span className={css.lb}>Competência</span>
-          <input type="month" value={mes} max={mesAtual()} onChange={(e) => e.target.value && ir({ mes: e.target.value, dia: null })} />
+          <input aria-label="Competência" type="month" value={mes} max={mesAtual()} onChange={(e) => e.target.value && ir({ mes: e.target.value, dia: null })} />
         </label>
         {visao === 'um' && (
           <label className={css.sel}>
@@ -111,6 +112,7 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
   const [busca, setBusca] = useState('');
   const [baixando, setBaixando] = useState<'zip' | 'xlsx' | null>(null);
   const [espelho, setEspelho] = useState<{ id: string; nome: string } | null>(null);
+  const [porque, setPorque] = useState<PedidoExplicacao | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -174,9 +176,18 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
         <>
           {nPend > 0 && (
             <div className={vt.callout}>
-              <b>{nPend} pendência{nPend === 1 ? '' : 's'}</b> em {rotuloMes(mes)}:
-              {pendentes.abertos.length > 0 && <span>{pendentes.abertos.length === 1 ? `${pendentes.abertos[0]} com batida em aberto hoje` : `${pendentes.abertos.length} com batida em aberto hoje (${pendentes.abertos.join(', ')})`}</span>}
-              {pendentes.faltas.length > 0 && <span>{pendentes.faltas.map((f) => `${f.nome} sem batida em ${f.dias.map(fmtDia).join(', ')}`).join(' · ')}</span>}
+              <div className={vt.calloutTopo}>
+                <b>{nPend} {nPend === 1 ? 'pessoa com pendência' : 'pessoas com pendência'}</b> em {rotuloMes(mes)}
+                <Link to="/rh" className={vt.calloutLink}>resolver no Início →</Link>
+              </div>
+              <ul className={vt.calloutLista}>
+                {pendentes.abertos.map((n) => <li key={`a${n}`}><b>{n}</b> · batida em aberto hoje</li>)}
+                {pendentes.faltas.map((f) => (
+                  <li key={`f${f.nome}`} title={f.dias.map(fmtDia).join(', ')}>
+                    <b>{f.nome}</b> · {f.dias.length === 1 ? `sem batida em ${fmtDia(f.dias[0]!)}` : `${f.dias.length} dias sem batida (${f.dias.slice(0, 3).map(fmtDia).join(', ')}${f.dias.length > 3 ? '…' : ''})`}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -192,7 +203,9 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
             <div className={vt.kpi}><div className={vt.kpiK}>Assinaturas</div><div className={vt.kpiV}>{t.assinadas} / {rel.linhas.length}</div><div className={vt.kpiS}>espelho de {rotuloMes(mes).split(' de ')[0]} assinado</div></div>
           </div>
 
-          <TabelaCompetencia rel={rel} modo="espelho" busca={busca} onAbrir={onAbrir} onEspelho={(l) => setEspelho({ id: l.empregadoId, nome: l.nome })} />
+          <TabelaCompetencia rel={rel} modo="espelho" busca={busca} onAbrir={onAbrir} onEspelho={(l) => setEspelho({ id: l.empregadoId, nome: l.nome })}
+            onExplicar={(l, campo) => setPorque({ empregadoId: l.empregadoId, nome: l.nome, campo })} />
+          <PorQue pedido={porque} inicio={faixaDoMes(mes).inicio} fim={faixaDoMes(mes).fim} onFechar={() => setPorque(null)} onVerDias={onAbrir} />
           {espelho && (
             <VisorPdf titulo={`Espelho de ${espelho.nome}`}
               sub={mes === hojeSP().slice(0, 7) ? `${rotuloMes(mes)} · prévia até ${fmtDia(hojeSP())}, com as batidas registradas até agora` : rotuloMes(mes)}
@@ -201,7 +214,7 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
               onFechar={() => setEspelho(null)} />
           )}
           <div className={vt.legenda}>
-            <span>Clique na linha pra ver o mês do funcionário · "PDF" abre a prévia do espelho.</span>
+            <span>Clique na linha pra ver o mês do funcionário · número sublinhado mostra de onde ele veio · "PDF" abre a prévia do espelho.</span>
             <span>Banco anterior = saldo fechado até o mês passado · Acumulado = anterior + este mês + folgas/pagamentos.</span>
           </div>
         </>

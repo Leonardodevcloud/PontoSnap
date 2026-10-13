@@ -66,7 +66,7 @@
 .modalTit { font-family:var(--ff-display, inherit); font-weight:700; font-size:19px; color:var(--ink, #10403F); }
 .modalTxt { font-size:13px; color:var(--ash, #5C4F49); margin:6px 0 16px; line-height:1.5; }
 .modalPin { width:100%; text-align:center; letter-spacing:.4em; font-size:22px; padding:14px; border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:12px; background:var(--cream, #FFF8EE); }
-.modalErro { color:var(--coral-d, #E4502F); font-size:13px; margin:8px 0 0; text-align:center; }
+.modalErro { color:var(--coral-dark); font-size:13px; margin:8px 0 0; text-align:center; }
 .modalAcoes { display:flex; gap:10px; margin-top:16px; }
 .modalCancelar { flex:1; background:transparent; border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:999px; padding:13px; font:inherit; font-weight:800; color:var(--ink, #10403F); cursor:pointer; }
 .modalConfirmar { flex:2; background:var(--coral, #FF6B4A); color:#fff; border:none; border-radius:999px; padding:13px; font:inherit; font-weight:800; cursor:pointer; }

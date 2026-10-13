@@ -7,7 +7,8 @@ import css from './PainelRH.module.css';
 
 const COLETOR: Record<number, string> = { 1: 'App', 2: 'Navegador', 3: 'Desktop', 4: 'Quiosque', 5: 'Outro' };
 
-export function PainelRH() {
+/** embutido = dentro do Início: sem título e sem as pendências (a central já mostra). */
+export function PainelRH({ embutido = false }: { embutido?: boolean } = {}) {
   const [p, setP] = useState<PainelResp | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -20,10 +21,10 @@ export function PainelRH() {
 
   return (
     <div>
-      <div className={css.head}><h2>Painel</h2><p>Visão do dia · {p ? fmtDataExtenso(p.data) : '—'}</p></div>
+      {!embutido && <div className={css.head}><h2>Painel</h2><p>Visão do dia · {p ? fmtDataExtenso(p.data) : '—'}</p></div>}
       {erro && <p className={css.erro}>{erro}</p>}
 
-      {p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0 || p.pendencias.naoBateramTotal > 0 || (p.pendencias.ajustes ?? 0) > 0) && (
+      {!embutido && p && (p.pendencias.atestados > 0 || p.pendencias.revisarTotal > 0 || p.pendencias.naoBateramTotal > 0 || (p.pendencias.ajustes ?? 0) > 0) && (
         <div className={css.pend}>
           {p.pendencias.naoBateramTotal > 0 && (
             <Link to="/rh/espelhos" className={`${css.pendCard} ${css.pendAlerta}`}>

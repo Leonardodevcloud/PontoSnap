@@ -1,30 +1,31 @@
 /* Visão "Todos os funcionários" — compartilhada por Espelhos e Apuração CLT. */
 .seg{ display:inline-flex; background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-pill); padding:3px; }
-.seg button{ border:none; background:transparent; font-family:var(--ff-body); font-weight:800; font-size:13.5px; padding:8px 16px; border-radius:var(--r-pill); cursor:pointer; color:var(--ash); }
+.seg button{ border:none; background:transparent; font-family:var(--ff-body); font-weight:800; font-size:14px; padding:8px 16px; border-radius:var(--r-pill); cursor:pointer; color:var(--ash); }
 .seg .segOn{ background:var(--ink); color:var(--cream); }
 .seg button:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
 
 .kpis{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:20px; }
 .kpi{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:14px 16px; }
 .kpiPeach{ background:var(--peach); border-color:transparent; }
-.kpiAlerta{ background:#fff0ec; border-color:var(--coral); }
-.kpiInk{ background:var(--ink); color:var(--cream); border-color:transparent; }
-.kpiK{ font-family:var(--ff-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--coral-dark); }
+.kpiAlerta{ background:var(--erro-bg); border-color:var(--coral); }
+.kpiInk{ background:var(--fundo-escuro); color:var(--sobre-escuro); border-color:transparent; }
+.kpiInk .kpiV{ color:var(--sobre-escuro); }
+.kpiK{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--coral-dark); }
 .kpiInk .kpiK{ color:var(--lime); }
-.kpiV{ font-family:var(--ff-display); font-weight:600; font-size:24px; line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
-.kpiS{ font-size:11.5px; color:var(--ash); margin-top:3px; }
+.kpiV{ font-family:var(--ff-display); font-weight:600; font-size:22px; line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
+.kpiS{ font-size:12.5px; color:var(--ash); margin-top:3px; }
 .kpiInk .kpiS{ color:rgba(255,248,238,.7); }
 
-.callout{ background:var(--aviso-bg); border:1px solid var(--aviso-border); border-radius:12px; padding:10px 14px; font-size:13.5px; margin-bottom:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.callout{ background:var(--aviso-bg); border:1px solid var(--aviso-border); border-radius:12px; padding:10px 14px; font-size:14px; margin-bottom:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .callout b{ color:var(--coral-dark); }
 
 .tab{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:hidden; }
-.scroll{ overflow-x:auto; }
+.scroll{ overflow-x:auto; position:relative; }
 .table{ width:100%; border-collapse:collapse; min-width:860px; }
-.table th{ background:var(--thead-bg); font-family:var(--ff-mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); text-align:left; padding:11px 14px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
+.table th{ background:var(--thead-bg); font-family:var(--ff-mono); font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); text-align:left; padding:11px 14px; font-weight:500; white-space:nowrap; cursor:pointer; user-select:none; }
 .table th.n{ text-align:right; }
 .table th.ord{ color:var(--ink); }
-.table td{ padding:11px 14px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:13.5px; vertical-align:middle; }
+.table td{ padding:11px 14px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:14px; vertical-align:middle; }
 .table td.n{ text-align:right; font-family:var(--ff-mono); font-size:12.5px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .row{ cursor:pointer; }
 .row:hover td{ background:var(--field-bg); }
@@ -32,23 +33,23 @@
 .tot td{ background:var(--thead-bg); font-weight:800; border-top:2px solid rgba(var(--ink-rgb),.15); }
 .nome{ font-weight:800; white-space:nowrap; }
 .table td:first-child{ min-width:200px; }
-.nome small{ display:block; font-family:var(--ff-mono); font-size:10.5px; color:var(--ash); font-weight:400; }
+.nome small{ display:block; font-family:var(--ff-mono); font-size:11px; color:var(--ash); font-weight:400; }
 .pos{ color:var(--ok-text); }
 .neg{ color:var(--coral-dark); }
 .mute{ color:var(--ash); }
-.pill{ display:inline-block; font-family:var(--ff-mono); font-size:10.5px; padding:2px 8px; border-radius:6px; white-space:nowrap; margin:1px 3px 1px 0; }
+.pill{ display:inline-block; font-family:var(--ff-mono); font-size:11px; padding:2px 8px; border-radius:6px; white-space:nowrap; margin:1px 3px 1px 0; }
 .pillOk{ background:var(--ok-bg); color:var(--ok-text); }
 .pillErr{ background:var(--erro-bg); color:var(--coral-dark); }
 .pillWarn{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); }
 .pillLime{ background:var(--lime); color:var(--ink); }
 .pillMute{ background:rgba(var(--ink-rgb),.06); color:var(--ash); }
 .vazio{ padding:28px 16px; text-align:center; color:var(--ash); font-size:14px; }
-.legenda{ display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ash); margin:10px 2px 0; }
+.legenda{ display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:var(--ash); margin:10px 2px 0; }
 
-.crumb{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ash); margin-bottom:12px; flex-wrap:wrap; }
+.crumb{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ash); margin-bottom:12px; flex-wrap:wrap; }
 .crumb button{ background:none; border:none; padding:0; color:var(--coral-dark); font:inherit; font-weight:800; cursor:pointer; }
 .crumb button:hover{ text-decoration:underline; }
-.busca{ background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:10px 14px; font-family:var(--ff-body); font-weight:600; font-size:14.5px; color:var(--ink); outline:none; min-width:min(300px, 100%); }
+.busca{ background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:10px 14px; font-family:var(--ff-body); font-weight:600; font-size:14px; color:var(--ink); outline:none; min-width:min(300px, 100%); }
 .busca:focus{ border-color:var(--coral); }
 .acoes{ display:flex; gap:8px; flex-wrap:wrap; }
 .btn{ width:auto; }
@@ -56,3 +57,25 @@
 .btnPdf:hover{ border-color:var(--ink); background:var(--lime); }
 .btnPdf:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
 .srOnly{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+/* Número que explica a própria conta ("Por que deu esse número?") */
+.num{
+  background:none; border:none; padding:4px 6px; margin:-4px -6px; min-height:28px; border-radius:6px; font:inherit; color:inherit; cursor:help;
+  text-decoration:underline dotted; text-decoration-color:rgba(var(--ink-rgb),.45); text-underline-offset:4px;
+}
+.num:hover{ background:var(--lime); color:#10403F; text-decoration-color:transparent; }
+.num:focus-visible{ outline:3px solid var(--ink); outline-offset:1px; }
+
+.calloutTopo{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; width:100%; }
+.calloutLink{ margin-left:auto; color:var(--coral-dark); font-weight:800; font-size:14px; }
+.calloutLista{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; width:100%; }
+.calloutLista li{ background:var(--white); border-radius:999px; padding:4px 10px; font-size:12.5px; }
+
+/* Sombra na borda quando há colunas escondidas para o lado (rola a tabela) */
+.scroll{
+  background:
+    linear-gradient(to right, var(--white) 30%, rgba(255,255,255,0)) left center / 40px 100% no-repeat local,
+    linear-gradient(to left, var(--white) 30%, rgba(255,255,255,0)) right center / 40px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(16,64,63,.2), rgba(16,64,63,0)) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(16,64,63,.2), rgba(16,64,63,0)) right center / 14px 100% no-repeat scroll;
+}

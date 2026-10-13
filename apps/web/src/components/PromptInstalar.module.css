@@ -8,7 +8,7 @@
 .txt{ flex:1; font-size:13px; line-height:1.4; color:var(--ink); }
 .txt b{ font-weight:800; color:var(--coral-dark); }
 .instalar{
-  flex-shrink:0; background:var(--coral); color:#fff; border:none; cursor:pointer;
+  flex-shrink:0; background:var(--coral-acao); color:var(--on-coral); border:none; cursor:pointer;
   font:inherit; font-weight:800; font-size:13px; padding:9px 16px; border-radius:var(--r-pill);
 }
 .instalar:active{ transform:scale(.97); }
