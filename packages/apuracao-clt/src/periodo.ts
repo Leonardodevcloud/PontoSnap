@@ -1,5 +1,6 @@
 import type { EntradaDia, RegrasApuracao, ResultadoDia, ResultadoPeriodo } from './tipos.js';
 import { apurarDia } from './dia.js';
+import { compensarSemanas, type OpcoesSemana } from './semana.js';
 
 /** Chave da semana: data (YYYY-MM-DD) da segunda-feira daquela semana (-0300). */
 function segundaDaSemana(iso: string): string {
@@ -14,17 +15,21 @@ function segundaDaSemana(iso: string): string {
  * Apura um período (competência). Encadeia os dias em ordem para calcular a
  * interjornada, agrega os totais, estima o reflexo em DSR e trata o banco.
  */
-export function apurarPeriodo(dias: EntradaDia[], regras: RegrasApuracao): ResultadoPeriodo {
+export function apurarPeriodo(dias: EntradaDia[], regras: RegrasApuracao, opts: OpcoesSemana = {}): ResultadoPeriodo {
   const ordenados = [...dias].sort((a, b) => a.data.localeCompare(b.data));
 
-  const resultados: ResultadoDia[] = [];
+  let brutos: ResultadoDia[] = [];
   let saidaAnterior: Date | undefined;
   for (const d of ordenados) {
     const r = apurarDia({ ...d, saidaDiaAnterior: saidaAnterior }, regras);
-    resultados.push(r);
+    brutos.push(r);
     const ms = [...d.marcacoes].sort((a, b) => a.getTime() - b.getTime());
     if (ms.length) saidaAnterior = ms[ms.length - 1];
   }
+  // Escala que compensa na semana: extra/atraso/falta decididos por semana.
+  brutos = compensarSemanas(ordenados, brutos, regras, opts);
+  // Dias antes do recorte só serviram para fechar a semana (são do mês anterior).
+  const resultados = opts.recorteDe ? brutos.filter((r) => r.data >= opts.recorteDe!) : brutos;
 
   const soma = (f: (r: ResultadoDia) => number) => resultados.reduce((acc, r) => acc + f(r), 0);
   const totalTrabalhado = soma((r) => r.minutosTrabalhados);

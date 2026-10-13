@@ -53,3 +53,14 @@
 .porDiaNome { font-weight: 700; width: 44px; color: var(--ink, #10403F); font-size: 14px; }
 .porDiaInput { padding: 6px 10px; border: 1.5px solid rgba(var(--ink-rgb),.15); border-radius: 8px; font-size: 14px; }
 .porDiaUn { font-size: 12.5px; color: var(--ash, #5C4F49); }
+
+.compOn{ border-color:var(--ink); }
+.compKpis{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+@media(max-width:620px){ .compKpis{ grid-template-columns:1fr; } }
+.compKpis div{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:10px; padding:9px 11px; }
+.compKpis small{ display:block; font-family:var(--ff-mono); font-size:9.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); }
+.compKpis b{ font-family:var(--ff-display); font-size:18px; font-weight:600; color:var(--ink); }
+.compKpis em{ display:block; font-style:normal; font-size:11.5px; color:var(--ash); }
+.compRegras{ margin:10px 0 0; padding:0; list-style:none; font-size:12.8px; line-height:1.55; color:var(--ink); }
+.compRegras li{ padding:4px 0 4px 20px; position:relative; }
+.compRegras li::before{ content:'✓'; position:absolute; left:2px; color:var(--ok-text); font-weight:800; }

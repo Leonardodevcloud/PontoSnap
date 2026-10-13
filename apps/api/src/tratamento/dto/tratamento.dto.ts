@@ -9,6 +9,8 @@ export class CriarHorarioDto {
   @IsOptional() @IsObject() jornadaPorDia?: Record<string, number> | null; // {dia(0-6): minutos} sobrepõe durJornadaMin
   /** Contrato de horas: apura só pela carga do dia, sem janela de entrada/saída. */
   @IsOptional() @IsBoolean() flexivel?: boolean;
+  /** Compensa na semana: carga pela semana (seg–dom), dia sem batida não é falta se a semana fechar. */
+  @IsOptional() @IsBoolean() compensaSemana?: boolean;
 }
 
 export class CriarAusenciaDto {

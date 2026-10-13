@@ -365,6 +365,13 @@
       "when": 1784602980000,
       "tag": "0051_vt_home_office",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1784603040000,
+      "tag": "0052_escala_compensa_semana",
+      "breakpoints": true
     }
   ]
 }

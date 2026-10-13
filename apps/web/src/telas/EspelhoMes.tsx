@@ -126,6 +126,7 @@ export function EspelhoMes() {
                     : motivo ?? (folga ? 'Descanso' : 'Sem batidas')}
                   {d.paresIncompletos && <span className={`${css.tag} ${css.tagF}`}>Em aberto</span>}
                   {d.faltaInjustificada && <span className={`${css.tag} ${css.tagF}`}>Falta</span>}
+                  {d.semana?.compensado && d.marcacoes.length === 0 && !d.faltaInjustificada && <span className={css.tag}>{d.semana.estado === 'FECHADA' ? 'Compensado na semana' : 'Semana em aberto'}</span>}
                 </span>
                 <span className={`${css.dS} ${d.saldoMin > 0 ? css.pos : d.saldoMin < 0 ? css.neg : ''}`}>
                   {d.paresIncompletos ? '—' : d.marcacoes.length > 0 ? comSinal(d.saldoMin) : '—'}

@@ -53,6 +53,12 @@ export interface EntradaDia {
    */
   jornadaFlexivel?: boolean;
   /**
+   * Escala "compensa na semana": o dia entra na conta da semana (seg–dom).
+   * Dia sem batida não é falta se a semana fechar a carga; extra/atraso/falta
+   * são decididos no fim da semana.
+   */
+  compensaSemana?: boolean;
+  /**
    * Dia de HOJE, ainda em andamento. O funcionário pode não ter batido a
    * saída (ou nem a entrada) porque o expediente não acabou — então o dia
    * não gera falta nem atraso enquanto não terminar.
@@ -93,6 +99,22 @@ export interface ResultadoDia {
    */
   pendente: boolean;
   observacoes: string[];
+  /** Escala que compensa na semana: a semana do dia e como ela fechou. */
+  semana?: SemanaCompensada;
+}
+
+export interface SemanaCompensada {
+  inicio: string; fim: string;
+  /** FECHADA = resultado lançado · ABERTA = ainda não terminou · PROXIMO_MES = termina no mês seguinte e fecha lá. */
+  estado: 'FECHADA' | 'ABERTA' | 'PROXIMO_MES';
+  /** Horas feitas nos dias da semana (até 10h por dia) e a carga da semana. */
+  feitoMin: number; cargaMin: number;
+  /** > 0 acima da carga · < 0 abaixo (antes de virar falta) · 0 fechou certo ou não fechou ainda. */
+  resultadoMin: number;
+  /** Dia sem batida coberto pelas horas da semana (não é falta). */
+  compensado: boolean;
+  /** Semana segura por batida em aberto (dia pendente). */
+  pendente?: boolean;
 }
 
 export interface ResultadoPeriodo {

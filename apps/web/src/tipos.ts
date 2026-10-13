@@ -138,6 +138,19 @@ export interface ResultadoDiaCLT {
   /** Batida em aberto ou hoje em andamento: sem falta/atraso/extra até ser tratado. */
   pendente?: boolean;
   observacoes: string[];
+  /** Escala que compensa na semana: a semana do dia e como fechou. */
+  semana?: SemanaCompensadaCLT;
+}
+
+export interface SemanaCompensadaCLT {
+  inicio: string; fim: string;
+  /** FECHADA = resultado lançado · ABERTA = não terminou · PROXIMO_MES = termina no mês seguinte e fecha lá. */
+  estado: 'FECHADA' | 'ABERTA' | 'PROXIMO_MES';
+  feitoMin: number; cargaMin: number; resultadoMin: number;
+  /** Dia sem batida coberto pelas horas da semana (não é falta). */
+  compensado: boolean;
+  /** Semana segura por batida em aberto. */
+  pendente?: boolean;
 }
 
 export interface ResultadoPeriodoCLT {
@@ -204,6 +217,8 @@ export interface Horario {
   jornadaPorDia?: Record<string, number> | null;
   /** Contrato de horas: só a carga do dia conta, sem horário fixo. */
   flexivel?: boolean;
+  /** Compensa na semana: a carga vale pela semana (seg–dom), dia sem batida não é falta se a semana fechar. */
+  compensaSemana?: boolean;
   criadoEm?: string;
 }
 

@@ -26,6 +26,11 @@ export const pontoHorarioContratual = pgTable('ponto_horario_contratual', {
    * base de atraso/extra.
    */
   flexivel: boolean('flexivel').notNull().default(false),
+  /**
+   * Compensa na semana: a carga vale pela SEMANA (seg–dom). Dia sem batida não
+   * é falta se a semana fechar; extra/atraso/falta são decididos no domingo.
+   */
+  compensaSemana: boolean('compensa_semana').notNull().default(false),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });
 

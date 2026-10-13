@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/formato';
@@ -282,29 +282,38 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
               <h3>Dias do mês <span className={css.h3sub}>· clique no dia para ver as batidas</span></h3>
               {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
               <div className={css.dias}>
-                {dias.map((d) => {
+                {dias.map((d, i) => {
                   const motivo = motivoDoDia(d.data);
                   const folga = (d.ehDescansoDia || !!motivo) && d.marcacoes.length === 0;
                   const faltou = d.faltaMin > 0 && d.marcacoes.length === 0;
                   const alerta = d.paresIncompletos || faltou;
                   const horas = horasDoDia(d);
+                  // Compensa na semana: um cabeçalho por semana (a lista vem do mais novo pro mais antigo).
+                  const sem = d.semana;
+                  const novaSemana = !!sem && dias[i - 1]?.semana?.inicio !== sem.inicio;
+                  const compensado = !!sem?.compensado && d.marcacoes.length === 0 && d.faltaMin === 0;
                   return (
-                    <button key={d.data} className={`${css.dia} ${alerta ? css.diaAlerta : ''} ${folga ? css.diaFolga : ''}`} onClick={() => onDia(d.data)}>
+                    <Fragment key={d.data}>
+                    {novaSemana && sem && <CabecalhoSemana s={sem} faltas={dias.filter((x) => x.semana?.inicio === sem.inicio && x.faltaMin > 0).length} />}
+                    <button className={`${css.dia} ${alerta ? css.diaAlerta : ''} ${folga ? css.diaFolga : ''}`} onClick={() => onDia(d.data)}>
                       <span className={css.dN}>{d.data.slice(8, 10)}<small>{diaSemanaCurto(d.data)}</small></span>
                       <span className={css.dM}>
-                        {motivo ?? (horas ? <>{horas}{d.paresIncompletos && <span className={css.neg}> · em aberto</span>}</> : folga ? 'Folga' : faltou ? 'Sem batida' : '—')}
+                        {motivo ?? (horas ? <>{horas}{d.paresIncompletos && <span className={css.neg}> · em aberto</span>}</> : folga ? 'Folga' : faltou || compensado ? 'Sem batida' : '—')}
                       </span>
                       <span className={css.dTags}>
                         {faltou && <span className={`${vt.pill} ${vt.pillErr}`}>falta</span>}
+                        {compensado && <span className={`${vt.pill} ${vt.pillMute}`} title="Dia sem batida coberto pelas horas da semana">{sem!.estado === 'FECHADA' ? 'compensado na semana' : 'semana em aberto'}</span>}
+                        {sem?.estado === 'PROXIMO_MES' && !compensado && d.marcacoes.length > 0 && <span className={`${vt.pill} ${vt.pillMute}`}>fecha no mês seguinte</span>}
                         {d.paresIncompletos && <span className={`${vt.pill} ${vt.pillErr}`}>faltou bater</span>}
                         {d.atrasoMin > 0 && <span className={`${vt.pill} ${vt.pillErr}`}>atraso {minutosParaHhMm(d.atrasoMin)}</span>}
                         {d.penalidadeIntervaloMin > 0 && <span className={`${vt.pill} ${vt.pillWarn}`}>intervalo curto</span>}
                         {d.violacaoInterjornada && <span className={`${vt.pill} ${vt.pillWarn}`}>descanso &lt; 11h</span>}
                       </span>
                       <span className={`${css.dS} ${d.saldoMin > 0 ? vt.pos : d.saldoMin < 0 ? vt.neg : ''}`}>
-                        {d.paresIncompletos || d.marcacoes.length === 0 ? '' : comSinal(d.saldoMin)}
+                        {d.paresIncompletos || d.marcacoes.length === 0 ? '' : sem ? minutosParaHhMm(d.minutosTrabalhados) : comSinal(d.saldoMin)}
                       </span>
                     </button>
+                    </Fragment>
                   );
                 })}
               </div>
@@ -449,5 +458,25 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
         </div>
       )}
     </>
+  );
+}
+
+/** Cabeçalho de uma semana na escala que compensa na semana: feito × carga e como fechou. */
+function CabecalhoSemana({ s, faltas }: { s: NonNullable<ResultadoDiaCLT['semana']>; faltas: number }) {
+  const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  const pct = s.cargaMin > 0 ? Math.min(100, Math.round((s.feitoMin / s.cargaMin) * 100)) : 0;
+  const res = s.estado === 'PROXIMO_MES' ? <span className={css.semMute}>fecha no mês seguinte</span>
+    : s.estado === 'ABERTA' ? <span className={s.pendente ? vt.neg : css.semMute}>{s.pendente ? 'batida em aberto: trate para fechar a semana' : 'em andamento'}</span>
+    : faltas > 0 ? <span className={vt.neg}>{faltas} falta{faltas > 1 ? 's' : ''}{s.resultadoMin < 0 ? ` · ${minutosParaHhMm(-s.resultadoMin)} abaixo` : ''}</span>
+    : s.resultadoMin > 0 ? <span className={vt.pos}>+{minutosParaHhMm(s.resultadoMin)} acima da carga</span>
+    : s.resultadoMin < 0 ? <span className={vt.neg}>−{minutosParaHhMm(-s.resultadoMin)} abaixo da carga</span>
+    : <span className={vt.pos}>fechou a carga</span>;
+  return (
+    <div className={css.semH}>
+      <span className={css.semT}>Semana <b>{dm(s.inicio)} – {dm(s.fim)}</b></span>
+      <span className={css.semBar} aria-hidden><i className={s.estado === 'FECHADA' && (faltas > 0 || s.resultadoMin < 0) ? css.semBarNeg : ''} style={{ width: `${pct}%` }} /></span>
+      <span className={css.semV} title={s.estado === 'FECHADA' ? 'Feito / carga da semana' : 'Feito / carga dos dias que já passaram'}>{minutosParaHhMm(s.feitoMin)} / {minutosParaHhMm(s.cargaMin)}{s.estado !== 'FECHADA' && <small className={css.semMute}> até agora</small>}</span>
+      <span className={css.semR}>{res}</span>
+    </div>
   );
 }

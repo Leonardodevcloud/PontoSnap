@@ -30,6 +30,8 @@ export function Escalas() {
   const [flexivel, setFlexivel] = useState(false);
   const [cargaFlex, setCargaFlex] = useState('08:00');
   const [recalculados, setRecalculados] = useState<number | null>(null);
+  // Compensa na semana: a carga vale pela semana, não por dia.
+  const [compensa, setCompensa] = useState(false);
 
   function editar(h: Horario) {
     setEditandoId(h.id);
@@ -38,6 +40,7 @@ export function Escalas() {
     setPares(h.pares.map((p) => ({ entrada: `${p.entrada.slice(0, 2)}:${p.entrada.slice(2)}`, saida: `${p.saida.slice(0, 2)}:${p.saida.slice(2)}` })));
     setRegime(h.regime);
     setFlexivel(!!h.flexivel);
+    setCompensa(!!h.compensaSemana);
     setCargaFlex(minParaHhmm(h.durJornadaMin));
     if (h.jornadaPorDia && Object.keys(h.jornadaPorDia).length > 0) {
       setPorDiaLigado(true);
@@ -52,7 +55,7 @@ export function Escalas() {
   function cancelarEdicao() {
     setEditandoId(null); setCodigo(''); setDias([1, 2, 3, 4, 5]);
     setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal');
-    setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00');
+    setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00'); setCompensa(false);
   }
   async function excluir(h: Horario) {
     if (!confirm(`Excluir a escala "${h.codigo}"? Só é possível se nenhum funcionário estiver usando.`)) return;
@@ -70,6 +73,8 @@ export function Escalas() {
   const durPares = pares.reduce((acc, p) => acc + Math.max(0, hhmmParaMin(p.saida) - hhmmParaMin(p.entrada)), 0);
   // Flexível: a carga vem do campo próprio; fixo: é a soma dos períodos.
   const durTotal = flexivel ? hhmmParaMin(cargaFlex || '00:00') : durPares;
+  // Carga da semana: soma da carga de cada dia marcado (com jornada por dia, se houver).
+  const cargaSemana = dias.reduce((a, d) => a + (porDiaLigado && jornadaDia[d] ? hhmmParaMin(jornadaDia[d]!) : durTotal), 0);
 
   function toggleDia(n: number) {
     setDias((d) => (d.includes(n) ? d.filter((x) => x !== n) : [...d, n]).sort());
@@ -89,7 +94,7 @@ export function Escalas() {
       const jornadaPorDia = porDiaLigado
         ? Object.fromEntries(dias.map((d) => [String(d), hhmmParaMin(jornadaDia[d] ?? minParaHhmm(durTotal))]))
         : null;
-      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime, jornadaPorDia, flexivel };
+      const corpo = { codigo: codigo.trim(), durJornadaMin: durTotal, pares: paresAfd, diasSemana: dias, regime, jornadaPorDia, flexivel, compensaSemana: regime === 'normal' && compensa };
       if (editandoId) {
         const r = await api.patch<{ funcionariosRecalculados?: number }>(`/tratamento/horarios/${editandoId}`, corpo);
         if (r?.funcionariosRecalculados) setRecalculados(r.funcionariosRecalculados);
@@ -97,7 +102,7 @@ export function Escalas() {
         await api.post('/tratamento/horarios', corpo);
       }
       setEditandoId(null);
-      setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal'); setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00');
+      setCodigo(''); setDias([1, 2, 3, 4, 5]); setPares([{ entrada: '08:00', saida: '12:00' }, { entrada: '13:00', saida: '17:00' }]); setRegime('normal'); setPorDiaLigado(false); setJornadaDia({}); setFlexivel(false); setCargaFlex('08:00'); setCompensa(false);
       void carregar();
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
@@ -203,6 +208,34 @@ export function Escalas() {
           )}
         </div>
 
+        {regime === 'normal' && (
+          <div className={`${css.porDiaBox} ${compensa ? css.compOn : ''}`}>
+            <label className={css.porDiaToggle}>
+              <input type="checkbox" checked={compensa} onChange={(e) => setCompensa(e.target.checked)} />
+              <span>
+                <strong>Compensa na semana</strong>: a pessoa pode trabalhar mais em alguns dias para não vir em outros
+                (estica a semana e folga o sábado, ou vem no sábado e sai mais cedo). Conta o <strong>total da semana</strong>.
+              </span>
+            </label>
+            {compensa && (
+              <div className={css.porDiaGrade}>
+                <div className={css.compKpis}>
+                  <div><small>Carga da semana</small><b>{minutosParaHhMm(cargaSemana)}</b><em>soma dos dias da escala</em></div>
+                  <div><small>Semana vai de</small><b>seg → dom</b><em>fecha no domingo</em></div>
+                  <div><small>Teto por dia</small><b>10h00</b><em>acima disso é extra no dia</em></div>
+                </div>
+                <ul className={css.compRegras}>
+                  <li>Dia sem batida <b>não é falta</b> se a semana fechar a carga.</li>
+                  <li>No fim da semana: passou da carga → <b>hora extra</b> (ou banco, pela regra do perfil). Ficou abaixo → <b>atraso</b>.</li>
+                  <li>Só vira <b>falta</b> quando a semana fica devendo um dia inteiro (falta tira cesta e DSR).</li>
+                  <li>Domingo e feriado trabalhados continuam extra 100%, fora da conta da semana. Feriado e atestado tiram a carga daquele dia da semana.</li>
+                  <li>A semana que vira o mês é apurada inteira e fecha no mês em que termina.</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {erro && <p className={css.erro}>{erro}</p>}
         {recalculados != null && (
           <p className={css.hint} style={{ color: 'var(--ok-text)', fontWeight: 700 }}>
@@ -227,7 +260,7 @@ export function Escalas() {
             <span className={css.cod}>{h.codigo}</span>
             <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
             <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
-            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}{h.flexivel ? ' · flexível' : ''}</span>
+            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}{h.flexivel ? ' · flexível' : ''}{h.compensaSemana ? ' · compensa na semana' : ''}</span>
             <span className={css.acoes}>
               <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
               <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>

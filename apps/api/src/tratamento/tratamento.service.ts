@@ -37,12 +37,12 @@ export class TratamentoService {
   }
 
   // ---- Horário contratual ----
-  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean }) {
+  criarHorario(tenantId: string, dto: { codigo: string; durJornadaMin: number; pares: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean; compensaSemana?: boolean }) {
     return comTenant(this.db, tenantId, async (tx) =>
       (await tx.insert(pontoHorarioContratual).values({
         tenantId, codigo: dto.codigo, durJornadaMin: dto.durJornadaMin, pares: dto.pares,
         diasSemana: dto.diasSemana ?? [1, 2, 3, 4, 5], regime: dto.regime ?? 'normal',
-        jornadaPorDia: dto.jornadaPorDia ?? null, flexivel: dto.flexivel ?? false,
+        jornadaPorDia: dto.jornadaPorDia ?? null, flexivel: dto.flexivel ?? false, compensaSemana: dto.compensaSemana ?? false,
       }).returning())[0]);
   }
 
@@ -51,7 +51,7 @@ export class TratamentoService {
    * Recalcula a apuração de todos que a usam — por isso é para CORREÇÃO, não
    * para mudança real de jornada (essa usa mudarEscalaComVigencia).
    */
-  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean }) {
+  atualizarHorario(tenantId: string, id: string, dto: { codigo?: string; durJornadaMin?: number; pares?: Par[]; diasSemana?: number[]; regime?: string; jornadaPorDia?: Record<string, number> | null; flexivel?: boolean; compensaSemana?: boolean }) {
     return comTenant(this.db, tenantId, async (tx) => {
       const set: Record<string, unknown> = {};
       if (dto.codigo !== undefined) set.codigo = dto.codigo;
@@ -61,6 +61,7 @@ export class TratamentoService {
       if (dto.regime !== undefined) set.regime = dto.regime;
       if (dto.jornadaPorDia !== undefined) set.jornadaPorDia = dto.jornadaPorDia;
       if (dto.flexivel !== undefined) set.flexivel = dto.flexivel;
+      if (dto.compensaSemana !== undefined) set.compensaSemana = dto.compensaSemana;
       const rows = await tx.update(pontoHorarioContratual).set(set)
         .where(and(eq(pontoHorarioContratual.id, id), eq(pontoHorarioContratual.tenantId, tenantId))).returning();
       if (!rows[0]) throw new NotFoundException('Escala não encontrada');
@@ -389,6 +390,14 @@ export class TratamentoService {
     const [a, m] = comp.split('-').map(Number);
     return `${comp}-${String(new Date(Date.UTC(a!, m!, 0)).getUTCDate()).padStart(2, '0')}`;
   }
+  /** Segunda-feira da semana de uma data (YYYY-MM-DD). */
+  private static segundaDaSemana(dataStr: string): string {
+    const d = new Date(`${dataStr}T12:00:00Z`);
+    const dow = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+    return d.toISOString().slice(0, 10);
+  }
+
   private static somarDias(dataStr: string, dias: number): string {
     const d = new Date(`${dataStr}T12:00:00Z`);
     d.setUTCDate(d.getUTCDate() + dias);
@@ -421,7 +430,17 @@ export class TratamentoService {
       if (!rep) throw new NotFoundException('REP-P não configurado');
 
       const fuso = await this.carregarFuso(tx, tenantId);
-      const inicio = inicioDoDia(inicioStr, fuso);
+      // Escala que compensa na semana: a semana do dia 1º começa no mês anterior
+      // e precisa ser apurada inteira — busca a partir da segunda-feira dela.
+      const idsEscala = [emp.horarioContratualId, ...(await tx.select({ id: empregadoEscalaVigencia.horarioContratualId }).from(empregadoEscalaVigencia)
+        .where(and(eq(empregadoEscalaVigencia.empregadoId, empregadoId), eq(empregadoEscalaVigencia.tenantId, tenantId)))).map((v) => v.id)]
+        .filter((x): x is string => !!x);
+      const escalasEmp = idsEscala.length
+        ? await tx.select({ c: pontoHorarioContratual.compensaSemana, r: pontoHorarioContratual.regime }).from(pontoHorarioContratual).where(inArray(pontoHorarioContratual.id, idsEscala))
+        : [];
+      const compensaSemana = escalasEmp.some((x) => x.c && x.r !== 'r12x36');
+      const inicioQStr = compensaSemana ? TratamentoService.segundaDaSemana(inicioStr) : inicioStr;
+      const inicio = inicioDoDia(inicioQStr, fuso);
       const fim = fimDoDia(fimStr, fuso);
 
       const marcs = await tx.select({ id: pontoMarcacao.id, dtMarcacao: pontoMarcacao.dtMarcacao }).from(pontoMarcacao)
@@ -431,7 +450,7 @@ export class TratamentoService {
 
       // Ajustes aprovados: tira as batidas desconsideradas, soma as incluídas.
       // O AFD segue intocado — isto vale só pro cálculo e pro espelho.
-      const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, inicioStr, fimStr);
+      const aj = await ajustesAprovados(tx as never, tenantId, empregadoId, inicioQStr, fimStr);
       const efetivas = aplicarAjustes(marcs, aj);
 
       const horario = emp.horarioContratualId
@@ -485,7 +504,7 @@ export class TratamentoService {
       // Abonar jornada por atestado vem de ponto_documento, mais abaixo.
       const aus = await tx.select().from(pontoAusencia).where(and(
         eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, empregadoId),
-        gte(pontoAusencia.data, inicioStr), lte(pontoAusencia.data, fimStr)));
+        gte(pontoAusencia.data, inicioQStr), lte(pontoAusencia.data, fimStr)));
       const descansoPorAusencia = new Set<string>(
         aus.filter((a) => a.tipo === 1 || a.tipo === 4).map((a) => a.data));
 
@@ -494,23 +513,23 @@ export class TratamentoService {
       const docs = await tx.select().from(pontoDocumento).where(and(
         eq(pontoDocumento.tenantId, tenantId), eq(pontoDocumento.empregadoId, empregadoId),
         eq(pontoDocumento.status, 'ABONADO'),
-        lte(pontoDocumento.dataInicio, fimStr), gte(pontoDocumento.dataFim, inicioStr)));
+        lte(pontoDocumento.dataInicio, fimStr), gte(pontoDocumento.dataFim, inicioQStr)));
       // Férias, INSS e licenças: o dia não é esperado, então não pode virar falta.
       // Entra pelo mesmo cano do atestado (abono de dia inteiro), que já é testado.
       const afast = await tx.select().from(pontoAfastamento).where(and(
         eq(pontoAfastamento.tenantId, tenantId), eq(pontoAfastamento.empregadoId, empregadoId),
-        lte(pontoAfastamento.dataInicio, fimStr), gte(pontoAfastamento.dataFim, inicioStr)));
+        lte(pontoAfastamento.dataInicio, fimStr), gte(pontoAfastamento.dataFim, inicioQStr)));
 
       const abonoPorData = new Map<string, number>();
       const abonoDiaInteiro = new Set<string>();
       for (const a of afast) {
         for (let dt = a.dataInicio; dt <= a.dataFim; dt = TratamentoService.somarDias(dt, 1)) {
-          if (dt >= inicioStr && dt <= fimStr) abonoDiaInteiro.add(dt);
+          if (dt >= inicioQStr && dt <= fimStr) abonoDiaInteiro.add(dt);
         }
       }
       for (const d of docs) {
         for (let dt = d.dataInicio; dt <= d.dataFim; dt = TratamentoService.somarDias(dt, 1)) {
-          if (dt < inicioStr || dt > fimStr) continue;
+          if (dt < inicioQStr || dt > fimStr) continue;
           if (d.minutos == null) abonoDiaInteiro.add(dt);
           else abonoPorData.set(dt, (abonoPorData.get(dt) ?? 0) + d.minutos);
         }
@@ -518,7 +537,7 @@ export class TratamentoService {
 
       // feriados do banco (calendário do cliente) + os passados por parâmetro
       const feriadosBanco = await tx.select({ data: pontoFeriado.data }).from(pontoFeriado).where(and(
-        eq(pontoFeriado.tenantId, tenantId), gte(pontoFeriado.data, inicioStr), lte(pontoFeriado.data, fimStr)));
+        eq(pontoFeriado.tenantId, tenantId), gte(pontoFeriado.data, inicioQStr), lte(pontoFeriado.data, fimStr)));
       const feriadoSet = new Set<string>([...feriados, ...feriadosBanco.map((f) => f.data)]);
 
       // agrupa as batidas EFETIVAS (com ajustes aprovados) por dia local
@@ -602,7 +621,7 @@ export class TratamentoService {
         }
       } else {
         // varre TODOS os dias do período — assim faltas de dia inteiro aparecem
-        const cursor = new Date(`${inicioStr}T12:00:00${fuso}`);
+        const cursor = new Date(`${inicioQStr}T12:00:00${fuso}`);
         const ultimo = new Date(`${fimStr}T12:00:00${fuso}`);
         while (cursor.getTime() <= ultimo.getTime()) {
           const data = this.diaLocalISO(cursor, fuso);
@@ -628,12 +647,14 @@ export class TratamentoService {
           // Nesse caso avalia só pela duração do dia (a janela fica de fora).
           const jornadaCustomizada = porDiaMap != null && porDiaMap[String(dow)] != null
             && porDiaMap[String(dow)] !== escDia?.durJornadaMin;
-          if (uteisDia.includes(dow)) {
+          // Dias da semana anterior ao período: só entram na apuração da semana.
+          const doPeriodo = data >= inicioStr;
+          if (doPeriodo && uteisDia.includes(dow)) {
             diasEscala.push(data);
             jornadaEscala[data] = durDia;
             if (!ehFeriado) diasUteisCal.push(data);
           }
-          if (ehUtil && jornada > 0 && !abonoDiaInteiro.has(data)) diasPrevistos.push(data);
+          if (doPeriodo && ehUtil && jornada > 0 && !abonoDiaInteiro.has(data)) diasPrevistos.push(data);
           if (naoChegou(data)) {
             // Dia que ainda não chegou: não vira falta (não é apurado), mas a
             // jornada esperada dele entra no contratado do MÊS INTEIRO.
@@ -651,13 +672,16 @@ export class TratamentoService {
             // Contrato de horas (flexível): sem janela — só a carga do dia conta.
             janelaPrevista: (ehUtil && !jornadaCustomizada && !jornadaFlexivel(itens, escDia)) ? escDia?.pares : undefined,
             jornadaFlexivel: jornadaFlexivel(itens, escDia),
+            compensaSemana: !!escDia?.compensaSemana,
             ausenciaAbonadaMin: abonoDiaInteiro.has(data) ? jornada : abonoPorData.get(data),
           });
           cursor.setUTCDate(cursor.getUTCDate() + 1);
         }
       }
 
-      const resultado = apurarPeriodo(dias, regras);
+      // Compensa na semana: extra/atraso/falta por semana; o resultado da semana
+      // entra no mês em que ela termina (a que termina depois do fim fica aberta).
+      const resultado = apurarPeriodo(dias, regras, compensaSemana ? { recorteDe: inicioStr, fimPeriodo: fimStr } : {});
       // Contratado do MÊS INTEIRO: o que já foi apurado + o que falta acontecer.
       resultado.totalContratadoMesMin = resultado.totalContratadoMin + contratadoFuturoMin;
 

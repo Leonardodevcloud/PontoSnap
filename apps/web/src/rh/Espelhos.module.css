@@ -103,3 +103,14 @@
 .bAviso{ font-size:12px; background:rgba(255,248,238,.08); border-radius:10px; padding:9px 11px; margin-top:10px; }
 .bAviso a{ color:var(--lime); }
 .bNota{ font-size:11.5px; opacity:.7; margin-top:10px; }
+
+/* Compensa na semana */
+.semH{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:8px 12px; margin-top:6px; border-radius:10px; background:var(--thead-bg); font-size:12.5px; }
+.semT{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }
+.semT b{ color:var(--ink); }
+.semBar{ flex:1; min-width:80px; max-width:200px; height:6px; border-radius:999px; background:rgba(var(--ink-rgb),.1); overflow:hidden; }
+.semBar i{ display:block; height:100%; background:var(--ok-text); border-radius:999px; }
+.semBar i.semBarNeg{ background:var(--coral); }
+.semV{ font-family:var(--ff-mono); font-weight:700; }
+.semR{ margin-left:auto; font-weight:800; }
+.semMute{ color:var(--ash); font-weight:600; }
