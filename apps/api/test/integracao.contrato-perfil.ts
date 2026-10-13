@@ -54,7 +54,7 @@ async function main() {
   await trat.atualizarHorario(t.id, hor.id, { flexivel: true });
   await comoMaster(db, (tx) => tx.update(pontoPerfilRegra).set({ config: { contrato: { tipoJornada: 'FIXO' } } } as never).where(eq(pontoPerfilRegra.id, perfil.id)));
   const d2 = await dia();
-  ok(d2.extrasTotalMin === 60, `perfil FIXO ganha da escala flexível: volta a ser extra (${d2.extrasTotalMin})`);
+  ok(d2.extrasTotalMin === 0 && d2.saldoMin === 60, `escala de contrato de horas manda, mesmo com perfil FIXO (${d2.extrasTotalMin})`);
 
   // Perfil sem tipo de jornada: segue a escala (legado flexível).
   await comoMaster(db, (tx) => tx.update(pontoPerfilRegra).set({ config: {} } as never).where(eq(pontoPerfilRegra.id, perfil.id)));

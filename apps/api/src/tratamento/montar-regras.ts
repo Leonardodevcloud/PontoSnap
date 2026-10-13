@@ -29,12 +29,12 @@ export const BANCO_CLT: ConfigBanco = { bancoModo: 'HERDA', bancoTipoAcordo: nul
 export const DESTINACAO_CLT: ConfigDestinacao = { destinacaoFaltas: 'DESCONTA', destinacaoAtrasos: 'BANCO' };
 
 /**
- * A jornada do dia é flexível (contrato de horas)? O perfil manda; sem
- * definição no perfil, vale a marca da escala (escalas antigas "flexíveis").
+ * A jornada do dia é flexível (contrato de horas)? Quem define é a ESCALA
+ * (configurada junto com os dias e a carga). Perfis antigos que marcaram
+ * "contrato de horas" continuam valendo (compatibilidade).
  */
 export function jornadaFlexivel(it: ItensResolvidos, escala?: { flexivel?: boolean | null } | null): boolean {
-  if (it.contrato?.tipoJornada) return it.contrato.tipoJornada === 'CONTRATO_HORAS';
-  return !!escala?.flexivel;
+  return !!escala?.flexivel || it.contrato?.tipoJornada === 'CONTRATO_HORAS';
 }
 
 /** Monta as regras de apuração combinando as peças escolhidas (o que faltar, CLT). */

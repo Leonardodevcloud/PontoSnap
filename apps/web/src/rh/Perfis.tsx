@@ -76,7 +76,7 @@ export default function Perfis() {
 function resumo(c: Config): { lb: string; valor: string }[] {
   const h = (min: number) => Math.round(min / 60);
   return [
-    { lb: 'jornada do dia', valor: !c.contrato ? 'como a escala' : c.contrato.tipoJornada === 'CONTRATO_HORAS' ? 'contrato de horas' : 'horário fixo' },
+    ...(c.contrato?.tipoJornada === 'CONTRATO_HORAS' ? [{ lb: 'jornada do dia', valor: 'contrato de horas (forma antiga)' }] : []),
     { lb: 'hora extra', valor: c.extra ? `${c.extra.extraDiaUtilPct}% / ${c.extra.extraDomingoFeriadoPct}%` : 'CLT' },
     { lb: 'tolerância', valor: c.tolerancia ? `${c.tolerancia.toleranciaDiariaMin} min/dia` : 'CLT' },
     { lb: 'noturno', valor: c.noturno ? `${c.noturno.noturnoAdicionalPct}%` : 'CLT' },
@@ -98,10 +98,6 @@ const OPCOES_BANCO: { k: ModoBanco; t: string; d: string; ex?: string }[] = [
   { k: 'MES', t: 'Compensa no mês e paga a diferença', d: 'Extra e atraso do mês se compensam. Se o mês fechar positivo, a diferença é paga como hora extra na folha e o banco zera.', ex: '+8h extra −3h atraso → paga 5h' },
   { k: 'NAO', t: 'Não usa banco: toda hora extra é paga', d: 'Hora extra paga cheia; atraso e falta seguem a regra de desconto. Nada se compensa.' },
 ];
-const OPCOES_JORNADA: { k: 'FIXO' | 'CONTRATO_HORAS'; t: string; d: string; ex: string }[] = [
-  { k: 'FIXO', t: 'Horário fixo', d: 'Tem hora para entrar e sair. Chegar depois é atraso, sair depois é extra.', ex: 'escala 8h–18h · chegou 9h → 1h de atraso' },
-  { k: 'CONTRATO_HORAS', t: 'Contrato de horas', d: 'Entra e sai na hora que quiser. Conta só se cumpriu a carga do dia da escala.', ex: 'carga 8h · fez das 12h às 21h → cumpriu' },
-];
 const faltaTxt = (f: string) => f === 'DESCONTA' ? 'descontam' : f === 'BANCO' ? 'abatem do banco' : 'abonadas';
 
 // ---------------------------------------------------------------------------
@@ -118,15 +114,6 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
 
   // helpers pra ligar/desligar cada bloco e editar campos
   const setBloco = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
-  const [sugestao, setSugestao] = useState<string | null>(null);
-
-  /** Escolhe o tipo de jornada. O banco é decidido à parte (não mexe nele). */
-  function escolherJornada(k: 'FIXO' | 'CONTRATO_HORAS') {
-    setCfg((c) => ({ ...c, contrato: { tipoJornada: k } }));
-    setSugestao(k === 'CONTRATO_HORAS'
-      ? 'Agora escolha no Banco de horas o que acontece com o saldo: acumular entre os meses (positivo e negativo seguem para o mês seguinte) ou compensar no mês e pagar a diferença.'
-      : null);
-  }
 
   async function salvar() {
     if (nome.trim().length < 2) { setErro('Dê um nome ao perfil.'); return; }
@@ -173,28 +160,17 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
         </label>
       </div>
 
-      <div className={css.card}>
-        <p className={css.secaoTit}>Tipo de jornada</p>
-        <p className={css.exp}>Como o dia de trabalho é contado. A carga de cada dia vem da escala do funcionário.</p>
-        <div className={`${css.opBanco} ${css.opDuas}`} role="radiogroup" aria-label="Tipo de jornada">
-          {OPCOES_JORNADA.map((o) => {
-            const on = cfg.contrato?.tipoJornada === o.k;
-            return (
-              <button key={o.k} type="button" role="radio" aria-checked={on}
-                className={`${css.opB} ${on ? css.opBOn : ''}`} onClick={() => escolherJornada(o.k)}>
-                <i className={css.opRd} aria-hidden />
-                <span><b>{o.t}</b><span>{o.d}</span><em className={css.opEx}>{o.ex}</em></span>
-              </button>
-            );
-          })}
-        </div>
-        {!cfg.contrato && (
-          <p className={css.exp} style={{ marginTop: 10 }}>
-            Ainda não definido: vale o que a <strong>escala</strong> de cada funcionário diz (escalas antigas marcadas como “horário flexível” contam como contrato de horas). Escolha uma opção para o perfil mandar.
+      {cfg.contrato && (
+        <div className={css.card}>
+          <p className={css.secaoTit}>Contrato de horas (forma antiga)</p>
+          <p className={css.exp}>
+            Este perfil ainda marca o tipo de jornada ({cfg.contrato.tipoJornada === 'CONTRATO_HORAS' ? 'contrato de horas' : 'horário fixo'}).
+            Agora isso é escolhido na <strong>escala</strong>, junto com os dias e a carga. {cfg.contrato.tipoJornada === 'CONTRATO_HORAS'
+              ? 'Enquanto estiver marcado aqui, quem usa este perfil continua em contrato de horas.' : 'Esta marcação não muda mais nada.'}
           </p>
-        )}
-        {sugestao && <p className={css.sugestao}>{sugestao}</p>}
-      </div>
+          <button type="button" className={css.btnG} onClick={() => setBloco('contrato', null)}>Tirar do perfil (usar só a escala)</button>
+        </div>
+      )}
 
       <Secao titulo="Horas extras"
         ligado={!!cfg.extra}

@@ -29,9 +29,9 @@ function resumoBanco(b: ConfigRegra['banco']): string {
   return `acumula no banco · ${b.bancoPrazoMeses ?? 6}m`;
 }
 
-/** A jornada é contrato de horas? O perfil manda; sem definição, vale a escala (legado). */
+/** A jornada é contrato de horas? Vem da escala (ou de perfil antigo que ainda marca). */
 const ehContratoHoras = (c: ConfigRegra | undefined, escalaFlexivel?: boolean) =>
-  c?.contrato ? c.contrato.tipoJornada === 'CONTRATO_HORAS' : !!escalaFlexivel;
+  !!escalaFlexivel || c?.contrato?.tipoJornada === 'CONTRATO_HORAS';
 
 const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
@@ -72,10 +72,6 @@ export function Funcionarios() {
   const temPerfil = (e: Empregado) => !!e.perfilRegraId;
 
   /** Perfil que vale pro funcionário (o dele ou o padrão da empresa). */
-  const perfilEfetivo = (e: Empregado) => (e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined) ?? perfis.find((x) => x.padrao);
-  /** Contrato de horas que ainda vem da escala (forma antiga): falta definir no perfil. */
-  const desencontrado = (e: Empregado) => e.ativo && !!e.escalaFlexivel && !perfilEfetivo(e)?.config?.contrato;
-  const nDesencontrados = lista?.filter(desencontrado).length ?? 0;
 
   const visiveis = lista?.filter((e) => {
     const q = busca.trim().toLowerCase();
@@ -106,12 +102,6 @@ export function Funcionarios() {
         ))}
       </div>
 
-      {nDesencontrados > 0 && (
-        <div className={css.avisoContrato}>
-          <b>{nDesencontrados === 1 ? '1 funcionário' : `${nDesencontrados} funcionários`} com contrato de horas definido só na escala (forma antiga).</b>{' '}
-          Coloque {nDesencontrados === 1 ? 'ele' : 'eles'} num perfil com “Tipo de jornada: contrato de horas” (em <strong>Perfis de regra</strong>), com a regra de banco certa.
-        </div>
-      )}
 
       <div className={css.cards}>
         {visiveis?.length === 0 && <div className={css.vazio}>{lista?.length === 0 ? 'Ninguém cadastrado ainda. Adiciona o primeiro funcionário.' : 'Nenhum funcionário com esse filtro.'}</div>}
@@ -156,11 +146,6 @@ export function Funcionarios() {
                       ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
                       : <span className={css.bancoResumo}>horário fixo</span>}
                     <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco)}</span>
-                    {desencontrado(e) && (
-                      <span className={css.alertaContrato} title="O contrato de horas vem da escala (forma antiga). Coloque num perfil com Tipo de jornada: contrato de horas.">
-                        ⚠ contrato de horas só na escala: defina no perfil
-                      </span>
-                    )}
                   </>
                 );
               })()}
@@ -699,7 +684,7 @@ function ModalRegras({ perfil, onFechar }: { perfil: PerfilResumo | null; onFech
     { nome: 'Adicional noturno', desc: 'A mais nas horas de madrugada',
       r: c.noturno ? val(`${c.noturno.noturnoAdicionalPct}%`) : clt('20%') },
     { nome: 'Tipo de jornada', desc: 'Como o dia de trabalho é contado',
-      r: !c.contrato ? { custom: false as const, texto: 'Como a escala do funcionário' } : val(c.contrato.tipoJornada === 'CONTRATO_HORAS' ? 'Contrato de horas (sem horário fixo)' : 'Horário fixo') },
+      r: c.contrato?.tipoJornada === 'CONTRATO_HORAS' ? val('Contrato de horas (marcado no perfil, forma antiga)') : { custom: false as const, texto: 'Definido na escala do funcionário' } },
     { nome: 'Jornada semanal', desc: 'Horas normais antes de virar extra',
       r: c.jornada ? val(`${h(c.jornada.jornadaSemanalMin)}h/semana`) : clt('44h') },
     { nome: 'Banco de horas', desc: 'Como as horas extras são tratadas', r: bancoTxt() },

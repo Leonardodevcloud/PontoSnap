@@ -137,33 +137,28 @@ export function Escalas() {
           </select>
         </div>
 
-        {!flexivel && (
-          <p className={css.hint} style={{ margin: '4px 0 16px' }}>
-            <strong>Contrato de horas</strong> (entra e sai em qualquer horário, vale só a carga do dia) agora é escolhido no{' '}
-            <strong>perfil de regra</strong>, junto com o banco de horas. Aqui fica só quais dias e quantas horas.
-          </p>
-        )}
-        {flexivel && (
-        <div className={css.porDiaBox}>
-          <label className={css.porDiaToggle}>
-            <input type="checkbox" checked={flexivel} onChange={(e) => setFlexivel(e.target.checked)} />
-            <span>
-              <strong>Contrato de horas (horário flexível): forma antiga</strong>. Esta escala ainda está marcada assim e continua valendo
-              para quem tem perfil sem “Tipo de jornada” definido. O certo agora é escolher <strong>contrato de horas no perfil de regra</strong>;
-              depois de mover as pessoas, pode desmarcar aqui.
-            </span>
-          </label>
-          {flexivel && (
-            <div className={css.porDiaGrade}>
-              <div className={css.porDiaLinha}>
-                <span className={css.porDiaNome}>Carga/dia</span>
-                <input type="time" className={css.porDiaInput} value={cargaFlex} onChange={(e) => setCargaFlex(e.target.value)} />
-                <span className={css.porDiaUn}>de trabalho</span>
-              </div>
-              <p className={css.hint}>Tolerância, intervalo (Art. 71), interjornada e adicional noturno continuam valendo — só a janela de horário deixa de contar.</p>
+        {regime === 'normal' && (
+          <div className={css.bloco}>
+            <span className={css.lb}>Tipo de jornada</span>
+            <div className={css.tipoJ} role="radiogroup" aria-label="Tipo de jornada">
+              <button type="button" role="radio" aria-checked={!flexivel} className={!flexivel ? css.tipoJOn : ''} onClick={() => setFlexivel(false)}>
+                <b>Horário fixo</b><span>Tem hora para entrar e sair. Chegar depois é atraso, sair depois é extra.</span>
+              </button>
+              <button type="button" role="radio" aria-checked={flexivel} className={flexivel ? css.tipoJOn : ''} onClick={() => { setFlexivel(true); if (!flexivel) setCargaFlex(minParaHhmm(durPares || 480)); }}>
+                <b>Contrato de horas</b><span>Entra e sai na hora que quiser. Vale só a carga do dia: extra acima dela, atraso abaixo.</span>
+              </button>
             </div>
-          )}
-        </div>
+            {flexivel && (
+              <div className={css.porDiaGrade} style={{ marginTop: 10 }}>
+                <div className={css.porDiaLinha}>
+                  <span className={css.porDiaNome} style={{ width: 'auto', minWidth: 72 }}>Carga/dia</span>
+                  <input type="time" className={css.porDiaInput} value={cargaFlex} onChange={(e) => setCargaFlex(e.target.value)} />
+                  <span className={css.porDiaUn}>de trabalho</span>
+                </div>
+                <p className={css.hint}>Tolerância, intervalo (Art. 71), interjornada e adicional noturno continuam valendo; só a janela de horário deixa de contar. O que fazer com o saldo (acumular no banco ou pagar) segue o banco de horas da empresa ou do perfil do funcionário.</p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className={css.bloco}>
@@ -260,7 +255,7 @@ export function Escalas() {
             <span className={css.cod}>{h.codigo}</span>
             <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
             <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
-            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}{h.flexivel ? ' · flexível' : ''}{h.compensaSemana ? ' · compensa na semana' : ''}</span>
+            <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : 'normal'}{h.flexivel ? ' · contrato de horas' : ''}{h.compensaSemana ? ' · compensa na semana' : ''}</span>
             <span className={css.acoes}>
               <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
               <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>
