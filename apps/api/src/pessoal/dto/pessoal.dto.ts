@@ -16,6 +16,8 @@ export class ConfigCltDto {
   @Matches(COMP) vigenteDesde!: string;
   /** true = a partir de vigenteDesde segue o padrão da empresa. */
   @IsOptional() @IsBoolean() usaPadrao?: boolean;
+  /** Dias da semana em home office, sem VT (0=dom … 6=sáb). */
+  @IsOptional() @IsArray() @ArrayMaxSize(7) @IsInt({ each: true }) @Min(0, { each: true }) @Max(6, { each: true }) vtSemDias?: number[];
 }
 
 export class PadraoDto {

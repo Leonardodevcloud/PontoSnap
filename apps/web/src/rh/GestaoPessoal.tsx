@@ -29,6 +29,8 @@ const mesCurto = (c: string) => MESES[Number(c.slice(5, 7)) - 1] ?? c;
 const mesLongo = (c: string) => `${mesCurto(c)} de ${c.slice(0, 4)}`;
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const mesAtual = () => { const d = new Date(Date.now() - 3 * 3600_000); return d.toISOString().slice(0, 7); };
+const DIAS_SEMANA: [number, string][] = [[1, 'Seg'], [2, 'Ter'], [3, 'Qua'], [4, 'Qui'], [5, 'Sex'], [6, 'Sáb'], [0, 'Dom']];
+const nomesDias = (l: number[]) => DIAS_SEMANA.filter(([n]) => l.includes(n)).map(([, t]) => t.toLowerCase()).join(', ');
 const somarMes = (c: string, n: number) => {
   const d = new Date(Date.UTC(Number(c.slice(0, 4)), Number(c.slice(5, 7)) - 1 + n, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -235,7 +237,7 @@ export function GestaoPessoal() {
   const comoTexto: Record<Exclude<Aba, 'historico'>, ReactNode> = {
     folha: <>Valor do dia = salário ÷ dias de trabalho de {mesCurto(mes)}. Extras, faltas e atrasos vêm do ponto. Hora extra de quem tem banco de horas vai pro banco e não entra em R$. Indenização de intervalo é paga sempre (não vai pro banco).</>,
     beneficios: d ? <>Hoje você carrega <b>{mesCurto(d.proxima)}</b>. O que foi pago para <b>{mesCurto(mes)}</b> e não foi usado (feriado, falta, férias, atestado) volta
-      como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos. Sábado de meio turno recebe VT, mas não VR/VA. A cesta só é paga sem falta no mês e depois da carência.
+      como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos. Sábado de meio turno recebe VT, mas não VR/VA. Dia em home office (marcado no painel da pessoa) não recebe VT. A cesta só é paga sem falta no mês e depois da carência.
       {d.clt.some((c) => c.beneficios.pagosEstimado) && <> Como {mesCurto(mes)} ainda não foi fechado no sistema, os dias pagos foram estimados pela escala.</>}</> : null,
     prestadores: <><b>MEI</b> é por mês, com uma nota fiscal no mês: <b>bruto</b> = contrato + extras + feriados trabalhados − faltas + meta (valor da NF);
       valor-hora = contrato ÷ (dias do mês × 8h), extra × 1,5. <b>Motorista</b> é por semana, com uma nota por semana: diária = valor mensal ÷ dias do mês (sem feriados),
@@ -499,7 +501,9 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
                   : <span className={`${vt.pill} ${c.origem === 'PROPRIO' ? vt.pillLime : vt.pillMute}`} title={c.vigenteDesde ? `Vale desde ${mesLongo(c.vigenteDesde)}` : undefined}>{c.origem === 'PROPRIO' ? 'valor próprio' : 'padrão'}</span>}</td>
               <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
               <td className={vt.n}>{b.diasProx}{b.diasProxVr != null && b.diasProxVr !== b.diasProx
-                && <small className={css.sub} title="Sábado de meio turno recebe VT, mas não VR/VA">VR em {b.diasProxVr} · sáb. ½ turno</small>}</td>
+                && <small className={css.sub} title="Sábado de meio turno recebe VT, mas não VR/VA">VR em {b.diasProxVr} · sáb. ½ turno</small>}
+                {c.vtTipo === 'DIA' && b.diasProxVt != null && b.diasProxVt !== b.diasProx
+                && <small className={css.sub} title="Dia em home office não recebe VT">VT em {b.diasProxVt} · {nomesDias(c.vtSemDias ?? [])} home</small>}</td>
               <td className={vt.n}>{b.vrProxCent ? brl(b.vrProxCent) : '—'}</td>
               <td className={vt.n}><StatusCesta l={l} /></td>
               <td className={vt.n}>{c.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)}<small className={css.sub}>{c.vtTipo === 'FIXO' ? 'combustível · fixo' : c.vtTipo === 'DIA' ? `VT ${brl(c.vtValorCent)}/dia` : ''}</small></td>
@@ -878,7 +882,7 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
   const inicial = () => ({
     modo: (l.config.origem === 'PROPRIO' ? 'PROPRIO' : 'PADRAO') as 'PADRAO' | 'PROPRIO',
     ben: { vrDiaCent: l.config.vrDiaCent, cestaCent: l.config.cestaCent, vtTipo: l.config.vtTipo === 'NENHUM' && l.config.origem !== 'PROPRIO' ? 'DIA' as VtTipo : l.config.vtTipo, vtValorCent: l.config.vtValorCent },
-    cargo: l.config.cargo ?? '', pix: l.config.chavePix ?? '', vig: d.proxima,
+    cargo: l.config.cargo ?? '', pix: l.config.chavePix ?? '', vig: d.proxima, semVt: [...(l.config.vtSemDias ?? [])].sort(),
   });
   const [f, setF] = useState(inicial);
   const [salvando, setSalvando] = useState(false);
@@ -895,6 +899,7 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
         cargo: f.cargo, chavePix: f.pix, vigenteDesde: f.vig, usaPadrao: !proprio,
         vrDia: proprio ? f.ben.vrDiaCent / 100 : 0, cestaMensal: proprio ? f.ben.cestaCent / 100 : 0,
         vtTipo: proprio ? f.ben.vtTipo : 'NENHUM', vtValor: proprio && f.ben.vtTipo !== 'NENHUM' ? f.ben.vtValorCent / 100 : 0,
+        vtSemDias: f.semVt,
       });
       await onSalvo(); onAviso(`${l.nome}: ${proprio ? 'valor próprio' : 'padrão da empresa'} a partir de ${mesLongo(f.vig)}.`);
     } catch (e) { setErro((e as Error).message); }
@@ -950,7 +955,8 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
           {b.diasProxVr != null && b.diasProxVr !== b.diasProx && <p className={css.formula}>{b.diasProx - b.diasProxVr} sábado{b.diasProx - b.diasProxVr > 1 ? 's' : ''} de meio turno: recebe VT, mas não VR/VA.</p>}
           <Linha2 k={`Cesta básica de ${mesCurto(mes)}`} v={<StatusCesta l={l} />} />
           {b.cestaStatus === 'PERDIDA_FALTA' && <p className={css.formula}>Faltou em {l.faltasDias.map(fmtDia).join(', ')} — com falta no mês a cesta não é paga.</p>}
-          <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível · fixo mensal' : l.config.vtTipo === 'DIA' ? `VT · ${b.diasProx} dias` : 'Transporte'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
+          <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível · fixo mensal' : l.config.vtTipo === 'DIA' ? `VT · ${b.diasProxVt ?? b.diasProx} dias` : 'Transporte'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
+          {l.config.vtTipo === 'DIA' && b.diasProxVt != null && b.diasProxVt !== b.diasProx && <p className={css.formula}>{b.diasProx - b.diasProxVt} dia{b.diasProx - b.diasProxVt > 1 ? 's' : ''} em home office ({nomesDias(l.config.vtSemDias ?? [])}): sem VT.</p>}
           <Linha2 k={`Acerto de ${mesCurto(mes)}`} v={b.acertoCent ? brl(-b.acertoCent) : '—'} cls={b.acertoCent ? css.neg : ''} />
           {b.naoUsados.length > 0 && <p className={css.formula}>{b.naoUsados.map((x) => `${fmtDia(x.data)} ${ROT_MOTIVO[x.motivo]}`).join(' · ')} — {b.acertoCent
             ? `devolvido pelo valor que foi pago em ${mesCurto(mes)}`
@@ -967,6 +973,17 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
           {f.modo === 'PADRAO'
             ? <p className={css.hint}>{d.padrao ? `${resumoBen(d.padrao)}. Se o padrão mudar, muda pra esta pessoa também.` : 'Defina o padrão em Benefícios → "Definir padrão da empresa".'}</p>
             : <CamposBeneficio f={f.ben} set={(ben) => setF({ ...f, ben })} disabled={fechado} prefixo="pp" />}
+          <div className={css.campo} role="group" aria-label="Dias em home office (sem vale-transporte)">
+            <span>Home office (sem VT)</span>
+            <div className={css.diasSemana}>
+              {DIAS_SEMANA.map(([n, t]) => {
+                const on = f.semVt.includes(n);
+                return <button key={n} type="button" disabled={fechado} aria-pressed={on}
+                  onClick={() => setF({ ...f, semVt: on ? f.semVt.filter((x) => x !== n) : [...f.semVt, n].sort() })}>{t}</button>;
+              })}
+            </div>
+            <small>Marque os dias em que trabalha de casa: nesses dias não recebe VT (VR/VA continua). Meio período presencial recebe VT normalmente.</small>
+          </div>
           <div className={css.grade2}>
             <CampoTexto id="cargo" rotulo="Cargo" valor={f.cargo} onChange={(v) => setF({ ...f, cargo: v })} placeholder="Auxiliar de logística" disabled={fechado} />
             <CampoTexto id="pix" rotulo="Chave Pix (opcional)" valor={f.pix} onChange={(v) => setF({ ...f, pix: v })} disabled={fechado} />
@@ -1080,15 +1097,16 @@ function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinha
 
       {!fechado && aberto === '' && (
         <div className={css.acoes}>
-          <button className={css.btnContornoNeutro} onClick={() => { setR({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes }); setAberto('reajuste'); }}>Reajustar valor</button>
+          <button className={css.btnContornoNeutro} onClick={() => { setR({ valorCent: p.valorCent, baseDias: p.baseDias, vig: mes }); setAberto('reajuste'); }}>Reajustar valor ou dias</button>
           <button className={css.link} onClick={() => { setF({ nome: p.nome, empresa: p.empresa ?? '', inicioAtividade: p.inicioAtividade ?? '', documento: mascaraDoc(p.documento ?? ''), funcao: p.funcao ?? '', chavePix: p.chavePix ?? '' }); setAberto('dados'); }}>Editar nome, empresa, {motorista ? 'documento' : 'CNPJ'} ou Pix</button>
         </div>
       )}
 
       {aberto === 'reajuste' && (
         <>
-          <CampoReais id="rj-val" rotulo="Novo valor mensal" valorCent={r.valorCent} onChange={(c) => setR({ ...r, valorCent: c })} />
-          <Alternar<BaseDias> rotulo="Dias que contam" valor={r.baseDias} onChange={(v) => setR({ ...r, baseDias: v })} opcoes={[['SEG_SAB', 'Segunda a sábado'], ['SEG_SEX', 'Segunda a sexta']]} />
+          <CampoReais id="rj-val" rotulo="Valor mensal" valorCent={r.valorCent} onChange={(c) => setR({ ...r, valorCent: c })} />
+          <Alternar<BaseDias> rotulo="Trabalha no sábado?" valor={r.baseDias} onChange={(v) => setR({ ...r, baseDias: v })} opcoes={[['SEG_SAB', 'Sim: segunda a sábado'], ['SEG_SEX', 'Não: segunda a sexta']]} />
+          <p className={css.hint} style={{ marginTop: -4 }}>Define quantos dias o valor mensal é dividido (valor do dia) e quais dias entram nas semanas do motorista. Pode manter o valor e mudar só os dias.</p>
           <label className={css.campo} htmlFor="rj-vig">
             <span>Vale a partir de</span>
             <span className={css.input}><select id="rj-vig" value={r.vig} onChange={(e) => setR({ ...r, vig: e.target.value })}>
@@ -1450,8 +1468,8 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
             <CampoReais id="p-val" rotulo={mei ? 'Valor do contrato (mensal)' : 'Valor mensal'} valorCent={f.valorCent} onChange={(c) => setF({ ...f, valorCent: c })} />
             {tocado.valor && erros.valor && <small className={css.erroCampo}>{erros.valor}</small>}
           </div>
-          <Alternar<BaseDias> rotulo="Dias que contam para o valor do dia" valor={f.baseDias} onChange={(v) => setF({ ...f, baseDias: v })}
-            opcoes={[['SEG_SAB', 'Segunda a sábado'], ['SEG_SEX', 'Segunda a sexta']]} />
+          <Alternar<BaseDias> rotulo="Trabalha no sábado?" valor={f.baseDias} onChange={(v) => setF({ ...f, baseDias: v })}
+            opcoes={[['SEG_SAB', 'Sim: segunda a sábado'], ['SEG_SEX', 'Não: segunda a sexta']]} />
           <p className={css.hint}>Valor do dia = valor mensal ÷ dias do mês nessa base, já sem os feriados da empresa.</p>
         </section>
         <section className={css.secao}>

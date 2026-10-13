@@ -137,6 +137,11 @@ async function main() {
   // outubro/2026: 22 dias úteis − 12/10 = 21; + 5 sábados (3,10,17,24,31) = 26
   ok(dv.beneficios.diasProx === 26 && dv.beneficios.diasProxVr === 21, `VT em 26 dias, VR em 21 — sábado de 4h sem VR (${dv.beneficios.diasProx}/${dv.beneficios.diasProxVr})`);
   ok(dv.beneficios.vrProxCent === 21 * 2500 && dv.beneficios.vtProxCent === 26 * 1000, 'carga: VR × 21 e VT × 26');
+  // sábado em home office: sem VT no sábado (VR segue a regra do meio turno)
+  await pes.salvarConfigClt(t.id, davi.id, { vrDia: 25, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, vigenteDesde: '2026-09', vtSemDias: [6] });
+  const dh = (await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === davi.id)!;
+  ok(dh.config.vtSemDias?.join() === '6' && dh.beneficios.diasProxVt === 21 && dh.beneficios.vtProxCent === 21 * 1000 && dh.beneficios.vrProxCent === 21 * 2500,
+    `sábado home office: VT em 21 dias, VR igual (${dh.beneficios.diasProxVt} · ${dh.beneficios.vtProxCent})`);
   await pes.excluir(t.id, { pessoaTipo: 'CLT', pessoaId: davi.id, competencia: '2026-09', escopo: 'DIANTE' });
 
   // ── MEI ──

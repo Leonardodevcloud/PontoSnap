@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calcularBeneficio, calcularMei, calcularSemanaMotorista, diasBase, diasComVr, parcelaNoMes, situacaoDebito, semanasDoMes, somarMeses,
+  calcularBeneficio, calcularMei, calcularSemanaMotorista, diasBase, diasComVr, diasComVt, lerDiasSemana, parcelaNoMes, situacaoDebito, semanasDoMes, somarMeses,
 } from '../src/pessoal/calculo';
 
 describe('calendário', () => {
@@ -56,6 +56,19 @@ describe('benefícios com acerto do mês anterior', () => {
     previstosMes: new Set(['2026-10-13', '2026-10-20', '2026-10-21']), // 12/10 é feriado
     faltas: new Set(['2026-10-20']), feriados: new Set(['2026-10-12']),
   };
+  it('lê os dias de home office (vazio = nenhum)', () => {
+    expect(lerDiasSemana('')).toEqual([]);
+    expect(lerDiasSemana(null)).toEqual([]);
+    expect(lerDiasSemana('1,6')).toEqual([1, 6]);
+    expect(diasComVt(['2026-10-09', '2026-10-10'], [6])).toEqual(['2026-10-09']);
+  });
+  it('home office: VT só nos dias presenciais, e o acerto de VT só devolve dia que teve VT', () => {
+    // 12/10 (feriado) não teve VT pago (era home); a falta de 20/10 teve.
+    const r = calcularBeneficio({ ...base, diasProxVt: 15, pagosVt: ['2026-10-13', '2026-10-20', '2026-10-21'] });
+    expect(r.vtProxCent).toBe(15 * 1180);
+    expect(r.acertoVtCent).toBe(1180);
+    expect(r.acertoVrCent).toBe(5000);
+  });
   it('feriado pago e falta do ponto voltam como acerto na carga seguinte', () => {
     const r = calcularBeneficio(base);
     expect(r.vrProxCent).toBe(19 * 2500);

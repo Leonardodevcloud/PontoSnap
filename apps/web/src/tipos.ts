@@ -681,6 +681,8 @@ export interface PessoalLinhaClt {
     origem: 'PADRAO' | 'PROPRIO' | 'NENHUM';
     /** Mês do benefício a partir do qual esse valor vale. */
     vigenteDesde: string | null;
+    /** Dias da semana em home office, sem VT (0=dom … 6=sáb). */
+    vtSemDias?: number[];
   };
   /** Salário do mês (proporcional se mudou no meio). */
   salarioCent: number | null;
@@ -699,6 +701,8 @@ export interface PessoalLinhaClt {
     diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;
     /** Dias da carga com VR/VA (sábado de meio turno fica fora). Fechamentos antigos não têm. */
     diasProxVr?: number; diasProxVrLista?: string[];
+    /** Dias da carga com VT por dia (sem home office). */
+    diasProxVt?: number; diasProxVtLista?: string[];
     vrProxCent: number; vtProxCent: number;
     naoUsados: { data: string; motivo: MotivoNaoUso }[];
     acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;

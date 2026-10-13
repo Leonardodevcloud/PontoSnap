@@ -120,6 +120,10 @@ export interface EntradaBeneficio {
   pagos: string[];
   /** Desses, os que foram pagos com VR/VA. Ausente = todos (regra antiga). */
   pagosVr?: string[];
+  /** Dias da carga que dão VT por dia (sem os de home office). Ausente = diasProx. */
+  diasProxVt?: number;
+  /** Dias pagos com VT por dia (sem home office). Ausente = todos os pagos. */
+  pagosVt?: string[];
   /** Dias em que a pessoa devia trabalhar no mês apurado (sem feriado/afastamento). */
   previstosMes: Set<string>;
   /** Faltas (dia inteiro) do mês apurado, vindas do ponto. */
@@ -172,7 +176,7 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
     : e.cestaLiberada === false ? 'CARENCIA'
     : e.faltas.size > 0 ? 'PERDIDA_FALTA' : 'PAGA';
   const cestaCent = cestaStatus === 'PAGA' ? e.cestaCent : 0;
-  const vtProxCent = e.vtTipo === 'DIA' ? e.diasProx * e.vtValorCent : e.vtTipo === 'FIXO' ? e.vtValorCent : 0;
+  const vtProxCent = e.vtTipo === 'DIA' ? (e.diasProxVt ?? e.diasProx) * e.vtValorCent : e.vtTipo === 'FIXO' ? e.vtValorCent : 0;
 
   const naoUsados = e.pagos
     .filter((d) => !e.previstosMes.has(d) || e.faltas.has(d))
@@ -188,7 +192,10 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
   const nVr = pagosVr ? naoUsados.filter((x) => pagosVr.has(x.data)).length : n;
   const acertoVrCent = pg.vrDiaCent > 0 ? nVr * pg.vrDiaCent : 0;
   const semFeriado = naoUsados.filter((x) => x.motivo !== 'feriado').length;
-  const acertoVtCent = pg.vtTipo === 'DIA' ? n * pg.vtValorCent
+  // VT por dia só volta dos dias em que foi pago (home office não teve VT).
+  const pagosVt = e.pagosVt ? new Set(e.pagosVt) : null;
+  const nVt = pagosVt ? naoUsados.filter((x) => pagosVt.has(x.data)).length : n;
+  const acertoVtCent = pg.vtTipo === 'DIA' ? nVt * pg.vtValorCent
     : pg.vtTipo === 'FIXO' ? Math.round((semFeriado * pg.vtValorCent) / 30) : 0;
   const acertoCent = acertoVrCent + acertoVtCent;
   return {
@@ -256,6 +263,17 @@ export function calcularSemanaMotorista(e: { mensalCent: number; diasMes: number
  * Dias que dão VR/VA: todo dia da escala, menos o sábado de meio turno
  * (jornada do sábado menor que o turno cheio da semana). VT continua em todos.
  */
+/** Dias que dão VT por dia: tira os dias da semana em home office (0=dom … 6=sáb). */
+export function diasComVt(dias: string[], semVt: number[]): string[] {
+  if (!semVt.length) return dias;
+  const fora = new Set(semVt);
+  return dias.filter((d) => !fora.has(diaSemana(d)));
+}
+
+/** "6" / "1,6" → [6] / [1, 6]. */
+export const lerDiasSemana = (s: string | null | undefined): number[] =>
+  (s ?? '').split(',').map((x) => x.trim()).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+
 export function diasComVr(dias: string[], jornada: Record<string, number>): string[] {
   const semana = Object.entries(jornada).filter(([d]) => { const w = diaSemana(d); return w >= 1 && w <= 5; }).map(([, m]) => m);
   const cheio = semana.length ? Math.max(...semana) : Math.max(0, ...Object.values(jornada));

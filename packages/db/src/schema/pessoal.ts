@@ -19,6 +19,8 @@ export const pessoalCltConfig = pgTable('pessoal_clt_config', {
   vtTipo: varchar('vt_tipo', { length: 8 }).notNull().default('NENHUM'),
   vtValor: numeric('vt_valor', { precision: 10, scale: 2 }).notNull().default('0'),
   chavePix: varchar('chave_pix', { length: 120 }),
+  /** Dias da semana em home office, sem VT ("6" = sábado; vírgula separa). Vazio = todos presenciais. */
+  vtSemDias: varchar('vt_sem_dias', { length: 20 }).notNull().default(''),
   /** Competência (mês do benefício) a partir da qual esta linha vale. */
   vigenteDesde: varchar('vigente_desde', { length: 7 }).notNull().default('2000-01'),
   /** true = a partir daqui segue o padrão da empresa (pessoal_padrao). */

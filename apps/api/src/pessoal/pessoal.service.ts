@@ -12,7 +12,7 @@ import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
 import {
-  calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, faixaDoMes, parcelaNoMes, situacaoDebito,
+  calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, diasComVt, lerDiasSemana, faixaDoMes, parcelaNoMes, situacaoDebito,
   semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
 } from './calculo';
 
@@ -28,7 +28,9 @@ export interface LinhaClt {
    * da empresa), PROPRIO (valor da pessoa) ou NENHUM (sem benefício).
    * vigenteDesde = mês do benefício a partir do qual esse valor vale.
    */
-  config: ConfigBeneficio & { cargo: string | null; chavePix: string | null; origem: 'PADRAO' | 'PROPRIO' | 'NENHUM'; vigenteDesde: string | null };
+  config: ConfigBeneficio & { cargo: string | null; chavePix: string | null; origem: 'PADRAO' | 'PROPRIO' | 'NENHUM'; vigenteDesde: string | null;
+    /** Dias da semana em home office (sem VT), 0=dom … 6=sáb. */
+    vtSemDias?: number[] };
   /** Salário do MÊS (proporcional se mudou no meio). null = sem salário. */
   salarioCent: number | null;
   /** Trechos do mês quando o salário mudou (promoção/reajuste); 1 trecho = sem mudança. */
@@ -51,6 +53,8 @@ export interface LinhaClt {
     diasProx: number; diasProxLista: string[]; pagosEstimado: boolean;
     /** Dias da carga com VR/VA (sábado de meio turno fica fora; VT usa diasProxLista). */
     diasProxVr: number; diasProxVrLista: string[];
+    /** Dias da carga com VT por dia (home office fica fora). */
+    diasProxVt?: number; diasProxVtLista?: string[];
     vrProxCent: number; vtProxCent: number;
     naoUsados: { data: string; motivo: MotivoNaoUso }[];
     acertoVrCent: number; acertoVtCent: number; acertoCent: number; cargaCent: number;
@@ -271,6 +275,9 @@ export class PessoalService {
       .map((p) => ({ vigenteDesde: p.vigenteDesde, vrDiaCent: centavos(p.vrDia), cestaCent: centavos(p.cestaMensal), vtTipo: p.vtTipo as VtTipo, vtValorCent: centavos(p.vtValor) }))
       .sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde));
     const padraoEm = (c: string) => padroes.find((p) => p.vigenteDesde <= c) ?? null;
+    /** Dias em home office (sem VT) que valem no mês `c`: da linha própria mais recente ≤ c. */
+    const semVtEm = (empId: string, c: string) => lerDiasSemana(dados.configs.filter((x) => x.empregadoId === empId && x.vigenteDesde <= c)
+      .sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0]?.vtSemDias);
     /** Valor que vale para o benefício do mês `c` (vigência: a linha mais recente ≤ c). */
     const beneficioEm = (empId: string, c: string) => {
       const proprio = dados.configs.filter((x) => x.empregadoId === empId && x.vigenteDesde <= c)
@@ -293,7 +300,7 @@ export class PessoalService {
       // Cargo e Pix não têm vigência: vale o último informado.
       const ultimo = dados.configs.filter((c) => c.empregadoId === e.id).sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
       // A carga feita neste fechamento é do PRÓXIMO mês → vale o valor vigente nele.
-      const config = { ...beneficioEm(e.id, prox), cargo: ultimo?.cargo ?? null, chavePix: ultimo?.chavePix ?? null };
+      const config = { ...beneficioEm(e.id, prox), cargo: ultimo?.cargo ?? null, chavePix: ultimo?.chavePix ?? null, vtSemDias: semVtEm(e.id, prox) };
       let salarioCent: number | null = null;
       let salarioPartes: LinhaClt['salarioPartes'] = [];
       let salarioFimMesCent = 0;
@@ -345,6 +352,9 @@ export class PessoalService {
       // Dias pagos COM VR: o que o fechamento anterior gravou; fechamento antigo
       // (sem a lista) pagou VR em todos; estimado segue a regra do sábado.
       const pagosVr = linhaAnt ? (linhaAnt.beneficios.diasProxVrLista ?? pagosSnap) : diasComVr(diasEscala, jornadaMes);
+      // Dias pagos COM VT por dia: idem; sem fechamento, estima tirando o home office do mês.
+      const pagosVt = linhaAnt ? (linhaAnt.beneficios.diasProxVtLista ?? pagosSnap) : diasComVt(diasEscala, semVtEm(e.id, comp));
+      const diasProxVtLista = diasComVt(diasProxLista, config.vtSemDias);
       // O acerto devolve pelo valor que FOI PAGO para este mês: o do fechamento
       // anterior, ou (sem fechamento) o valor vigente neste mês.
       const pagoCom = linhaAnt?.config ?? beneficioEm(e.id, comp);
@@ -357,6 +367,7 @@ export class PessoalService {
       const ben = calcularBeneficio({
         vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, diasProxVr: diasProxVrLista.length, pagos, pagosVr: pagosVr ?? undefined,
+        diasProxVt: diasProxVtLista.length, pagosVt: pagosVt ?? undefined,
         previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados,
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
@@ -377,7 +388,7 @@ export class PessoalService {
         valorHoraCent: Math.round(salarioFimMesCent / 220),
         heMin, heNoBancoMin, bancoAcertoMin, bancoAcertoCent, bancoPassaMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
         beneficios: {
-          ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, pagosEstimado: !pagosSnap,
+          ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, diasProxVt: diasProxVtLista.length, diasProxVtLista, pagosEstimado: !pagosSnap,
           cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null,
         },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,
@@ -509,7 +520,7 @@ export class PessoalService {
    */
   async salvarConfigClt(tenantId: string, empregadoId: string, d: {
     cargo?: string | null; vrDia: number; cestaMensal: number; vtTipo: VtTipo; vtValor: number; chavePix?: string | null;
-    vigenteDesde: string; usaPadrao?: boolean;
+    vigenteDesde: string; usaPadrao?: boolean; vtSemDias?: number[];
   }) {
     await this.exigirVigenciaAberta(tenantId, d.vigenteDesde);
     return comTenant(this.db, tenantId, async (tx) => {
@@ -520,6 +531,7 @@ export class PessoalService {
         cargo: d.cargo?.trim() || null, vrDia: reais(centavos(d.vrDia)), cestaMensal: reais(centavos(d.cestaMensal)),
         vtTipo: d.vtTipo, vtValor: reais(centavos(d.vtValor)), chavePix: d.chavePix?.trim() || null,
         usaPadrao: !!d.usaPadrao, atualizadoEm: new Date(),
+        vtSemDias: [...new Set(d.vtSemDias ?? [])].filter((n) => n >= 0 && n <= 6).sort().join(','),
       };
       const [r] = await tx.insert(pessoalCltConfig).values({ tenantId, empregadoId, vigenteDesde: d.vigenteDesde, ...v })
         .onConflictDoUpdate({ target: [pessoalCltConfig.tenantId, pessoalCltConfig.empregadoId, pessoalCltConfig.vigenteDesde], set: v }).returning();
