@@ -1,0 +1,62 @@
+.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; }
+.s{ font-size:12.5px; color:var(--ash); margin:2px 0 14px; }
+.erro{ background:var(--erro-bg); color:var(--coral-dark); border-radius:12px; padding:10px 12px; font-weight:700; font-size:14px; }
+.sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+.banner{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--fundo-escuro, #10403F); color:var(--sobre-escuro, #FFF8EE); border:0; border-radius:16px; padding:12px 14px; margin-bottom:12px; cursor:pointer; font:inherit; }
+.banner > span:first-child{ flex:1; min-width:0; }
+.banner b{ display:block; font-size:14px; }
+.banner small{ display:block; opacity:.8; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.go{ background:var(--lime); color:#10403F; border-radius:999px; padding:6px 12px; font-weight:800; font-size:12.5px; white-space:nowrap; }
+.banner:focus-visible{ outline:3px solid var(--coral); outline-offset:2px; }
+
+.secao{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ash); margin:12px 2px 8px; }
+.post{ position:relative; background:var(--white); border-radius:18px; padding:13px; margin-bottom:10px; border:1px solid rgba(var(--ink-rgb),.1); }
+.naoLido::before{ content:""; position:absolute; left:-1px; top:16px; bottom:16px; width:4px; border-radius:0 4px 4px 0; background:var(--coral); }
+.postLink{ position:absolute; inset:0; border:0; background:none; border-radius:18px; cursor:pointer; z-index:0; }
+.postLink:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.post > *:not(.postLink){ position:relative; pointer-events:none; }
+.post .midia, .post .midia *{ pointer-events:auto; }
+.post .midia{ z-index:1; }
+.autor{ display:flex; align-items:center; gap:9px; margin-bottom:8px; }
+.autor b{ display:block; font-size:13.5px; }
+.autor small{ color:var(--ash); font-size:12px; }
+.av{ width:32px; height:32px; border-radius:50%; color:#fff; display:grid; place-items:center; font-family:var(--ff-display); font-weight:600; font-size:13px; flex-shrink:0; }
+.post h3{ margin:0 0 4px; font-size:16px; font-weight:800; line-height:1.3; font-family:var(--ff-body); }
+.trecho{ margin:0; color:var(--ash); font-size:14px; line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.midia, .fotos{ margin-top:10px; }
+.rodape{ display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12.5px; color:var(--ash); flex-wrap:wrap; }
+.pedeCiencia{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); border-radius:8px; padding:3px 8px; font-weight:800; font-size:12px; }
+.lido{ color:var(--ok-text); font-weight:800; font-size:12px; }
+.contReac{ margin-left:auto; display:flex; gap:4px; }
+.contReac span{ background:var(--cream); border-radius:999px; padding:2px 8px; font-weight:800; }
+.vazio{ background:var(--white); border-radius:18px; padding:26px 18px; text-align:center; border:1px dashed rgba(var(--ink-rgb),.2); }
+.vazio b{ font-family:var(--ff-display); font-weight:600; font-size:18px; }
+.vazio p{ margin:6px 0 0; color:var(--ash); font-size:14px; line-height:1.5; }
+.esqueleto{ height:220px; border-radius:18px; background:linear-gradient(110deg,var(--white) 30%,var(--cream) 50%,var(--white) 70%); background-size:200% 100%; animation:brilho 1.2s linear infinite; }
+@keyframes brilho{ to{ background-position:-200% 0; } }
+
+/* leitura */
+.voltar{ align-self:flex-start; background:none; border:0; padding:4px 0; margin-bottom:8px; color:var(--ash); font:inherit; font-weight:800; font-size:14px; cursor:pointer; }
+.leitura{ display:flex; flex-direction:column; gap:4px; }
+.topoVideo{ margin:0 0 12px; }
+.titulo{ font-family:var(--ff-display); font-weight:600; font-size:23px; line-height:1.25; margin:2px 0 10px; }
+.reacoes{ display:flex; gap:6px; flex-wrap:wrap; margin:16px 0 4px; }
+.reacoes button{ border:1px solid rgba(var(--ink-rgb),.14); background:var(--white); border-radius:999px; padding:6px 12px; font-size:16px; cursor:pointer; display:inline-flex; gap:5px; align-items:center; min-height:38px; }
+.reacoes button span{ font-family:var(--ff-mono); font-size:12px; font-weight:700; color:var(--ink); }
+.reacoes .reacOn{ background:var(--peach); border-color:var(--coral); }
+.reacoes button:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.cienteBox{ position:sticky; bottom:calc(58px + env(safe-area-inset-bottom)); margin-top:16px; padding:22px 0 12px; background:linear-gradient(transparent, var(--cream) 28%); text-align:center; z-index:2; }
+.btnCiente{ width:100%; min-height:52px; border-radius:999px; border:0; background:var(--coral-acao); color:var(--on-coral); font:inherit; font-weight:800; font-size:16px; cursor:pointer; box-shadow:0 10px 24px -12px rgba(204,68,38,.7); }
+.btnCiente:disabled{ opacity:.6; }
+.btnCiente:focus-visible{ outline:3px solid var(--ink); outline-offset:3px; }
+.cienteBox small{ display:block; color:var(--ash); font-size:12px; margin-top:6px; }
+.cienteOk{ margin:0; background:var(--ok-bg); color:var(--ok-text); border-radius:14px; padding:12px; font-weight:800; font-size:14px; }
+
+/* Aviso na tela de bater ponto (não bloqueia a batida) */
+.faixa{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--fundo-escuro, #10403F); color:var(--sobre-escuro, #FFF8EE); border:0; border-radius:14px; padding:10px 12px; margin:4px 0 10px; cursor:pointer; font:inherit; }
+.faixa span:first-child{ font-size:18px; }
+.faixa b{ display:block; font-size:13.5px; }
+.faixa small{ display:block; opacity:.8; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.faixa > span:nth-child(2){ flex:1; min-width:0; }
+@media (prefers-reduced-motion:reduce){ .esqueleto{ animation:none; } }

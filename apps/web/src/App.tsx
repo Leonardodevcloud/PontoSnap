@@ -34,6 +34,10 @@ import { BatidasFaltando } from './rh/BatidasFaltando';
 import { Auditoria } from './rh/Auditoria';
 import { Dispositivos } from './rh/Dispositivos';
 import { Notificacoes } from './rh/Notificacoes';
+import { Comunicacao } from './rh/Comunicacao';
+import { ComunicadoEditor } from './rh/ComunicadoEditor';
+import { ComunicadoDetalhe } from './rh/ComunicadoDetalhe';
+import { Avisos, Aviso } from './telas/Avisos';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
 import { Cobranca } from './master/Cobranca';
@@ -97,6 +101,8 @@ export function App() {
         <Route path="banco" element={<MeuBanco />} />
         <Route path="atestados" element={<MeusAtestados />} />
         <Route path="notificacoes" element={<NotificacaoPrefs />} />
+        <Route path="avisos" element={<Avisos />} />
+        <Route path="avisos/:id" element={<Aviso />} />
       </Route>
 
       {/* RH / Admin (desktop) */}
@@ -120,6 +126,10 @@ export function App() {
         <Route path="auditoria" element={<Auditoria />} />
         <Route path="dispositivos" element={<Dispositivos />} />
         <Route path="notificacoes" element={<Notificacoes />} />
+        <Route path="comunicacao" element={<Comunicacao />} />
+        <Route path="comunicacao/novo" element={<ComunicadoEditor key="novo" />} />
+        <Route path="comunicacao/:id" element={<ComunicadoDetalhe />} />
+        <Route path="comunicacao/:id/editar" element={<ComunicadoEditor />} />
         <Route path="assinatura" element={<Assinatura />} />
       </Route>
 

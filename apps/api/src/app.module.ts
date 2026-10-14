@@ -22,12 +22,13 @@ import { NotificacaoModule } from './notificacao/notificacao.module';
 import { JobsModule } from './jobs/jobs.module';
 import { PessoalModule } from './pessoal/pessoal.module';
 import { CadastroModule } from './cadastro/cadastro.module';
+import { ComunicacaoModule } from './comunicacao/comunicacao.module';
 
 @Module({
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule,
+    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule, ComunicacaoModule,
   ],
 })
 export class AppModule {}

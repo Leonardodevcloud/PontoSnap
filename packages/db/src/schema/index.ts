@@ -23,3 +23,4 @@ export * from './dispositivo';
 export * from './job';
 export * from './notificacao';
 export * from './pessoal';
+export * from './comunicacao';

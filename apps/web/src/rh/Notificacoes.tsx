@@ -14,7 +14,7 @@ interface Painel { servidor: { ativo: boolean }; resumo: { ativos: number; comAp
 type Filtro = 'TODOS' | 'ATIVAS' | 'NAO_ATIVOU' | 'SEM_APP';
 const TIPOS: Record<string, string> = {
   lembreteAntes: 'lembrete', esqueceuEntrada: 'esqueceu a entrada', esqueceuAlmoco: 'esqueceu o almoço', esqueceuSaida: 'esqueceu a saída',
-  ajusteRespondido: 'ajuste respondido', atestadoAnalisado: 'atestado', resumoSemanal: 'resumo semanal', sempre: 'aviso do RH', teste: 'teste',
+  ajusteRespondido: 'ajuste respondido', atestadoAnalisado: 'atestado', resumoSemanal: 'resumo semanal', sempre: 'aviso do RH', teste: 'teste', comunicado: 'comunicado',
 };
 const quando = (iso: string | null) => {
   if (!iso) return '—';

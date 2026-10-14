@@ -24,7 +24,7 @@ export interface Notificacao {
 export type TipoNotificacao =
   | 'lembreteAntes' | 'esqueceuEntrada' | 'esqueceuAlmoco' | 'esqueceuSaida'
   | 'ajusteRespondido' | 'atestadoAnalisado' | 'espelhoDisponivel'
-  | 'resumoSemanal' | 'bancoVencendo' | 'sempre' | 'teste';
+  | 'resumoSemanal' | 'bancoVencendo' | 'sempre' | 'teste' | 'comunicado';
 
 export interface ResultadoEnvio { dispositivos: number; entregues: number; duplicada: boolean }
 
@@ -66,7 +66,7 @@ export class PushService {
     tenantId: string, empregadoId: string, usuarioId: string, tipo: TipoNotificacao, notif: Notificacao,
   ): Promise<number> {
     if (!this.configurado) return 0;
-    if (tipo !== 'sempre' && tipo !== 'teste') {
+    if (tipo !== 'sempre' && tipo !== 'teste' && tipo !== 'comunicado') {
       const ok = await this.empregadoQuer(tenantId, empregadoId, tipo);
       if (!ok) return 0;
     }

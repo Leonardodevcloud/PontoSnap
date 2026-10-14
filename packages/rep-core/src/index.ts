@@ -9,3 +9,4 @@ export * from './assinatura/index.js';
 export * from './relatorio-apuracao/index.js';
 export * from './relatorio-competencia/index.js';
 export * from './offline';
+export * from './ciencia-comunicado/index.js';

@@ -43,16 +43,19 @@
 .abas{
   position:fixed; left:0; right:0; bottom:0; z-index:20;
   max-width:440px; margin:0 auto;
-  display:flex; gap:6px; justify-content:center;
-  padding:8px 20px max(10px, env(safe-area-inset-bottom));
+  display:flex; gap:4px; justify-content:center;
+  padding:8px 12px max(10px, env(safe-area-inset-bottom));
   background:var(--cream);
   border-top:1px solid rgba(var(--ink-rgb),.07);
 }
 .abas button{
-  flex:1; max-width:200px; background:transparent; border:1.5px solid transparent; cursor:pointer;
-  font:inherit; font-size:12.5px; font-weight:800; color:var(--ash);
-  padding:10px 6px; border-radius:var(--r-pill); white-space:nowrap;
+  flex:1; min-width:0; max-width:200px; background:transparent; border:1.5px solid transparent; cursor:pointer;
+  font:inherit; font-size:12px; font-weight:800; color:var(--ash); letter-spacing:-.01em;
+  padding:10px 2px; border-radius:var(--r-pill); white-space:nowrap;
 }
+.comBolinha{ position:relative; }
+.bolinha{ position:absolute; top:1px; right:calc(50% - 30px); min-width:17px; height:17px; padding:0 4px; border-radius:999px; background:var(--coral-acao); color:#fff; font-size:10.5px; font-weight:800; display:grid; place-items:center; line-height:1; }
+.faixaZona{ max-width:440px; margin:0 auto; padding:0 22px; }
 .abas .on{ background:var(--white); border-color:rgba(var(--ink-rgb),.1); color:var(--ink); }
 
 /* Zona do banner de instalar o app (PWA) */

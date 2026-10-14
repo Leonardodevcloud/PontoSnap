@@ -8,6 +8,9 @@ import { PromptInstalar } from '../components/PromptInstalar';
 import { NotificacaoPrompt } from './NotificacaoPrompt';
 import { AtualizacaoCadastral, type MeuCadastro } from './AtualizacaoCadastral';
 import css from './LayoutColaborador.module.css';
+import cssAv from './Avisos.module.css';
+
+interface ResumoAvisos { naoLidos: number; pendentesCiencia: number; primeiroPendente: { id: string; titulo: string } | null }
 
 /** Casca das telas do funcionário: marca, navegação e a saída. */
 export function LayoutColaborador() {
@@ -22,6 +25,17 @@ export function LayoutColaborador() {
   useEffect(() => {
     api.get<MeuCadastro>('/cadastro/meu').then(setMeu).catch(() => setMeu('erro'));
   }, []);
+
+  // Avisos do RH: bolinha na aba e faixa na tela de bater ponto (não bloqueia a batida).
+  const [avisos, setAvisos] = useState<ResumoAvisos | null>(null);
+  useEffect(() => {
+    const buscar = () => { api.get<ResumoAvisos>('/comunicacao/meus/resumo').then(setAvisos).catch(() => {}); };
+    buscar();
+    window.addEventListener('pontosnap:avisos', buscar);
+    const vis = () => { if (document.visibilityState === 'visible') buscar(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { window.removeEventListener('pontosnap:avisos', buscar); document.removeEventListener('visibilitychange', vis); };
+  }, [pathname]);
 
   // A aba de banco de horas só existe pra quem tem acordo. Mostrar uma aba
   // vazia seria pior do que não ter aba nenhuma.
@@ -71,6 +85,7 @@ export function LayoutColaborador() {
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/atestados'); }}>Atestados</button>
+                <button role="menuitem" onClick={() => { setMenu(false); navegar('/avisos'); }}>Avisos do RH{avisos?.naoLidos ? ` (${avisos.naoLidos})` : ''}</button>
                 {temBanco && (
                   <button role="menuitem" onClick={() => { setMenu(false); navegar('/banco'); }}>Banco de horas</button>
                 )}
@@ -95,6 +110,15 @@ export function LayoutColaborador() {
       </div>
 
       <main className={css.conteudo}>
+        {pathname === '/' && avisos?.primeiroPendente && (
+          <div className={css.faixaZona}>
+            <button type="button" className={cssAv.faixa} onClick={() => navegar(`/avisos/${avisos.primeiroPendente!.id}`)}>
+              <span aria-hidden="true">📢</span>
+              <span><b>{avisos.pendentesCiencia === 1 ? 'Um aviso do RH pede sua ciência' : `${avisos.pendentesCiencia} avisos do RH pedem sua ciência`}</b><small>{avisos.primeiroPendente.titulo}</small></span>
+              <span className={cssAv.go}>Ver</span>
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
 
@@ -110,6 +134,10 @@ export function LayoutColaborador() {
         </button>
         <button className={pathname === '/atestados' ? css.on : ''} onClick={() => navegar('/atestados')}>
           Atestados
+        </button>
+        <button className={`${pathname.startsWith('/avisos') ? css.on : ''} ${css.comBolinha}`} onClick={() => navegar('/avisos')}
+          aria-label={avisos?.naoLidos ? `Avisos, ${avisos.naoLidos} não ${avisos.naoLidos === 1 ? 'lido' : 'lidos'}` : 'Avisos'}>
+          Avisos{avisos && avisos.naoLidos > 0 && <span className={css.bolinha} aria-hidden="true">{avisos.naoLidos > 9 ? '9+' : avisos.naoLidos}</span>}
         </button>
         {temBanco && (
           <button className={pathname === '/banco' ? css.on : ''} onClick={() => navegar('/banco')}>
