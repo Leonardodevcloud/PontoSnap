@@ -71,6 +71,15 @@ export function resumoMidias(blocos: BlocoComunicado[]): string {
   return nomes.length === 1 ? nomes[0]! : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`;
 }
 
+/** Miniatura da lista do RH: a 1ª foto publicada ou o vídeo (YouTube tem capa pública). */
+export function capaDe(blocos: BlocoComunicado[]): { tipo: 'FOTO'; midiaId: string } | { tipo: 'VIDEO'; provedor: string; videoId: string } | null {
+  for (const b of blocos) {
+    if (b.tipo === 'FOTOS' && b.midias[0]) return { tipo: 'FOTO', midiaId: b.midias[0] };
+    if (b.tipo === 'VIDEO') return { tipo: 'VIDEO', provedor: b.provedor, videoId: b.videoId };
+  }
+  return null;
+}
+
 @Injectable()
 export class ComunicacaoService {
   private readonly log = new Logger(ComunicacaoService.name);
@@ -234,7 +243,7 @@ export class ComunicacaoService {
           id: c.id, titulo: c.titulo, status: c.status as StatusComunicado, fixado: c.fixado, pedirCiencia: c.pedirCiencia,
           publicadoEm: c.publicadoEm?.toISOString() ?? null, agendadoPara: c.agendadoPara?.toISOString() ?? null,
           atualizadoEm: c.atualizadoEm.toISOString(), autorNome: c.autorNome, publico: c.publico,
-          tipos: [...new Set(c.blocos.map((b) => b.tipo))], midias: resumoMidias(c.blocos),
+          tipos: [...new Set(c.blocos.map((b) => b.tipo))], midias: resumoMidias(c.blocos), capa: capaDe(c.blocos),
           destinatarios: d.length, abertos, cientes, pendentesCiencia: pend.length,
         };
       });

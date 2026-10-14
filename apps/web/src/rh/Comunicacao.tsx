@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { quando, type Publico, type StatusComunicado } from '../lib/comunicacao';
+import { miniaturaVideo, quando, useMidia, type Publico, type StatusComunicado } from '../lib/comunicacao';
 import css from './Comunicacao.module.css';
 
 interface Item {
   id: string; titulo: string; status: StatusComunicado; fixado: boolean; pedirCiencia: boolean;
   publicadoEm: string | null; agendadoPara: string | null; atualizadoEm: string; autorNome: string | null; publico: Publico;
-  tipos: string[]; midias: string; destinatarios: number; abertos: number; cientes: number; pendentesCiencia: number;
+  tipos: string[]; midias: string;
+  capa: { tipo: 'FOTO'; midiaId: string } | { tipo: 'VIDEO'; provedor: string; videoId: string } | null; destinatarios: number; abertos: number; cientes: number; pendentesCiencia: number;
 }
 interface Resp {
   itens: Item[];
@@ -20,7 +21,13 @@ type Filtro = 'TODOS' | 'PENDENCIA' | 'AGENDADOS' | 'RASCUNHOS' | 'ARQUIVADOS';
 
 const PUBLICO: Record<string, string> = { TODOS: 'Todos', CLIENTE: 'Por cliente', ESCALA: 'Por escala', PESSOAS: 'Pessoas escolhidas' };
 
+/** Capa do card: a foto publicada (miniatura) ou a capa do vídeo; sem isso, o ícone do tipo. */
 function Miniatura({ i }: { i: Item }) {
+  const foto = useMidia(i.capa?.tipo === 'FOTO' ? `/comunicacao/midia/${i.capa.midiaId}?mini=1` : null);
+  const [semCapa, setSemCapa] = useState(false);
+  const capaVideo = i.capa?.tipo === 'VIDEO' && !semCapa ? miniaturaVideo(i.capa) : null;
+  if (foto.url) return <span className={css.thumb} aria-hidden="true"><img src={foto.url} alt="" /></span>;
+  if (capaVideo) return <span className={`${css.thumb} ${css.tVideo} ${css.thumbVideo}`} aria-hidden="true"><img src={capaVideo} alt="" onError={() => setSemCapa(true)} /><i>▶</i></span>;
   if (i.tipos.includes('VIDEO')) return <span className={`${css.thumb} ${css.tVideo}`} aria-hidden="true">▶</span>;
   if (i.tipos.includes('FOTOS')) return <span className={`${css.thumb} ${css.tFoto}`} aria-hidden="true">🖼</span>;
   if (i.tipos.includes('AUDIO')) return <span className={`${css.thumb} ${css.tAudio}`} aria-hidden="true">🎙</span>;
