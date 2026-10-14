@@ -1,7 +1,7 @@
 /** Ícones de traço do menu e da central (24×24, herdam a cor do texto). */
 export type NomeIcone =
   | 'inicio' | 'calendario' | 'caixa' | 'sol' | 'relogio' | 'dinheiro' | 'documento' | 'pessoas'
-  | 'grade' | 'ajustes' | 'engrenagem' | 'busca' | 'mais' | 'alerta' | 'check' | 'lapis' | 'sair' | 'x' | 'seta';
+  | 'grade' | 'ajustes' | 'engrenagem' | 'sino' | 'busca' | 'mais' | 'alerta' | 'check' | 'lapis' | 'sair' | 'x' | 'seta';
 
 const P: Record<NomeIcone, JSX.Element> = {
   inicio: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></>,
@@ -14,6 +14,7 @@ const P: Record<NomeIcone, JSX.Element> = {
   pessoas: <><circle cx="9" cy="8" r="3.5" /><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6" /><path d="M16 4.5a3.5 3.5 0 010 7M18 14c2.4.6 4 2.8 4 6" /></>,
   grade: <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M3 10h18M9 10v10" /></>,
   ajustes: <><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></>,
+  sino: <><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z" /><path d="M10 20a2 2 0 004 0" /></>,
   engrenagem: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" /></>,
   busca: <><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></>,
   mais: <><circle cx="5" cy="12" r="1.6" fill="currentColor" /><circle cx="12" cy="12" r="1.6" fill="currentColor" /><circle cx="19" cy="12" r="1.6" fill="currentColor" /></>,

@@ -35,8 +35,11 @@ export function BatidasFaltando() {
   async function notificar() {
     setNotificando(true); setMsg(null);
     try {
-      const r = await api.post<{ enviados: number; funcionarios: number }>('/tratamento/batidas-faltando/notificar');
-      setMsg(`Notificação enviada para ${r.funcionarios} funcionário${r.funcionarios > 1 ? 's' : ''}.`);
+      const r = await api.post<{ enviados: number; funcionarios: number; comPendencia?: number }>('/tratamento/batidas-faltando/notificar');
+      const total = r.comPendencia ?? r.funcionarios;
+      setMsg(r.funcionarios === total
+        ? `Notificação entregue para ${r.funcionarios} funcionário${r.funcionarios === 1 ? '' : 's'}.`
+        : `Entregue para ${r.funcionarios} de ${total}. Quem não recebeu está sem notificação ativa no celular (veja em Configurações › Notificações do app).`);
     } catch (e) { setMsg((e as Error).message); }
     finally { setNotificando(false); }
   }

@@ -1,305 +1,127 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { and, eq, gte, lt } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt, lte } from 'drizzle-orm';
 import {
-  empregado, usuario, pontoHorarioContratual, pontoMarcacao, notificacaoPreferencia,
-  tenant, comoMaster, type Db,
+  empregado, usuario, pontoHorarioContratual, pontoMarcacao, notificacaoPreferencia, pushSubscription,
+  pontoFeriado, pontoAfastamento, pontoAusencia, pontoEscala, tenant, comoMaster, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
-import { PushService, type TipoNotificacao } from './push.service';
+import { PushService } from './push.service';
+import { agendaDoMomento } from './agenda';
 
-/** Horário no fuso, HH:MM → minutos desde meia-noite. */
-function hmParaMin(hm: string): number {
-  const [h, m] = hm.split(':').map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-function agoraMin(fuso: string): number {
-  const off = Number(fuso) / 100; // "-0300" → -3
-  const agora = new Date(Date.now() + off * 3600_000);
-  return agora.getUTCHours() * 60 + agora.getUTCMinutes();
-}
-function hojeISO(fuso: string): string {
-  const off = Number(fuso) / 100;
-  return new Date(Date.now() + off * 3600_000).toISOString().slice(0, 10);
-}
-function diaSemana(fuso: string): number {
-  const off = Number(fuso) / 100;
-  return new Date(Date.now() + off * 3600_000).getUTCDay();
+/** Hora local do cliente a partir do fuso "-0300". */
+function agoraLocal(fuso: string) {
+  const sinal = fuso.startsWith('-') ? -1 : 1;
+  const offMin = sinal * (Number(fuso.slice(1, 3)) * 60 + Number(fuso.slice(3, 5) || 0));
+  const d = new Date(Date.now() + offMin * 60_000);
+  return { min: d.getUTCHours() * 60 + d.getUTCMinutes(), hoje: d.toISOString().slice(0, 10), dow: d.getUTCDay(), offMin };
 }
 
-interface EmpComHorario {
-  empId: string;
-  usuarioId: string;
-  tenantId: string;
-  fuso: string;
-  nome: string;
-  pares: Array<{ entrada: string; saida: string }>;
-  diasSemana: number[];
-}
-
+/**
+ * Lembretes e "esqueceu de bater?" automáticos.
+ *
+ * Roda a cada 2 minutos. Só olha quem tem notificação ativa em algum aparelho.
+ * Não manda nada em feriado, folga/ausência, férias/afastamento, dia fora da
+ * escala, antes da data de início do ponto, nem para contrato de horas (sem
+ * horário fixo). A deduplicação fica no PushService (chave por usuário e dia).
+ */
 @Injectable()
 export class NotificacaoCronService implements OnModuleInit {
   private readonly log = new Logger(NotificacaoCronService.name);
+  private rodando = false;
 
-  constructor(
-    @Inject(DB) private readonly db: Db,
-    private readonly push: PushService,
-  ) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly push: PushService) {}
 
   onModuleInit() {
     if (process.env.NOTIF_CRON === 'off') return;
-    // Checa a cada 2 minutos
-    setInterval(() => void this.tick().catch((e) => this.log.error(e.message)), 120_000);
-    // Checa 10s depois do boot
-    setTimeout(() => void this.tick().catch((e) => this.log.error(e.message)), 10_000);
+    if (!this.push.ativo) { this.log.warn('Cron de notificações parado: push sem chaves VAPID.'); return; }
+    setInterval(() => void this.tick(), 120_000);
+    setTimeout(() => void this.tick(), 10_000);
     this.log.log('Cron de notificações ativo (intervalo: 2 min)');
   }
 
-  private async tick() {
-    const tenants = await comoMaster(this.db, (tx) =>
-      tx.select({ id: tenant.id, fuso: tenant.fuso }).from(tenant),
-    );
-    for (const t of tenants) {
-      const fuso = t.fuso ?? '-0300';
-      const agora = agoraMin(fuso);
-      const hoje = hojeISO(fuso);
-      const dow = diaSemana(fuso);
-
-      const emps = await this.listarEmpregadosComHorario(t.id, dow);
-
-      for (const e of emps) {
-        await this.checarLembretes(e, agora, fuso);
-        await this.checarEsquecimentos(e, agora, hoje, fuso);
+  async tick() {
+    if (this.rodando) return; // tick anterior ainda rodando
+    this.rodando = true;
+    try {
+      const tenants = await comoMaster(this.db, (tx) => tx.select({ id: tenant.id, fuso: tenant.fuso }).from(tenant));
+      for (const t of tenants) {
+        try { await this.tickTenant(t.id, t.fuso ?? '-0300'); }
+        catch (e) { this.log.error(`Notificações do cliente ${t.id}: ${(e as Error).message}`); }
       }
-
-      // Resumo semanal: sexta entre 17:58-18:02
-      if (dow === 5 && agora >= 1078 && agora <= 1082) {
-        await this.enviarResumoSemanal(t.id, fuso);
-      }
-    }
+    } finally { this.rodando = false; }
   }
 
-  /** Lista empregados ativos com horário contratual, filtrando pelo dia da semana. */
-  private async listarEmpregadosComHorario(tenantId: string, dow: number): Promise<EmpComHorario[]> {
-    return comoMaster(this.db, async (tx) => {
-      const rows = await tx.select({
-        empId: empregado.id,
-        nome: empregado.nome,
-        tenantId: empregado.tenantId,
-        horarioContratualId: empregado.horarioContratualId,
-      }).from(empregado)
-        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)));
+  async tickTenant(tenantId: string, fuso: string, agoraFixo?: { min: number; hoje: string; dow: number; offMin: number }) {
+    const { min: agora, hoje, dow, offMin } = agoraFixo ?? agoraLocal(fuso);
 
-      const resultado: EmpComHorario[] = [];
-      for (const r of rows) {
-        if (!r.horarioContratualId) continue;
-
-        const hc = (await tx.select().from(pontoHorarioContratual)
-          .where(eq(pontoHorarioContratual.id, r.horarioContratualId)).limit(1))[0];
-        if (!hc) continue;
-        if (!hc.diasSemana.includes(dow)) continue;
-
-        // Buscar usuarioId vinculado a este empregado
-        const u = (await tx.select({ id: usuario.id }).from(usuario)
-          .where(and(eq(usuario.empregadoId, r.empId), eq(usuario.tenantId, tenantId))).limit(1))[0];
-        if (!u) continue;
-
-        resultado.push({
-          empId: r.empId,
-          usuarioId: u.id,
-          tenantId,
-          fuso: '-0300',
-          nome: r.nome,
-          pares: hc.pares,
-          diasSemana: hc.diasSemana,
-        });
-      }
-      return resultado;
+    const dados = await comoMaster(this.db, async (tx) => {
+      // Só quem tem aparelho com notificação ativa.
+      const comPush = await tx.selectDistinct({ usuarioId: pushSubscription.usuarioId }).from(pushSubscription).where(eq(pushSubscription.tenantId, tenantId));
+      if (comPush.length === 0) return null;
+      const feriado = (await tx.select({ id: pontoFeriado.id }).from(pontoFeriado)
+        .where(and(eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.data, hoje))).limit(1)).length > 0;
+      const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId }).from(usuario)
+        .where(and(eq(usuario.tenantId, tenantId), eq(usuario.ativo, true), inArray(usuario.id, comPush.map((c) => c.usuarioId))));
+      const empIds = us.map((u) => u.empregadoId).filter((x): x is string => !!x);
+      if (empIds.length === 0) return null;
+      const emps = await tx.select({
+        id: empregado.id, cpf: empregado.cpf, horarioId: empregado.horarioContratualId, inicio: empregado.dataInicioPonto,
+      }).from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true), inArray(empregado.id, empIds)));
+      const horIds = [...new Set(emps.map((e) => e.horarioId).filter((x): x is string => !!x))];
+      const hors = horIds.length ? await tx.select().from(pontoHorarioContratual).where(inArray(pontoHorarioContratual.id, horIds)) : [];
+      const afast = await tx.select({ e: pontoAfastamento.empregadoId }).from(pontoAfastamento)
+        .where(and(eq(pontoAfastamento.tenantId, tenantId), lte(pontoAfastamento.dataInicio, hoje), gte(pontoAfastamento.dataFim, hoje)));
+      const aus = await tx.select({ e: pontoAusencia.empregadoId }).from(pontoAusencia)
+        .where(and(eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.data, hoje)));
+      const escala = await tx.select({ e: pontoEscala.empregadoId }).from(pontoEscala)
+        .where(and(eq(pontoEscala.tenantId, tenantId), eq(pontoEscala.data, hoje)));
+      const prefs = await tx.select().from(notificacaoPreferencia).where(eq(notificacaoPreferencia.tenantId, tenantId));
+      // Batidas de hoje (dia local).
+      const ini = new Date(Date.parse(`${hoje}T00:00:00Z`) - offMin * 60_000);
+      const fim = new Date(ini.getTime() + 86_400_000);
+      const marcs = await tx.select({ cpf: pontoMarcacao.cpf }).from(pontoMarcacao)
+        .where(and(eq(pontoMarcacao.tenantId, tenantId), gte(pontoMarcacao.dtMarcacao, ini), lt(pontoMarcacao.dtMarcacao, fim)));
+      return { feriado, us, emps, hors, afast, aus, escala, prefs, marcs };
     });
-  }
+    if (!dados || dados.feriado) return { enviados: 0 };
 
-  // ── LEMBRETES (X min antes de cada marcação prevista) ──
+    const horPorId = new Map(dados.hors.map((h) => [h.id, h]));
+    const usuarioDe = new Map(dados.us.filter((u) => u.empregadoId).map((u) => [u.empregadoId!, u.id]));
+    const fora = new Set([...dados.afast.map((a) => a.e), ...dados.aus.map((a) => a.e)]);
+    const temEscalaHoje = new Set(dados.escala.map((x) => x.e));
+    const prefPor = new Map(dados.prefs.map((p) => [p.empregadoId, p]));
+    const batidas = new Map<string, number>();
+    for (const m of dados.marcs) batidas.set(m.cpf, (batidas.get(m.cpf) ?? 0) + 1);
 
-  private async checarLembretes(e: EmpComHorario, agora: number, fuso: string) {
-    // Buscar preferência de minutos
-    const pref = await this.buscarPref(e.tenantId, e.empId);
-    if (!pref.lembreteAntes) return;
-    const antesMin = pref.lembreteMinutos;
-
-    const etiquetas: Array<{ horario: string; tipo: string }> = [];
-    for (let i = 0; i < e.pares.length; i++) {
-      const p = e.pares[i]!;
-      etiquetas.push({ horario: p.entrada, tipo: i === 0 ? 'entrada' : 'volta do almoço' });
-      etiquetas.push({ horario: p.saida, tipo: i === 0 ? 'saída pro almoço' : 'saída' });
+    let enviados = 0;
+    for (const e of dados.emps) {
+      if (fora.has(e.id) || (e.inicio && e.inicio > hoje) || !e.horarioId) continue;
+      const h = horPorId.get(e.horarioId);
+      if (!h) continue;
+      const trabalhaHoje = h.regime === 'r12x36' ? temEscalaHoje.has(e.id) : h.diasSemana.includes(dow);
+      if (!trabalhaHoje) continue;
+      const p = prefPor.get(e.id);
+      const envios = agendaDoMomento({
+        pares: h.pares, flexivel: h.flexivel, marcacoes: batidas.get(e.cpf) ?? 0,
+        jornadaDiaMin: (h.jornadaPorDia as Record<string, number> | null)?.[String(dow)] ?? null,
+        lembreteAntes: p?.lembreteAntes ?? true, lembreteMinutos: p?.lembreteMinutos ?? 10,
+      }, agora, hoje);
+      const usuarioId = usuarioDe.get(e.id)!;
+      for (const v of envios) {
+        enviados += await this.push.enviarParaEmpregado(tenantId, e.id, usuarioId, v.tipo, { titulo: v.titulo, corpo: v.corpo, url: v.url, tag: v.chave });
+      }
     }
 
-    for (const et of etiquetas) {
-      const alvo = hmParaMin(et.horario);
-      const diff = alvo - agora;
-      // Janela: entre [antesMin-1, antesMin+1] pra compensar o intervalo do cron
-      if (diff >= antesMin - 1 && diff <= antesMin + 1) {
-        const textos = this.textoLembrete(et.tipo, et.horario);
-        await this.push.enviarParaEmpregado(e.tenantId, e.empId, e.usuarioId, 'lembreteAntes', {
-          titulo: textos.titulo,
-          corpo: textos.corpo,
-          url: '/',
-          tag: `lembrete-${et.tipo}-${hojeISO(fuso)}`,
+    // Resumo semanal: sexta a partir das 18h (a chave do dia impede repetir).
+    if (dow === 5 && agora >= 18 * 60 && agora <= 20 * 60) {
+      for (const [empId, usuarioId] of usuarioDe) {
+        enviados += await this.push.enviarParaEmpregado(tenantId, empId, usuarioId, 'resumoSemanal', {
+          titulo: 'Sua semana em números',
+          corpo: 'Confira seu espelho para ver as horas trabalhadas e o saldo da semana. Bom fim de semana!',
+          url: '/espelho', tag: `resumo-semanal-${hoje}`,
         });
       }
     }
-  }
-
-  private textoLembrete(tipo: string, horario: string): { titulo: string; corpo: string } {
-    switch (tipo) {
-      case 'entrada':
-        return { titulo: 'Hora de bater o ponto', corpo: `Sua entrada é às ${horario}. Toque pra abrir o app.` };
-      case 'volta do almoço':
-        return { titulo: 'Almoço terminando', corpo: `Sua volta é às ${horario}. Não esquece de bater.` };
-      case 'saída':
-        return { titulo: 'Quase na hora de sair', corpo: `Sua saída é às ${horario}. Bata o ponto antes de ir.` };
-      default:
-        return { titulo: 'Lembrete de ponto', corpo: `Marcação prevista às ${horario}.` };
-    }
-  }
-
-  // ── ESQUECIMENTOS (detecta batida faltante) ──
-
-  private async checarEsquecimentos(e: EmpComHorario, agora: number, hoje: string, fuso: string) {
-    if (e.pares.length === 0) return;
-
-    // Buscar marcações de hoje
-    const marcacoes = await this.marcacoesHoje(e.tenantId, e.empId, hoje, fuso);
-    const totalEsperado = e.pares.length * 2; // cada par tem entrada + saída
-
-    // Montar lista de horários esperados em ordem
-    const esperados: Array<{ min: number; tipo: TipoNotificacao; nome: string }> = [];
-    for (let i = 0; i < e.pares.length; i++) {
-      const p = e.pares[i]!;
-      esperados.push({
-        min: hmParaMin(p.entrada),
-        tipo: i === 0 ? 'esqueceuEntrada' : 'esqueceuAlmoco',
-        nome: i === 0 ? 'entrada' : 'volta do almoço',
-      });
-      esperados.push({
-        min: hmParaMin(p.saida),
-        tipo: i === e.pares.length - 1 ? 'esqueceuSaida' : 'esqueceuAlmoco',
-        nome: i === e.pares.length - 1 ? 'saída' : 'saída pro almoço',
-      });
-    }
-
-    // Pra cada marcação esperada que já deveria ter acontecido (15 min de tolerância),
-    // verificar se existe a marcação correspondente
-    for (let idx = 0; idx < esperados.length; idx++) {
-      const esp = esperados[idx]!;
-      const atraso = agora - esp.min;
-      // Janela: entre 14 e 20 min depois (notifica uma vez nessa janela)
-      if (atraso < 14 || atraso > 20) continue;
-      // Se tem marcações suficientes pra essa posição, ok
-      if (marcacoes >= idx + 1) continue;
-
-      const textos = this.textoEsquecimento(esp.nome, esp.min);
-      await this.push.enviarParaEmpregado(e.tenantId, e.empId, e.usuarioId, esp.tipo, {
-        titulo: textos.titulo,
-        corpo: textos.corpo,
-        url: '/',
-        tag: `esqueceu-${esp.nome}-${hoje}`,
-      });
-    }
-  }
-
-  private textoEsquecimento(tipo: string, minutosEsperado: number): { titulo: string; corpo: string } {
-    const h = String(Math.floor(minutosEsperado / 60)).padStart(2, '0');
-    const m = String(minutosEsperado % 60).padStart(2, '0');
-    const horario = `${h}:${m}`;
-    switch (tipo) {
-      case 'entrada':
-        return { titulo: 'Sua jornada começou', corpo: `Faz um tempo que o expediente iniciou e ainda não tem marcação. Esqueceu?` };
-      case 'volta do almoço':
-        return { titulo: 'Voltou do almoço?', corpo: `Sua volta era às ${horario} e a marcação ainda não apareceu.` };
-      case 'saída':
-        return { titulo: 'Esqueceu a saída?', corpo: `Seu expediente encerrou às ${horario} e falta a marcação de saída.` };
-      default:
-        return { titulo: 'Marcação pendente', corpo: `A marcação das ${horario} ainda não apareceu.` };
-    }
-  }
-
-  /** Conta marcações de hoje pra um empregado (via CPF + timestamp do dia). */
-  private async marcacoesHoje(tenantId: string, empregadoId: string, hoje: string, fuso: string): Promise<number> {
-    return comoMaster(this.db, async (tx) => {
-      // Buscar CPF do empregado
-      const emp = (await tx.select({ cpf: empregado.cpf }).from(empregado)
-        .where(eq(empregado.id, empregadoId)).limit(1))[0];
-      if (!emp) return 0;
-
-      // Calcular início e fim do dia no fuso
-      const offH = Number(fuso) / 100; // "-0300" → -3
-      const inicioUtc = new Date(`${hoje}T00:00:00Z`);
-      inicioUtc.setUTCHours(inicioUtc.getUTCHours() - offH);
-      const fimUtc = new Date(inicioUtc.getTime() + 86_400_000);
-
-      const rows = await tx.select({ id: pontoMarcacao.id }).from(pontoMarcacao)
-        .where(and(
-          eq(pontoMarcacao.tenantId, tenantId),
-          eq(pontoMarcacao.cpf, emp.cpf),
-          gte(pontoMarcacao.dtMarcacao, inicioUtc),
-          lt(pontoMarcacao.dtMarcacao, fimUtc),
-        ));
-      return rows.length;
-    });
-  }
-
-  // ── RESUMO SEMANAL (toda sexta 18h) ──
-
-  private async enviarResumoSemanal(tenantId: string, _fuso: string) {
-    // Simplificado: envia mensagem genérica. O saldo real requer apuração completa
-    // que é pesada — em versão futura, pré-calcular no job de apuração noturna.
-    const emps = await comoMaster(this.db, async (tx) => {
-      const rows = await tx.select({
-        empId: empregado.id,
-        nome: empregado.nome,
-      }).from(empregado)
-        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)));
-
-      const result: Array<{ empId: string; usuarioId: string }> = [];
-      for (const r of rows) {
-        const u = (await tx.select({ id: usuario.id }).from(usuario)
-          .where(and(eq(usuario.empregadoId, r.empId), eq(usuario.tenantId, tenantId))).limit(1))[0];
-        if (u) result.push({ empId: r.empId, usuarioId: u.id });
-      }
-      return result;
-    });
-
-    for (const e of emps) {
-      await this.push.enviarParaEmpregado(tenantId, e.empId, e.usuarioId, 'resumoSemanal', {
-        titulo: 'Sua semana em números',
-        corpo: 'Confira seu espelho pra ver as horas trabalhadas e o saldo da semana. Bom fim de semana!',
-        url: '/espelho',
-        tag: `resumo-semanal-${hojeISO('-0300')}`,
-      });
-    }
-  }
-
-  // ── HELPER: buscar preferências ──
-
-  private async buscarPref(tenantId: string, empregadoId: string) {
-    const rows = await comoMaster(this.db, (tx) =>
-      tx.select().from(notificacaoPreferencia)
-        .where(eq(notificacaoPreferencia.empregadoId, empregadoId)).limit(1),
-    );
-    if (rows.length === 0) {
-      return {
-        lembreteAntes: true, lembreteMinutos: 10,
-        esqueceuEntrada: true, esqueceuAlmoco: true, esqueceuSaida: true,
-        resumoSemanal: false,
-      };
-    }
-    const p = rows[0]!;
-    return {
-      lembreteAntes: p.lembreteAntes,
-      lembreteMinutos: p.lembreteMinutos,
-      esqueceuEntrada: p.esqueceuEntrada,
-      esqueceuAlmoco: p.esqueceuAlmoco,
-      esqueceuSaida: p.esqueceuSaida,
-      resumoSemanal: p.resumoSemanal,
-    };
+    return { enviados };
   }
 }

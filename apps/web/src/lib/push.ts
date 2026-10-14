@@ -76,6 +76,29 @@ export async function ativarNotificacoes(): Promise<{ ok: boolean; erro?: string
   }
 }
 
+/**
+ * Garante que o servidor conhece a inscrição deste aparelho. O navegador pode
+ * ter a inscrição e o servidor não (salvar falhou antes, aparelho trocado de
+ * usuário, limpeza de inscrição vencida). Chamado em silêncio ao abrir o app.
+ */
+export async function sincronizarSubscription(): Promise<boolean> {
+  if (!pushSuportado() || Notification.permission !== 'granted') return false;
+  try {
+    const reg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+    ]);
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return false;
+    const raw = sub.toJSON();
+    await api.post('/notificacao/subscription', {
+      endpoint: sub.endpoint, p256dh: raw.keys?.p256dh ?? '', auth: raw.keys?.auth ?? '',
+      dispositivo: navigator.userAgent.slice(0, 200),
+    });
+    return true;
+  } catch { return false; }
+}
+
 export async function desativarNotificacoes(): Promise<void> {
   if (!pushSuportado()) return;
   try {

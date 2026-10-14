@@ -56,6 +56,7 @@ const CONFIG: ItemMenu[] = [
   { to: '/rh/feriados', rotulo: 'Feriados', icone: 'calendario' },
   { to: '/rh/local', rotulo: 'Local e cerca', icone: 'inicio' },
   { to: '/rh/dispositivos', rotulo: 'Quiosques', icone: 'grade' },
+  { to: '/rh/notificacoes', rotulo: 'Notificações do app', icone: 'sino' },
   { to: '/rh/auditoria', rotulo: 'Auditoria', icone: 'documento' },
   { to: '/rh/assinatura', rotulo: 'Plano e cobrança', icone: 'dinheiro', soAdmin: true },
 ];
@@ -74,7 +75,7 @@ const NOMES: Record<string, string> = {
   '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e benefícios',
   '/rh/relatorios': 'Relatórios', '/rh/fiscal': 'Arquivos fiscais', '/rh/funcionarios': 'Funcionários', '/rh/escalas': 'Escalas',
   '/rh/regras': 'Regras de cálculo', '/rh/feriados': 'Feriados', '/rh/local': 'Local e cerca', '/rh/dispositivos': 'Quiosques',
-  '/rh/auditoria': 'Auditoria', '/rh/assinatura': 'Plano e cobrança',
+  '/rh/auditoria': 'Auditoria', '/rh/notificacoes': 'Notificações do app', '/rh/assinatura': 'Plano e cobrança',
 };
 
 const NOME_PERFIL: Record<string, string> = {

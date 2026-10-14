@@ -1564,6 +1564,7 @@ export class TratamentoService {
     const dados = await this.batidasFaltando(tenantId);
     if (!this.push) return { enviados: 0 };
 
+    let alcancados = 0;
     let enviados = 0;
     for (const g of dados.grupos) {
       // Buscar empregado + usuario pelo nome
@@ -1590,8 +1591,10 @@ export class TratamentoService {
         tag: 'batidas-faltando-' + new Date().toISOString().slice(0, 10),
       });
       enviados += n;
+      if (n > 0) alcancados++;
     }
-    return { enviados, funcionarios: dados.grupos.length };
+    // funcionarios = quantos receberam em pelo menos um aparelho (não quantos tinham pendência).
+    return { enviados, funcionarios: alcancados, comPendencia: dados.grupos.length };
   }
 
 }

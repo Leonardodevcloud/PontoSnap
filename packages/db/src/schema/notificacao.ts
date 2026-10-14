@@ -13,6 +13,10 @@ export const pushSubscription = pgTable('push_subscription', {
   auth: text('auth').notNull(),
   dispositivo: varchar('dispositivo', { length: 200 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+  /** Saúde do aparelho (migration 0054): última entrega aceita e último erro. */
+  ultimoSucessoEm: timestamp('ultimo_sucesso_em', { withTimezone: true }),
+  ultimoErro: varchar('ultimo_erro', { length: 200 }),
+  ultimoErroEm: timestamp('ultimo_erro_em', { withTimezone: true }),
 }, (t) => [unique().on(t.usuarioId, t.endpoint)]);
 
 /** Preferências de notificação de um empregado. */
@@ -33,3 +37,21 @@ export const notificacaoPreferencia = pgTable('notificacao_preferencia', {
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
   atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.empregadoId)]);
+
+/**
+ * Notificação enviada (migration 0054). A chave é única por usuário: o mesmo
+ * lembrete não sai duas vezes, mesmo com o cron rodando em mais de uma instância.
+ */
+export const notificacaoEnvio = pgTable('notificacao_envio', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  usuarioId: uuid('usuario_id').notNull().references(() => usuario.id),
+  empregadoId: uuid('empregado_id').references(() => empregado.id),
+  tipo: varchar('tipo', { length: 30 }).notNull(),
+  chave: varchar('chave', { length: 160 }).notNull(),
+  titulo: varchar('titulo', { length: 160 }).notNull(),
+  dispositivos: integer('dispositivos').notNull().default(0),
+  entregues: integer('entregues').notNull().default(0),
+  erro: varchar('erro', { length: 200 }),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique('uq_notificacao_envio').on(t.usuarioId, t.chave)]);

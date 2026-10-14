@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { pushSuportado, estadoPermissao, temSubscriptionAtiva, ativarNotificacoes } from '../lib/push';
+import { pushSuportado, estadoPermissao, temSubscriptionAtiva, ativarNotificacoes, sincronizarSubscription } from '../lib/push';
 import css from './NotificacaoPrompt.module.css';
 
 const CHAVE_DESCARTOU = 'pontosnap.push.descartou';
@@ -11,6 +11,8 @@ export function NotificacaoPrompt() {
 
   useEffect(() => {
     if (!pushSuportado()) return;
+    // Já ativado neste aparelho: confirma com o servidor (em silêncio).
+    void sincronizarSubscription();
     if (localStorage.getItem(CHAVE_DESCARTOU)) return;
     if (estadoPermissao() === 'denied') return;
 

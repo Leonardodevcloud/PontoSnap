@@ -1,16 +1,19 @@
-import { BadRequestException, Body, Controller, Delete, Get, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, ParseUUIDPipe, Post, Put, UseGuards } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
-import { pushSubscription, notificacaoPreferencia, usuario, comTenant, type Db } from '@ponto/db';
+import { eq, and, ne, desc } from 'drizzle-orm';
+import { Perfil } from '@ponto/shared';
+import { pushSubscription, notificacaoPreferencia, notificacaoEnvio, usuario, empregado, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PushService } from './push.service';
 import { SalvarSubscriptionDto, RemoverSubscriptionDto, SalvarPreferenciasDto } from './dto';
 
 @Controller('notificacao')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class NotificacaoController {
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -42,16 +45,17 @@ export class NotificacaoController {
   @Get('teste')
   async teste(@UsuarioAtual() u: PayloadAcesso) {
     const tenantId = this.exigirTenant(u);
-    const enviados = await this.push.enviarParaUsuario(tenantId, u.sub, {
-      titulo: '🧪 Teste PontoSnap',
-      corpo: 'Se você está vendo isso, as notificações push estão funcionando!',
+    const r = await this.push.enviar(tenantId, u.sub, null, 'teste', {
+      titulo: 'Teste PontoSnap',
+      corpo: 'Se você está vendo isso, as notificações estão funcionando!',
       url: '/',
-      tag: 'teste-push',
+      tag: `teste-${Date.now()}`,
     });
+    const enviados = r.entregues;
     return {
       ok: enviados > 0,
       enviados,
-      configurado: !!this.push.vapidPublicKey,
+      configurado: this.push.ativo,
       usuarioId: u.sub,
       tenantId,
     };
@@ -63,6 +67,9 @@ export class NotificacaoController {
   async salvarSubscription(@UsuarioAtual() u: PayloadAcesso, @Body() dto: SalvarSubscriptionDto) {
     const tenantId = this.exigirTenant(u);
     return comTenant(this.db, tenantId, async (tx) => {
+      // Mesmo aparelho logado antes com outra pessoa: a notificação passa a ser só de quem está logado agora.
+      await tx.delete(pushSubscription).where(and(
+        eq(pushSubscription.tenantId, tenantId), eq(pushSubscription.endpoint, dto.endpoint), ne(pushSubscription.usuarioId, u.sub)));
       const existente = await tx.select({ id: pushSubscription.id }).from(pushSubscription)
         .where(and(
           eq(pushSubscription.usuarioId, u.sub),
@@ -166,4 +173,87 @@ export class NotificacaoController {
       return { ok: true };
     });
   }
+
+  // ── Painel do RH: quem está com notificação ativa ──
+
+  @Get('painel')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  async painel(@UsuarioAtual() u: PayloadAcesso) {
+    const tenantId = this.exigirTenant(u);
+    return comTenant(this.db, tenantId, async (tx) => {
+      const emps = await tx.select({ id: empregado.id, nome: empregado.nome })
+        .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)));
+      const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId, ativo: usuario.ativo })
+        .from(usuario).where(eq(usuario.tenantId, tenantId));
+      const subs = await tx.select({
+        id: pushSubscription.id, usuarioId: pushSubscription.usuarioId, dispositivo: pushSubscription.dispositivo,
+        criadoEm: pushSubscription.criadoEm, ultimoSucessoEm: pushSubscription.ultimoSucessoEm,
+        ultimoErro: pushSubscription.ultimoErro, ultimoErroEm: pushSubscription.ultimoErroEm,
+      }).from(pushSubscription).where(eq(pushSubscription.tenantId, tenantId));
+      const prefs = await tx.select().from(notificacaoPreferencia).where(eq(notificacaoPreferencia.tenantId, tenantId));
+      const envios = await tx.select().from(notificacaoEnvio)
+        .where(eq(notificacaoEnvio.tenantId, tenantId)).orderBy(desc(notificacaoEnvio.criadoEm)).limit(60);
+
+      const usuarioDe = new Map(us.filter((x) => x.empregadoId && x.ativo).map((x) => [x.empregadoId!, x.id]));
+      const empDoUsuario = new Map(us.filter((x) => x.empregadoId).map((x) => [x.id, x.empregadoId!]));
+      const nomeDe = new Map(emps.map((e) => [e.id, e.nome]));
+      const prefDe = new Map(prefs.map((p) => [p.empregadoId, p]));
+      const pessoas = emps.map((e) => {
+        const uid = usuarioDe.get(e.id);
+        const aparelhos = uid ? subs.filter((s) => s.usuarioId === uid).map((s) => ({
+          id: s.id, aparelho: rotuloAparelho(s.dispositivo), criadoEm: s.criadoEm.toISOString(),
+          ultimoSucessoEm: s.ultimoSucessoEm?.toISOString() ?? null, ultimoErro: s.ultimoErro, ultimoErroEm: s.ultimoErroEm?.toISOString() ?? null,
+        })) : [];
+        const p = prefDe.get(e.id);
+        return {
+          empregadoId: e.id, nome: e.nome, temApp: !!uid, aparelhos,
+          preferencias: {
+            lembretes: p ? p.lembreteAntes : true, lembreteMinutos: p ? p.lembreteMinutos : 10,
+            esqueceu: p ? (p.esqueceuEntrada || p.esqueceuAlmoco || p.esqueceuSaida) : true,
+            personalizou: !!p,
+          },
+        };
+      }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      return {
+        servidor: { ativo: this.push.ativo },
+        resumo: {
+          ativos: emps.length,
+          comApp: pessoas.filter((p) => p.temApp).length,
+          comNotificacao: pessoas.filter((p) => p.aparelhos.length > 0).length,
+        },
+        pessoas,
+        envios: envios.map((v) => ({
+          id: v.id, empregadoId: v.empregadoId ?? empDoUsuario.get(v.usuarioId) ?? null,
+          nome: nomeDe.get(v.empregadoId ?? empDoUsuario.get(v.usuarioId) ?? '') ?? 'RH',
+          tipo: v.tipo, titulo: v.titulo, criadoEm: v.criadoEm.toISOString(),
+          dispositivos: v.dispositivos, entregues: v.entregues, erro: v.erro,
+        })),
+      };
+    });
+  }
+
+  /** RH manda uma notificação de teste para um funcionário (confere se chega). */
+  @Post('teste/:empregadoId')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  async testeFuncionario(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId', ParseUUIDPipe) empregadoId: string) {
+    const tenantId = this.exigirTenant(u);
+    if (!this.push.ativo) throw new BadRequestException('O servidor está sem as chaves de notificação (VAPID). Fale com o suporte.');
+    const us = await comTenant(this.db, tenantId, (tx) => tx.select({ id: usuario.id }).from(usuario)
+      .where(and(eq(usuario.tenantId, tenantId), eq(usuario.empregadoId, empregadoId), eq(usuario.ativo, true))).limit(1));
+    if (!us[0]) throw new NotFoundException('Este funcionário não tem acesso ao app.');
+    const r = await this.push.enviar(tenantId, us[0].id, empregadoId, 'teste', {
+      titulo: 'Teste do RH', corpo: 'O RH mandou este teste para conferir se as notificações chegam no seu celular.', url: '/',
+      tag: `teste-rh-${Date.now()}`,
+    });
+    return { dispositivos: r.dispositivos, entregues: r.entregues };
+  }
+}
+
+/** "Mozilla/5.0 (Linux; Android 13; SM-A…) … Chrome/…" → "Android · Chrome". */
+function rotuloAparelho(ua: string | null): string {
+  if (!ua) return 'Aparelho';
+  const so = /iPhone|iPad/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Aparelho';
+  const nav = /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox'
+    : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '';
+  return nav ? `${so} · ${nav}` : so;
 }

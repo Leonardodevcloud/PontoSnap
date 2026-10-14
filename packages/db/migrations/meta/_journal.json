@@ -379,6 +379,13 @@
       "when": 1784689440000,
       "tag": "0053_cadastro_foto",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1784775840000,
+      "tag": "0054_notificacao_envio",
+      "breakpoints": true
     }
   ]
 }

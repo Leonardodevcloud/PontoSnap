@@ -33,6 +33,7 @@ import AjustesPonto from './rh/AjustesPonto';
 import { BatidasFaltando } from './rh/BatidasFaltando';
 import { Auditoria } from './rh/Auditoria';
 import { Dispositivos } from './rh/Dispositivos';
+import { Notificacoes } from './rh/Notificacoes';
 import { LayoutMaster } from './master/LayoutMaster';
 import { Clientes } from './master/Clientes';
 import { Cobranca } from './master/Cobranca';
@@ -118,6 +119,7 @@ export function App() {
         <Route path="batidas-faltando" element={<BatidasFaltando />} />
         <Route path="auditoria" element={<Auditoria />} />
         <Route path="dispositivos" element={<Dispositivos />} />
+        <Route path="notificacoes" element={<Notificacoes />} />
         <Route path="assinatura" element={<Assinatura />} />
       </Route>
 
