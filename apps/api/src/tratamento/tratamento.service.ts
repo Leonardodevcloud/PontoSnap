@@ -1187,9 +1187,9 @@ export class TratamentoService {
 
       const nomePorCpf = new Map(emps.map((e) => [e.cpf, e]));
       const presentes = new Set(marcsHoje.map((m) => m.cpf));
-      const ausentes = emps.filter((e) => !presentes.has(e.cpf)).map((e) => ({ nome: e.nome, matricula: e.matricula }));
+      const ausentes = emps.filter((e) => !presentes.has(e.cpf)).map((e) => ({ nome: e.nome, matricula: e.matricula, empregadoId: e.id }));
       const ultimas = marcsHoje.slice(0, 8).map((m) => ({
-        nome: nomePorCpf.get(m.cpf)?.nome ?? m.cpf, dt: m.dt, coletor: m.coletor,
+        nome: nomePorCpf.get(m.cpf)?.nome ?? m.cpf, dt: m.dt, coletor: m.coletor, empregadoId: nomePorCpf.get(m.cpf)?.id ?? null,
       }));
 
       // Pendências que pedem ação do RH.

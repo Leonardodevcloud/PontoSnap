@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { rotuloMarcacao } from '../lib/formato';
+import { Avatar } from '../components/Avatar';
 import css from './BatidasFaltando.module.css';
 
 interface BatFalt { hora: string; nsr: number | null; id: string }
@@ -103,6 +104,7 @@ export function BatidasFaltando() {
       {dados.grupos.map((g) => (
         <div key={g.empregadoId} className={css.grupo}>
           <div className={css.grupoHead}>
+            <Avatar id={g.empregadoId} nome={g.nome} tamanho={32} />
             <span className={css.grupoNome}>{g.nome}</span>
             <span className={css.grupoBadge}>{g.dias.length}</span>
           </div>

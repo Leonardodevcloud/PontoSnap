@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtHora } from '../lib/formato';
 import type { PainelResp } from '../tipos';
+import { Avatar } from '../components/Avatar';
 import css from './PainelRH.module.css';
 
 const COLETOR: Record<number, string> = { 1: 'App', 2: 'Navegador', 3: 'Desktop', 4: 'Quiosque', 5: 'Outro' };
@@ -121,6 +122,7 @@ export function PainelRH({ embutido = false }: { embutido?: boolean } = {}) {
           <div className={css.lista}>
             {p?.ultimas.map((m, i) => (
               <div key={i} className={css.item}>
+                {m.empregadoId && <Avatar id={m.empregadoId} nome={m.nome} tamanho={30} />}
                 <span className={css.itemNome}>{m.nome}</span>
                 <span className={css.itemHora}>{fmtHora(m.dt)}</span>
                 <span className={css.itemTag}>{COLETOR[m.coletor] ?? '—'}</span>
@@ -135,6 +137,7 @@ export function PainelRH({ embutido = false }: { embutido?: boolean } = {}) {
           <div className={css.lista}>
             {p?.listaAusentes.map((a, i) => (
               <div key={i} className={css.item}>
+                {a.empregadoId && <Avatar id={a.empregadoId} nome={a.nome} tamanho={30} />}
                 <span className={css.itemNome}>{a.nome}</span>
                 <span className={css.itemMat}>{a.matricula ?? '—'}</span>
               </div>

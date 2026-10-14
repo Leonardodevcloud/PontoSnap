@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { rotuloMarcacao } from '../lib/formato';
 import css from './AjustesPonto.module.css';
+import { Avatar } from '../components/Avatar';
 
 interface Pedido {
   id: string;
@@ -124,6 +125,7 @@ export default function AjustesPonto() {
       ) : grupos.map(([chave, doGrupo]) => (
         <div key={chave} className={css.grupo}>
           <div className={css.grupoTop}>
+            <Avatar id={doGrupo[0]!.empregadoId} nome={doGrupo[0]!.nome} tamanho={36} />
             <span className={css.quem}>{doGrupo[0]!.nome}</span>
             <span className={css.quando}>{dia(doGrupo[0]!.data)}</span>
             {doGrupo.length > 1 && <span className={css.contador}>{doGrupo.length} pedidos neste dia</span>}

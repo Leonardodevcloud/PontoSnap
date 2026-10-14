@@ -4,6 +4,7 @@ import { hojeSP } from '../lib/formato';
 import { prepararArquivo, type ArquivoPronto } from '../lib/imagem';
 import type { Documento, StatusDocumento, Empregado, TipoDocumento } from '../tipos';
 import css from './Atestados.module.css';
+import { Avatar } from '../components/Avatar';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
 const fmtQuando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -129,10 +130,13 @@ export function Atestados() {
       {docs.map((d) => (
         <div key={d.id} className={css.rev}>
           <div className={css.revTop}>
-            <div>
+            <div className={css.revQuem}>
+              <Avatar id={d.empregadoId} nome={d.nome ?? ''} tamanho={40} />
+              <div>
               <div className={css.revN}>{d.nome}</div>
               <div className={css.revD}>
                 {ROTULO[d.tipo] ?? d.tipo} · {periodo(d)} · enviado {fmtQuando(d.enviadoEm)}
+              </div>
               </div>
             </div>
             <span className={`${css.st} ${css[`st${d.status}`]}`}>{STATUS[d.status]}</span>

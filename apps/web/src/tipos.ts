@@ -227,9 +227,9 @@ export interface PainelResp {
   ativos: number;
   presentes: number;
   ausentes: number;
-  listaAusentes: { nome: string; matricula: string | null }[];
+  listaAusentes: { nome: string; matricula: string | null; empregadoId?: string }[];
   marcacoesHoje: number;
-  ultimas: { nome: string; dt: string; coletor: number }[];
+  ultimas: { nome: string; dt: string; coletor: number; empregadoId?: string | null }[];
   marcacoesPorTipo?: {
     total: number;
     entradas: number;

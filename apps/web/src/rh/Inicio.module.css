@@ -52,11 +52,11 @@
 .itemT{ margin:0; font-weight:800; font-size:16px; }
 .itemS{ margin:2px 0 0; color:var(--ash); font-size:14px; line-height:1.5; }
 .pessoas{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px; }
-.pessoas a, .pessoas span{
+.pessoas > li > a, .pessoas > li > span{
   display:inline-block; font-size:12.5px; font-weight:700; color:var(--ink); background:var(--cream);
   border-radius:999px; padding:4px 10px; text-decoration:none;
 }
-.pessoas a:hover{ background:var(--peach); }
+.pessoas > li > a:hover{ background:var(--peach); }
 .acoes{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 
 .vazio{ display:flex; gap:14px; align-items:center; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:16px; padding:18px 20px; }
@@ -92,4 +92,4 @@
   .acoes{ grid-column:2; justify-content:flex-start; }
 }
 
-.pessoas a.comAv{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px 3px 3px; }
+.pessoas > li > a.comAv{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px 3px 3px; }

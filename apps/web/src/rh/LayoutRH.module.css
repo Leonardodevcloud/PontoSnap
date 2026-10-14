@@ -76,10 +76,11 @@
 .contentLarga{ max-width:none; }
 
 /* Abas de telas irmãs (Espelhos/Apuração…) */
-.abas{ display:flex; gap:4px; margin:0 0 22px; border-bottom:1px solid rgba(var(--ink-rgb),.12); overflow-x:auto; }
+.abas{ display:flex; gap:4px; margin:0 0 22px; border-bottom:1px solid rgba(var(--ink-rgb),.12); overflow-x:auto; overflow-y:hidden; scrollbar-width:none; }
+.abas::-webkit-scrollbar{ display:none; }
 .aba{
   padding:10px 14px; font-weight:800; font-size:14px; color:var(--ash); text-decoration:none; white-space:nowrap;
-  border-bottom:3px solid transparent; margin-bottom:-1px; min-height:44px; display:flex; align-items:center;
+  border-bottom:3px solid transparent; min-height:44px; display:flex; align-items:center;
 }
 .aba:hover{ color:var(--ink); }
 .abaOn{ color:var(--ink); border-bottom-color:var(--coral); }

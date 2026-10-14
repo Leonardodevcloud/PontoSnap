@@ -23,9 +23,9 @@
 .vazio{text-align:center;padding:40px;font-size:16px;color:var(--ash)}
 
 .grupo{border:1px solid rgba(var(--ink-rgb),.08);border-radius:14px;margin-bottom:8px;overflow:hidden}
-.grupoHead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(var(--ink-rgb),.02)}
+.grupoHead{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(var(--ink-rgb),.02)}
 .grupoNome{font-weight:700;font-size:14px}
-.grupoBadge{font-family:var(--ff-mono);font-size:11px;background:var(--coral-acao);color:var(--on-coral);padding:2px 8px;border-radius:var(--r-pill);font-weight:600}
+.grupoBadge{margin-left:auto;font-family:var(--ff-mono);font-size:11px;background:var(--coral-acao);color:var(--on-coral);padding:2px 8px;border-radius:var(--r-pill);font-weight:600}
 
 .diaRow{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid rgba(var(--ink-rgb),.06)}
 .diaRow:hover{background:rgba(var(--ink-rgb),.02)}
