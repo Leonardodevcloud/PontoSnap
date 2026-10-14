@@ -393,6 +393,13 @@
       "when": 1784862240000,
       "tag": "0055_comunicacao_interna",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1784948640000,
+      "tag": "0056_comunicado_enquete",
+      "breakpoints": true
     }
   ]
 }

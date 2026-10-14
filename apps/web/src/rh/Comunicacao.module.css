@@ -176,3 +176,35 @@ textarea.inp{ min-height:110px; resize:vertical; line-height:1.55; }
   .vPrev{ grid-template-columns:1fr; }
 }
 @media (prefers-reduced-motion:reduce){ .sw::after{ transition:none; } }
+
+/* enquete no editor */
+.enq{ display:flex; flex-direction:column; }
+.ops{ display:flex; flex-direction:column; gap:8px; }
+.op{ display:flex; align-items:center; gap:8px; }
+.opBol, .opCaixa{ width:18px; height:18px; border:2px solid rgba(var(--ink-rgb),.35); flex-shrink:0; }
+.opBol{ border-radius:50%; }
+.opCaixa{ border-radius:5px; }
+.addOp{ align-self:flex-start; background:none; border:1px dashed rgba(var(--ink-rgb),.3); border-radius:999px; padding:7px 14px; font:inherit; font-weight:800; font-size:13.5px; color:var(--ink); cursor:pointer; }
+.addOp:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.atalhos{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:12px 0 2px; font-size:12.5px; color:var(--ash); }
+.enqOps{ margin-top:12px; border-top:1px dashed rgba(var(--ink-rgb),.2); padding-top:10px; }
+.addEnq{ border-color:var(--coral); }
+.inp:disabled{ background:var(--cream); color:var(--ash); }
+
+/* enquete no detalhe */
+.enqRes{ display:flex; flex-direction:column; gap:14px; margin-top:4px; }
+.enqCab{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.enqCab small{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; color:var(--ash); display:block; }
+.enqCab h3{ margin:2px 0 0; font-size:20px; font-family:var(--ff-display); font-weight:600; }
+.enqTot{ font-size:13px; color:var(--ash); }
+.enqTot b{ font-family:var(--ff-display); font-weight:600; font-size:24px; color:var(--ink); }
+.rt{ display:flex; justify-content:space-between; gap:8px; font-size:14px; margin-bottom:5px; }
+.rt span{ color:var(--ash); font-family:var(--ff-mono); font-size:12.5px; white-space:nowrap; }
+.rb{ height:12px; background:var(--cream); border-radius:9px; overflow:hidden; }
+.rb i{ display:block; height:100%; background:rgba(var(--ink-rgb),.35); border-radius:9px; }
+.lider .rb i{ background:var(--ok-text); }
+.quem{ display:flex; align-items:center; margin-top:6px; }
+.quem > *{ margin-left:-6px; border:2px solid var(--white); border-radius:50%; }
+.quem > *:first-child{ margin-left:0; }
+.quem em{ border:0; font-style:normal; font-size:12px; color:var(--ash); margin-left:6px; font-weight:700; }
+.divisor{ border:0; border-top:1px solid rgba(var(--ink-rgb),.08); margin:18px 0 0; }

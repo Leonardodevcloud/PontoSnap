@@ -1,8 +1,8 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import {
-  comunicado, comunicadoDestinatario, comunicadoMidia, empregado, usuario, pushSubscription, pontoHorarioContratual, tenant, pontoRep,
-  comTenant, comoMaster, type Db, type BlocoComunicado, type PublicoComunicado,
+  comunicado, comunicadoDestinatario, comunicadoMidia, comunicadoVoto, empregado, usuario, pushSubscription, pontoHorarioContratual, tenant, pontoRep,
+  comTenant, comoMaster, type Db, type BlocoComunicado, type BlocoEnquete, type PublicoComunicado,
 } from '@ponto/db';
 import { reconhecerVideo } from '@ponto/shared';
 import { gerarCienciaComunicadoPdf } from '@ponto/rep-core';
@@ -67,8 +67,23 @@ export function resumoMidias(blocos: BlocoComunicado[]): string {
   if (tem.has('FOTOS')) nomes.push(blocos.some((b) => b.tipo === 'FOTOS' && b.midias.length > 1) ? 'fotos' : 'foto');
   if (tem.has('AUDIO')) nomes.push('áudio');
   if (tem.has('ARQUIVO')) nomes.push('PDF');
+  if (tem.has('ENQUETE')) nomes.push('enquete');
   if (nomes.length === 0) return '';
   return nomes.length === 1 ? nomes[0]! : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`;
+}
+
+export const enqueteDe = (blocos: BlocoComunicado[]) => blocos.find((b): b is BlocoEnquete => b.tipo === 'ENQUETE') ?? null;
+export const enqueteEncerrada = (e: BlocoEnquete, agora = Date.now()) => !!e.encerraEm && Date.parse(e.encerraEm) <= agora;
+
+/**
+ * Quem ainda deve algo: a ciência (se pedida); senão o voto (se há enquete
+ * aberta); senão a leitura.
+ */
+export function estaPendente(c: { pedirCiencia: boolean; blocos: BlocoComunicado[] }, d: { abertoEm: Date | null; cienteEm: Date | null }, votou: boolean) {
+  if (c.pedirCiencia) return !d.cienteEm;
+  const e = enqueteDe(c.blocos);
+  if (e && !enqueteEncerrada(e)) return !votou;
+  return !d.abertoEm;
 }
 
 /** Miniatura da lista do RH: a 1ª foto publicada ou o vídeo (YouTube tem capa pública). */
@@ -169,6 +184,31 @@ export class ComunicacaoService {
           out.push({ tipo: 'ARQUIVO', midiaId: String(b.midiaId), nome: String(b.nome ?? 'arquivo.pdf').slice(0, 160), bytes: Number(b.bytes) || 0 });
           break;
         }
+        case 'ENQUETE': {
+          if (out.some((x) => x.tipo === 'ENQUETE')) throw new BadRequestException('Use só uma enquete por comunicado.');
+          const pergunta = String(b.pergunta ?? '').trim();
+          if (!pergunta) throw new BadRequestException('Escreva a pergunta da enquete.');
+          if (pergunta.length > 200) throw new BadRequestException('Pergunta da enquete muito longa (máximo 200 caracteres).');
+          const vistos = new Set<string>();
+          const opcoes = (Array.isArray(b.opcoes) ? b.opcoes : []).map((o, i) => {
+            const texto = String(o?.texto ?? '').trim().slice(0, 80);
+            let oid = /^[\w-]{1,24}$/.test(String(o?.id ?? '')) ? String(o.id) : `o${i + 1}`;
+            while (vistos.has(oid)) oid = `${oid}x`;
+            vistos.add(oid);
+            return { id: oid, texto };
+          }).filter((o) => o.texto);
+          if (opcoes.length < 2) throw new BadRequestException('A enquete precisa de pelo menos 2 opções.');
+          if (opcoes.length > 8) throw new BadRequestException('Use no máximo 8 opções na enquete.');
+          if (new Set(opcoes.map((o) => o.texto.toLowerCase())).size !== opcoes.length) throw new BadRequestException('Tem opção repetida na enquete.');
+          let encerraEm: string | null = null;
+          if (b.encerraEm) {
+            const dt = new Date(b.encerraEm);
+            if (Number.isNaN(dt.getTime())) throw new BadRequestException('Data de encerramento da enquete inválida.');
+            encerraEm = dt.toISOString();
+          }
+          out.push({ tipo: 'ENQUETE', pergunta, opcoes, multipla: !!b.multipla, mostrarResultado: b.mostrarResultado !== false, anonima: !!b.anonima, encerraEm });
+          break;
+        }
         default: throw new BadRequestException('Tipo de bloco inválido.');
       }
     }
@@ -223,6 +263,9 @@ export class ComunicacaoService {
       const ds = ids.length ? await tx.select().from(comunicadoDestinatario).where(inArray(comunicadoDestinatario.comunicadoId, ids)) : [];
       const porCom = new Map<string, typeof ds>();
       for (const d of ds) porCom.set(d.comunicadoId, [...(porCom.get(d.comunicadoId) ?? []), d]);
+      const comEnquete = cs.filter((c) => enqueteDe(c.blocos)).map((c) => c.id);
+      const votosPor = new Map((comEnquete.length ? await tx.select({ c: comunicadoVoto.comunicadoId, n: sql<number>`count(*)::int` }).from(comunicadoVoto)
+        .where(inArray(comunicadoVoto.comunicadoId, comEnquete)).groupBy(comunicadoVoto.comunicadoId) : []).map((v) => [v.c, v.n]));
 
       const agora = Date.now();
       const inicioMes = (() => { const x = new Date(agora + offset(fuso) * 60_000); return Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), 1) - offset(fuso) * 60_000; })();
@@ -245,6 +288,7 @@ export class ComunicacaoService {
           atualizadoEm: c.atualizadoEm.toISOString(), autorNome: c.autorNome, publico: c.publico,
           tipos: [...new Set(c.blocos.map((b) => b.tipo))], midias: resumoMidias(c.blocos), capa: capaDe(c.blocos),
           destinatarios: d.length, abertos, cientes, pendentesCiencia: pend.length,
+          votos: enqueteDe(c.blocos) ? votosPor.get(c.id) ?? 0 : null,
         };
       });
       const publicados = itens.filter((i) => i.status === 'PUBLICADO' || i.status === 'ARQUIVADO');
@@ -273,6 +317,9 @@ export class ComunicacaoService {
       const midias = await tx.select({ id: comunicadoMidia.id, tipo: comunicadoMidia.tipo, nome: comunicadoMidia.nome, bytes: comunicadoMidia.bytes })
         .from(comunicadoMidia).where(eq(comunicadoMidia.comunicadoId, id));
       const ds = await tx.select().from(comunicadoDestinatario).where(eq(comunicadoDestinatario.comunicadoId, id));
+      const enq = enqueteDe(c.blocos);
+      const votos = enq ? await tx.select().from(comunicadoVoto).where(eq(comunicadoVoto.comunicadoId, id)) : [];
+      const votoDe = new Map(votos.map((v) => [v.empregadoId, v]));
       const pessoas = new Map((await this.pessoasDoTenant(tx, tenantId)).map((p) => [p.id, p]));
       const faltantes = ds.filter((d) => !pessoas.has(d.empregadoId)).map((d) => d.empregadoId);
       const extras = faltantes.length ? await tx.select({ id: empregado.id, nome: empregado.nome, cliente: empregado.cliente }).from(empregado).where(inArray(empregado.id, faltantes)) : [];
@@ -283,6 +330,11 @@ export class ComunicacaoService {
           empregadoId: d.empregadoId, nome: p?.nome ?? '—', cliente: p?.cliente ?? null, temPush: !!(p && 'temPush' in p && p.temPush),
           abertoEm: d.abertoEm?.toISOString() ?? null, midiaEm: d.midiaEm?.toISOString() ?? null,
           cienteEm: d.cienteEm?.toISOString() ?? null, reacao: d.reacao,
+          votou: votoDe.has(d.empregadoId),
+          // No voto anônimo, o RH sabe quem votou (para lembrar quem falta), mas não em quê.
+          voto: enq && !enq.anonima ? votoDe.get(d.empregadoId)?.opcoes ?? null : null,
+          votoEm: votoDe.get(d.empregadoId)?.alteradoEm.toISOString() ?? null,
+          pendente: estaPendente(c, d, votoDe.has(d.empregadoId)),
         };
       }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       const grupos = new Map<string, { total: number; ok: number }>();
@@ -302,6 +354,12 @@ export class ComunicacaoService {
         notificados: c.notificados, autorNome: c.autorNome, midias, destinatarios,
         porCliente: [...grupos].map(([nome, g]) => ({ nome, ...g })).sort((a, b) => b.total - a.total),
         contagemReacoes: reacoes,
+        enquete: enq ? {
+          pergunta: enq.pergunta, multipla: enq.multipla, anonima: enq.anonima, mostrarResultado: enq.mostrarResultado,
+          encerraEm: enq.encerraEm, encerrada: enqueteEncerrada(enq), total: votos.length,
+          mudaram: votos.filter((v) => v.alteracoes > 0).length,
+          opcoes: enq.opcoes.map((o) => ({ ...o, votos: votos.filter((v) => v.opcoes.includes(o.id)).length })),
+        } : null,
       };
     });
   }
@@ -323,6 +381,18 @@ export class ComunicacaoService {
       }
       const blocos = await this.validarBlocos(tx, tenantId, d.blocos, id);
       const publicado = atual?.status === 'PUBLICADO';
+      if (publicado) {
+        // Enquete publicada: pergunta, opções e regras de voto ficam como estão (os votos apontam para elas).
+        // Dá para mudar só se o funcionário vê o resultado e o prazo.
+        const antiga = enqueteDe(atual!.blocos);
+        const i = blocos.findIndex((b) => b.tipo === 'ENQUETE');
+        if (antiga && i < 0) throw new BadRequestException('A enquete já foi publicada e não pode ser removida. Arquive o comunicado se precisar.');
+        if (!antiga && i >= 0) throw new BadRequestException('Não dá para incluir enquete num comunicado já publicado. Crie um novo comunicado.');
+        if (antiga && i >= 0) {
+          const nova = blocos[i] as BlocoEnquete;
+          blocos[i] = { ...antiga, mostrarResultado: nova.mostrarResultado, encerraEm: nova.encerraEm };
+        }
+      }
       const valores = {
         titulo, blocos,
         // Depois de publicado, o público e a ciência não mudam (o comprovante vale para quem recebeu).
@@ -385,7 +455,7 @@ export class ComunicacaoService {
       if (!c.notificar || !this.push.ativo) return 0;
       const extra = resumoMidias(c.blocos);
       const texto = c.blocos.find((b) => b.tipo === 'TEXTO') as { texto: string } | undefined;
-      const corpo = extra ? `${c.autorNome ?? 'RH'} · ${extra} · toque para ver` : `${c.autorNome ?? 'RH'}: ${(texto?.texto ?? '').slice(0, 110)}`;
+      const corpo = extra ? `${c.autorNome ?? 'RH'} · ${extra} · ${enqueteDe(c.blocos) ? 'toque para votar' : 'toque para ver'}` : `${c.autorNome ?? 'RH'}: ${(texto?.texto ?? '').slice(0, 110)}`;
       const n = await this.notificarPessoas(tenantId, alvo, { titulo: `📢 ${c.titulo}`, corpo, url: `/avisos/${id}`, tag: `comunicado-${id}` });
       await comTenant(this.db, tenantId, (tx) => tx.update(comunicado).set({ notificados: n }).where(eq(comunicado.id, id)));
       return n;
@@ -420,15 +490,19 @@ export class ComunicacaoService {
       if (!c) throw new NotFoundException('Comunicado não encontrado.');
       if (c.status !== 'PUBLICADO') throw new BadRequestException('Só dá para lembrar comunicados publicados.');
       const ds = await tx.select().from(comunicadoDestinatario).where(eq(comunicadoDestinatario.comunicadoId, id));
-      const pend = ds.filter((d) => (c.pedirCiencia ? !d.cienteEm : !d.abertoEm) && (!empregadoIds?.length || empregadoIds.includes(d.empregadoId)));
+      const votaram = new Set((await tx.select({ e: comunicadoVoto.empregadoId }).from(comunicadoVoto).where(eq(comunicadoVoto.comunicadoId, id))).map((v) => v.e));
+      const pend = ds.filter((d) => estaPendente(c, d, votaram.has(d.empregadoId)) && (!empregadoIds?.length || empregadoIds.includes(d.empregadoId)));
       const pessoas = (await this.pessoasDoTenant(tx, tenantId)).filter((p) => pend.some((d) => d.empregadoId === p.id));
       return { c, pessoas };
     });
     if (!this.push.ativo) return { pessoas: r.pessoas.length, receberam: 0, semChaves: true };
     const tag = tagFixa ?? `comunicado-lembrete-${id}-${Date.now()}`;
     const receberam = await this.notificarPessoas(tenantId, r.pessoas, {
-      titulo: r.c.pedirCiencia ? `Falta sua ciência: ${r.c.titulo}` : `Você ainda não viu: ${r.c.titulo}`,
-      corpo: r.c.pedirCiencia ? 'Abra o comunicado e toque em "Li e estou ciente".' : 'Toque para abrir o comunicado do RH.',
+      ...(r.c.pedirCiencia
+        ? { titulo: `Falta sua ciência: ${r.c.titulo}`, corpo: 'Abra o comunicado e toque em "Li e estou ciente".' }
+        : enqueteDe(r.c.blocos) && !enqueteEncerrada(enqueteDe(r.c.blocos)!)
+          ? { titulo: `Falta seu voto: ${r.c.titulo}`, corpo: `📊 ${enqueteDe(r.c.blocos)!.pergunta}`.slice(0, 140) }
+          : { titulo: `Você ainda não viu: ${r.c.titulo}`, corpo: 'Toque para abrir o comunicado do RH.' }),
       url: `/avisos/${id}`, tag,
     });
     return { pessoas: r.pessoas.length, receberam, semChaves: false };
@@ -563,7 +637,10 @@ export class ComunicacaoService {
       linhas: d.destinatarios.map((x) => ({
         nome: x.nome, cpf: extra.cpfs.get(x.empregadoId) ?? '',
         abertoEm: dataHoraLocal(x.abertoEm ? new Date(x.abertoEm) : null, fuso), cienteEm: dataHoraLocal(x.cienteEm ? new Date(x.cienteEm) : null, fuso),
+        votou: x.votou,
+        voto: x.voto ? x.voto.map((o) => d.enquete?.opcoes.find((p) => p.id === o)?.texto ?? o).join(', ') : null,
       })),
+      enquete: d.enquete ? { pergunta: d.enquete.pergunta, anonima: d.enquete.anonima, encerrada: d.enquete.encerrada, total: d.enquete.total, opcoes: d.enquete.opcoes } : null,
     });
     const slug = d.titulo.normalize('NFD').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase().slice(0, 40) || 'comunicado';
     return { buffer, nomeArquivo: `ciencia_${slug}.pdf` };
@@ -581,11 +658,14 @@ export class ComunicacaoService {
       const reac = ids.length ? await tx.select({ c: comunicadoDestinatario.comunicadoId, r: comunicadoDestinatario.reacao, n: sql<number>`count(*)::int` })
         .from(comunicadoDestinatario).where(and(inArray(comunicadoDestinatario.comunicadoId, ids), sql`${comunicadoDestinatario.reacao} is not null`))
         .groupBy(comunicadoDestinatario.comunicadoId, comunicadoDestinatario.reacao) : [];
-      const itens = linhas.map(({ c, d }) => this.cartao(c, d, reac.filter((r) => r.c === c.id)));
+      const comEnq = linhas.filter((l) => enqueteDe(l.c.blocos)).map((l) => l.c.id);
+      const votos = comEnq.length ? await tx.select().from(comunicadoVoto).where(inArray(comunicadoVoto.comunicadoId, comEnq)) : [];
+      const itens = linhas.map(({ c, d }) => this.cartao(c, d, reac.filter((r) => r.c === c.id), votos.filter((v) => v.comunicadoId === c.id), empregadoId));
       return {
         itens,
         naoLidos: itens.filter((i) => !i.abertoEm).length,
         pendentesCiencia: itens.filter((i) => i.pedirCiencia && !i.cienteEm).length,
+        faltaVoto: itens.filter((i) => i.enquete && !i.enquete.encerrada && !i.enquete.meuVoto).length,
       };
     });
   }
@@ -602,7 +682,8 @@ export class ComunicacaoService {
     });
   }
 
-  private cartao(c: typeof comunicado.$inferSelect, d: typeof comunicadoDestinatario.$inferSelect, reac: { r: string | null; n: number }[]) {
+  private cartao(c: typeof comunicado.$inferSelect, d: typeof comunicadoDestinatario.$inferSelect, reac: { r: string | null; n: number }[],
+    votos: (typeof comunicadoVoto.$inferSelect)[], empregadoId: string) {
     const texto = c.blocos.find((b) => b.tipo === 'TEXTO') as { texto: string } | undefined;
     const video = c.blocos.find((b) => b.tipo === 'VIDEO') as Extract<BlocoComunicado, { tipo: 'VIDEO' }> | undefined;
     const fotos = c.blocos.flatMap((b) => (b.tipo === 'FOTOS' ? b.midias : []));
@@ -621,7 +702,68 @@ export class ComunicacaoService {
       fotos: fotos.slice(0, 3), totalFotos: fotos.length, audio: audio ?? null, outros,
       abertoEm: d.abertoEm?.toISOString() ?? null, cienteEm: d.cienteEm?.toISOString() ?? null, midiaEm: d.midiaEm?.toISOString() ?? null,
       minhaReacao: d.reacao, reacoes: c.reacoes ? Object.fromEntries(reac.filter((r) => r.r).map((r) => [r.r!, r.n])) : {},
+      enquete: this.estadoEnquete(c.blocos, votos, empregadoId),
     };
+  }
+
+  /**
+   * A enquete vista pelo funcionário: o voto dele e, se o RH deixou, o
+   * resultado parcial (só depois de votar, ou quando encerra).
+   */
+  private estadoEnquete(blocos: BlocoComunicado[], votos: (typeof comunicadoVoto.$inferSelect)[], empregadoId: string) {
+    const e = enqueteDe(blocos);
+    if (!e) return null;
+    const meu = votos.find((v) => v.empregadoId === empregadoId);
+    const encerrada = enqueteEncerrada(e);
+    const verResultado = e.mostrarResultado && (!!meu || encerrada);
+    return {
+      pergunta: e.pergunta, multipla: e.multipla, encerraEm: e.encerraEm, encerrada, total: votos.length,
+      opcoes: e.opcoes.map((o) => ({ ...o, votos: verResultado ? votos.filter((v) => v.opcoes.includes(o.id)).length : null })),
+      meuVoto: meu?.opcoes ?? null, votadoEm: meu?.alteradoEm.toISOString() ?? null, verResultado,
+    };
+  }
+
+  /** Vota (ou muda o voto) na enquete do comunicado. */
+  async votar(tenantId: string, empregadoId: string, id: string, opcoes: string[]) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const { c, d } = await this.meuDestino(tx, tenantId, empregadoId, id);
+      const e = enqueteDe(c.blocos);
+      if (!e) throw new BadRequestException('Este comunicado não tem enquete.');
+      if (enqueteEncerrada(e)) throw new BadRequestException('A votação já encerrou.');
+      const escolha = [...new Set((opcoes ?? []).map(String))];
+      if (escolha.length === 0) throw new BadRequestException('Escolha uma opção.');
+      if (!e.multipla && escolha.length > 1) throw new BadRequestException('Nesta enquete, escolha só uma opção.');
+      if (escolha.some((o) => !e.opcoes.some((x) => x.id === o))) throw new BadRequestException('Opção inválida. Atualize a tela e tente de novo.');
+      const ordenada = e.opcoes.map((o) => o.id).filter((o) => escolha.includes(o));
+      const agora = new Date();
+      const atual = (await tx.select().from(comunicadoVoto).where(and(eq(comunicadoVoto.comunicadoId, id), eq(comunicadoVoto.empregadoId, empregadoId))).limit(1))[0];
+      if (!atual) {
+        await tx.insert(comunicadoVoto).values({ comunicadoId: id, empregadoId, tenantId, opcoes: ordenada, votadoEm: agora, alteradoEm: agora });
+      } else if (JSON.stringify(atual.opcoes) !== JSON.stringify(ordenada)) {
+        await tx.update(comunicadoVoto).set({ opcoes: ordenada, alteradoEm: agora, alteracoes: atual.alteracoes + 1 })
+          .where(and(eq(comunicadoVoto.comunicadoId, id), eq(comunicadoVoto.empregadoId, empregadoId)));
+      }
+      if (!d.abertoEm) {
+        await tx.update(comunicadoDestinatario).set({ abertoEm: agora })
+          .where(and(eq(comunicadoDestinatario.comunicadoId, id), eq(comunicadoDestinatario.empregadoId, empregadoId)));
+      }
+      const votos = await tx.select().from(comunicadoVoto).where(eq(comunicadoVoto.comunicadoId, id));
+      return this.estadoEnquete(c.blocos, votos, empregadoId)!;
+    });
+  }
+
+  /** O RH encerra a votação agora (o resultado fica congelado). */
+  async encerrarEnquete(tenantId: string, id: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const c = (await tx.select().from(comunicado).where(and(eq(comunicado.tenantId, tenantId), eq(comunicado.id, id))).limit(1))[0];
+      if (!c) throw new NotFoundException('Comunicado não encontrado.');
+      const e = enqueteDe(c.blocos);
+      if (!e) throw new BadRequestException('Este comunicado não tem enquete.');
+      if (enqueteEncerrada(e)) return { ok: true };
+      const blocos = c.blocos.map((b) => (b.tipo === 'ENQUETE' ? { ...b, encerraEm: new Date().toISOString() } : b));
+      await tx.update(comunicado).set({ blocos, atualizadoEm: new Date() }).where(eq(comunicado.id, id));
+      return { ok: true };
+    });
   }
 
   private async meuDestino(tx: Tx, tenantId: string, empregadoId: string, id: string) {
@@ -646,11 +788,13 @@ export class ComunicacaoService {
         .from(comunicadoMidia).where(eq(comunicadoMidia.comunicadoId, id));
       const reac = await tx.select({ r: comunicadoDestinatario.reacao, n: sql<number>`count(*)::int` }).from(comunicadoDestinatario)
         .where(and(eq(comunicadoDestinatario.comunicadoId, id), sql`${comunicadoDestinatario.reacao} is not null`)).groupBy(comunicadoDestinatario.reacao);
+      const votos = enqueteDe(c.blocos) ? await tx.select().from(comunicadoVoto).where(eq(comunicadoVoto.comunicadoId, id)) : [];
       return {
         id: c.id, titulo: c.titulo, autorNome: c.autorNome ?? 'RH', publicadoEm: c.publicadoEm!.toISOString(), blocos: c.blocos, midias,
         pedirCiencia: c.pedirCiencia, reacoesAtivas: c.reacoes,
         abertoEm: abertoEm.toISOString(), cienteEm: d.cienteEm?.toISOString() ?? null, midiaEm: d.midiaEm?.toISOString() ?? null,
         minhaReacao: d.reacao, reacoes: c.reacoes ? Object.fromEntries(reac.filter((r) => r.r).map((r) => [r.r!, r.n])) : {},
+        enquete: this.estadoEnquete(c.blocos, votos, empregadoId),
       };
     });
   }

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import {
   analisarAudio, enviarMidia, formatoGravacao, mmss, prepararFoto, tamanho, useMidia,
-  type Bloco, type Publico, type StatusComunicado,
+  type Bloco, type BlocoEnquete, type Publico, type StatusComunicado,
 } from '../lib/comunicacao';
 import { ArquivoPdf, ComunicadoView, PlayerAudio, VideoEmbed } from '../components/comunicado/ComunicadoView';
 import { PainelLateral } from '../components/PainelLateral';
@@ -26,7 +26,17 @@ const caminhoRH = (id: string, mini?: boolean) => `/comunicacao/midia/${id}${min
 const CHAVE_AUTOR = 'pontosnap.comunicado.autor';
 let seq = 0;
 const novaChave = () => `b${Date.now()}${seq++}`;
-const NOMES: Record<string, string> = { TEXTO: 'Texto', FOTOS: 'Fotos', AUDIO: 'Áudio', VIDEO: 'Vídeo', ARQUIVO: 'Arquivo PDF', GRAVANDO: 'Áudio · gravando' };
+const NOMES: Record<string, string> = { TEXTO: 'Texto', FOTOS: 'Fotos', AUDIO: 'Áudio', VIDEO: 'Vídeo', ARQUIVO: 'Arquivo PDF', GRAVANDO: 'Áudio · gravando', ENQUETE: 'Enquete' };
+const idOpcao = () => `o${Math.random().toString(36).slice(2, 8)}`;
+const ATALHOS: { rotulo: string; opcoes: string[] }[] = [
+  { rotulo: 'Sim / Não', opcoes: ['Sim', 'Não'] },
+  { rotulo: 'Sim / Não / Talvez', opcoes: ['Sim', 'Não', 'Talvez'] },
+  { rotulo: 'Nota de 1 a 5', opcoes: ['1', '2', '3', '4', '5'] },
+];
+const novaEnquete = (): BlocoEnquete => ({
+  tipo: 'ENQUETE', pergunta: '', opcoes: [{ id: idOpcao(), texto: 'Sim' }, { id: idOpcao(), texto: 'Não' }],
+  multipla: false, mostrarResultado: true, anonima: false, encerraEm: null,
+});
 
 function amanha0730() {
   const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(7, 30, 0, 0);
@@ -272,6 +282,10 @@ export function ComunicadoEditor() {
       if (b.tipo === 'TEXTO' && !b.texto.trim()) return [];
       if ((b.tipo === 'AUDIO' || b.tipo === 'ARQUIVO') && !b.midiaId) return [];
       if (b.tipo === 'FOTOS' && b.midias.length === 0) return [];
+      if (b.tipo === 'ENQUETE') {
+        const { k: _k, ...e } = b as BlocoEnquete & { k: string };
+        return [{ ...e, opcoes: e.opcoes.map((o) => ({ ...o, texto: o.texto.trim() })).filter((o) => o.texto) }];
+      }
       const { k: _k, enviando: _e, videoEstado: _v, videoErro: _ve, ...resto } = b as BlocoEd & Record<string, unknown>;
       return [resto as Bloco];
     });
@@ -321,14 +335,15 @@ export function ComunicadoEditor() {
 
   if (carregando) return <div className={css.pagina} aria-busy="true"><p className={css.ajuda}>Carregando…</p></div>;
 
-  const pronto = titulo.trim() && conteudo.length > 0 && !enviandoAlgo && (publico.tipo === 'TODOS' || publico.valores.length > 0);
+  const enqRuim = conteudo.some((b) => b.tipo === 'ENQUETE' && (!b.pergunta.trim() || b.opcoes.length < 2));
+  const pronto = titulo.trim() && conteudo.length > 0 && !enviandoAlgo && !enqRuim && (publico.tipo === 'TODOS' || publico.valores.length > 0);
   const lista: Opcao[] = publico.tipo === 'CLIENTE' ? opcoes?.clientes ?? [] : publico.tipo === 'ESCALA' ? opcoes?.escalas ?? [] : [];
   const sem = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const pessoasFiltradas = (opcoes?.pessoas ?? []).filter((p) => p.temApp && (!buscaP || sem(p.nome).includes(sem(buscaP))));
   const primeiroTexto = conteudo.find((b) => b.tipo === 'TEXTO') as { texto: string } | undefined;
   const midiasTxt = (() => {
     const t = new Set(conteudo.map((b) => b.tipo)); const n: string[] = [];
-    if (t.has('VIDEO')) n.push('vídeo'); if (t.has('FOTOS')) n.push('fotos'); if (t.has('AUDIO')) n.push('áudio'); if (t.has('ARQUIVO')) n.push('PDF');
+    if (t.has('VIDEO')) n.push('vídeo'); if (t.has('FOTOS')) n.push('fotos'); if (t.has('AUDIO')) n.push('áudio'); if (t.has('ARQUIVO')) n.push('PDF'); if (t.has('ENQUETE')) n.push('enquete');
     return n.length ? (n.length === 1 ? n[0] : `${n.slice(0, -1).join(', ')} e ${n.at(-1)}`) : '';
   })();
 
@@ -425,6 +440,8 @@ export function ComunicadoEditor() {
                   {(!b.videoEstado || b.videoEstado === 'vazio') && <p className={css.ajuda}>Dica: no YouTube, envie o vídeo como "Não listado". Só quem tem o link assiste.</p>}
                 </>)}
 
+                {b.tipo === 'ENQUETE' && <EditorEnquete b={b} travada={publicado} onMudar={(nb) => mudar(b.k, () => ({ ...nb, k: b.k }))} />}
+
                 {b.tipo === 'ARQUIVO' && ((b.enviando ?? 0) > 0
                   ? <p className={css.ajuda}>Enviando {b.nome} ({tamanho(b.bytes)})…</p>
                   : <ArquivoPdf caminho={caminhoRH(b.midiaId)} nome={b.nome} bytes={b.bytes} />)}
@@ -439,6 +456,9 @@ export function ComunicadoEditor() {
             <button type="button" className={css.addB} onClick={() => inAudio.current?.click()} disabled={blocos.length >= 20}>🎵 Enviar áudio</button>
             <button type="button" className={css.addB} onClick={() => add({ tipo: 'VIDEO', url: '', provedor: 'YOUTUBE', videoId: '', titulo: null, k: novaChave(), videoEstado: 'vazio' })} disabled={blocos.length >= 20}>▶ Vídeo (link)</button>
             <button type="button" className={css.addB} onClick={() => inPdf.current?.click()} disabled={blocos.length >= 20}>📎 Arquivo PDF</button>
+            <button type="button" className={`${css.addB} ${css.addEnq}`} onClick={() => add({ ...novaEnquete(), k: novaChave() })}
+              disabled={blocos.length >= 20 || blocos.some((b) => b.tipo === 'ENQUETE') || publicado}
+              title={publicado ? 'Não dá para incluir enquete depois de publicado' : blocos.some((b) => b.tipo === 'ENQUETE') ? 'Uma enquete por comunicado' : undefined}>📊 Enquete</button>
           </div>
           <input ref={inFotos} type="file" accept="image/*" multiple hidden onChange={(e) => { void fotosEscolhidas(e.target.files); e.target.value = ''; }} />
           <input ref={inAudio} type="file" accept="audio/*,.opus,.ogg,.m4a" hidden onChange={(e) => { void audioEscolhido(e.target.files); e.target.value = ''; }} />
@@ -501,7 +521,7 @@ export function ComunicadoEditor() {
             <h4>Como chega no celular</h4>
             <div className={css.notifPrev} aria-hidden="true">
               <div><i>P</i><span><b>📢 {titulo.trim() || 'Título do comunicado'}</b>
-                <small>{midiasTxt ? `${autor || 'RH'} · ${midiasTxt} · toque para ver` : `${autor || 'RH'}: ${(primeiroTexto?.texto ?? '').slice(0, 80)}`}</small></span></div>
+                <small>{midiasTxt ? `${autor || 'RH'} · ${midiasTxt} · ${t_enq(conteudo) ? 'toque para votar' : 'toque para ver'}` : `${autor || 'RH'}: ${(primeiroTexto?.texto ?? '').slice(0, 80)}`}</small></span></div>
             </div>
           </div>
 
@@ -545,4 +565,59 @@ function BlocoTexto({ valor, onMudar }: { valor: string; onMudar: (t: string) =>
     <textarea ref={ref} className={css.inp} value={valor} maxLength={5000} aria-label="Texto do comunicado"
       placeholder="Escreva o recado. Links viram clicáveis no app." onChange={(e) => onMudar(e.target.value)} />
   </>);
+}
+
+const t_enq = (bs: Bloco[]) => bs.some((b) => b.tipo === 'ENQUETE');
+
+function paraLocal(iso: string) {
+  const d = new Date(iso); const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** Bloco de enquete no editor. Depois de publicada, só o prazo e "ver resultado" mudam. */
+function EditorEnquete({ b, travada, onMudar }: { b: BlocoEnquete; travada: boolean; onMudar: (b: BlocoEnquete) => void }) {
+  const set = (p: Partial<BlocoEnquete>) => onMudar({ ...b, ...p });
+  const setOp = (id: string, texto: string) => set({ opcoes: b.opcoes.map((o) => (o.id === id ? { ...o, texto } : o)) });
+  const vazia = !b.pergunta.trim();
+  return (
+    <div className={css.enq}>
+      {travada && <p className={css.trava}>Enquete publicada: pergunta e opções não mudam (os votos já apontam para elas). Dá para mudar o prazo e se o funcionário vê o resultado.</p>}
+      <label className={css.lbl} htmlFor={`perg-${b.opcoes[0]?.id}`}>Pergunta</label>
+      <input id={`perg-${b.opcoes[0]?.id}`} className={css.inp} value={b.pergunta} maxLength={200} disabled={travada}
+        placeholder="Ex.: Qual dia você prefere?" onChange={(e) => set({ pergunta: e.target.value })} aria-invalid={vazia} />
+      <span className={css.lbl} style={{ marginTop: 12 }}>Opções</span>
+      <div className={css.ops}>
+        {b.opcoes.map((o, i) => (
+          <div key={o.id} className={css.op}>
+            <span className={b.multipla ? css.opCaixa : css.opBol} aria-hidden="true" />
+            <input className={css.inp} value={o.texto} maxLength={80} disabled={travada} aria-label={`Opção ${i + 1}`}
+              onChange={(e) => setOp(o.id, e.target.value)} />
+            {!travada && <button type="button" className={css.ico} onClick={() => set({ opcoes: b.opcoes.filter((x) => x.id !== o.id) })}
+              disabled={b.opcoes.length <= 2} aria-label={`Tirar opção ${i + 1}`} title="Tirar opção">✕</button>}
+          </div>
+        ))}
+        {!travada && b.opcoes.length < 8 && (
+          <button type="button" className={css.addOp} onClick={() => set({ opcoes: [...b.opcoes, { id: idOpcao(), texto: '' }] })}>＋ Adicionar opção</button>
+        )}
+      </div>
+      {!travada && (
+        <div className={css.atalhos}>
+          <span>Atalhos:</span>
+          {ATALHOS.map((a) => (
+            <button key={a.rotulo} type="button" className={css.chip} onClick={() => set({ opcoes: a.opcoes.map((texto) => ({ id: idOpcao(), texto })) })}>{a.rotulo}</button>
+          ))}
+        </div>
+      )}
+      <div className={css.enqOps}>
+        <Interruptor rotulo="Pode marcar mais de uma" ajuda="Cada pessoa escolhe todas as opções que quiser." ligado={b.multipla} desabilitado={travada} onMudar={(v) => set({ multipla: v })} />
+        <Interruptor rotulo="Funcionário vê o resultado" ajuda="Depois de votar, aparece a porcentagem de cada opção." ligado={b.mostrarResultado} onMudar={(v) => set({ mostrarResultado: v })} />
+        <Interruptor rotulo="Voto anônimo" ajuda="Você vê só o total de cada opção e quem já votou, sem saber quem votou em quê." ligado={b.anonima} desabilitado={travada} onMudar={(v) => set({ anonima: v })} />
+        <div className={css.tg}>
+          <div><b>Encerrar votação em</b><small>Até lá, dá para mudar o voto. Vazio = sem prazo (você encerra quando quiser).</small></div>
+          <input type="datetime-local" className={css.inp} style={{ width: 'auto', minWidth: 200 }} aria-label="Encerrar votação em"
+            value={b.encerraEm ? paraLocal(b.encerraEm) : ''} onChange={(e) => set({ encerraEm: e.target.value ? new Date(e.target.value).toISOString() : null })} />
+        </div>
+      </div>
+    </div>
+  );
 }

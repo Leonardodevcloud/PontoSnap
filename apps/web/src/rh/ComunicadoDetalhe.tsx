@@ -10,14 +10,20 @@ import css from './Comunicacao.module.css';
 interface Destinatario {
   empregadoId: string; nome: string; cliente: string | null; temPush: boolean;
   abertoEm: string | null; midiaEm: string | null; cienteEm: string | null; reacao: string | null;
+  votou: boolean; voto: string[] | null; votoEm: string | null; pendente: boolean;
+}
+interface ResultadoEnquete {
+  pergunta: string; multipla: boolean; anonima: boolean; mostrarResultado: boolean; encerraEm: string | null; encerrada: boolean;
+  total: number; mudaram: number; opcoes: { id: string; texto: string; votos: number }[];
 }
 interface Detalhe {
   id: string; titulo: string; blocos: Bloco[]; publico: Publico; status: StatusComunicado;
   pedirCiencia: boolean; fixado: boolean; notificar: boolean; lembrar: boolean; reacoes: boolean;
   publicadoEm: string | null; lembreteEm: string | null; notificados: number; autorNome: string | null;
   destinatarios: Destinatario[]; porCliente: { nome: string; total: number; ok: number }[]; contagemReacoes: Record<string, number>;
+  enquete: ResultadoEnquete | null;
 }
-type Filtro = 'TODOS' | 'NAO_ABRIU' | 'SEM_CIENCIA' | 'OK';
+type Filtro = string;
 const caminhoRH = (id: string, mini?: boolean) => `/comunicacao/midia/${id}${mini ? '?mini=1' : ''}`;
 const PUBLICO: Record<string, string> = { TODOS: 'Todos', CLIENTE: 'Por cliente', ESCALA: 'Por escala', PESSOAS: 'Pessoas escolhidas' };
 
@@ -59,11 +65,14 @@ export function ComunicadoDetalhe() {
     SEM_CIENCIA: ds.filter((x) => x.abertoEm && !x.cienteEm).length,
     OK: ds.filter((x) => (d?.pedirCiencia ? x.cienteEm : x.abertoEm)).length,
   }), [ds, d?.pedirCiencia]);
-  const pendentes = d ? ds.filter((x) => (d.pedirCiencia ? !x.cienteEm : !x.abertoEm)) : [];
+  const pendentes = ds.filter((x) => x.pendente);
+  const enq = d?.enquete ?? null;
+  const votando = !!enq && !enq.encerrada && !d?.pedirCiencia;
 
   if (d && (d.status === 'RASCUNHO' || d.status === 'AGENDADO')) return <Navigate to={`/rh/comunicacao/${d.id}/editar`} replace />;
 
-  const lista = ds.filter((x) => (filtro === 'TODOS' ? true : filtro === 'NAO_ABRIU' ? !x.abertoEm : filtro === 'SEM_CIENCIA' ? x.abertoEm && !x.cienteEm : d?.pedirCiencia ? x.cienteEm : x.abertoEm));
+  const lista = ds.filter((x) => (filtro === 'TODOS' ? true : filtro === 'NAO_ABRIU' ? !x.abertoEm : filtro === 'SEM_CIENCIA' ? x.abertoEm && !x.cienteEm
+    : filtro === 'NAO_VOTOU' ? !x.votou : filtro.startsWith('OP:') ? x.voto?.includes(filtro.slice(3)) : d?.pedirCiencia ? x.cienteEm : x.abertoEm));
   const temMidia = d?.blocos.some((b) => b.tipo === 'VIDEO' || b.tipo === 'AUDIO');
   const nVideo = d?.blocos.some((b) => b.tipo === 'VIDEO');
 
@@ -93,7 +102,12 @@ export function ComunicadoDetalhe() {
   const meio = d.pedirCiencia ? cont.SEM_CIENCIA : 0;
   const arquivado = d.status === 'ARQUIVADO';
   const reacoes = Object.entries(d.contagemReacoes).sort((a, b) => b[1] - a[1]);
+  const textoOp = (id: string) => enq?.opcoes.find((o) => o.id === id)?.texto ?? id;
   const statusDe = (x: Destinatario) => {
+    if (enq && !d.pedirCiencia) {
+      if (x.votou) return { t: x.voto ? x.voto.map(textoOp).join(', ') : `votou ${quando(x.votoEm)}`, c: css.stOk };
+      return { t: enq.encerrada ? 'não votou' : x.abertoEm ? 'abriu, não votou' : 'não votou', c: x.abertoEm ? css.stMeio : css.stPend };
+    }
     if (d.pedirCiencia && x.cienteEm) return { t: `ciente ${quando(x.cienteEm)}`, c: css.stOk };
     if (!d.pedirCiencia && x.abertoEm) return { t: `leu ${quando(x.abertoEm)}`, c: css.stOk };
     if (x.abertoEm) return { t: `abriu ${quando(x.abertoEm)}`, c: css.stMeio };
@@ -113,7 +127,8 @@ export function ComunicadoDetalhe() {
           {!arquivado && <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/comunicacao/${d.id}/editar`)}>Editar</button>}
           {!arquivado && <button type="button" className={css.btnSec} disabled={!!ocupado} onClick={() => acao('fixar', { fixado: !d.fixado }, d.fixado ? 'Desafixado.' : 'Fixado no topo do app.')}>{d.fixado ? 'Desafixar' : 'Fixar no topo'}</button>}
           <button type="button" className={css.btnSec} disabled={!!ocupado} onClick={() => acao('arquivar', { arquivar: !arquivado }, arquivado ? 'Voltou para o app.' : 'Arquivado: saiu do app dos funcionários. O comprovante continua aqui.')}>{arquivado ? 'Desarquivar' : 'Arquivar'}</button>
-          {!arquivado && pendentes.length > 0 && <button type="button" className={css.btnPri} disabled={!!ocupado} onClick={() => lembrar()}>🔔 Lembrar {pendentes.length === 1 ? 'o pendente' : `os ${pendentes.length} pendentes`}</button>}
+          {!arquivado && enq && !enq.encerrada && <button type="button" className={css.btnSec} disabled={!!ocupado} onClick={() => acao('encerrar-enquete', {}, 'Votação encerrada. O resultado ficou congelado.')}>Encerrar votação agora</button>}
+          {!arquivado && pendentes.length > 0 && <button type="button" className={css.btnPri} disabled={!!ocupado} onClick={() => lembrar()}>🔔 Lembrar {votando ? (pendentes.length === 1 ? 'quem não votou' : `os ${pendentes.length} que não votaram`) : pendentes.length === 1 ? 'o pendente' : `os ${pendentes.length} pendentes`}</button>}
         </div>
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
@@ -121,8 +136,10 @@ export function ComunicadoDetalhe() {
 
       <div className={css.det}>
         <div className={css.caixa}>
-          <div className={css.resumo}>
-            <Anel ok={ok} meio={meio} total={ds.length} />
+          {enq && <ResultadoEnqueteRH enq={enq} ds={ds} />}
+          {enq && <hr className={css.divisor} />}
+          <div className={css.resumo} style={enq ? { marginTop: 14 } : undefined}>
+            {!enq && <Anel ok={ok} meio={meio} total={ds.length} />}
             <div>
               <b>{ok} {d.pedirCiencia ? (ok === 1 ? 'deu ciência' : 'deram ciência') : ok === 1 ? 'leu' : 'leram'}</b>
               <small>{[d.pedirCiencia && cont.SEM_CIENCIA > 0 && `${cont.SEM_CIENCIA} ${cont.SEM_CIENCIA === 1 ? 'abriu' : 'abriram'} mas não confirmou`, cont.NAO_ABRIU > 0 && `${cont.NAO_ABRIU} ainda não ${cont.NAO_ABRIU === 1 ? 'abriu' : 'abriram'}`].filter(Boolean).join(' · ') || 'Todo mundo em dia.'}</small>
@@ -136,17 +153,22 @@ export function ComunicadoDetalhe() {
           </div>
 
           <div className={css.filtros} style={{ marginTop: 16 }} role="group" aria-label="Filtrar pessoas">
-            {(d.pedirCiencia
-              ? [['TODOS', 'Todos'], ['NAO_ABRIU', 'Não abriram'], ['SEM_CIENCIA', 'Abriram sem confirmar'], ['OK', 'Deram ciência']] as const
-              : [['TODOS', 'Todos'], ['NAO_ABRIU', 'Não abriram'], ['OK', 'Leram']] as const).map(([k, rot]) => (
-              <button key={k} className={`${css.fl} ${filtro === k ? css.flOn : ''}`} aria-pressed={filtro === k} onClick={() => setFiltro(k)}>{rot}<span>{cont[k]}</span></button>
+            {(enq
+              ? [['TODOS', 'Todos', ds.length], ['NAO_VOTOU', 'Não votaram', ds.filter((x) => !x.votou).length],
+                ...(enq.anonima ? [] : enq.opcoes.map((o) => [`OP:${o.id}`, o.texto, o.votos] as const)),
+                ...(d.pedirCiencia ? [['SEM_CIENCIA', 'Abriram sem ciência', cont.SEM_CIENCIA] as const, ['OK', 'Deram ciência', cont.OK] as const] : [])]
+              : d.pedirCiencia
+                ? [['TODOS', 'Todos', cont.TODOS], ['NAO_ABRIU', 'Não abriram', cont.NAO_ABRIU], ['SEM_CIENCIA', 'Abriram sem confirmar', cont.SEM_CIENCIA], ['OK', 'Deram ciência', cont.OK]]
+                : [['TODOS', 'Todos', cont.TODOS], ['NAO_ABRIU', 'Não abriram', cont.NAO_ABRIU], ['OK', 'Leram', cont.OK]]
+            ).map(([k, rot, n]) => (
+              <button key={k} className={`${css.fl} ${filtro === k ? css.flOn : ''}`} aria-pressed={filtro === k} onClick={() => setFiltro(String(k))}>{rot}<span>{n}</span></button>
             ))}
           </div>
           <ul className={css.pess}>
             {lista.length === 0 && <li><span className={css.nm}><small>Ninguém neste filtro.</small></span></li>}
             {lista.map((x) => {
               const s = statusDe(x);
-              const pend = d.pedirCiencia ? !x.cienteEm : !x.abertoEm;
+              const pend = x.pendente;
               return (
                 <li key={x.empregadoId}>
                   <Avatar id={x.empregadoId} nome={x.nome} tamanho={34} />
@@ -160,7 +182,26 @@ export function ComunicadoDetalhe() {
         </div>
 
         <div className={css.lado}>
-          {d.porCliente.length > 1 && (
+          {enq && !enq.anonima && d.porCliente.length > 1 && (
+            <div className={css.caixa}>
+              <h4>Votos por cliente</h4>
+              <div className={css.grupo}>
+                {d.porCliente.map((g) => {
+                  const doGrupo = ds.filter((x) => (x.cliente ?? 'Sem cliente') === g.nome);
+                  const partes = enq.opcoes.map((o) => `${o.texto} ${doGrupo.filter((x) => x.voto?.includes(o.id)).length}`);
+                  const falta = doGrupo.filter((x) => !x.votou).length;
+                  return <div key={g.nome}><div><b>{g.nome}</b><span>{doGrupo.length - falta}/{doGrupo.length}</span></div><small className={css.ajuda} style={{ margin: 0 }}>{partes.join(' · ')}</small></div>;
+                })}
+              </div>
+            </div>
+          )}
+          {enq && enq.mudaram > 0 && (
+            <div className={css.caixa}>
+              <h4>Mudanças de voto</h4>
+              <p className={css.ajuda} style={{ margin: 0 }}>{enq.mudaram} {enq.mudaram === 1 ? 'pessoa mudou' : 'pessoas mudaram'} o voto. Vale o último, com a hora em que foi feito.</p>
+            </div>
+          )}
+          {!(enq && !enq.anonima) && d.porCliente.length > 1 && (
             <div className={css.caixa}>
               <h4>Por cliente</h4>
               <div className={css.grupo}>
@@ -180,13 +221,15 @@ export function ComunicadoDetalhe() {
             <h4>Envio</h4>
             <ul className={css.hist}>
               <li><b>{quando(d.publicadoEm)}</b> · publicado{d.notificar ? `, notificação chegou para ${d.notificados} ${d.notificados === 1 ? 'pessoa' : 'pessoas'}` : ' sem notificação'}</li>
-              {d.lembrar && <li><b>{d.lembreteEm ? quando(d.lembreteEm) : quando(new Date(Date.parse(d.publicadoEm!) + 86_400_000).toISOString())}</b> · {d.lembreteEm ? 'lembrete automático enviado' : 'lembrete automático para quem não leu'}</li>}
+              {d.lembrar && <li><b>{d.lembreteEm ? quando(d.lembreteEm) : quando(new Date(Date.parse(d.publicadoEm!) + 86_400_000).toISOString())}</b> · {d.lembreteEm ? 'lembrete automático enviado' : `lembrete automático para quem ${d.pedirCiencia ? 'não deu ciência' : votando ? 'não votou' : 'não leu'}`}</li>}
             </ul>
           </div>
           <div className={css.caixa}>
-            <h4>Comprovante</h4>
-            <p className={css.ajuda} style={{ margin: '0 0 10px' }}>Lista com nome, CPF, data e hora {d.pedirCiencia ? 'da ciência' : 'da leitura'} de cada pessoa. Serve de prova de que o funcionário foi comunicado.</p>
-            <button type="button" className={css.btnSec} onClick={baixarPdf} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? 'Gerando…' : `Baixar PDF de ${d.pedirCiencia ? 'ciência' : 'leitura'}`}</button>
+            <h4>{enq ? 'Exportar' : 'Comprovante'}</h4>
+            <p className={css.ajuda} style={{ margin: '0 0 10px' }}>{enq
+              ? `PDF com a pergunta, o total de cada opção e ${enq.anonima ? 'quem votou (sem dizer em quê, é anônima)' : 'o voto de cada pessoa'}, com data e hora${d.pedirCiencia ? ' da ciência' : ''}.`
+              : `Lista com nome, CPF, data e hora ${d.pedirCiencia ? 'da ciência' : 'da leitura'} de cada pessoa. Serve de prova de que o funcionário foi comunicado.`}</p>
+            <button type="button" className={css.btnSec} onClick={baixarPdf} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? 'Gerando…' : enq ? 'Baixar PDF do resultado' : `Baixar PDF de ${d.pedirCiencia ? 'ciência' : 'leitura'}`}</button>
           </div>
         </div>
       </div>
@@ -194,6 +237,37 @@ export function ComunicadoDetalhe() {
       <PainelLateral titulo={d.titulo} subtitulo={`${d.autorNome ?? 'RH'} · como aparece no app`} aberto={conteudo} onFechar={() => setConteudo(false)} largura={440}>
         <div className={css.previa}><ComunicadoView blocos={d.blocos} caminho={caminhoRH} /></div>
       </PainelLateral>
+    </div>
+  );
+}
+
+/** Resultado da enquete para o RH: barras, quem votou em cada opção (se não for anônima). */
+function ResultadoEnqueteRH({ enq, ds }: { enq: ResultadoEnquete; ds: Destinatario[] }) {
+  const maior = Math.max(0, ...enq.opcoes.map((o) => o.votos));
+  const ordem = [...enq.opcoes].sort((a, b) => b.votos - a.votos);
+  return (
+    <div className={css.enqRes}>
+      <div className={css.enqCab}>
+        <div><small>ENQUETE{enq.anonima ? ' · VOTO ANÔNIMO' : ''}{enq.multipla ? ' · MAIS DE UMA OPÇÃO' : ''}</small><h3>{enq.pergunta}</h3></div>
+        <div className={css.enqTot}><b>{enq.total}</b> de {ds.length} {ds.length === 1 ? 'votou' : 'votaram'}<br />
+          {enq.encerrada ? 'votação encerrada' : enq.encerraEm ? `até ${quando(enq.encerraEm)}` : 'sem prazo'}</div>
+      </div>
+      {ordem.map((o) => {
+        const pct = enq.total ? Math.round((o.votos / enq.total) * 100) : 0;
+        const quem = enq.anonima ? [] : ds.filter((x) => x.voto?.includes(o.id));
+        return (
+          <div key={o.id} className={o.votos === maior && maior > 0 ? css.lider : ''}>
+            <div className={css.rt}><b>{o.texto}</b><span>{o.votos} {o.votos === 1 ? 'voto' : 'votos'} · {pct}%</span></div>
+            <div className={css.rb} role="img" aria-label={`${o.texto}: ${o.votos} votos, ${pct}%`}><i style={{ width: `${pct}%` }} /></div>
+            {quem.length > 0 && (
+              <div className={css.quem} title={quem.map((x) => x.nome).join(', ')}>
+                {quem.slice(0, 6).map((x) => <Avatar key={x.empregadoId} id={x.empregadoId} nome={x.nome} tamanho={24} />)}
+                {quem.length > 6 && <em>+{quem.length - 6}</em>}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -60,3 +60,10 @@
 .faixa small{ display:block; opacity:.8; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .faixa > span:nth-child(2){ flex:1; min-width:0; }
 @media (prefers-reduced-motion:reduce){ .esqueleto{ animation:none; } }
+
+/* enquete no card da lista */
+.enqCard{ position:relative; margin-top:10px; background:var(--cream); border-radius:14px; padding:11px 84px 11px 12px; display:flex; flex-direction:column; gap:2px; }
+.enqCard b{ font-size:14px; line-height:1.35; }
+.enqCard > span:not(.enqGo){ color:var(--ash); font-size:12.5px; }
+.enqFeito{ background:var(--ok-bg); padding-right:12px; }
+.enqGo{ position:absolute; right:10px; top:50%; transform:translateY(-50%); background:var(--coral-acao); color:var(--on-coral); border-radius:999px; padding:6px 14px; font-weight:800; font-size:13px; }

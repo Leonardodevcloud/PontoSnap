@@ -7,7 +7,18 @@ export type Bloco =
   | { tipo: 'FOTOS'; midias: string[] }
   | { tipo: 'AUDIO'; midiaId: string; duracaoSeg: number; picos: number[] }
   | { tipo: 'VIDEO'; url: string; provedor: 'YOUTUBE' | 'VIMEO' | 'DRIVE'; videoId: string; titulo: string | null }
-  | { tipo: 'ARQUIVO'; midiaId: string; nome: string; bytes: number };
+  | { tipo: 'ARQUIVO'; midiaId: string; nome: string; bytes: number }
+  | BlocoEnquete;
+export interface BlocoEnquete {
+  tipo: 'ENQUETE'; pergunta: string; opcoes: { id: string; texto: string }[];
+  multipla: boolean; mostrarResultado: boolean; anonima: boolean; encerraEm: string | null;
+}
+/** A enquete vista pelo funcionário (votos = null quando o resultado não está visível para ele). */
+export interface EstadoEnquete {
+  pergunta: string; multipla: boolean; encerraEm: string | null; encerrada: boolean; total: number;
+  opcoes: { id: string; texto: string; votos: number | null }[];
+  meuVoto: string[] | null; votadoEm: string | null; verResultado: boolean;
+}
 export interface Publico { tipo: 'TODOS' | 'CLIENTE' | 'ESCALA' | 'PESSOAS'; valores: string[] }
 export type StatusComunicado = 'RASCUNHO' | 'AGENDADO' | 'PUBLICADO' | 'ARQUIVADO';
 export const REACOES = ['👍', '❤️', '👏', '😂', '🙏'] as const;

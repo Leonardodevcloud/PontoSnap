@@ -10,7 +10,26 @@ export type BlocoComunicado =
   | { tipo: 'FOTOS'; midias: string[] }
   | { tipo: 'AUDIO'; midiaId: string; duracaoSeg: number; picos: number[] }
   | { tipo: 'VIDEO'; url: string; provedor: 'YOUTUBE' | 'VIMEO' | 'DRIVE'; videoId: string; titulo: string | null }
-  | { tipo: 'ARQUIVO'; midiaId: string; nome: string; bytes: number };
+  | { tipo: 'ARQUIVO'; midiaId: string; nome: string; bytes: number }
+  | BlocoEnquete;
+
+/**
+ * Enquete (no máximo uma por comunicado). Depois de publicada, pergunta e
+ * opções não mudam (os votos apontam para os ids das opções).
+ */
+export interface BlocoEnquete {
+  tipo: 'ENQUETE';
+  pergunta: string;
+  opcoes: { id: string; texto: string }[];
+  /** Pode marcar mais de uma opção. */
+  multipla: boolean;
+  /** O funcionário vê o resultado parcial depois de votar. */
+  mostrarResultado: boolean;
+  /** O RH vê só os totais, não quem votou em quê. */
+  anonima: boolean;
+  /** Fim da votação (ISO). Nulo = sem prazo, até o RH encerrar. */
+  encerraEm: string | null;
+}
 
 /** Para quem vai: todos, por cliente/loja, por escala ou pessoas escolhidas. */
 export interface PublicoComunicado { tipo: 'TODOS' | 'CLIENTE' | 'ESCALA' | 'PESSOAS'; valores: string[] }
@@ -70,3 +89,17 @@ export const comunicadoMidia = pgTable('comunicado_midia', {
   miniatura: bytea('miniatura'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_comunicado_midia_com').on(t.comunicadoId)]);
+
+/** Voto na enquete do comunicado (migration 0056). Fica só o último; dá para mudar até encerrar. */
+export const comunicadoVoto = pgTable('comunicado_voto', {
+  comunicadoId: uuid('comunicado_id').notNull().references(() => comunicado.id, { onDelete: 'cascade' }),
+  empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  opcoes: jsonb('opcoes').$type<string[]>().notNull().default([]),
+  votadoEm: timestamp('votado_em', { withTimezone: true }).notNull().defaultNow(),
+  alteradoEm: timestamp('alterado_em', { withTimezone: true }).notNull().defaultNow(),
+  alteracoes: integer('alteracoes').notNull().default(0),
+}, (t) => [
+  primaryKey({ columns: [t.comunicadoId, t.empregadoId] }),
+  index('idx_comunicado_voto_tenant').on(t.tenantId, t.comunicadoId),
+]);

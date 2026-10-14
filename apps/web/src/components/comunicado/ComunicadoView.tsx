@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { embedDoVideo } from '@ponto/shared';
-import { mmss, miniaturaVideo, tamanho, urlDaMidia, useMidia, type Bloco } from '../../lib/comunicacao';
+import { mmss, miniaturaVideo, tamanho, urlDaMidia, useMidia, type Bloco, type EstadoEnquete } from '../../lib/comunicacao';
+import { EnquetePrevia, EnqueteVotacao } from './Enquete';
 import css from './ComunicadoView.module.css';
 
 /** Monta o caminho da mídia: RH usa /comunicacao/midia, o app /comunicacao/meus/midia. */
@@ -240,7 +241,11 @@ export function ArquivoPdf({ caminho, nome, bytes }: { caminho: string; nome: st
 }
 
 /** O comunicado inteiro, na ordem em que o RH montou. */
-export function ComunicadoView({ blocos, caminho, onMidia }: { blocos: Bloco[]; caminho: CaminhoMidia; onMidia?: () => void }) {
+export function ComunicadoView({ blocos, caminho, onMidia, enquete, onVotar }: {
+  blocos: Bloco[]; caminho: CaminhoMidia; onMidia?: () => void;
+  /** No app: estado da enquete e como votar. Sem isso, a enquete aparece só como prévia. */
+  enquete?: EstadoEnquete | null; onVotar?: (opcoes: string[]) => Promise<EstadoEnquete>;
+}) {
   return (
     <div className={css.blocos}>
       {blocos.map((b, i) => {
@@ -250,6 +255,7 @@ export function ComunicadoView({ blocos, caminho, onMidia }: { blocos: Bloco[]; 
           case 'FOTOS': return <Galeria key={i} midias={b.midias} caminho={caminho} />;
           case 'AUDIO': return <PlayerAudio key={i} caminho={caminho(b.midiaId)} duracaoSeg={b.duracaoSeg} picos={b.picos} onOuvir={onMidia} />;
           case 'ARQUIVO': return <ArquivoPdf key={i} caminho={caminho(b.midiaId)} nome={b.nome} bytes={b.bytes} />;
+          case 'ENQUETE': return enquete && onVotar ? <EnqueteVotacao key={i} estado={enquete} onVotar={onVotar} /> : <EnquetePrevia key={i} bloco={b} />;
           default: return null;
         }
       })}

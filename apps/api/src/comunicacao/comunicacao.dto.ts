@@ -29,3 +29,7 @@ export class VideoDto { @IsString() @MaxLength(500) url!: string }
 export class ReacaoDto {
   @IsOptional() @IsIn(['👍', '❤️', '👏', '😂', '🙏', null]) reacao!: string | null;
 }
+
+export class VotoDto {
+  @IsArray() @ArrayMaxSize(8) @IsString({ each: true }) opcoes!: string[];
+}

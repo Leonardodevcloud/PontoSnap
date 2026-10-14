@@ -10,7 +10,7 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { ComunicacaoService, LIMITES, type ArquivoEnviado } from './comunicacao.service';
-import { ArquivarDto, FixarDto, LembrarDto, PublicarDto, ReacaoDto, SalvarComunicadoDto, VideoDto } from './comunicacao.dto';
+import { ArquivarDto, FixarDto, LembrarDto, PublicarDto, ReacaoDto, SalvarComunicadoDto, VideoDto, VotoDto } from './comunicacao.dto';
 
 const RH = [Perfil.ADMIN_CLIENTE, Perfil.RH] as const;
 
@@ -66,6 +66,11 @@ export class ComunicacaoController {
   async ciente(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
     const t = this.t(u);
     return this.svc.ciente(t, await this.svc.empregadoDoUsuario(t, u.sub), id);
+  }
+  @Post('meus/:id/voto') @Perfis(Perfil.COLABORADOR)
+  async votar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VotoDto) {
+    const t = this.t(u);
+    return this.svc.votar(t, await this.svc.empregadoDoUsuario(t, u.sub), id, dto.opcoes);
   }
   @Post('meus/:id/reacao') @Perfis(Perfil.COLABORADOR)
   async reagir(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReacaoDto) {
@@ -126,6 +131,9 @@ export class ComunicacaoController {
   arquivar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ArquivarDto) {
     return this.svc.arquivar(this.t(u), id, dto.arquivar);
   }
+  @Post(':id/encerrar-enquete') @Perfis(...RH)
+  encerrarEnquete(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.svc.encerrarEnquete(this.t(u), id); }
+
   @Get(':id/ciencia.pdf') @Perfis(...RH)
   async pdf(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
     const r = await this.svc.pdfCiencia(this.t(u), id);

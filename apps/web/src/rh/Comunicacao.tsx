@@ -8,7 +8,7 @@ interface Item {
   id: string; titulo: string; status: StatusComunicado; fixado: boolean; pedirCiencia: boolean;
   publicadoEm: string | null; agendadoPara: string | null; atualizadoEm: string; autorNome: string | null; publico: Publico;
   tipos: string[]; midias: string;
-  capa: { tipo: 'FOTO'; midiaId: string } | { tipo: 'VIDEO'; provedor: string; videoId: string } | null; destinatarios: number; abertos: number; cientes: number; pendentesCiencia: number;
+  capa: { tipo: 'FOTO'; midiaId: string } | { tipo: 'VIDEO'; provedor: string; videoId: string } | null; destinatarios: number; abertos: number; cientes: number; pendentesCiencia: number; votos: number | null;
 }
 interface Resp {
   itens: Item[];
@@ -30,6 +30,7 @@ function Miniatura({ i }: { i: Item }) {
   if (capaVideo) return <span className={`${css.thumb} ${css.tVideo} ${css.thumbVideo}`} aria-hidden="true"><img src={capaVideo} alt="" onError={() => setSemCapa(true)} /><i>▶</i></span>;
   if (i.tipos.includes('VIDEO')) return <span className={`${css.thumb} ${css.tVideo}`} aria-hidden="true">▶</span>;
   if (i.tipos.includes('FOTOS')) return <span className={`${css.thumb} ${css.tFoto}`} aria-hidden="true">🖼</span>;
+  if (i.tipos.includes('ENQUETE')) return <span className={`${css.thumb} ${css.tAudio}`} aria-hidden="true">📊</span>;
   if (i.tipos.includes('AUDIO')) return <span className={`${css.thumb} ${css.tAudio}`} aria-hidden="true">🎙</span>;
   return <span className={`${css.thumb} ${css.tTexto}`} aria-hidden="true">Aa</span>;
 }
@@ -101,7 +102,8 @@ export function Comunicacao() {
 
       <div className={css.lista}>
         {lista.map((i) => {
-          const base = i.pedirCiencia ? i.cientes : i.abertos;
+          const porVoto = i.votos != null && !i.pedirCiencia;
+          const base = i.pedirCiencia ? i.cientes : porVoto ? i.votos! : i.abertos;
           const pct = i.destinatarios ? Math.round((base / i.destinatarios) * 100) : 0;
           return (
             <button key={i.id} className={css.card} onClick={() => abrir(i)}>
@@ -123,7 +125,7 @@ export function Comunicacao() {
               </div>
               <div className={css.leit}>
                 {i.status === 'PUBLICADO' || i.status === 'ARQUIVADO' ? (<>
-                  <small>{i.pedirCiencia ? 'Deram ciência' : 'Leram'}</small>
+                  <small>{i.pedirCiencia ? 'Deram ciência' : porVoto ? 'Votaram' : 'Leram'}</small>
                   <b>{base} de {i.destinatarios}</b>
                   <div className={css.barra} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={i.pedirCiencia ? 'Ciência' : 'Leitura'}>
                     <i className={pct < 90 ? css.meio : ''} style={{ width: `${pct}%` }} />
