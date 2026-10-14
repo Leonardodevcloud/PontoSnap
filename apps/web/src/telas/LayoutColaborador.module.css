@@ -13,7 +13,7 @@
 
 .menuZona{ position:relative; }
 .avatar{
-  width:36px; height:36px; border-radius:50%; border:none; cursor:pointer;
+  width:40px; height:40px; border-radius:50%; border:none; cursor:pointer; overflow:hidden; padding:0;
   background:var(--ink); color:var(--cream);
   display:flex; align-items:center; justify-content:center;
 }
@@ -57,3 +57,5 @@
 
 /* Zona do banner de instalar o app (PWA) */
 .instalarZona{ padding:0 20px; }
+
+.avatarFoto{ width:100%; height:100%; object-fit:cover; display:block; }

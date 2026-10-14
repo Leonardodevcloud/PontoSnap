@@ -3,6 +3,7 @@ import { minutosParaHhMm, reaisDeCentavos } from '../lib/formato';
 import type { LinhaCompetencia, RelatorioCompetencia } from '../tipos';
 import type { CampoExplicavel } from '../lib/explicar';
 import vt from './VisaoTodos.module.css';
+import { Avatar } from '../components/Avatar';
 
 /**
  * Tabela "todos os funcionários" de uma competência. Serve às telas Espelhos
@@ -67,8 +68,8 @@ function colunas(modo: ModoTabela, hoje: string): Col[] {
   const sinal = (m: number) => (m > 0 ? vt.pos : m < 0 ? vt.neg : vt.mute);
   const base: Col[] = [
     { k: 'nome', t: 'Funcionário', v: (l) => l.nome, cell: (l) => (
-      <span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.regime === 'CLT_12x36' ? '12×36' : l.horarioDurMin ? `${Math.round(l.horarioDurMin / 60)}h/dia` : 'sem escala'}</small></span>
-    ), tot: (r) => `Total · ${r.linhas.length} funcionário${r.linhas.length === 1 ? '' : 's'}` },
+      <><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} /><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.regime === 'CLT_12x36' ? '12×36' : l.horarioDurMin ? `${Math.round(l.horarioDurMin / 60)}h/dia` : 'sem escala'}</small></span></>
+    ), cls: () => vt.comAv, tot: (r) => `Total · ${r.linhas.length} funcionário${r.linhas.length === 1 ? '' : 's'}` },
     { k: 'trab', t: 'Trab.', n: true, v: (l) => l.trabalhadoMin, cell: (l) => minutosParaHhMm(l.trabalhadoMin), tot: (r) => minutosParaHhMm(r.totais.trabalhadoMin) },
     // Contratado do MÊS INTEIRO (o que a escala espera até o último dia). O
     // apurado até hoje fica no tooltip — é a base do saldo.

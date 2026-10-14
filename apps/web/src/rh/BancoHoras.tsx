@@ -10,6 +10,7 @@ import type {
 } from '../tipos';
 import css from './BancoHoras.module.css';
 import vt from './VisaoTodos.module.css';
+import { Avatar } from '../components/Avatar';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
 const fmtDataHora = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
@@ -687,7 +688,7 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
                     <tr key={l.empregadoId} className={vt.row} tabIndex={0} role="button"
                       onClick={() => onAbrir(l.empregadoId)}
                       onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(l.empregadoId); } }}>
-                      <td><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? regraCurta(l) : 'sem banco'}</small></span></td>
+                      <td className={vt.comAv}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} /><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? regraCurta(l) : 'sem banco'}</small></span></td>
                       {l.ativo ? (
                         <>
                           <td className={`${vt.n} ${sinal(l.saldoMin)}`}><b>{comSinal(l.saldoMin)}</b></td>

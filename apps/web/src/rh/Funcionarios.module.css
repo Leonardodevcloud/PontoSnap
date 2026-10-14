@@ -151,3 +151,18 @@
 
 /* mobile-head: título em cima, ações embaixo quebrando linha */
 @media (max-width:760px){ .head{ flex-direction:column; align-items:stretch; } .head > div{ flex-wrap:wrap; } }
+
+/* Atualização cadastral (fotos) */
+.adesao{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; background:var(--white); border:1px solid rgba(var(--ink-rgb),.09); border-radius:16px; padding:14px 18px; margin:0 0 16px; }
+.adesaoRostos{ display:flex; }
+.adesaoAv{ border:2px solid var(--white); margin-left:-8px; }
+.adesaoRostos > :first-child{ margin-left:0; }
+.adesaoTxt{ flex:1; min-width:220px; display:flex; flex-direction:column; gap:6px; }
+.adesaoTxt small{ color:var(--ash); font-size:12.5px; }
+.adesaoOk{ color:var(--ok-text) !important; font-weight:700; }
+.adesaoBarra{ height:10px; background:var(--cream); border-radius:9px; overflow:hidden; }
+.adesaoBarra i{ display:block; height:100%; background:var(--ok-text); border-radius:9px; }
+.tagFoto{ font-family:var(--ff-mono); font-size:11px; padding:4px 8px; border-radius:6px; background:var(--cream); color:var(--ash); white-space:nowrap; border:none; }
+.tagRevisar{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); font-weight:700; cursor:pointer; min-height:28px; }
+.tagRecusada{ background:var(--erro-bg); color:var(--coral-dark); }
+@media (max-width:760px){ .tagFoto{ display:none; } }

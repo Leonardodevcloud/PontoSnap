@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import { BotaoTema } from '../components/BotaoTema';
 import { Icone, type NomeIcone } from '../components/Icone';
+import { Avatar, ProvedorAvatares } from '../components/Avatar';
 import type { Empregado, RespAtencao } from '../tipos';
 import css from './LayoutRH.module.css';
 
@@ -167,9 +168,9 @@ function Busca({ aberta, onFechar }: { aberta: boolean; onFechar: () => void }) 
   const termo = sem(q.trim());
   const resultados = [
     ...telas.filter((t) => !termo || sem(t.rotulo).includes(termo)).slice(0, termo ? 6 : 8)
-      .map((t) => ({ chave: `t${t.to}${t.rotulo}`, rotulo: t.rotulo, meta: 'tela', icone: t.icone, ir: t.to })),
+      .map((t) => ({ chave: `t${t.to}${t.rotulo}`, rotulo: t.rotulo, meta: 'tela', icone: t.icone, ir: t.to, empId: undefined as string | undefined })),
     ...(termo ? (emps ?? []).filter((e) => e.ativo !== false && (sem(e.nome).includes(termo) || (e.matricula ?? '').includes(termo) || e.cpf.includes(termo.replace(/\D/g, '') || '§')))
-      .slice(0, 6).map((e) => ({ chave: `e${e.id}`, rotulo: e.nome, meta: 'ponto do mês', icone: 'pessoas' as NomeIcone, ir: `/rh/espelhos?emp=${e.id}` })) : []),
+      .slice(0, 6).map((e) => ({ chave: `e${e.id}`, rotulo: e.nome, meta: 'ponto do mês', icone: 'pessoas' as NomeIcone, ir: `/rh/espelhos?emp=${e.id}`, empId: e.id as string | undefined })) : []),
   ];
 
   function escolher(i: number) {
@@ -201,7 +202,7 @@ function Busca({ aberta, onFechar }: { aberta: boolean; onFechar: () => void }) 
           {resultados.map((r, i) => (
             <li key={r.chave} role="option" aria-selected={i === sel}>
               <button className={`${css.buscaItem} ${i === sel ? css.buscaSel : ''}`} onMouseEnter={() => setSel(i)} onClick={() => escolher(i)}>
-                <Icone nome={r.icone} /><span>{r.rotulo}</span><small>{r.meta}</small>
+                {r.empId ? <Avatar id={r.empId} nome={r.rotulo} tamanho={26} /> : <Icone nome={r.icone} />}<span>{r.rotulo}</span><small>{r.meta}</small>
               </button>
             </li>
           ))}
@@ -301,6 +302,7 @@ export function LayoutRH() {
   const contexto: ContextoRH = { atencao, recarregarAtencao };
 
   return (
+    <ProvedorAvatares>
     <div className={css.app}>
       <a href="#conteudo" className={css.pular}>Pular para o conteúdo</a>
       <aside className={css.side}>
@@ -372,5 +374,6 @@ export function LayoutRH() {
 
       <Busca aberta={busca} onFechar={() => setBusca(false)} />
     </div>
+    </ProvedorAvatares>
   );
 }

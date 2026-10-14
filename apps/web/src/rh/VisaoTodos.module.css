@@ -79,3 +79,7 @@
     radial-gradient(farthest-side at 0 50%, rgba(16,64,63,.2), rgba(16,64,63,0)) left center / 14px 100% no-repeat scroll,
     radial-gradient(farthest-side at 100% 50%, rgba(16,64,63,.2), rgba(16,64,63,0)) right center / 14px 100% no-repeat scroll;
 }
+
+/* Rosto ao lado do nome nas tabelas */
+.comAv.comAv.comAv{ position:relative; padding-left:58px !important; }
+.avTd{ position:absolute; left:14px; top:50%; transform:translateY(-50%); }

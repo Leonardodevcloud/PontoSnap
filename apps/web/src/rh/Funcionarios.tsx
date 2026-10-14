@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Avatar, useAvatares } from '../components/Avatar';
+import { RevisarFotos } from './RevisarFotos';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
 import { lerReais } from '../lib/formato';
@@ -33,7 +36,6 @@ function resumoBanco(b: ConfigRegra['banco']): string {
 const ehContratoHoras = (c: ConfigRegra | undefined, escalaFlexivel?: boolean) =>
   !!escalaFlexivel || c?.contrato?.tipoJornada === 'CONTRATO_HORAS';
 
-const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((n) => n[0]?.toUpperCase() ?? '').join('');
 
 export function Funcionarios() {
   const [lista, setLista] = useState<Empregado[] | null>(null);
@@ -58,6 +60,10 @@ export function Funcionarios() {
     catch (e) { setErro((e as Error).message); }
   }
   useEffect(() => { void carregar(); }, []);
+  const { dados: avs, trocarDesenho } = useAvatares();
+  const [params, setParams] = useSearchParams();
+  const revisarAberto = params.get('revisar') === '1';
+  const abrirRevisar = (v: boolean) => setParams((p) => { const n = new URLSearchParams(p); if (v) n.set('revisar', '1'); else n.delete('revisar'); return n; });
   useEffect(() => {
     api.get<PerfilResumo[]>('/perfis-regra').then(setPerfis).catch(() => {});
   }, [perfilPara]);
@@ -86,7 +92,7 @@ export function Funcionarios() {
   return (
     <div onClick={() => setMenu(null)}>
       <div className={css.head}>
-        <div><h2>Funcionários</h2><p>{lista ? `${ativos} ativos · quem bate ponto na Cliente A` : 'carregando…'}</p></div>
+        <div><h2>Funcionários</h2><p>{lista ? `${ativos} ${ativos === 1 ? 'ativo' : 'ativos'}` : 'carregando…'}</p></div>
         <div className={css.topoAcoes}>
           <Botao variante="ghost" className={css.add} onClick={() => setImportarAberto(true)}>Importar planilha</Botao>
           <Botao variante="coral" className={css.add} onClick={() => setAddAberto(true)}>+ Adicionar funcionário</Botao>
@@ -94,6 +100,25 @@ export function Funcionarios() {
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
+
+      {avs && avs.resumo.ativos > 0 && lista && (() => {
+        const r = avs.resumo;
+        const semFoto = lista.filter((e) => e.ativo && !avs.empregados[e.id]?.foto);
+        const pct = Math.round((r.comFoto / r.ativos) * 100);
+        return (
+          <div className={css.adesao}>
+            <div className={css.adesaoRostos} aria-hidden="true">
+              {lista.filter((e) => e.ativo).slice(0, 6).map((e) => <Avatar key={e.id} id={e.id} nome={e.nome} tamanho={32} className={css.adesaoAv} />)}
+            </div>
+            <div className={css.adesaoTxt}>
+              <b>Atualização cadastral: {r.comFoto} de {r.ativos} com foto</b>
+              <div className={css.adesaoBarra} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Funcionários com foto"><i style={{ width: `${pct}%` }} /></div>
+              <small>{semFoto.length === 0 ? 'Todo mundo com foto.' : `Sem foto aparece um desenho. O app pede a foto no próximo acesso de ${semFoto.length === 1 ? semFoto[0]!.nome.split(' ')[0] : `${semFoto.length} pessoas`}.`}</small>
+            </div>
+            {r.revisar > 0 && <Botao variante="coral" className={css.add} onClick={() => abrirRevisar(true)}>Revisar {r.revisar} {r.revisar === 1 ? 'foto' : 'fotos'}</Botao>}
+          </div>
+        );
+      })()}
 
       <div className={css.filtros}>
         <input className={css.busca} aria-label="Buscar funcionário" placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
@@ -108,17 +133,25 @@ export function Funcionarios() {
         {visiveis?.map((e) => (
           <div key={e.id} className={css.card}>
             <div className={css.linha1}>
-              <span className={css.avatar}>{iniciais(e.nome)}</span>
+              <Avatar id={e.id} nome={e.nome} tamanho={44} trocavel />
               <span className={css.quem}>
                 <span className={css.nomeC}>{e.nome}</span>
                 <span className={css.metaC}>mat. {e.matricula ?? '—'} · {fmtCpf(e.cpf)} · {e.escalaCodigo ? `escala ${e.escalaCodigo}` : e.horarioContratualId ? 'horário vinculado' : 'sem horário'}</span>
               </span>
+              {e.ativo && (() => {
+                const a = avs?.empregados[e.id];
+                if (a?.status === 'REVISAR') return <button className={`${css.tagFoto} ${css.tagRevisar}`} onClick={(ev) => { ev.stopPropagation(); abrirRevisar(true); }}>foto nova · revisar</button>;
+                if (a?.status === 'RECUSADA') return <span className={`${css.tagFoto} ${css.tagRecusada}`} title={a.motivo ?? undefined}>foto recusada · pedindo outra</span>;
+                if (!a?.foto) return <span className={css.tagFoto} title="Mostrando um desenho até a pessoa mandar a foto">{a?.temApp ? 'sem foto · pede no próximo acesso' : 'sem foto · sem acesso ao app'}</span>;
+                return null;
+              })()}
               <span className={`${css.status} ${e.ativo ? css.ativo : css.inativo}`}><span className={css.sdot} />{e.ativo ? 'Ativo' : 'Inativo'}</span>
               <span className={css.pinC}>{e.temPin ? 'PIN ✓' : 'sem PIN'}</span>
               <span className={css.kebabWrap} onClick={(ev) => { ev.stopPropagation(); setMenu(menu === e.id ? null : e.id); }}>
                 <button className={css.kebab} aria-label="Ações">⋯</button>
                 {menu === e.id && (
                   <div className={css.menu} onClick={(ev) => ev.stopPropagation()}>
+                    {!avs?.empregados[e.id]?.foto && <button onClick={() => { void trocarDesenho('CLT', e.id); setMenu(null); }}>Trocar desenho</button>}
                     <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
                     <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
                     <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
@@ -165,6 +198,7 @@ export function Funcionarios() {
       {dataInicioPara && <ModalDataInicio empregado={dataInicioPara} onFechar={() => setDataInicioPara(null)} onSalvo={() => { setDataInicioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
+      <RevisarFotos aberto={revisarAberto} onFechar={() => abrirRevisar(false)} emps={lista ?? []} />
     </div>
   );
 }

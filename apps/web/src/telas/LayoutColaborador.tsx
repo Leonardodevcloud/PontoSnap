@@ -6,6 +6,7 @@ import { Flash } from '../components/Flash';
 import { BotaoTema } from '../components/BotaoTema';
 import { PromptInstalar } from '../components/PromptInstalar';
 import { NotificacaoPrompt } from './NotificacaoPrompt';
+import { AtualizacaoCadastral, type MeuCadastro } from './AtualizacaoCadastral';
 import css from './LayoutColaborador.module.css';
 
 /** Casca das telas do funcionário: marca, navegação e a saída. */
@@ -15,6 +16,12 @@ export function LayoutColaborador() {
   const { pathname } = useLocation();
   const [menu, setMenu] = useState(false);
   const [temBanco, setTemBanco] = useState(false);
+  // Atualização cadastral: sem foto válida, o app não libera o ponto.
+  const [meu, setMeu] = useState<MeuCadastro | null | 'erro'>(null);
+  const [trocarFoto, setTrocarFoto] = useState(false);
+  useEffect(() => {
+    api.get<MeuCadastro>('/cadastro/meu').then(setMeu).catch(() => setMeu('erro'));
+  }, []);
 
   // A aba de banco de horas só existe pra quem tem acordo. Mostrar uma aba
   // vazia seria pior do que não ter aba nenhuma.
@@ -26,6 +33,13 @@ export function LayoutColaborador() {
       } catch { setTemBanco(false); }
     })();
   }, []);
+
+  if (meu === null) return <div className={css.casca} aria-busy="true" />;
+  if (meu !== 'erro' && (meu.precisaAtualizar || trocarFoto)) {
+    return <AtualizacaoCadastral meu={meu} modo={meu.precisaAtualizar ? 'obrigatorio' : 'trocar'}
+      onConcluir={(m) => { setMeu(m); setTrocarFoto(false); }} onCancelar={() => setTrocarFoto(false)} />;
+  }
+  const foto = meu !== 'erro' ? meu.foto?.miniatura : undefined;
 
   return (
     <div className={css.casca}>
@@ -40,17 +54,19 @@ export function LayoutColaborador() {
             className={css.avatar} onClick={() => setMenu((v) => !v)}
             aria-haspopup="menu" aria-expanded={menu} aria-label="Minha conta"
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="8" r="3.6" stroke="currentColor" strokeWidth="1.9" />
-              <path d="M4.5 20a7.5 7.5 0 0115 0" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-            </svg>
+            {foto ? <img src={foto} alt="" className={css.avatarFoto} /> : (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="8" r="3.6" stroke="currentColor" strokeWidth="1.9" />
+                <path d="M4.5 20a7.5 7.5 0 0115 0" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+              </svg>
+            )}
           </button>
 
           {menu && (
             <>
               <div className={css.fundo} onClick={() => setMenu(false)} />
               <div className={css.menu} role="menu">
-                <div className={css.menuNome}>Minha conta</div>
+                <div className={css.menuNome}>{meu !== 'erro' ? meu.nome : 'Minha conta'}</div>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/'); }}>Bater ponto</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
@@ -58,6 +74,7 @@ export function LayoutColaborador() {
                 {temBanco && (
                   <button role="menuitem" onClick={() => { setMenu(false); navegar('/banco'); }}>Banco de horas</button>
                 )}
+                {meu !== 'erro' && <button role="menuitem" onClick={() => { setMenu(false); setTrocarFoto(true); }}>Minha foto e dados</button>}
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/trocar-senha'); }}>Trocar minha senha</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/notificacoes'); }}>Notificações</button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px' }}>

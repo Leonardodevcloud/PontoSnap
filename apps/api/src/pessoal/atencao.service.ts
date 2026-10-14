@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   empregado, pontoHorarioContratual, pontoDocumento, pontoAjuste, pontoPerfilRegra,
-  espelhoAssinatura, pessoalFechamento, usuario, comTenant, type Db,
+  espelhoAssinatura, pessoalFechamento, usuario, empregadoFoto, comTenant, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
@@ -24,14 +24,14 @@ export interface ItemAtencao {
   id: string;
   grupo: GrupoAtencao;
   tipo: 'BATIDAS' | 'SEMANA' | 'ATESTADO' | 'AJUSTE' | 'MES_ANTERIOR' | 'NF' | 'ASSINATURA'
-    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME';
+    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME' | 'FOTO_REVISAR';
   /** Quantas ocorrências o item resume (dias, pessoas, notas…). */
   qtd: number;
   titulo: string;
   /** Por que importa, em uma frase. */
   texto: string;
   pessoas: { nome: string; detalhe?: string; empregadoId?: string | null }[];
-  acao: { rotulo: string; rota?: string; abrir?: 'BATIDAS' };
+  acao: { rotulo: string; rota?: string; abrir?: 'BATIDAS' | 'FOTOS' };
   acao2?: { rotulo: string; rota: string };
 }
 export interface RespAtencao {
@@ -109,7 +109,9 @@ export class AtencaoService {
         .where(and(eq(usuario.tenantId, tenantId), eq(usuario.ativo, true), inArray(usuario.empregadoId, emps.map((e) => e.id)))) : [];
       const fechs = await tx.select({ c: pessoalFechamento.competencia }).from(pessoalFechamento)
         .where(eq(pessoalFechamento.tenantId, tenantId));
-      return { emps, horarios, docs, ajustes, perfis, usaAssinatura, assinadasAnt, comApp, fechs };
+      const fotosRevisar = await tx.select({ empregadoId: empregadoFoto.empregadoId }).from(empregadoFoto)
+        .where(and(eq(empregadoFoto.tenantId, tenantId), eq(empregadoFoto.status, 'REVISAR')));
+      return { emps, horarios, docs, ajustes, perfis, usaAssinatura, assinadasAnt, comApp, fechs, fotosRevisar };
     });
 
     const empPorId = new Map(base.emps.map((e) => [e.id, e]));
@@ -277,6 +279,17 @@ export class AtencaoService {
         pessoas: quem.map((e) => ({ nome: primeiroNome(e.nome), detalhe: horPorId.get(e.horarioId!)?.codigo ?? undefined, empregadoId: e.id })),
         acao: { rotulo: 'Renomear regra', rota: '/rh/regras' },
         acao2: { rotulo: 'Trocar escala', rota: '/rh/funcionarios' },
+      });
+    }
+
+    const fotos = base.fotosRevisar.filter((f) => empPorId.has(f.empregadoId));
+    if (fotos.length > 0) {
+      itens.push({
+        id: 'fotos', grupo: 'CADASTRO', tipo: 'FOTO_REVISAR', qtd: fotos.length,
+        titulo: `${fotos.length} ${plural(fotos.length, 'foto nova para revisar', 'fotos novas para revisar')}`,
+        texto: 'A foto já aparece no sistema. Se não estiver boa, recuse com o motivo e o app pede outra.',
+        pessoas: fotos.map((f) => ({ nome: primeiroNome(nome(f.empregadoId)), empregadoId: f.empregadoId })),
+        acao: { rotulo: 'Revisar fotos', abrir: 'FOTOS' },
       });
     }
 

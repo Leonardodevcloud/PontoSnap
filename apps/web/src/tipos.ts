@@ -804,12 +804,12 @@ export interface ItemAtencao {
   id: string;
   grupo: GrupoAtencao;
   tipo: 'BATIDAS' | 'SEMANA' | 'ATESTADO' | 'AJUSTE' | 'MES_ANTERIOR' | 'NF' | 'ASSINATURA'
-    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME';
+    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME' | 'FOTO_REVISAR';
   qtd: number;
   titulo: string;
   texto: string;
   pessoas: { nome: string; detalhe?: string; empregadoId?: string | null }[];
-  acao: { rotulo: string; rota?: string; abrir?: 'BATIDAS' };
+  acao: { rotulo: string; rota?: string; abrir?: 'BATIDAS' | 'FOTOS' };
   acao2?: { rotulo: string; rota: string };
 }
 export interface RespAtencao {

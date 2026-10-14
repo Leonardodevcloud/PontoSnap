@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { Icone, type NomeIcone } from '../components/Icone';
 import { PainelRH } from './PainelRH';
+import { Avatar } from '../components/Avatar';
 import { CompletarBatidas } from './CompletarBatidas';
 import type { ContextoRH } from './LayoutRH';
 import type { GrupoAtencao, ItemAtencao } from '../tipos';
@@ -18,7 +19,7 @@ const GRUPOS: { id: GrupoAtencao; titulo: (mes: string) => string; sub: string }
 
 const ICONE: Record<ItemAtencao['tipo'], NomeIcone> = {
   BATIDAS: 'relogio', SEMANA: 'calendario', ATESTADO: 'caixa', AJUSTE: 'lapis', MES_ANTERIOR: 'calendario', NF: 'documento',
-  ASSINATURA: 'lapis', PADRAO_BENEFICIO: 'dinheiro', SEM_SALARIO: 'dinheiro', SEM_ESCALA: 'grade', SEM_BENEFICIO: 'dinheiro', REGRA_NOME: 'alerta',
+  ASSINATURA: 'lapis', PADRAO_BENEFICIO: 'dinheiro', SEM_SALARIO: 'dinheiro', SEM_ESCALA: 'grade', SEM_BENEFICIO: 'dinheiro', REGRA_NOME: 'alerta', FOTO_REVISAR: 'pessoas',
 };
 
 function saudacao() {
@@ -41,6 +42,7 @@ export function Inicio() {
 
   function agir(i: ItemAtencao) {
     if (i.acao.abrir === 'BATIDAS') setBatidas(true);
+    else if (i.acao.abrir === 'FOTOS') navegar('/rh/funcionarios?revisar=1');
     else if (i.acao.rota) navegar(i.acao.rota);
   }
 
@@ -103,7 +105,7 @@ export function Inicio() {
                         {i.pessoas.slice(0, 8).map((p, k) => (
                           <li key={k}>
                             {p.empregadoId
-                              ? <Link to={`/rh/espelhos?emp=${p.empregadoId}`}>{p.nome}{p.detalhe ? ` · ${p.detalhe}` : ''}</Link>
+                              ? <Link to={`/rh/espelhos?emp=${p.empregadoId}`} className={css.comAv}><Avatar id={p.empregadoId} nome={p.nome} tamanho={22} />{p.nome}{p.detalhe ? ` · ${p.detalhe}` : ''}</Link>
                               : <span>{p.nome}{p.detalhe ? ` · ${p.detalhe}` : ''}</span>}
                           </li>
                         ))}

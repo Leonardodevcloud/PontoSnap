@@ -1,4 +1,4 @@
-import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date, index } from 'drizzle-orm/pg-core';
+import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date, index, integer, customType } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 
 export const empregado = pgTable('empregado', {
@@ -22,6 +22,13 @@ export const empregado = pgTable('empregado', {
   /** Gestão de pessoal: cliente (loja/empresa atendida) a que o CLT pertence. Texto livre. */
   cliente: varchar('cliente', { length: 120 }),
   salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }),
+  /** Atualização cadastral feita pelo próprio funcionário no app (migration 0053). */
+  celular: varchar('celular', { length: 20 }),
+  emailPessoal: varchar('email_pessoal', { length: 160 }),
+  contatoEmergencia: varchar('contato_emergencia', { length: 160 }),
+  cadastroAtualizadoEm: timestamp('cadastro_atualizado_em', { withTimezone: true }),
+  /** Variação da caricatura mostrada enquanto não há foto (nulo = derivada do id). */
+  avatarSemente: integer('avatar_semente'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique('uq_empregado_cpf').on(t.tenantId, t.cpf),
@@ -43,3 +50,23 @@ export const empregadoSalario = pgTable('empregado_salario', {
   unique('uq_empregado_salario').on(t.tenantId, t.empregadoId, t.vigenteDesde),
   index('idx_empregado_salario_emp').on(t.tenantId, t.empregadoId),
 ]);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
+
+/**
+ * Foto do funcionário (migration 0053). Cifrada em repouso. A miniatura (96px)
+ * vai nas listas; a foto (320px) só no perfil e na revisão do RH.
+ * status: REVISAR (já vale, RH não olhou) | APROVADA | RECUSADA (app pede outra).
+ */
+export const empregadoFoto = pgTable('empregado_foto', {
+  empregadoId: uuid('empregado_id').primaryKey().references(() => empregado.id),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  foto: bytea('foto').notNull(),
+  miniatura: bytea('miniatura').notNull(),
+  status: varchar('status', { length: 10 }).notNull().default('REVISAR'),
+  motivo: varchar('motivo', { length: 200 }),
+  origem: varchar('origem', { length: 10 }).notNull().default('CAMERA'),
+  enviadaEm: timestamp('enviada_em', { withTimezone: true }).notNull().defaultNow(),
+  revisadaEm: timestamp('revisada_em', { withTimezone: true }),
+  revisadaPor: varchar('revisada_por', { length: 160 }),
+}, (t) => [index('idx_empregado_foto_tenant').on(t.tenantId, t.status)]);

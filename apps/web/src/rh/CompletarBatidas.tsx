@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { PainelLateral } from '../components/PainelLateral';
+import { Avatar } from '../components/Avatar';
 import css from './Inicio.module.css';
 
 interface BatFalt { hora: string; nsr: number | null; id: string }
@@ -98,7 +99,7 @@ export function CompletarBatidas({ aberto, onFechar, onSalvo }: { aberto: boolea
       {dados && dados.grupos.length === 0 && <p className={css.mudo}>Nenhuma batida faltando. Tudo em dia.</p>}
       {dados?.grupos.map((g) => (
         <section key={g.empregadoId} className={css.cbPessoa}>
-          <h3>{g.nome}</h3>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar id={g.empregadoId} nome={g.nome} tamanho={32} />{g.nome}</h3>
           {g.dias.map((d) => {
             const k = `${g.empregadoId}|${d.data}`;
             const f = slotFaltando(d);

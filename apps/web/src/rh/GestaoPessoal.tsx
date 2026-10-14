@@ -11,6 +11,7 @@ import type {
   BaseDias, PessoaTipo, PessoalCompetencia, PessoalSemanaMot, PessoalDebito, PessoalHistorico, PessoalPessoaHistorico, PessoalNfArquivo, PessoalPagamentoMes, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
+import { Avatar } from '../components/Avatar';
 import css from './GestaoPessoal.module.css';
 
 /**
@@ -448,7 +449,7 @@ function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: Pessoal
         {linhas.length === 0 && <Vazio cols={10}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
         {linhas.map((l) => (
           <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-            <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
+            <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
               {l.erro && <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro}>sem escala</span>}
               {l.salarioCent == null && <span className={`${vt.pill} ${vt.pillWarn}`}>sem salário</span>}</td>
             <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
@@ -496,7 +497,7 @@ function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d
           const semCfg = c.origem === 'NENHUM' || (c.vrDiaCent === 0 && c.vtTipo === 'NENHUM');
           return (
             <Linha key={l.empregadoId} rotulo={`Abrir benefícios de ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-              <td className={vt.nome}>{l.nome}<small>{semCfg ? 'sem benefício' : resumoBen(c)}</small>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} trocavel />{l.nome}<small>{semCfg ? 'sem benefício' : resumoBen(c)}</small>
                 {semCfg ? <span className={`${vt.pill} ${vt.pillWarn}`}>configurar</span>
                   : <span className={`${vt.pill} ${c.origem === 'PROPRIO' ? vt.pillLime : vt.pillMute}`} title={c.vigenteDesde ? `Vale desde ${mesLongo(c.vigenteDesde)}` : undefined}>{c.origem === 'PROPRIO' ? 'valor próprio' : 'padrão'}</span>}</td>
               <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
@@ -549,7 +550,7 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
             const l = x.l;
             return (
               <Linha key={l.id} rotulo={`Abrir lançamento de ${l.nome}`} onAbrir={(el) => onAbrir('MEI', l.id, el)}>
-                <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}{tag('MEI')}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
+                <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MEI')}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
                 <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
                 <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${l.diasMes} dias no mês`}>{brl(l.valorDiaCent)}/dia</small></td>
                 <td className={vt.n}>{l.heCent + l.feriadosCent ? <><span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span>
@@ -572,7 +573,7 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
           const adic = l.semanas.reduce((a, s) => a + s.adicionalCent, 0);
           return (
             <Linha key={l.id} rotulo={`Abrir semanas de ${l.nome}`} onAbrir={(el) => onAbrir('MOTORISTA', l.id, el)}>
-              <td className={vt.nome}><span className={css.nomeLinha}>{l.nome}{tag('MOTORISTA')}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onAbrir('MOTORISTA', l.id, document.activeElement as HTMLElement)} /></span>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MOTORISTA')}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onAbrir('MOTORISTA', l.id, document.activeElement as HTMLElement)} /></span>
                 <small>{[fmtDoc(l.documento), l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'].filter(Boolean).join(' · ')}</small></td>
               <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
               <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${dias} dia${dias === 1 ? '' : 's'} trabalhados no mês`}>{brl(l.diariaCent)}/dia · {dias}d</small></td>
