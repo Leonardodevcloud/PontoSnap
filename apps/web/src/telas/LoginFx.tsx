@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
 // Cores da marca usadas nas estrelas/partículas/confete.
-const CORAL = '#FF6B4A';
-const LIME = '#CBF54D';
-const PEACH = '#FFE2D1';
+const CORAL = '#2457D6';
+const LIME = '#FFB23E';
+const PEACH = '#E6EDFC';
 
 function prefereMenosMovimento() {
   return typeof window !== 'undefined'

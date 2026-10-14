@@ -1,8 +1,8 @@
-.h { font-family: var(--ff-display); font-weight: 600; font-size: 24px; color: var(--ink); }
+.h { font-family: var(--ff-display); font-weight:800; font-size: 24px; color: var(--ink); }
 .sub { font-size: 14px; color: var(--ash); margin-bottom: 20px; line-height: 1.45; }
 
 .aviso {
-  background: var(--peach);
+  background: var(--aviso-bg);
   border-radius: 12px;
   padding: 12px 16px;
   font-size: 13px;
@@ -16,13 +16,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--ink);
+  background: var(--fundo-escuro);
   border-radius: 16px;
   padding: 16px 18px;
   margin-bottom: 20px;
 }
-.masterTit { font-weight: 700; font-size: 15px; color: var(--white); }
-.masterDesc { font-size: 12px; color: var(--peach); margin-top: 2px; }
+.masterTit { font-weight: 700; font-size: 15px; color: var(--sobre-escuro); }
+.masterDesc { font-size: 12px; color: rgba(232,237,247,.75); margin-top: 2px; }
 
 /* category */
 .cat { margin-bottom: 18px; }

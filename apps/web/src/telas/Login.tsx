@@ -78,7 +78,7 @@ export function Login() {
           <FlashSvg tamanho={220} cor="var(--lime)" className={`${css.amb} ${css.amb2}`} />
         </div>
         <div className={css.marcaLogo}>
-          <FlashSvg tamanho={26} cor="var(--coral)" className={css.giraLogo} />
+          <FlashSvg tamanho={26} cor="var(--marca-clara)" className={css.giraLogo} />
           Ponto<b>Snap</b>
         </div>
         <h2 className={css.marcaTit}>Bater ponto<br />num <span>estalo</span>.</h2>

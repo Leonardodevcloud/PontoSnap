@@ -2,7 +2,7 @@
 .head h2{ font-size:28px; }
 .head p{ margin:6px 0 0; color:var(--ash); font-size:14px; }
 .add{ width:auto; }
-.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 14px; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 14px; }
 
 .row:first-child{ border-top:none; }
 .thead span{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ash); }
@@ -26,14 +26,14 @@
 .selWrap{ display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
 .selLb{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
 .select{ padding:11px 12px; border:1px solid rgba(var(--ink-rgb),.18); border-radius:12px; font:inherit; background:var(--white); }
-.aviso{ background:var(--peach); color:var(--ink); border-radius:var(--r-md); padding:12px 14px; font-size:14px; margin:0 0 8px; }
-.aviso strong{ color:var(--coral-dark); }
-.erroModal{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:10px 13px; font-size:14px; font-weight:600; margin:0 0 12px; }
+.aviso{ background:var(--aviso-bg); color:var(--ink); border-radius:var(--r-md); padding:12px 14px; font-size:14px; margin:0 0 8px; }
+.aviso strong{ color:var(--aviso-text); }
+.erroModal{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:10px 13px; font-size:14px; font-weight:600; margin:0 0 12px; }
 
-.sucesso{ background:#eef7d8; color:#5f7d0a; border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 12px; }
+.sucesso{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 12px; }
 
 .credencial{ background:var(--cream); border:1px solid var(--peach); border-radius:var(--r-md); padding:16px 18px; margin-bottom:14px; }
-.credAviso{ margin:0 0 12px; font-size:12.5px; color:var(--coral-dark); line-height:1.45; }
+.credAviso{ margin:0 0 12px; font-size:12.5px; color:var(--aviso-text); line-height:1.45; }
 .credLinha{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 0; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:14px; }
 .credLinha:first-of-type{ border-top:none; }
 .credLinha span{ color:var(--ash); }
@@ -65,7 +65,7 @@
 
 .importResultado{ display:flex; flex-direction:column; gap:14px; }
 .importResumo{
-  background:var(--lime); color:var(--ink); border-radius:12px; padding:14px 16px;
+  background:var(--lime); color:var(--sobre-lime); border-radius:12px; padding:14px 16px;
   font-size:16px; line-height:1.5;
 }
 .importResumo strong{ font-size:22px; }
@@ -89,7 +89,7 @@
 .cards{ display:flex; flex-direction:column; gap:11px; }
 .card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.09); border-radius:16px; padding:15px 18px; }
 .linha1{ display:flex; align-items:center; gap:12px; }
-.avatar{ width:38px; height:38px; border-radius:12px; background:var(--peach); color:var(--coral-dark); display:grid; place-items:center; font-family:var(--ff-display); font-weight:600; font-size:16px; flex-shrink:0; }
+.avatar{ width:38px; height:38px; border-radius:12px; background:var(--peach); color:var(--coral-dark); display:grid; place-items:center; font-family:var(--ff-display); font-weight:800; font-size:16px; flex-shrink:0; }
 .quem{ flex:1; min-width:0; }
 .nomeC{ font-weight:800; font-size:16px; display:block; }
 .metaC{ font-family:var(--ff-mono); font-size:12.5px; color:var(--ash); margin-top:2px; display:block; }
@@ -101,7 +101,7 @@
 .pVal{ color:var(--ink); }
 .pecaCLT{ opacity:.55; }
 .pecaCLT .pVal{ color:var(--ash); font-weight:600; }
-.conv{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; padding:5px 11px; border-radius:var(--r-pill); background:var(--peach); color:var(--coral-dark); border:1.5px solid rgba(255,107,74,.25); }
+.conv{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; padding:5px 11px; border-radius:var(--r-pill); background:var(--peach); color:var(--coral-dark); border:1.5px solid rgba(36,87,214,.25); }
 .semConv{ background:var(--cream); color:var(--ash); border:1.5px dashed rgba(var(--ink-rgb),.18); font-weight:600; }
 .editarRegras{ margin-left:auto; background:none; border:none; font:inherit; font-size:12.5px; font-weight:800; color:var(--coral-dark); cursor:pointer; text-decoration:underline; white-space:nowrap; min-height:32px; padding:0 4px; }
 
@@ -117,23 +117,23 @@
 .herdaTxt{ font-weight:400; font-size:12.5px; }
 
 .modoEscala { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
-.radioLinha { display: flex; gap: 9px; align-items: flex-start; font-size:12.5px; color: var(--ash, #5C4F49); line-height: 1.4; cursor: pointer; }
+.radioLinha { display: flex; gap: 9px; align-items: flex-start; font-size:12.5px; color: var(--ash, #55627A); line-height: 1.4; cursor: pointer; }
 .radioLinha input { margin-top: 2px; flex-shrink: 0; }
-.radioLinha strong { color: var(--ink, #10403F); }
+.radioLinha strong { color: var(--ink, #0F1B33); }
 
 /* Tag de perfil clicável (abre o modal de regras) */
 .perfilBadge { cursor: pointer; border: none; font: inherit; transition: filter .12s; }
 .perfilBadge:hover { filter: brightness(0.96); }
 
 /* Modal de regras do perfil */
-.regrasSub { font-size: 12.5px; color: var(--ash, #5C4F49); margin: 0 0 8px; }
+.regrasSub { font-size: 12.5px; color: var(--ash, #55627A); margin: 0 0 8px; }
 .regrasLista { display: flex; flex-direction: column; }
 .regraItem { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--row-border); }
 .regraItem:last-child { border-bottom: none; }
-.regraNome { font-size:14px; font-weight: 700; color: var(--ink, #10403F); }
-.regraDesc { font-size:12.5px; color: var(--ash, #5C4F49); margin-top: 2px; }
+.regraNome { font-size:14px; font-weight: 700; color: var(--ink, #0F1B33); }
+.regraDesc { font-size:12.5px; color: var(--ash, #55627A); margin-top: 2px; }
 .regraValCustom { font-size:12.5px; font-weight: 800; color: var(--coral-dark); text-align: right; white-space: nowrap; }
-.regraValClt { font-size:12.5px; font-weight: 700; color: var(--ash, #5C4F49); background: var(--cream, #FFF8EE); padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+.regraValClt { font-size:12.5px; font-weight: 700; color: var(--ash, #55627A); background: var(--cream, #F5F7FB); padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
 
 /* Grid de 2 colunas pro formulário de cadastro */
 .formGrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
@@ -146,8 +146,8 @@
 .bancoPrevLb{ font-family:var(--ff-mono); font-size:11px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }
 
 .tagContrato{ background:var(--ink); color:var(--lime); }
-.alertaContrato{ font-size:12.5px; font-weight:700; color:var(--coral-dark); background:var(--peach); border-radius:6px; padding:4px 8px; }
-.avisoContrato{ background:var(--peach); border-radius:12px; padding:12px 14px; font-size:14px; line-height:1.5; margin:0 0 14px; color:var(--ink); }
+.alertaContrato{ font-size:12.5px; font-weight:700; color:var(--aviso-text); background:var(--aviso-bg); border-radius:6px; padding:4px 8px; }
+.avisoContrato{ background:var(--aviso-bg); border-radius:12px; padding:12px 14px; font-size:14px; line-height:1.5; margin:0 0 14px; color:var(--ink); }
 
 /* mobile-head: título em cima, ações embaixo quebrando linha */
 @media (max-width:760px){ .head{ flex-direction:column; align-items:stretch; } .head > div{ flex-wrap:wrap; } }
@@ -164,5 +164,5 @@
 .adesaoBarra i{ display:block; height:100%; background:var(--ok-text); border-radius:9px; }
 .tagFoto{ font-family:var(--ff-mono); font-size:11px; padding:4px 8px; border-radius:6px; background:var(--cream); color:var(--ash); white-space:nowrap; border:none; }
 .tagRevisar{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); font-weight:700; cursor:pointer; min-height:28px; }
-.tagRecusada{ background:var(--erro-bg); color:var(--coral-dark); }
+.tagRecusada{ background:var(--erro-bg); color:var(--erro-text); }
 @media (max-width:760px){ .tagFoto{ display:none; } }

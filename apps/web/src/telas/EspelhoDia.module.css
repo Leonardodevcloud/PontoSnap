@@ -1,6 +1,6 @@
-.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; margin-top:6px; }
+.h{ font-family:var(--ff-display); font-weight:800; font-size:24px; margin-top:6px; }
 .d{ font-family:var(--ff-mono); font-size:12px; color:var(--ash); margin-top:2px; margin-bottom:18px; }
-.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:600; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:600; }
 .vazio{ color:var(--ash); font-size:14.5px; }
 
 .row{
@@ -21,10 +21,10 @@
   display:flex; justify-content:space-between; align-items:center;
 }
 .l{ font-size:13px; color:var(--ash); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
-.v{ font-family:var(--ff-display); font-weight:600; font-size:22px; color:var(--ink); }
+.v{ font-family:var(--ff-display); font-weight:800; font-size:22px; color:var(--ink); }
 .afd{ font-family:var(--ff-mono); font-size:11.5px; color:var(--ash); text-align:center; margin-top:14px; letter-spacing:.03em; }
 .ok{ color:var(--ok-text); }
-.aviso{ font-size:13.5px; color:var(--coral-dark); font-weight:600; text-align:center; margin-top:12px; }
+.aviso{ font-size:13.5px; color:var(--aviso-text); font-weight:600; text-align:center; margin-top:12px; }
 .espaco{ flex:1; min-height:16px; }
 
 /* Navegação por dia — sem isso o funcionário não alcança os comprovantes
@@ -59,12 +59,12 @@
 .dupla{ display:flex; gap:8px; }
 .batidas{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:11px; }
 .batB{ font-family:var(--ff-mono); font-size:13px; padding:7px 12px; border-radius:9px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ink); cursor:pointer; }
-.batOn{ background:var(--erro-bg); border-color:var(--coral); color:var(--coral-dark); font-weight:800; }
+.batOn{ background:var(--erro-bg); border-color:var(--erro-text); color:var(--erro-text); font-weight:800; }
 .formAcoes{ display:flex; gap:10px; align-items:center; }
 .cancelarF{ background:none; border:none; font:inherit; font-size:13px; font-weight:700; color:var(--ash); text-decoration:underline; cursor:pointer; }
 .okBox{ background:var(--ok-bg); color:var(--ok-text); border-radius:12px; padding:11px 13px; font-size:13.5px; margin-top:14px; }
 .pedBox{ background:var(--aviso-bg); border:1px solid var(--aviso-border); border-radius:12px; padding:11px 13px; font-size:13px; color:var(--ash); margin-top:12px; }
 .pedOk{ background:var(--ok-bg); border-color:var(--ok-border); }
-.pedNo{ background:var(--erro-bg); border-color:rgba(255,107,74,.3); }
-.tagInc{ font-family:var(--ff-mono); font-size:10px; color:var(--ink); background:var(--lime); padding:2px 7px; border-radius:6px; }
+.pedNo{ background:var(--erro-bg); border-color:rgba(36,87,214,.3); }
+.tagInc{ font-family:var(--ff-mono); font-size:10px; color:var(--ok-text); background:var(--ok-bg); padding:2px 7px; border-radius:6px; }
 .pedObs{ display:block; font-size:12px; color:var(--ash); margin-top:4px; font-style:italic; }

@@ -62,7 +62,7 @@ export function Assinatura() {
             <div className={css.info}><span className={css.k}>Valor</span><span className={`${css.v} ${css.mono}`}>{brl(aberto.valor)}</span></div>
             <div className={css.info}>
               <span className={css.k}>{atrasada ? 'Venceu em' : 'Vence em'}</span>
-              <span className={css.v} style={atrasada ? { color: 'var(--coral-dark)' } : undefined}>{fmtData(aberto.vencimento)}</span>
+              <span className={css.v} style={atrasada ? { color: 'var(--erro-text)' } : undefined}>{fmtData(aberto.vencimento)}</span>
             </div>
           </>
         )}

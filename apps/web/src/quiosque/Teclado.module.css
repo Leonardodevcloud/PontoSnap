@@ -1,7 +1,7 @@
 .pad{ display:grid; grid-template-columns:repeat(3, 120px); gap:14px; }
 .key{
   height:78px; border-radius:20px; background:var(--white); border:2px solid rgba(var(--ink-rgb),.1);
-  font-family:var(--ff-display); font-weight:600; font-size:30px; color:var(--ink); cursor:pointer;
+  font-family:var(--ff-display); font-weight:800; font-size:30px; color:var(--ink); cursor:pointer;
   transition:transform .06s ease, background .12s ease;
 }
 .key:active{ transform:scale(.95); background:var(--peach); }

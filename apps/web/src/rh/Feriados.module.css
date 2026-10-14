@@ -7,10 +7,10 @@
 .lb{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
 .sel select{ padding:11px 12px; border:1px solid rgba(var(--ink-rgb),.18); border-radius:12px; font:inherit; background:var(--white); }
 .add{ width:auto; }
-.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin-bottom:14px; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin-bottom:14px; }
 
 .anoBar{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
-.anoBar span{ font-family:var(--ff-display); font-weight:600; font-size:22px; }
+.anoBar span{ font-family:var(--ff-display); font-weight:800; font-size:22px; }
 .anoBar button{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(var(--ink-rgb),.18); background:var(--white); cursor:pointer; font-size:16px; color:var(--ink); }
 .anoBar button:hover{ background:var(--peach); }
 

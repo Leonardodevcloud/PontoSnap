@@ -17,7 +17,7 @@
 .rm:hover{ background:var(--cream); }
 .rm:hover{ color:var(--coral-dark); }
 .addPar{ align-self:flex-start; border:1px dashed rgba(var(--ink-rgb),.3); background:none; border-radius:10px; padding:6px 12px; font-family:var(--ff-mono); font-size:12.5px; color:var(--ash); cursor:pointer; }
-.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:14px 0 0; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:14px 0 0; }
 .salvar{ width:auto; margin-top:18px; }
 
 .table{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:hidden; max-width:960px; }
@@ -39,28 +39,28 @@
   border: none; border-radius: 8px; padding: 0 12px; min-height: 32px;
   font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
 }
-.btnEditar { background: var(--peach, #FFE2D1); color: var(--coral-dark); }
-.btnExcluir { background:var(--white); color: var(--ash, #5C4F49); border: 1px solid rgba(var(--ink-rgb),.12); }
+.btnEditar { background: var(--peach, #E6EDFC); color: var(--coral-dark); }
+.btnExcluir { background:var(--white); color: var(--ash, #55627A); border: 1px solid rgba(var(--ink-rgb),.12); }
 .btnEditar:hover { filter: brightness(0.97); }
 .btnExcluir:hover { background: var(--field-bg); }
 
 .porDiaBox { margin: 16px 0; }
-.porDiaToggle { display: flex; gap: 9px; align-items: flex-start; font-size:12.5px; color: var(--ash, #5C4F49); line-height: 1.4; cursor: pointer; background: var(--peach); border-radius: 10px; padding: 11px 12px; }
+.porDiaToggle { display: flex; gap: 9px; align-items: flex-start; font-size:12.5px; color: var(--ash, #55627A); line-height: 1.4; cursor: pointer; background: var(--peach); border-radius: 10px; padding: 11px 12px; }
 .porDiaToggle input { margin-top: 2px; flex-shrink: 0; }
-.porDiaToggle strong { color: var(--ink, #10403F); }
+.porDiaToggle strong { color: var(--ink, #0F1B33); }
 .porDiaGrade { margin-top: 12px; border: 1px solid var(--row-border); border-radius: 12px; overflow: hidden; }
 .porDiaLinha { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--row-border); }
 .porDiaLinha:last-of-type { border-bottom: none; }
-.porDiaNome { font-weight: 700; width: 44px; color: var(--ink, #10403F); font-size:14px; }
+.porDiaNome { font-weight: 700; width: 44px; color: var(--ink, #0F1B33); font-size:14px; }
 .porDiaInput { padding: 6px 10px; border: 1.5px solid rgba(var(--ink-rgb),.15); border-radius: 8px; font-size:14px; }
-.porDiaUn { font-size: 12.5px; color: var(--ash, #5C4F49); }
+.porDiaUn { font-size: 12.5px; color: var(--ash, #55627A); }
 
 .compOn{ border-color:var(--ink); }
 .compKpis{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
 @media(max-width:620px){ .compKpis{ grid-template-columns:1fr; } }
 .compKpis div{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:10px; padding:9px 11px; }
 .compKpis small{ display:block; font-family:var(--ff-mono); font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--ash); }
-.compKpis b{ font-family:var(--ff-display); font-size:18px; font-weight:600; color:var(--ink); }
+.compKpis b{ font-family:var(--ff-display); font-size:18px; font-weight:800; color:var(--ink); }
 .compKpis em{ display:block; font-style:normal; font-size:12.5px; color:var(--ash); }
 .compRegras{ margin:10px 0 0; padding:0; list-style:none; font-size:12.5px; line-height:1.55; color:var(--ink); }
 .compRegras li{ padding:4px 0 4px 20px; position:relative; }

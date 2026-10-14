@@ -31,7 +31,7 @@ const avisarMudanca = () => window.dispatchEvent(new Event('pontosnap:avisos'));
 function Autor({ nome, quandoIso }: { nome: string; quandoIso: string }) {
   const ini = nome.trim().split(/\s+/).filter((p) => /\p{L}/u.test(p)).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || 'RH';
   let h = 0; for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  const cores = ['#10403F', '#CC4426', '#5B4BC4', '#0B7A4B', '#8A5A12', '#2D4E8A'];
+  const cores = ['#0F1B33', '#2457D6', '#5B4BC4', '#0E7A50', '#8C5A00', '#2D4E8A'];
   return (
     <div className={css.autor}>
       <span className={css.av} style={{ background: cores[h % cores.length] }} aria-hidden="true">{ini}</span>

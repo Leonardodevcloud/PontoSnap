@@ -21,7 +21,7 @@
 .votar:focus-visible, .mudar:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 .mudar{ min-height:44px; border-radius:999px; border:1.5px solid rgba(var(--ink-rgb),.22); background:var(--white); color:var(--ink); font:inherit; font-weight:800; cursor:pointer; }
 .obs{ text-align:center; color:var(--ash); font-size:12px; }
-.erro{ margin:0; background:var(--erro-bg); color:var(--coral-dark); border-radius:10px; padding:8px 10px; font-weight:700; font-size:13px; }
+.erro{ margin:0; background:var(--erro-bg); color:var(--erro-text); border-radius:10px; padding:8px 10px; font-weight:700; font-size:13px; }
 .res{ border-radius:12px; padding:8px 10px; background:var(--cream); }
 .meu{ background:var(--ok-bg); outline:1.5px solid var(--ok-text); }
 .resT{ display:flex; justify-content:space-between; gap:8px; font-size:14px; font-weight:700; margin-bottom:5px; color:var(--ink); }

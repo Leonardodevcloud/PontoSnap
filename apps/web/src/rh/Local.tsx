@@ -176,7 +176,7 @@ export function Local() {
             </div>
             <div className={css.cobertura} aria-hidden="true">
               <svg width="96" height="96" viewBox="0 0 96 96">
-                <circle cx="48" cy="52" r="30" fill="rgba(255,107,74,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
+                <circle cx="48" cy="52" r="30" fill="rgba(36,87,214,.10)" stroke="var(--coral)" strokeWidth="1.5" strokeDasharray="4 4" />
                 <path d="M48 24 C40 24 34 30 34 38 C34 48 48 60 48 60 C48 60 62 48 62 38 C62 30 56 24 48 24 Z" fill="var(--coral)" />
                 <circle cx="48" cy="38" r="5" fill="var(--cream)" />
               </svg>

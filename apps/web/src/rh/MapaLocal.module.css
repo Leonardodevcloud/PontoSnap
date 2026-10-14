@@ -5,7 +5,7 @@
   flex: 1; padding: 11px 13px; border: 1.5px solid rgba(var(--ink-rgb),.15);
   border-radius: 11px; font-size:14px; font-family: inherit; color: var(--ink);
 }
-.busca input:focus { outline: none; border-color: var(--coral); box-shadow: 0 0 0 4px rgba(255,107,74,.13); }
+.busca input:focus { outline: none; border-color: var(--coral); box-shadow: 0 0 0 4px rgba(36,87,214,.13); }
 .busca button {
   background: var(--ink); color: #fff; border: none; border-radius: 11px;
   padding: 0 18px; font-weight: 800; cursor: pointer; font-size:12.5px; white-space: nowrap;
@@ -14,12 +14,12 @@
 
 .mapa {
   height: 300px; border-radius: 14px; overflow: hidden;
-  border: 1px solid rgba(var(--ink-rgb),.1); background: #eef1ea;
+  border: 1px solid rgba(var(--ink-rgb),.1); background: var(--thead-bg);
 }
 
-.dicaMapa { font-size:12.5px; color: var(--ash, #5C4F49); margin: 8px 0 0; text-align: center; }
-.erroBusca { font-size: 12.5px; color: var(--coral-dark); margin: 8px 0 0; }
+.dicaMapa { font-size:12.5px; color: var(--ash, #55627A); margin: 8px 0 0; text-align: center; }
+.erroBusca { font-size: 12.5px; color: var(--erro-text); margin: 8px 0 0; }
 .erroMapa {
-  font-size:12.5px; color: var(--ash, #5C4F49); background: var(--cream, #FFF8EE);
+  font-size:12.5px; color: var(--ash, #55627A); background: var(--cream, #F5F7FB);
   border: 1px dashed rgba(var(--ink-rgb),.2); border-radius: 12px; padding: 14px; margin: 6px 0;
 }

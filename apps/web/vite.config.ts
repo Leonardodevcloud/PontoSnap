@@ -16,8 +16,8 @@ export default defineConfig({
         name: 'PontoSnap',
         short_name: 'PontoSnap',
         description: 'Bater ponto num estalo.',
-        theme_color: '#FF6B4A',
-        background_color: '#FFF8EE',
+        theme_color: '#2457D6',
+        background_color: '#F5F7FB',
         display: 'standalone',
         start_url: '/',
         icons: [

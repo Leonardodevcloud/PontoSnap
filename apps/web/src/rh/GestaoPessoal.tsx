@@ -1613,7 +1613,7 @@ function ModalPix({ alvo, mes, onFechar, onRegistrar }: {
   }), [norm.chave, alvo.nome, valor, mes]);
   useEffect(() => {
     let vivo = true;
-    QRCode.toDataURL(codigo, { margin: 1, width: 216, errorCorrectionLevel: 'M', color: { dark: '#10403F', light: '#FFFFFF' } })
+    QRCode.toDataURL(codigo, { margin: 1, width: 216, errorCorrectionLevel: 'M', color: { dark: '#0F1B33', light: '#FFFFFF' } })
       .then((u) => { if (vivo) setImg(u); }).catch(() => setImg(''));
     return () => { vivo = false; };
   }, [codigo]);

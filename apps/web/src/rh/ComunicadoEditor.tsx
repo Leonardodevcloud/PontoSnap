@@ -425,7 +425,7 @@ export function ComunicadoEditor() {
                   <input className={css.inp} value={b.url} placeholder="Cole o link do YouTube, Vimeo ou Google Drive" aria-label="Link do vídeo"
                     onChange={(e) => urlVideo(b.k, e.target.value)} />
                   {b.videoEstado === 'verificando' && <p className={css.ajuda}>Verificando o link…</p>}
-                  {b.videoEstado === 'erro' && <p className={css.ajuda} style={{ color: 'var(--coral-dark)', fontWeight: 700 }}>{b.videoErro}</p>}
+                  {b.videoEstado === 'erro' && <p className={css.ajuda} style={{ color: 'var(--erro-text)', fontWeight: 700 }}>{b.videoErro}</p>}
                   {b.videoEstado === 'ok' && b.videoId && (
                     <div className={css.vPrev}>
                       <VideoEmbed bloco={b} compacto />

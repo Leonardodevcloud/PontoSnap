@@ -1,7 +1,7 @@
-.veu{ position:fixed; inset:0; background:rgba(16,64,63,.32); z-index:90; }
+.veu{ position:fixed; inset:0; background:rgba(15,27,51,.32); z-index:90; }
 .painel{
   position:fixed; top:0; right:0; bottom:0; z-index:91; background:var(--white);
-  box-shadow:-12px 0 40px rgba(16,64,63,.2); display:flex; flex-direction:column;
+  box-shadow:-12px 0 40px rgba(15,27,51,.2); display:flex; flex-direction:column;
   padding-bottom:env(safe-area-inset-bottom, 0px);
 }
 .topo{ display:flex; gap:12px; align-items:flex-start; padding:20px 22px 14px; border-bottom:1px solid rgba(var(--ink-rgb),.1); }

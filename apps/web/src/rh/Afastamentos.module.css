@@ -1,5 +1,5 @@
 .tela{ max-width:720px; }
-.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; }
+.h{ font-family:var(--ff-display); font-weight:800; font-size:28px; }
 .sub{ color:var(--ash); font-size:14px; margin:6px 0 18px; line-height:1.55; }
 .sub strong{ color:var(--ink); }
 
@@ -32,7 +32,7 @@
   background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1);
   border-radius:12px; padding:12px 14px; margin-bottom:7px;
 }
-.itemN{ font-family:var(--ff-display); font-size:16px; font-weight:600; }
+.itemN{ font-family:var(--ff-display); font-size:16px; font-weight:800; }
 .itemD{ font-size:12.5px; color:var(--ash); margin-top:3px; }
 .tag{
   display:inline-block; background:var(--peach); color:var(--coral-dark);
@@ -49,11 +49,11 @@
 
 .vazio{ color:var(--ash); font-size:14px; padding:8px 0; }
 .erro{
-  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
   padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
 }
 .ok{
-  background:rgba(203,245,77,.4); color:var(--ink); border-radius:var(--r-md);
+  background:rgba(255,178,62,.4); color:var(--ink); border-radius:var(--r-md);
   padding:10px 14px; font-size:14px; font-weight:700; margin-bottom:12px;
 }
 .nota{

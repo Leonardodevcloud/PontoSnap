@@ -45,7 +45,7 @@ export function RedefinirSenha() {
           <Flash t={220} c="var(--lime)" cn={`${css.amb} ${css.amb2}`} />
         </div>
         <div className={css.marcaLogo}>
-          <Flash t={26} c="var(--coral)" cn={css.giraLogo} />Ponto<b>Snap</b>
+          <Flash t={26} c="var(--marca-clara)" cn={css.giraLogo} />Ponto<b>Snap</b>
         </div>
         <h2 className={css.marcaTit}>Bater ponto<br />num <span>estalo</span>.</h2>
       </aside>

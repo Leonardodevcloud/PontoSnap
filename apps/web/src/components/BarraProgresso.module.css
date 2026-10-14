@@ -7,7 +7,7 @@
 
 .pulso{
   position:absolute; top:0; height:100%; width:40%;
-  background:linear-gradient(90deg, rgba(255,107,74,0), var(--coral), rgba(255,107,74,0));
+  background:linear-gradient(90deg, rgba(36,87,214,0), var(--coral), rgba(36,87,214,0));
   animation:desliza 1.1s ease-in-out infinite;
 }
 

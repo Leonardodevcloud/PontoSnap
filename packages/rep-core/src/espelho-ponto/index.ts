@@ -78,7 +78,7 @@ function estrelaFlash(doc: PDFKit.PDFDocument, cx: number, cy: number, r: number
   doc.restore();
 }
 
-const VERDE_SELO = '#0FA968';
+const VERDE_SELO = '#0E7A50';
 
 /** Carimbo redondo "assinado digitalmente" com os dados que comprovam a assinatura. */
 function carimboAssinatura(
@@ -109,11 +109,11 @@ function carimboAssinatura(
   }
 }
 
-const TINTA = '#10403F';
-const CORAL = '#E5502F';
-const CINZA = '#5C4F49';
-const LINHA = '#D9CFC1';
-const CAB_BG = '#FBEFE6';
+const TINTA = '#0F1B33';
+const CORAL = '#2457D6';
+const CINZA = '#55627A';
+const LINHA = '#D3DAE6';
+const CAB_BG = '#E6EDFC';
 
 const fmtData = (iso: string) => { const [a, m, d] = iso.split('-'); return `${d}/${m}/${a}`; };
 const diaSemana = (iso: string, fuso: string) =>
@@ -226,7 +226,7 @@ export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
       y = desenharCabecalho(y);
     }
     // zebra leve para folga/feriado
-    if (l.tipoDia !== 'TRAB') { doc.rect(34, y, larguraUtil, h).fill('#FBF7F0'); }
+    if (l.tipoDia !== 'TRAB') { doc.rect(34, y, larguraUtil, h).fill('#F5F7FB'); }
     let x = 34;
     doc.fillColor(TINTA).font('Helvetica').fontSize(7);
     const valores: Record<string, string> = {

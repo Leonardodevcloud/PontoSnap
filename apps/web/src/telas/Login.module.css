@@ -2,7 +2,7 @@
 
 /* ── Painel da marca (desktop) ── */
 .marca{
-  background:var(--ink); color:var(--cream); padding:52px 48px;
+  background:var(--fundo-escuro); color:var(--sobre-escuro); padding:52px 48px;
   display:flex; flex-direction:column; position:relative; overflow:hidden;
 }
 .ambiente{ position:absolute; inset:0; pointer-events:none; }
@@ -14,17 +14,17 @@
 
 .marcaLogo{
   position:relative; z-index:1; display:flex; align-items:center; gap:10px;
-  font-family:var(--ff-display); font-weight:600; font-size:23px; color:var(--cream);
+  font-family:var(--ff-display); font-weight:800; font-size:23px; color:var(--sobre-escuro);
 }
-.marcaLogo b{ color:var(--coral); }
+.marcaLogo b{ color:var(--marca-clara); }
 .giraLogo{ animation:gira-devagar 22s linear infinite; transform-origin:center; }
 .marcaTit{
   position:relative; z-index:1; margin:auto 0;
-  font-family:var(--ff-display); font-weight:600; font-size:40px; line-height:1.08; letter-spacing:-.02em;
+  font-family:var(--ff-display); font-weight:800; font-size:40px; line-height:1.08; letter-spacing:-.02em;
   /* global.css força color:var(--ink) em h1..h3 — sobre o painel escuro tem que ser explícito. */
-  color:var(--cream);
+  color:var(--sobre-escuro);
 }
-.marcaTit span{ color:var(--coral); }
+.marcaTit span{ color:var(--marca-clara); }
 
 /* ── Faixa da marca (celular) ── */
 .faixaMob{ display:none; }
@@ -35,7 +35,7 @@
   display:flex; flex-direction:column; justify-content:center;
 }
 .caixa{ width:100%; max-width:352px; margin:0 auto; }
-.titulo{ font-family:var(--ff-display); font-weight:600; font-size:31px; letter-spacing:-.015em; color:var(--ink); }
+.titulo{ font-family:var(--ff-display); font-weight:800; font-size:31px; letter-spacing:-.015em; color:var(--ink); }
 .sub{ color:var(--ash); font-size:15px; margin:6px 0 28px; }
 
 .campo{ margin-bottom:14px; }
@@ -48,7 +48,7 @@
   border:1.5px solid transparent; border-radius:var(--r-md); padding:14px 16px;
   transition:border-color .15s, box-shadow .15s; color:var(--ink);
 }
-.entrada:focus-within{ border-color:var(--coral); box-shadow:0 0 0 4px rgba(255,107,74,.14); }
+.entrada:focus-within{ border-color:var(--coral); box-shadow:0 0 0 4px rgba(36,87,214,.14); }
 .entrada > svg{ flex:none; opacity:.4; }
 .entrada input{
   border:none; outline:none; background:transparent; font:inherit; font-size:15.5px;
@@ -59,7 +59,7 @@
 .olho:hover{ opacity:.75; }
 
 .erro{
-  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
   padding:11px 14px; font-size:14px; font-weight:600; margin:4px 0 12px;
 }
 
@@ -93,11 +93,11 @@
   .tela{ grid-template-columns:1fr; grid-template-rows:auto 1fr; }
   .marca{ display:none; }
   .faixaMob{
-    display:block; background:var(--ink); color:var(--cream); padding:34px 26px 26px;
+    display:block; background:var(--fundo-escuro); color:var(--sobre-escuro); padding:34px 26px 26px;
     position:relative; overflow:hidden; border-radius:0 0 26px 26px;
   }
   .faixaMob .marcaLogo{ font-size:21px; }
-  .faixaTag{ position:relative; z-index:1; color:rgba(255,248,238,.6); font-size:13px; margin-top:5px; }
+  .faixaTag{ position:relative; z-index:1; color:rgba(245,247,251,.6); font-size:13px; margin-top:5px; }
   .lado{ padding:30px 24px 40px; justify-content:flex-start; }
   .titulo{ font-size:25px; }
   .sub{ margin-bottom:20px; }
@@ -111,7 +111,7 @@
 
 /* ── Botão Entrar com vida ── */
 .entrar{ transition:transform .15s, box-shadow .15s, filter .15s; }
-.entrar:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 10px 24px rgba(255,107,74,.38); }
+.entrar:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 10px 24px rgba(36,87,214,.38); }
 .entrar:active:not(:disabled){ transform:translateY(0) scale(.98); }
 
 /* ── O "estalo" pulsa sozinho de vez em quando ── */
@@ -153,8 +153,8 @@
   100%{ transform:scale(1.15) rotate(0); opacity:1; }
 }
 .sucessoTxt{
-  position:absolute; bottom:32%; z-index:1; color:var(--cream);
-  font-family:var(--ff-display); font-weight:600; font-size:22px;
+  position:absolute; bottom:32%; z-index:1; color:var(--sobre-escuro);
+  font-family:var(--ff-display); font-weight:800; font-size:22px;
   animation:sucesso-txt 1.15s ease;
 }
 @keyframes sucesso-txt{ 0%,25%{ opacity:0; transform:translateY(10px); } 45%,100%{ opacity:1; transform:none; } }

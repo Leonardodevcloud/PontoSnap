@@ -1,5 +1,5 @@
 .tela{ max-width:560px; }
-.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; }
+.h{ font-family:var(--ff-display); font-weight:800; font-size:28px; }
 .sub{ color:var(--ash); font-size:14px; margin:6px 0 22px; line-height:1.55; }
 .sub strong{ color:var(--ink); }
 
@@ -21,11 +21,11 @@
 .dica strong{ color:var(--ink); }
 
 .erro{
-  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
   padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
 }
 .ok{
-  background:rgba(203,245,77,.4); color:var(--ink); border-radius:var(--r-md);
+  background:rgba(255,178,62,.4); color:var(--ink); border-radius:var(--r-md);
   padding:10px 14px; font-size:14px; font-weight:700; margin-bottom:12px;
 }
 .acoes{ display:flex; gap:10px; }
@@ -48,7 +48,7 @@
   background:var(--verde-bg); color:var(--verde);
 }
 .dot{ width:7px; height:7px; border-radius:50%; background:currentColor; }
-.endereco{ font-family:var(--ff-display); font-weight:600; font-size:22px; margin:14px 0 2px; }
+.endereco{ font-family:var(--ff-display); font-weight:800; font-size:22px; margin:14px 0 2px; }
 .facts{ display:flex; flex-wrap:wrap; gap:8px 22px; margin:14px 0 14px; }
 .fl{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); }
 .fv{ font-family:var(--ff-mono); font-size:16px; color:var(--ink); margin-top:2px; }
@@ -62,7 +62,7 @@
 .remover:disabled{ opacity:.5; cursor:wait; }
 .cobertura{
   width:132px; height:132px; flex-shrink:0; border-radius:var(--r-md);
-  background:radial-gradient(circle at 50% 46%, rgba(255,107,74,.12), rgba(255,107,74,0) 62%), var(--cream);
+  background:radial-gradient(circle at 50% 46%, rgba(36,87,214,.12), rgba(36,87,214,0) 62%), var(--cream);
   border:1px solid rgba(var(--ink-rgb),.08); display:flex; align-items:center; justify-content:center;
 }
 /* Mapa grande em destaque no topo do card (modo ver) */
@@ -76,7 +76,7 @@
 /* ---------- empty state ---------- */
 .empty{ text-align:center; padding:34px 20px; }
 .emptyFlash{ margin-bottom:12px; }
-.empty h3{ font-family:var(--ff-display); font-weight:600; font-size:18px; }
+.empty h3{ font-family:var(--ff-display); font-weight:800; font-size:18px; }
 .empty p{ color:var(--ash); font-size:14px; margin:6px auto 18px; max-width:40ch; line-height:1.5; }
 
 @media(max-width:640px){

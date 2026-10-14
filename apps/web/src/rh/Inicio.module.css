@@ -10,11 +10,11 @@
 }
 .num{
   width:64px; height:64px; border-radius:50%; display:grid; place-items:center;
-  font-family:var(--ff-display); font-weight:600; font-size:28px; background:var(--erro-bg); color:var(--coral-dark);
+  font-family:var(--ff-display); font-weight:800; font-size:28px; background:var(--erro-bg); color:var(--erro-text);
 }
 .numOk{ background:var(--ok-bg); color:var(--ok-text); }
 .prTxt{ min-width:0; }
-.prT{ font-family:var(--ff-display); font-weight:600; font-size:18px; margin:0; line-height:1.3; }
+.prT{ font-family:var(--ff-display); font-weight:800; font-size:18px; margin:0; line-height:1.3; }
 .prS{ margin:4px 0 0; color:var(--ash); font-size:14px; }
 
 .btnPri, .btnSec{
@@ -45,7 +45,7 @@
 .item{ display:grid; grid-template-columns:40px minmax(0,1fr) auto; gap:14px; align-items:center; padding:14px 16px; border-top:1px solid rgba(var(--ink-rgb),.08); }
 .item:first-child{ border-top:none; }
 .ic{ width:40px; height:40px; border-radius:11px; display:grid; place-items:center; }
-.icBLOQUEIA{ background:var(--erro-bg); color:var(--coral-dark); }
+.icBLOQUEIA{ background:var(--erro-bg); color:var(--erro-text); }
 .icANTES{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); }
 .icCADASTRO{ background:var(--info-bg); color:var(--ink); }
 .itemTxt{ min-width:0; }
@@ -66,7 +66,7 @@
 
 /* Completar batidas (painel lateral) */
 .mudo{ color:var(--ash); font-size:14px; }
-.erro{ background:var(--erro-bg); color:var(--coral-dark); border-radius:10px; padding:10px 12px; font-size:14px; font-weight:700; margin:12px 0 0; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:10px; padding:10px 12px; font-size:14px; font-weight:700; margin:12px 0 0; }
 .cbPessoa{ margin-bottom:16px; }
 .cbPessoa h3{ font-size:16px; margin:0 0 8px; }
 .cbDia{ border:1px solid rgba(var(--ink-rgb),.12); border-radius:12px; padding:12px; margin-bottom:10px; }
@@ -78,7 +78,7 @@
   background:var(--cream); font-family:var(--ff-mono); font-weight:700; font-size:14px;
 }
 .cbChip small{ font-family:var(--ff-body); font-size:12.5px; font-weight:600; color:var(--ash); }
-.cbFalta{ background:var(--white); border:1.5px dashed var(--coral-dark); }
+.cbFalta{ background:var(--white); border:1.5px dashed var(--erro-text); }
 .cbFalta input{ border:none; background:none; font:inherit; color:var(--ink); text-align:center; width:96px; }
 .cbMotivo{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
 .cbMotivo label{ font-weight:800; font-size:14px; }

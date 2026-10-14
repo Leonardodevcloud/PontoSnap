@@ -1,55 +1,70 @@
 :root{
-  --coral:#FF6B4A; --coral-dark:#B5391F;
-  /* Botão de ação: coral um tom abaixo para o texto branco passar 4,5:1 (WCAG AA) */
-  --coral-acao:#CC4426; --coral-acao-hover:#B5391F; --on-coral:#FFFFFF; --ink:#10403F; --lime:#CBF54D;
-  --cream:#FFF8EE; --peach:#FFE2D1; --ash:#5C4F49; --white:#FFFFFF;
-  --ink-rgb:16,64,63;
-  /* Superfície verde-escura fixa (menu, cartão de destaque): igual nos dois temas */
-  --fundo-escuro:#10403F; --sobre-escuro:#FFF8EE;
+  /*
+   * Paleta "Azul Confiança" (out/2026). Os nomes antigos (--coral, --peach,
+   * --lime…) ficaram para não mexer em centenas de telas — o que vale é o papel:
+   *   --coral / --coral-acao  → cor da marca e do botão de ação (azul royal)
+   *   --coral-dark            → marca forte: links, realces, rótulos
+   *   --peach                 → fundo suave da marca
+   *   --lime                  → acento (âmbar) para selos e destaques pequenos
+   *   --ink / --cream / --ash → texto, fundo da página, texto secundário
+   * Erro e atenção têm tokens próprios (--erro-*, --aviso-*): a marca não é mais vermelha.
+   */
+  --coral:#2457D6; --coral-dark:#1C45AE;
+  --coral-acao:#2457D6; --coral-acao-hover:#1C45AE; --on-coral:#FFFFFF;
+  --ink:#0F1B33; --lime:#FFB23E; --sobre-lime:#2A1B00;
+  --cream:#F5F7FB; --peach:#E6EDFC; --ash:#55627A; --white:#FFFFFF;
+  --ink-rgb:15,27,51;
+  --marca-rgb:36,87,214;
+  /* Superfície escura fixa (menu, cartão de destaque): marinho */
+  --fundo-escuro:#0F1B33; --sobre-escuro:#E8EDF7;
+  /* Azul claro para texto/ícone em cima do fundo escuro (logo "Snap", item ativo do menu) */
+  --marca-clara:#86A9FF;
   --r-lg:28px; --r-md:16px; --r-pill:100px;
-  --ff-display:'Fredoka', sans-serif;
+  --ff-display:'Nunito Sans', sans-serif;
   --ff-body:'Nunito Sans', sans-serif;
   --ff-mono:'JetBrains Mono', monospace;
   /* Cores semânticas de feedback */
-  --ok-bg:#EAF7EE; --ok-text:#0B7A4B; --ok-border:rgba(15,169,104,.3);
-  --erro-bg:#FFE9E3; --erro-text:var(--coral-dark);
-  --aviso-bg:#FFF6E8; --aviso-border:rgba(255,107,74,.25);
-  --info-bg:#EAF4F1;
+  --ok-bg:#E5F5EE; --ok-text:#0E7A50; --ok-border:rgba(14,122,80,.3);
+  --erro-bg:#FDECEA; --erro-text:#C2362B; --erro-border:rgba(194,54,43,.3);
+  --aviso-bg:#FFF2DB; --aviso-text:#8C5A00; --aviso-border:rgba(255,178,62,.45);
+  --info-bg:#E6EDFC; --info-text:#1C45AE;
   /* Superfícies de tabela e campos */
-  --thead-bg:#fbf4e8; --row-border:#f4f1ec; --field-bg:#faf7f4;
-  --placeholder:#7A8784;
+  --thead-bg:#F0F3F9; --row-border:#EEF1F6; --field-bg:#F8FAFD;
+  --placeholder:#7A869A;
   /* Tags de categoria */
-  --tag-green-bg:#e6f3e6; --tag-green-text:#3a7a3a;
-  --tag-blue-bg:#e9edff; --tag-blue-text:#3a4a9a;
-  --tag-yellow-bg:#FCEFCE; --tag-yellow-text:#8A5A12;
-  --tag-purple-bg:#F3E5F5;
-  --tag-orange-bg:#FFF3E0;
-  --tag-ltblue-bg:#E3F2FD;
-  --tag-ltgreen-bg:#E8F5E9;
+  --tag-green-bg:#E5F5EE; --tag-green-text:#0E7A50;
+  --tag-blue-bg:#E6EDFC; --tag-blue-text:#1C45AE;
+  --tag-yellow-bg:#FFF2DB; --tag-yellow-text:#8C5A00;
+  --tag-purple-bg:#F1E9FB;
+  --tag-orange-bg:#FFEEDD;
+  --tag-ltblue-bg:#E3F0FB;
+  --tag-ltgreen-bg:#E8F5EC;
 }
 
 :root[data-theme="dark"] {
-  --cream: #161615;
-  --ink: #EDE8E1;
-  --white: #222221;
-  --ash: #9A9590;
-  --peach: #3D2A22;
-  --coral: #FF7F63;
-  --coral-dark: #FF6B4A;
-  --coral-acao:#FF7F63; --coral-acao-hover:#FF9479; --on-coral:#1C1C1B;
-  --ink-rgb:237,232,225;
-  --fundo-escuro:#0F2524;
-  --ok-bg:#1A2E1F; --ok-text:#4ADE80; --ok-border:rgba(74,222,128,.25);
-  --erro-bg:#2E1A1A; --erro-text:#FF7F63;
-  --aviso-bg:#2E2518; --aviso-border:rgba(255,127,99,.2);
-  --info-bg:#1A2625;
+  --cream:#0B1220;
+  --ink:#E6EBF5;
+  --white:#131C2E;
+  --ash:#93A0B8;
+  --peach:#17264A;
+  --coral:#5B8BFF;
+  --coral-dark:#86A9FF;
+  --coral-acao:#5B8BFF; --coral-acao-hover:#86A9FF; --on-coral:#081024;
+  --lime:#FFC266; --sobre-lime:#2A1B00;
+  --ink-rgb:230,235,245;
+  --marca-rgb:91,139,255;
+  --fundo-escuro:#070D18; --sobre-escuro:#E6EBF5; --marca-clara:#86A9FF;
+  --ok-bg:#0F2A20; --ok-text:#4BD49A; --ok-border:rgba(75,212,154,.25);
+  --erro-bg:#321716; --erro-text:#FF7B70; --erro-border:rgba(255,123,112,.3);
+  --aviso-bg:#2C2210; --aviso-text:#FFC266; --aviso-border:rgba(255,194,102,.25);
+  --info-bg:#17264A; --info-text:#86A9FF;
   --thead-bg:rgba(255,255,255,.04); --row-border:rgba(255,255,255,.06); --field-bg:rgba(255,255,255,.04);
-  --placeholder:#6B6560;
-  --tag-green-bg:#1A2E1F; --tag-green-text:#4ADE80;
-  --tag-blue-bg:#1A1F2E; --tag-blue-text:#7B9BFF;
-  --tag-yellow-bg:#2E2518; --tag-yellow-text:#F5C842;
-  --tag-purple-bg:#251A2E;
+  --placeholder:#6E7B93;
+  --tag-green-bg:#0F2A20; --tag-green-text:#4BD49A;
+  --tag-blue-bg:#17264A; --tag-blue-text:#86A9FF;
+  --tag-yellow-bg:#2C2210; --tag-yellow-text:#FFC266;
+  --tag-purple-bg:#241A38;
   --tag-orange-bg:#2E2015;
-  --tag-ltblue-bg:#1A2530;
-  --tag-ltgreen-bg:#1A2E1F;
+  --tag-ltblue-bg:#14243A;
+  --tag-ltgreen-bg:#0F2A20;
 }

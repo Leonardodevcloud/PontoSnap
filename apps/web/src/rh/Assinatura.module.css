@@ -1,20 +1,20 @@
 .tela{ max-width:560px; }
-.h{ font-family:var(--ff-display); font-weight:600; font-size:22px; color:var(--ink); }
+.h{ font-family:var(--ff-display); font-weight:800; font-size:22px; color:var(--ink); }
 .sub{ color:var(--ash); font-size:14px; margin:4px 0 20px; }
 .carregando{ color:var(--ash); font-family:var(--ff-mono); font-size:12.5px; }
 .semAss{ color:var(--ash); font-size:14px; background:var(--white); border-radius:12px; padding:18px; }
-.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
 
 .cartao{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.08); border-radius:16px; padding:24px 26px; }
 .status{ display:flex; align-items:center; gap:10px; padding:13px 15px; border-radius:12px; margin-bottom:18px; }
 .stOk{ background:var(--ok-bg); }
-.stAtraso{ background:var(--peach); }
+.stAtraso{ background:var(--erro-bg); }
 .bola{ width:10px; height:10px; border-radius:50%; }
 .stOk .bola{ background:var(--ok-text); }
-.stAtraso .bola{ background:var(--coral); }
+.stAtraso .bola{ background:var(--erro-text); }
 .stTexto{ font-weight:800; font-size:14px; }
 .stOk .stTexto{ color:var(--ok-text); }
-.stAtraso .stTexto{ color:var(--coral-dark); }
+.stAtraso .stTexto{ color:var(--erro-text); }
 
 .info{ display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid rgba(var(--ink-rgb),.06); }
 .info:last-of-type{ border-bottom:none; }
@@ -36,5 +36,5 @@
 .valorHist{ font-family:var(--ff-mono); font-weight:700; font-size:14px; color:var(--ink); }
 .pill{ font-size:11px; font-weight:800; padding:3px 10px; border-radius:var(--r-pill); text-transform:uppercase; }
 .pillPaga{ background:var(--ok-bg); color:var(--ok-text); }
-.pillAtraso{ background:var(--peach); color:var(--coral-dark); }
+.pillAtraso{ background:var(--erro-bg); color:var(--erro-text); }
 .pillAberta{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); }

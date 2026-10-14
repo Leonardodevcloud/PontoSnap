@@ -50,7 +50,7 @@ export function MapaLocal({ lat, lon, raio, onMover, onEndereco, somenteLeitura 
       });
       const circle = new g.maps.Circle({
         map: raio && raio > 0 ? map : null, center: centro, radius: raio ?? 0,
-        fillColor: '#FF6B4A', fillOpacity: 0.12, strokeColor: '#FF6B4A', strokeWeight: 2,
+        fillColor: '#2457D6', fillOpacity: 0.12, strokeColor: '#2457D6', strokeWeight: 2,
       });
       geo.current = new g.maps.Geocoder();
 

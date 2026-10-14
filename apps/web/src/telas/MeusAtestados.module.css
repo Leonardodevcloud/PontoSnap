@@ -1,4 +1,4 @@
-.h{ font-family:var(--ff-display); font-weight:600; font-size:24px; }
+.h{ font-family:var(--ff-display); font-weight:800; font-size:24px; }
 .s{ font-size:12.5px; color:var(--ash); margin:2px 0 14px; }
 
 .enviar{
@@ -23,8 +23,8 @@
   padding:3px 8px; border-radius:var(--r-pill); white-space:nowrap;
 }
 .stEM_ANALISE{ background:rgba(var(--ink-rgb),.08); color:var(--ash); }
-.stABONADO{ background:rgba(203,245,77,.5); color:var(--ink); }
-.stRECUSADO{ background:var(--peach); color:var(--coral-dark); }
+.stABONADO{ background:rgba(255,178,62,.5); color:var(--ink); }
+.stRECUSADO{ background:var(--erro-bg); color:var(--erro-text); }
 .docMot{
   font-size:12px; color:var(--ash); font-style:italic;
   margin-top:8px; padding-top:8px; border-top:1px solid rgba(var(--ink-rgb),.08);
@@ -38,7 +38,7 @@
   background:var(--cream); width:100%; max-width:440px; border-radius:24px 24px 0 0;
   padding:22px 20px max(22px, env(safe-area-inset-bottom)); max-height:92dvh; overflow-y:auto;
 }
-.folhaH{ font-family:var(--ff-display); font-size:21px; font-weight:600; margin-bottom:14px; }
+.folhaH{ font-family:var(--ff-display); font-size:21px; font-weight:800; margin-bottom:14px; }
 .lb{
   display:block; font-family:var(--ff-mono); font-size:9px; letter-spacing:.1em;
   text-transform:uppercase; color:var(--coral-dark); margin-bottom:5px;
@@ -79,7 +79,7 @@
 
 .vazio{ color:var(--ash); font-size:14px; padding:18px 0; text-align:center; }
 .erro{
-  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
   padding:10px 14px; font-size:13.5px; font-weight:600; margin-bottom:12px;
 }
 

@@ -49,10 +49,10 @@ export function hash(s: string): number {
   return h >>> 0;
 }
 
-const FUNDOS = ['#CFE3DD', '#FFE2D1', '#E7F0C8', '#DDE6F5', '#F3E3F0', '#FCEFCE', '#E2EEF0', '#EFE6DA'];
+const FUNDOS = ['#DCE7FB', '#E6EDFC', '#E3F2EA', '#DDE6F5', '#EEE6F8', '#FFF0D6', '#E4ECF4', '#EAEFF6'];
 const PELES = ['#F3D0B4', '#E8B993', '#D9A27C', '#C68B63', '#A5704E', '#8A5A3E', '#6E4630'];
 const CABELOS = ['#1E120C', '#3A2418', '#5E3A1E', '#8A6A44', '#B5391F', '#2B2B2B', '#B9AE9E'];
-const ROUPAS = ['#10403F', '#FF6B4A', '#5C4F49', '#2F5B8A', '#0B7A4B', '#8A5A12', '#7A4FA0'];
+const ROUPAS = ['#0F1B33', '#2457D6', '#55627A', '#2F5B8A', '#0E7A50', '#8C5A00', '#7A4FA0'];
 
 function escurecer(hex: string, f: number) {
   const n = parseInt(hex.slice(1), 16);
@@ -109,7 +109,7 @@ export function Avatar({ id, nome, tipo = 'CLT', tamanho = 36, className, titulo
   const info = tipo === 'CLT' ? dados?.empregados[id] : dados?.prestadores[id];
   const foto = tipo === 'CLT' ? (info as InfoAvatarClt | undefined)?.foto ?? null : null;
   const semente = info?.semente ?? hash(id);
-  const estilo = { width: tamanho, height: tamanho, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, display: 'inline-block', verticalAlign: 'middle', background: '#E2EEF0' } as const;
+  const estilo = { width: tamanho, height: tamanho, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, display: 'inline-block', verticalAlign: 'middle', background: '#E6EDFC' } as const;
   if (trocavel && !foto) {
     return (
       <button type="button" className={className} style={{ ...estilo, border: 'none', padding: 0, cursor: 'pointer' }}

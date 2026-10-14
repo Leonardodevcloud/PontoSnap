@@ -78,7 +78,7 @@ function Fluxo({ onDespareado }: { onDespareado: () => void }) {
         <Flash tamanho={96} cor="var(--peach)" girando className={css.confFlash} />
         <div className={css.check} aria-hidden="true">
           <svg width="66" height="66" viewBox="0 0 24 24" fill="none">
-            <path d="M4 12.5 L9.5 18 L20 6" stroke="#FFF8EE" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M4 12.5 L9.5 18 L20 6" stroke="#F5F7FB" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
         <div className={css.bateu}>Bateu, {nome.split(' ')[0]}!</div>

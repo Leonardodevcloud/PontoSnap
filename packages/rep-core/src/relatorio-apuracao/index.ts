@@ -50,10 +50,11 @@ const fmtDia = (iso: string) => { const [, m, d] = iso.split('-'); return `${d}/
 const reais = (c: number) => `R$ ${(c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const diaSem = (iso: string) => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(`${iso}T12:00:00-0300`).getUTCDay()];
 
-const INK = '#10403F';
-const CORAL = '#E5502F';
-const ASH = '#5C4F49';
-const LINHA = '#E7DED2';
+const INK = '#0F1B33';
+const CORAL = '#2457D6';
+const ERRO = '#C2362B';
+const ASH = '#55627A';
+const LINHA = '#E2E7F0';
 
 /** Relatório de Apuração CLT (PDF), no visual PontoSnap. Estimativas sinalizadas. */
 export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Buffer> {
@@ -105,7 +106,7 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
       const col = i % 4, row = Math.floor(i / 4);
       const x = L + col * (cw + 8);
       const cy = y + row * 46;
-      doc.roundedRect(x, cy, cw, 40, 6).fillColor(destaque ? '#FFE2D1' : '#FFFFFF').fill();
+      doc.roundedRect(x, cy, cw, 40, 6).fillColor(destaque ? '#E6EDFC' : '#FFFFFF').fill();
       doc.roundedRect(x, cy, cw, 40, 6).lineWidth(0.7).strokeColor(LINHA).stroke();
       doc.fillColor(CORAL).font('Helvetica').fontSize(6.5).text(k.toUpperCase(), x + 8, cy + 7, { width: cw - 16 });
       doc.fillColor(INK).font('Helvetica-Bold').fontSize(14).text(v, x + 8, cy + 17, { width: cw - 16 });
@@ -124,7 +125,7 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
       { t: 'Sinais', w: 80, a: 'left' as const },
     ];
     const drawHead = (yy: number) => {
-      doc.rect(L, yy, W, 18).fillColor('#FBF4E8').fill();
+      doc.rect(L, yy, W, 18).fillColor('#F0F3F9').fill();
       let x = L + 6;
       doc.fillColor(ASH).font('Helvetica-Bold').fontSize(7);
       for (const c of cols) { doc.text(c.t.toUpperCase(), x, yy + 5, { width: c.w - 6, align: c.a }); x += c.w; }
@@ -145,11 +146,11 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
         dia.sinais || '',
       ];
       let x = L + 6;
-      doc.font('Helvetica').fontSize(8).fillColor(vazio ? '#B9AEA2' : INK);
+      doc.font('Helvetica').fontSize(8).fillColor(vazio ? '#A3AEC2' : INK);
       cells.forEach((val, i) => {
         const c = cols[i]!;
-        if (i === 5 && dia.faltaMin) doc.fillColor(CORAL).font('Helvetica-Bold');
-        else doc.font('Helvetica').fillColor(vazio ? '#B9AEA2' : INK);
+        if (i === 5 && dia.faltaMin) doc.fillColor(ERRO).font('Helvetica-Bold');
+        else doc.font('Helvetica').fillColor(vazio ? '#A3AEC2' : INK);
         doc.text(val, x, y + 3, { width: c.w - 6, align: c.a });
         x += c.w;
       });
@@ -185,8 +186,8 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
       doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text('Valores (R$)', L, y);
       y += 20;
       const linhaV = (rot: string, val: string, forte = false, desc = false) => {
-        doc.fillColor(desc ? CORAL : ASH).font('Helvetica').fontSize(9).text(rot, L, y, { width: 300 });
-        doc.fillColor(forte ? INK : desc ? CORAL : INK).font(forte ? 'Helvetica-Bold' : 'Helvetica').fontSize(forte ? 11 : 9)
+        doc.fillColor(desc ? ERRO : ASH).font('Helvetica').fontSize(9).text(rot, L, y, { width: 300 });
+        doc.fillColor(forte ? INK : desc ? ERRO : INK).font(forte ? 'Helvetica-Bold' : 'Helvetica').fontSize(forte ? 11 : 9)
           .text(val, L, y, { width: W, align: 'right' });
         doc.moveTo(L, y + 15).lineTo(R, y + 15).lineWidth(0.4).strokeColor(LINHA).stroke();
         y += 18;
@@ -209,7 +210,7 @@ export function gerarRelatorioApuracaoPdf(d: DadosRelatorioApuracao): Promise<Bu
       'Percentuais na base CLT; o acordo/convenção coletiva do cliente prevalece. Escala seg–sex quando não configurada; ' +
       'feriados do calendário do cliente. O reflexo de DSR é ESTIMATIVA. Este relatório não substitui validação contábil.',
       L, y, { width: W });
-    doc.fillColor('#B9AEA2').fontSize(6.5).text(`REP-P • Registro INPI: ${d.numeroInpi}`, L, y + 24, { width: W, align: 'center' });
+    doc.fillColor('#A3AEC2').fontSize(6.5).text(`REP-P • Registro INPI: ${d.numeroInpi}`, L, y + 24, { width: W, align: 'center' });
 
     doc.end();
   });

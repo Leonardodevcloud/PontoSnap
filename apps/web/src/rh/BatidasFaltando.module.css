@@ -1,7 +1,7 @@
 .voltar{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ash);cursor:pointer;margin-bottom:10px;background:none;border:none;font:inherit}
 .voltar:hover{color:var(--ink)}
 .topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-.h{font-family:var(--ff-display);font-weight:600;font-size:22px}
+.h{font-family:var(--ff-display);font-weight:800;font-size:22px}
 .sub{font-size:14px;color:var(--ash);line-height:1.45;margin-top:2px}
 
 .notifBtn{
@@ -35,7 +35,7 @@
 
 .chip{font-family:var(--ff-mono);font-size:11px;padding:2px 7px;border-radius:5px;display:inline-block}
 .chip_ok{background:var(--ok-bg);color:var(--ok-text)}
-.chip_miss{background:var(--erro-bg);color:var(--coral-dark);font-weight:600}
+.chip_miss{background:var(--erro-bg);color:var(--erro-text);font-weight:600}
 .chip_open{background:var(--aviso-bg);color:#B7791F}
 
 .diaAcao{
@@ -48,7 +48,7 @@
 .overlay{position:fixed;inset:0;background:rgba(var(--ink-rgb),.32);display:flex;align-items:flex-start;justify-content:center;padding:20px;z-index:50;overflow-y:auto}
 .modal{background:var(--cream);border-radius:var(--r-lg);padding:24px;width:100%;max-width:460px;margin:auto 0;box-shadow:0 30px 70px -20px rgba(var(--ink-rgb),.5)}
 .modalHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.modalH{font-family:var(--ff-display);font-weight:600;font-size:22px}
+.modalH{font-family:var(--ff-display);font-weight:800;font-size:22px}
 .modalX{background:none;border:none;font-size:18px;color:var(--ash);cursor:pointer;padding:4px}
 .modalNome{font-weight:700;font-size:16px;margin-bottom:2px}
 .modalSub{font-size:12.5px;color:var(--ash);margin-bottom:12px}
@@ -56,7 +56,7 @@
 .slots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;background:rgba(var(--ink-rgb),.03);border-radius:12px;padding:10px 12px}
 .slot{display:inline-flex;flex-direction:column;align-items:center;gap:2px;border:1.5px solid rgba(var(--ink-rgb),.12);border-radius:10px;padding:5px 10px;min-width:60px}
 .slotOk{border-color:var(--ok-text);background:var(--ok-bg)}
-.slotMiss{border-color:var(--coral);background:var(--erro-bg)}
+.slotMiss{border-color:var(--erro-text);background:var(--erro-bg)}
 .slotLb{font-family:var(--ff-mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ash)}
 .slotV{font-family:var(--ff-mono);font-size:12.5px;font-weight:700;color:var(--ink)}
 .slotTagOk{font-family:var(--ff-mono);font-size:11px;font-weight:600;color:var(--ok-text)}

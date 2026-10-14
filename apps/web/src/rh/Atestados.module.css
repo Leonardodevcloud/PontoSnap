@@ -1,5 +1,5 @@
 .tela{ max-width:720px; }
-.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; }
+.h{ font-family:var(--ff-display); font-weight:800; font-size:28px; }
 .sub{ color:var(--ash); font-size:14px; margin:6px 0 18px; line-height:1.55; }
 .sub strong{ color:var(--ink); }
 
@@ -15,15 +15,15 @@
   border-radius:var(--r-md); padding:16px; margin-bottom:11px;
 }
 .revTop{ display:flex; justify-content:space-between; gap:12px; margin-bottom:11px; }
-.revN{ font-family:var(--ff-display); font-size:16px; font-weight:600; }
+.revN{ font-family:var(--ff-display); font-size:16px; font-weight:800; }
 .revD{ font-family:var(--ff-mono); font-size:11px; color:var(--ash); margin-top:2px; }
 .st{
   font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
   padding:3px 9px; border-radius:var(--r-pill); white-space:nowrap; height:fit-content;
 }
 .stEM_ANALISE{ background:rgba(var(--ink-rgb),.08); color:var(--ash); }
-.stABONADO{ background:rgba(203,245,77,.5); color:var(--ink); }
-.stRECUSADO{ background:var(--peach); color:var(--coral-dark); }
+.stABONADO{ background:rgba(255,178,62,.5); color:var(--ink); }
+.stRECUSADO{ background:var(--erro-bg); color:var(--erro-text); }
 
 .arq{
   width:100%; display:flex; align-items:center; gap:10px; background:var(--cream);
@@ -56,7 +56,7 @@
 
 .vazio{ color:var(--ash); font-size:14px; padding:16px 0; }
 .erro{
-  background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md);
+  background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
   padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
 }
 .lgpd{
@@ -81,7 +81,7 @@
   width:100%; max-width:440px; background:var(--white); border-radius:var(--r-lg);
   padding:24px 22px; max-height:92dvh; overflow-y:auto;
 }
-.folhaH{ font-family:var(--ff-display); font-size:22px; font-weight:600; }
+.folhaH{ font-family:var(--ff-display); font-size:22px; font-weight:800; }
 .folhaSub{ color:var(--ash); font-size:12.5px; margin:2px 0 16px; }
 .lb{
   display:block; font-family:var(--ff-mono); font-size:11px; letter-spacing:.06em;

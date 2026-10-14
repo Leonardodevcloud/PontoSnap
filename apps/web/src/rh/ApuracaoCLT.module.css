@@ -6,16 +6,16 @@
 .sel{ display:flex; flex-direction:column; gap:6px; }
 .lb{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--coral-dark); }
 .sel select, .sel input{ padding:10px 12px; border:1px solid rgba(var(--ink-rgb),.18); border-radius:12px; font:inherit; background:var(--white); min-width:220px; }
-.erro{ background:var(--peach); color:var(--coral-dark); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
 .carregando{ color:var(--ash); font-family:var(--ff-mono); font-size:12.5px; }
 
 .cards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:24px; }
 .card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:14px 16px; }
 .cardDestaque{ background:var(--peach); border-color:transparent; }
-.cardAlerta{ background:var(--erro-bg); border-color:var(--coral); }
+.cardAlerta{ background:var(--erro-bg); border-color:var(--erro-text); }
 .cardK{ font-family:var(--ff-mono); font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--coral-dark); }
 .cardK em{ font-style:normal; color:var(--ash); text-transform:none; letter-spacing:0; }
-.cardV{ font-family:var(--ff-display); font-weight:600; font-size:22px; line-height:1.15; margin-top:4px; }
+.cardV{ font-family:var(--ff-display); font-weight:800; font-size:22px; line-height:1.15; margin-top:4px; }
 
 .tabela{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:hidden; }
 .linha{ display:grid; grid-template-columns:1fr .75fr .75fr 1.15fr .8fr .75fr 1.6fr; align-items:center; gap:10px; padding:10px 16px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:14px; }
@@ -25,13 +25,13 @@
 .data{ font-weight:700; }
 .data em{ font-style:normal; color:var(--ash); font-weight:400; font-size:12.5px; margin-left:4px; }
 .mono{ font-family:var(--ff-mono); font-size:12.5px; }
-.faltaTxt{ color:var(--coral-dark); font-weight:600; }
+.faltaTxt{ color:var(--erro-text); font-weight:600; }
 .diaVazio{ opacity:.5; }
 .viol{ background:var(--aviso-bg); }
 .sinais{ display:flex; gap:5px; flex-wrap:wrap; align-content:center; }
 .tag{ font-family:var(--ff-mono); font-size:11px; background:var(--ink); color:var(--cream); padding:2px 6px; border-radius:6px; white-space:nowrap; }
 .viol .tag{ background:var(--coral-dark); }
-.tagAtraso{ background:var(--coral-dark); }
+.tagAtraso{ background:var(--erro-text); }
 
 .disclaimer{ margin-top:16px; font-size:12.5px; color:var(--ash); line-height:1.5; background:var(--white); border:1px dashed rgba(var(--ink-rgb),.2); border-radius:var(--r-md); padding:12px 14px; }
 .disclaimer strong{ color:var(--ink); }
@@ -45,7 +45,7 @@
 .vForte{ border-top:2px solid var(--ink); margin-top:4px; padding-top:12px; }
 .vForte span{ font-weight:700; }
 .vForte strong{ font-size:16px; }
-.vDesc{ color:var(--coral-dark); }
+.vDesc{ color:var(--erro-text); }
 
 /* Coluna Extra: cada faixa numa linha, adicional em coral */
 .extraItem{ display:block; line-height:1.35; }
@@ -53,16 +53,16 @@
 
 /* Destinação de faltas e atrasos */
 .destinacao{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:14px; padding:16px 18px; margin:6px 0 18px; }
-.destinacao h3{ font-family:var(--ff-display); font-weight:600; font-size:16px; margin:0 0 10px; }
+.destinacao h3{ font-family:var(--ff-display); font-weight:800; font-size:16px; margin:0 0 10px; }
 .destLinha{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(var(--ink-rgb),.06); font-size:14px; }
 .destLinha:last-of-type{ border-bottom:none; }
 .destBadge{ font-family:var(--ff-mono); font-size:11px; padding:2px 9px; border-radius:6px; margin-left:8px; }
-.destDesc{ background:var(--erro-bg); color:var(--coral-dark); }
-.destBanco{ background:var(--lime); color:var(--ink); }
+.destDesc{ background:var(--erro-bg); color:var(--erro-text); }
+.destBanco{ background:var(--lime); color:var(--sobre-lime); }
 .destTotal{ font-weight:700; border-top:1px solid rgba(var(--ink-rgb),.14) !important; margin-top:4px; padding-top:12px; }
 .destTotal .mono{ font-size:16px; }
-.neg{ color:var(--coral-dark); }
-.destAviso{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border-radius:10px; background:var(--erro-bg); border:1px solid var(--coral); font-size:12.5px; }
+.neg{ color:var(--erro-text); }
+.destAviso{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border-radius:10px; background:var(--erro-bg); border:1px solid var(--erro-text); font-size:12.5px; }
 .destNota{ font-size:12.5px; color:var(--ash); margin:10px 0 0; }
 
 /* ===== Gaveta lateral: detalhe do dia ===== */
@@ -72,7 +72,7 @@
 .fundoGaveta{ position:fixed; inset:0; background:rgba(var(--ink-rgb),.18); z-index:50; }
 .gaveta{ position:fixed; top:0; right:0; bottom:0; width:min(420px, 92vw); background:var(--white); border-left:1px solid rgba(var(--ink-rgb),.12); box-shadow:-12px 0 30px rgba(var(--ink-rgb),.1); padding:22px 24px; overflow-y:auto; z-index:60; }
 .gTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:16px; }
-.gData{ font-family:var(--ff-display); font-weight:600; font-size:18px; margin:0; text-transform:capitalize; }
+.gData{ font-family:var(--ff-display); font-weight:800; font-size:18px; margin:0; text-transform:capitalize; }
 .gSub{ color:var(--ash); font-size:12.5px; margin:3px 0 0; }
 .gX{ background:none; border:none; font-size:18px; color:var(--ash); cursor:pointer; line-height:1; padding:2px 6px; }
 .gSecLb{ display:block; font-family:var(--ff-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--coral-dark); margin:0 0 10px; }
@@ -84,8 +84,8 @@
 .gBatNome{ flex:1; font-size:14px; font-weight:600; }
 .gBatHora{ font-family:var(--ff-mono); font-size:14px; font-weight:700; }
 .gRiscado{ text-decoration:line-through; opacity:.55; }
-.gTagAj{ font-family:var(--ff-mono); font-size:11px; background:var(--lime); color:var(--ink); padding:2px 6px; border-radius:5px; }
-.gTagDesc{ font-family:var(--ff-mono); font-size:11px; background:var(--erro-bg); color:var(--coral-dark); padding:2px 6px; border-radius:5px; }
+.gTagAj{ font-family:var(--ff-mono); font-size:11px; background:var(--lime); color:var(--sobre-lime); padding:2px 6px; border-radius:5px; }
+.gTagDesc{ font-family:var(--ff-mono); font-size:11px; background:var(--erro-bg); color:var(--erro-text); padding:2px 6px; border-radius:5px; }
 .gVazio{ font-size:14px; color:var(--ash); margin:0; }
 .gObs{ background:var(--cream); border-radius:10px; padding:10px 12px; font-size:12.5px; color:var(--ash); margin-top:10px; line-height:1.5; }
 .gSep{ height:1px; background:rgba(var(--ink-rgb),.08); margin:18px 0; }
@@ -106,7 +106,7 @@
 .loteOverlay { position: fixed; inset: 0; background: rgba(var(--ink-rgb),.35); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
 .loteModal { background:var(--white); border-radius: 18px; max-width: 460px; width: 100%; max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(var(--ink-rgb),.25); }
 .loteHead { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; background: var(--cream); border-bottom: 1px solid rgba(var(--ink-rgb),.08); }
-.loteHead h3 { font-family: 'Fredoka', sans-serif; font-size:18px; margin: 0; color: var(--ink); }
+.loteHead h3 { font-family: var(--ff-display); font-weight:800; font-size:18px; margin: 0; color: var(--ink); }
 .loteX { border: none; background: none; font-size:16px; cursor: pointer; color: var(--ash); }
 .loteBody { padding: 18px 22px 22px; overflow-y: auto; }
 .loteLb { display: block; font-size:11px; letter-spacing: .05em; text-transform: uppercase; color: var(--coral-d); font-weight: 800; margin-bottom: 8px; }

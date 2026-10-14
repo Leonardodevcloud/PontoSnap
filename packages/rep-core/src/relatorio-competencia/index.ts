@@ -29,10 +29,11 @@ const hhmm = (min: number) => `${Math.floor(Math.abs(min) / 60)}h${String(Math.a
 const reais = (c: number) => `R$ ${(c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDia = (iso: string) => { const [, m, d] = iso.split('-'); return `${d}/${m}`; };
 
-const INK = '#10403F';
-const CORAL = '#E5502F';
-const ASH = '#5C4F49';
-const LINHA = '#E7DED2';
+const INK = '#0F1B33';
+const CORAL = '#2457D6';
+const ERRO = '#C2362B';
+const ASH = '#55627A';
+const LINHA = '#E2E7F0';
 
 /** Relatório consolidado da competência (PDF paisagem). */
 export function gerarRelatorioCompetenciaPdf(d: DadosRelatorioCompetencia): Promise<Buffer> {
@@ -62,7 +63,7 @@ export function gerarRelatorioCompetenciaPdf(d: DadosRelatorioCompetencia): Prom
       { t: 'Parcial R$', w: 102, a: 'right' as const },
     ];
     const head = (yy: number) => {
-      doc.rect(L, yy, W, 18).fillColor('#FBF4E8').fill();
+      doc.rect(L, yy, W, 18).fillColor('#F0F3F9').fill();
       let x = L + 6;
       doc.fillColor(ASH).font('Helvetica-Bold').fontSize(7.5);
       for (const c of cols) { doc.text(c.t.toUpperCase(), x, yy + 5, { width: c.w - 6, align: c.a }); x += c.w; }
@@ -86,7 +87,7 @@ export function gerarRelatorioCompetenciaPdf(d: DadosRelatorioCompetencia): Prom
       doc.font('Helvetica').fontSize(8.5).fillColor(INK);
       cells.forEach((val, i) => {
         const c = cols[i]!;
-        doc.fillColor(i === 4 && l.faltaMin ? CORAL : i === 5 && l.atrasoMin ? CORAL : INK);
+        doc.fillColor(i === 4 && l.faltaMin ? ERRO : i === 5 && l.atrasoMin ? ERRO : INK);
         doc.text(val, x, y + 3, { width: c.w - 6, align: c.a });
         x += c.w;
       });
@@ -102,14 +103,14 @@ export function gerarRelatorioCompetenciaPdf(d: DadosRelatorioCompetencia): Prom
       hhmm(d.totais.faltaMin), hhmm(d.totais.atrasoMin), reais(d.totais.extrasCentavos), reais(d.totais.liquidoProventosCentavos),
     ];
     let x = L + 6;
-    doc.fillColor('#FFF8EE').font('Helvetica-Bold').fontSize(8.5);
+    doc.fillColor('#F5F7FB').font('Helvetica-Bold').fontSize(8.5);
     tot.forEach((val, i) => { const c = cols[i]!; doc.text(val, x, y + 5, { width: c.w - 6, align: c.a }); x += c.w; });
     y += 30;
 
     doc.fillColor(ASH).font('Helvetica').fontSize(7).text(
       'Valores sobre o salário cadastrado (divisor 220h). Reflexo de DSR é estimativa. Cobre o que a jornada gera — não é a folha completa. Não substitui validação contábil.',
       L, y, { width: W });
-    doc.fillColor('#B9AEA2').fontSize(6.5).text(`REP-P • Registro INPI: ${d.numeroInpi}`, L, y + 16, { width: W, align: 'center' });
+    doc.fillColor('#A3AEC2').fontSize(6.5).text(`REP-P • Registro INPI: ${d.numeroInpi}`, L, y + 16, { width: W, align: 'center' });
 
     doc.end();
   });
