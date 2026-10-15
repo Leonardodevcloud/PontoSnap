@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="PontoSnap" />
@@ -29,6 +30,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800;6..12,900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    // Versão nova publicada e o aparelho ainda com a página antiga em cache
+    // (service worker): o JS antigo não existe mais e a tela fica em branco.
+    // Se o script principal falhar, limpa o cache do app e recarrega UMA vez.
+    (function () {
+      var CHAVE = 'pontosnap.recuperou';
+      function recuperar() {
+        try { if (sessionStorage.getItem(CHAVE)) return; sessionStorage.setItem(CHAVE, '1'); } catch (e) { return; }
+        var p = [];
+        if ('serviceWorker' in navigator) p.push(navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }));
+        if (window.caches) p.push(caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }));
+        Promise.all(p).catch(function () {}).then(function () { location.reload(); });
+      }
+      window.addEventListener('error', function (e) {
+        var t = e.target;
+        if (t && t.tagName === 'SCRIPT' && /\/assets\//.test(t.src || '')) recuperar();
+      }, true);
+      window.addEventListener('vite:preloadError', function () { recuperar(); });
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>

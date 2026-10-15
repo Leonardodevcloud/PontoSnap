@@ -16,6 +16,9 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Carregou a versão nova: libera a recuperação automática para a próxima atualização.
+setTimeout(() => { try { sessionStorage.removeItem('pontosnap.recuperou'); } catch { /* ok */ } }, 10_000);
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
