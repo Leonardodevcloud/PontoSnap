@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { tenant, pontoRep, usuario, usuarioTenant, comoMaster, type Db } from '@ponto/db';
 import { TipoIdentificador } from '@ponto/shared';
 import { DB } from '../database/database.module';
@@ -171,6 +171,66 @@ export class TenantService {
     return this.obter(id);
   }
 
+  /** Dados do cliente para o formulário de edição (inclui o e-mail do administrador). */
+  async dadosParaEditar(id: string) {
+    return comoMaster(this.db, async (tx) => {
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, id)).limit(1))[0];
+      if (!t) throw new NotFoundException('Cliente não encontrado');
+      const admin = (await tx.select({ id: usuario.id, email: usuario.email, deveTrocarSenha: usuario.deveTrocarSenha }).from(usuario)
+        .where(and(eq(usuario.tenantId, id), eq(usuario.perfil, 'ADMIN_CLIENTE'))).orderBy(asc(usuario.criadoEm)).limit(1))[0] ?? null;
+      return { id: t.id, cnpj: t.cnpj, razaoSocial: t.razaoSocial, localPrestacao: t.localPrestacao, admin };
+    });
+  }
+
+  /**
+   * Corrige razão social, CNPJ ou local. Quando muda a identificação do
+   * empregador, o REP-P grava um registro tipo 2 (alteração da empresa) no
+   * AFD — é assim que a Portaria 671 manda registrar a mudança; as batidas
+   * antigas continuam intactas.
+   */
+  async editarDados(id: string, d: { razaoSocial?: string; cnpj?: string; localPrestacao?: string | null }) {
+    return comoMaster(this.db, async (tx) => {
+      const t = (await tx.select().from(tenant).where(eq(tenant.id, id)).limit(1))[0];
+      if (!t) throw new NotFoundException('Cliente não encontrado');
+      const cnpj = d.cnpj !== undefined ? soDigitosSimples(d.cnpj) : t.cnpj;
+      if (cnpj.length !== 14) throw new ConflictException('CNPJ deve ter 14 dígitos.');
+      const razaoSocial = d.razaoSocial !== undefined ? d.razaoSocial.trim() : t.razaoSocial;
+      if (razaoSocial.length < 2) throw new ConflictException('Informe a razão social.');
+      const localPrestacao = d.localPrestacao !== undefined ? (d.localPrestacao?.trim() || null) : t.localPrestacao;
+      if (cnpj !== t.cnpj) {
+        const outro = (await tx.select({ id: tenant.id }).from(tenant).where(eq(tenant.cnpj, cnpj)).limit(1))[0];
+        if (outro && outro.id !== id) throw new ConflictException('Já existe outro cliente com este CNPJ.');
+      }
+      const mudou = cnpj !== t.cnpj || razaoSocial !== t.razaoSocial || localPrestacao !== t.localPrestacao;
+      if (!mudou) return { ...t, eventoAfd: false };
+      await tx.update(tenant).set({ cnpj, razaoSocial, localPrestacao }).where(eq(tenant.id, id));
+      await tx.update(pontoRep).set({ documentoEmpregador: cnpj, razaoSocial }).where(eq(pontoRep.tenantId, id));
+      const nsr = await registrarEventoRep(tx as never, id, {
+        tipo: 2, tpIdtEmpregador: TipoIdentificador.CNPJ, docEmpregador: cnpj, razaoSocial, localPrestacao,
+      });
+      const atual = (await tx.select().from(tenant).where(eq(tenant.id, id)).limit(1))[0]!;
+      return { ...atual, eventoAfd: nsr != null };
+    });
+  }
+
+  /**
+   * Troca o e-mail do administrador do cliente (cadastrado errado). Com
+   * reenviar, gera senha provisória nova e manda o acesso para o e-mail novo.
+   */
+  async alterarEmailAdmin(id: string, emailNovo: string, reenviar: boolean) {
+    const email = emailNovo.trim().toLowerCase();
+    await comoMaster(this.db, async (tx) => {
+      const u = (await tx.select().from(usuario).where(and(eq(usuario.tenantId, id), eq(usuario.perfil, 'ADMIN_CLIENTE')))
+        .orderBy(asc(usuario.criadoEm)).limit(1))[0];
+      if (!u) throw new NotFoundException('Este cliente não tem conta de administrador.');
+      const dono = (await tx.select({ id: usuario.id }).from(usuario).where(sql`lower(${usuario.email}) = ${email}`).limit(1))[0];
+      if (dono && dono.id !== u.id) throw new ConflictException('Este e-mail já é usado por outro acesso do PontoSnap.');
+      await tx.update(usuario).set({ email }).where(eq(usuario.id, u.id));
+    });
+    if (reenviar) return await this.reenviarAcesso(id);
+    return { email, emailEnviado: false, senhaProvisoria: null };
+  }
+
   // ---- Acesso multi-empresa (só MASTER concede) ----
 
   /** Contas de administração (ADMIN/RH) e as empresas de cada uma. */
@@ -330,7 +390,7 @@ export class TenantService {
       if (!t) throw new NotFoundException('Cliente não encontrado');
       const u = (await tx.select().from(usuario)
         .where(and(eq(usuario.tenantId, tenantId), eq(usuario.perfil, 'ADMIN_CLIENTE')))
-        .limit(1))[0];
+        .orderBy(asc(usuario.criadoEm)).limit(1))[0];
       if (!u) throw new NotFoundException('Este cliente não tem conta de administrador.');
 
       const senha = senhaProvisoria();

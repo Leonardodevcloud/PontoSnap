@@ -52,3 +52,7 @@
 @media (max-width: 560px){ .caminhos{ grid-template-columns:1fr; } }
 
 .okMsg{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; margin-bottom:14px; line-height:1.5; }
+
+.rzBtn{ background:none; border:0; padding:0; font:inherit; font-weight:700; font-size:15px; color:inherit; text-align:left; cursor:pointer; }
+.rzBtn:hover{ text-decoration:underline; }
+.rzBtn:focus-visible{ outline:3px solid var(--coral); outline-offset:2px; border-radius:4px; }

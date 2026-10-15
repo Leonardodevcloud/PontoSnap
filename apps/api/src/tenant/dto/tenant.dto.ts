@@ -29,3 +29,14 @@ export class VincularEmpresaDto {
   @IsString() tenantId!: string;
   @IsIn(['ADMIN_CLIENTE', 'RH']) perfil!: 'ADMIN_CLIENTE' | 'RH';
 }
+
+export class EditarTenantDto {
+  @IsOptional() @IsString() @MinLength(2) razaoSocial?: string;
+  @IsOptional() @IsString() cnpj?: string;
+  @IsOptional() @IsString() localPrestacao?: string | null;
+}
+
+export class EmailAdminDto {
+  @IsEmail({}, { message: 'E-mail inválido' }) email!: string;
+  @IsOptional() @IsBoolean() reenviar?: boolean;
+}

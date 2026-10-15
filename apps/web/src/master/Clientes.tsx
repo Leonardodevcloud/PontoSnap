@@ -25,6 +25,7 @@ export function Clientes() {
   const [addAberto, setAddAberto] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [editarFuso, setEditarFuso] = useState<Tenant | null>(null);
+  const [editarDados, setEditarDados] = useState<Tenant | null>(null);
 
   async function carregar() {
     try { setLista(await api.get<Tenant[]>('/tenants')); }
@@ -92,7 +93,7 @@ export function Clientes() {
         {lista?.length === 0 && <div className={css.vazio}>Nenhum cliente ainda. Cadastre o primeiro.</div>}
         {lista?.map((t) => (
           <div key={t.id} className={css.row}>
-            <span className={css.rz}>{t.razaoSocial}</span>
+            <button type="button" className={`${css.rz} ${css.rzBtn}`} onClick={() => setEditarDados(t)} title="Editar dados">{t.razaoSocial}</button>
             <span className={css.mono}>{fmtCnpj(t.cnpj)}</span>
             <span className={css.muted}>{t.localPrestacao ?? '—'}</span>
             <span className={css.fusoCol}>{rotuloFuso(t.fuso)}</span>
@@ -102,6 +103,7 @@ export function Clientes() {
               <button className={css.kebab} aria-label="Ações">⋯</button>
               {menu === t.id && (
                 <div className={css.menu} onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => { setMenu(null); setEditarDados(t); }}>Editar dados</button>
                   <button onClick={() => { setMenu(null); setEditarFuso(t); }}>Fuso horário</button>
                   <button onClick={() => { setMenu(null); void baixarAttr(t); }}>Baixar ATTR</button>
                   <button onClick={() => { setMenu(null); void reenviarAcesso(t); }}>Reenviar acesso</button>
@@ -114,6 +116,8 @@ export function Clientes() {
       </div>
 
       {addAberto && <ModalNovoCliente onFechar={() => setAddAberto(false)} onCriado={() => { setAddAberto(false); void carregar(); }} />}
+      {editarDados && <ModalEditarCliente tenant={editarDados} onFechar={() => setEditarDados(null)}
+        onSalvo={(m) => { setEditarDados(null); setMsgAttr(m); void carregar(); }} />}
       {editarFuso && <ModalFuso tenant={editarFuso} onFechar={() => setEditarFuso(null)} onSalvo={() => { setEditarFuso(null); void carregar(); }} />}
     </div>
   );
@@ -270,6 +274,72 @@ function ModalFuso({ tenant, onFechar, onSalvo }: { tenant: Tenant; onFechar: ()
       {erro && <p className={css.erro}>{erro}</p>}
       <Botao variante="coral" onClick={salvar} disabled={enviando || fuso === (tenant.fuso ?? '-0300')}>
         {enviando ? 'Salvando…' : 'Salvar fuso'}
+      </Botao>
+    </Modal>
+  );
+}
+
+interface DadosEdicao { id: string; cnpj: string; razaoSocial: string; localPrestacao: string | null; admin: { id: string; email: string; deveTrocarSenha: boolean } | null }
+const mascaraCnpj = (v: string) => soDigitos(v).slice(0, 14)
+  .replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+
+/**
+ * Corrigir o cadastro do cliente: razão social, CNPJ e local (muda também a
+ * identificação no REP-P, com registro tipo 2 no AFD) e o e-mail do admin.
+ */
+function ModalEditarCliente({ tenant, onFechar, onSalvo }: { tenant: Tenant; onFechar: () => void; onSalvo: (msg: string) => void }) {
+  const [d, setD] = useState<DadosEdicao | null>(null);
+  const [razao, setRazao] = useState(tenant.razaoSocial);
+  const [cnpj, setCnpj] = useState(mascaraCnpj(tenant.cnpj));
+  const [local, setLocal] = useState(tenant.localPrestacao ?? '');
+  const [email, setEmail] = useState('');
+  const [reenviar, setReenviar] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  useEffect(() => {
+    api.get<DadosEdicao>(`/tenants/${tenant.id}/dados`).then((r) => { setD(r); setEmail(r.admin?.email ?? ''); }).catch((e) => setErro((e as Error).message));
+  }, [tenant.id]);
+
+  const mudouEmpresa = soDigitos(cnpj) !== tenant.cnpj || razao.trim() !== tenant.razaoSocial || (local.trim() || null) !== (tenant.localPrestacao ?? null);
+  const mudouEmail = !!d?.admin && email.trim().toLowerCase() !== d.admin.email.toLowerCase();
+  const cnpjOk = soDigitos(cnpj).length === 14;
+
+  async function salvar() {
+    setErro(null); setEnviando(true);
+    const partes: string[] = [];
+    try {
+      if (mudouEmpresa) {
+        const r = await api.patch<{ eventoAfd: boolean }>(`/tenants/${tenant.id}`, { razaoSocial: razao.trim(), cnpj: soDigitos(cnpj), localPrestacao: local.trim() || null });
+        partes.push(`Dados de ${razao.trim()} atualizados${r.eventoAfd ? ' (alteração registrada no AFD)' : ''}.`);
+      }
+      if (mudouEmail) {
+        const r = await api.patch<{ email: string; emailEnviado: boolean; senhaProvisoria: string | null }>(`/tenants/${tenant.id}/admin-email`, { email: email.trim(), reenviar });
+        partes.push(reenviar
+          ? (r.emailEnviado ? `E-mail do admin trocado para ${r.email} e o acesso foi enviado. Senha provisória: ${r.senhaProvisoria}` : `E-mail do admin trocado para ${r.email}, mas o e-mail não saiu. Passe manualmente: senha provisória ${r.senhaProvisoria}`)
+          : `E-mail do admin trocado para ${r.email}. A senha continua a mesma.`);
+      }
+      onSalvo(partes.join(' '));
+    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+  }
+
+  return (
+    <Modal titulo="Editar dados do cliente" onFechar={onFechar}>
+      <Campo rotulo="Razão social" id="ed-razao" value={razao} onChange={(e) => setRazao(e.target.value)} />
+      <Campo rotulo="CNPJ" id="ed-cnpj" inputMode="numeric" value={cnpj} onChange={(e) => setCnpj(mascaraCnpj(e.target.value))} />
+      <Campo rotulo="Local de prestação (cidade/UF)" id="ed-local" value={local} onChange={(e) => setLocal(e.target.value)} placeholder="SALVADOR/BA" />
+      {mudouEmpresa && <p className={css.fusoNota} style={{ margin: '0 0 14px' }}>A identificação do empregador muda também no REP-P: o sistema grava um registro de alteração da empresa (tipo 2) no AFD. As batidas já gravadas não mudam.</p>}
+
+      <Campo rotulo="E-mail do administrador (login)" id="ed-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!d?.admin} />
+      {d && !d.admin && <p className={css.fusoNota} style={{ margin: '0 0 14px' }}>Este cliente não tem conta de administrador própria (é administrado por um acesso de outra empresa — veja em Acessos).</p>}
+      {mudouEmail && (
+        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, margin: '0 0 14px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={reenviar} onChange={(e) => setReenviar(e.target.checked)} style={{ marginTop: 3 }} />
+          <span>Gerar senha provisória nova e mandar o acesso para o e-mail novo <small style={{ display: 'block', color: 'var(--ash)' }}>Recomendado quando o e-mail estava errado: o admin nunca recebeu o acesso.</small></span>
+        </label>
+      )}
+      {erro && <p className={css.erro}>{erro}</p>}
+      <Botao variante="coral" onClick={salvar} disabled={enviando || !d || (!mudouEmpresa && !mudouEmail) || !cnpjOk || razao.trim().length < 2 || (mudouEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()))}>
+        {enviando ? 'Salvando…' : 'Salvar alterações'}
       </Botao>
     </Modal>
   );

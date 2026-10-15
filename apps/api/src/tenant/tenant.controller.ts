@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, StreamableFile, UseGuards, BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { TenantService } from './tenant.service';
-import { CriarTenantDto, AtivoDto, FusoDto, VincularEmpresaDto } from './dto/tenant.dto';
+import { CriarTenantDto, AtivoDto, FusoDto, VincularEmpresaDto, EditarTenantDto, EmailAdminDto } from './dto/tenant.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -16,6 +16,12 @@ export class TenantController {
   @Post() criar(@Body() dto: CriarTenantDto) { return this.tenants.criar(dto); }
   @Get() listar() { return this.tenants.listar(); }
   @Get(':id') obter(@Param('id') id: string) { return this.tenants.obter(id); }
+  /** Corrigir cadastro: razão social, CNPJ, local (gera registro 2 no AFD) e e-mail do admin. */
+  @Get(':id/dados') dados(@Param('id') id: string) { return this.tenants.dadosParaEditar(id); }
+  @Patch(':id') editar(@Param('id') id: string, @Body() dto: EditarTenantDto) { return this.tenants.editarDados(id, dto); }
+  @Patch(':id/admin-email') emailAdmin(@Param('id') id: string, @Body() dto: EmailAdminDto) {
+    return this.tenants.alterarEmailAdmin(id, dto.email, !!dto.reenviar);
+  }
   @Patch(':id/ativo') ativo(@Param('id') id: string, @Body() dto: AtivoDto) {
     return this.tenants.definirAtivo(id, dto.ativo);
   }
