@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth';
 import { Flash } from '../components/Flash';
 import type { RespLogin } from '../tipos';
 import css from './Prestador.module.css';
+import { RegrasSenha, senhaValida } from '../components/RegrasSenha';
 
 interface Convite { nome: string; empresa: string; tipo: 'MEI' | 'MOTORISTA'; email: string | null; telefone: string | null; expirado: boolean; usado: boolean }
 
@@ -63,7 +64,7 @@ export function PrimeiroAcesso() {
               <button type="button" className={css.btn} onClick={() => navegar('/login')}>Ir para o login</button>
             </>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); if (senha.length >= 8) void criar(); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <form onSubmit={(e) => { e.preventDefault(); if (senhaValida(senha)) void criar(); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className={css.campo}>
                 <label htmlFor="pa-email">Seu usuário (e-mail)</label>
                 <input id="pa-email" type="email" autoComplete="username" value={c.email ?? ''} readOnly aria-describedby="pa-email-ajuda" />
@@ -75,14 +76,14 @@ export function PrimeiroAcesso() {
                   <input id="pa-senha" type={ver ? 'text' : 'password'} autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={8} />
                   <button type="button" onClick={() => setVer((v) => !v)} aria-label={ver ? 'Esconder senha' : 'Mostrar senha'}>{ver ? 'esconder' : 'mostrar'}</button>
                 </div>
-                <small>Pelo menos 8 caracteres.</small>
+                <RegrasSenha senha={senha} />
               </div>
               <div className={css.campo}>
                 <label htmlFor="pa-cel">Celular (para avisos)</label>
                 <input id="pa-cel" inputMode="tel" autoComplete="tel" value={cel} onChange={(e) => setCel(mascaraCel(e.target.value))} placeholder="(00) 00000-0000" />
               </div>
               {erro && <div className={css.erro} role="alert">{erro}</div>}
-              <button type="submit" className={css.btn} disabled={senha.length < 8 || enviando}>{enviando ? 'Criando…' : 'Criar meu acesso'}</button>
+              <button type="submit" className={css.btn} disabled={!senhaValida(senha) || enviando}>{enviando ? 'Criando…' : 'Criar meu acesso'}</button>
               <p style={{ fontSize: 12.5 }}>Depois disso, o app pede para ativar as notificações.</p>
             </form>
           )}

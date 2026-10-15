@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import css from './Login.module.css';
+import { RegrasSenha, senhaValida } from '../components/RegrasSenha';
 
 const Flash = ({ t, c, cn }: { t: number; c: string; cn?: string }) => (
   <svg width={t} height={t} viewBox="0 0 100 100" aria-hidden="true" className={cn}>
@@ -20,11 +21,9 @@ export function RedefinirSenha() {
   const [enviando, setEnviando] = useState(false);
   const [pronto, setPronto] = useState(false);
 
-  const curta = senha.length > 0 && senha.length < 8;
-  const difere = senha2.length > 0 && senha !== senha2;
 
   async function submeter() {
-    if (!senha || senha.length < 8 || senha !== senha2 || enviando) return;
+    if (!senhaValida(senha, senha2) || enviando) return;
     setErro(null);
     setEnviando(true);
     try {
@@ -69,7 +68,7 @@ export function RedefinirSenha() {
           ) : (
             <>
               <h1 className={css.titulo}>Nova senha</h1>
-              <p className={css.sub}>Crie uma senha com pelo menos 8 caracteres.</p>
+              <p className={css.sub}>Crie uma nova senha para entrar.</p>
 
               <div className={css.campo}>
                 <label htmlFor="s1">Nova senha</label>
@@ -79,7 +78,6 @@ export function RedefinirSenha() {
                     value={senha} onChange={(e) => setSenha(e.target.value)}
                   />
                 </div>
-                {curta && <span className={css.dica}>Mínimo de 8 caracteres.</span>}
               </div>
 
               <div className={css.campo}>
@@ -91,14 +89,14 @@ export function RedefinirSenha() {
                     onKeyDown={(e) => e.key === 'Enter' && void submeter()}
                   />
                 </div>
-                {difere && <span className={css.dica}>As senhas não batem.</span>}
               </div>
+              <RegrasSenha senha={senha} confirmacao={senha2} />
 
               {erro && <p className={css.erro} role="alert">{erro}</p>}
 
               <button
                 className={css.entrar} onClick={submeter}
-                disabled={enviando || senha.length < 8 || senha !== senha2}
+                disabled={enviando || !senhaValida(senha, senha2)}
               >
                 {enviando ? 'Salvando…' : 'Salvar nova senha'}
               </button>

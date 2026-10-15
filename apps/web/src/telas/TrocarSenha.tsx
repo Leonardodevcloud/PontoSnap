@@ -5,6 +5,7 @@ import type { Perfil } from '../tipos';
 import { Flash } from '../components/Flash';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
+import { RegrasSenha, senhaValida } from '../components/RegrasSenha';
 import css from './TrocarSenha.module.css';
 
 const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' || p === 'PRESTADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
@@ -22,8 +23,7 @@ export function TrocarSenha() {
 
   async function submeter() {
     setErro(null);
-    if (nova !== conf) { setErro('As senhas novas não batem.'); return; }
-    if (nova.length < 8) { setErro('A nova senha precisa de pelo menos 8 caracteres.'); return; }
+    if (!senhaValida(nova, conf) || (!primeiro && !atual)) return;
     setEnviando(true);
     try {
       await alterarSenha(atual, nova);
@@ -44,13 +44,15 @@ export function TrocarSenha() {
           value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••••" />
       )}
       <Campo rotulo="Nova senha" type="password" autoComplete="new-password"
-        value={nova} onChange={(e) => setNova(e.target.value)} placeholder="mínimo 8 caracteres" />
+        value={nova} onChange={(e) => setNova(e.target.value)} placeholder="crie sua senha" />
       <Campo rotulo="Confirmar nova senha" type="password" autoComplete="new-password"
         value={conf} onChange={(e) => setConf(e.target.value)} placeholder="repita a nova senha"
         onKeyDown={(e) => e.key === 'Enter' && submeter()} />
+      <RegrasSenha senha={nova} confirmacao={conf} />
+      <div style={{ height: 12 }} />
 
       {erro && <p className={css.erro}>{erro}</p>}
-      <Botao variante="coral" onClick={submeter} disabled={enviando || (!primeiro && !atual) || !nova || !conf}>
+      <Botao variante="coral" onClick={submeter} disabled={enviando || (!primeiro && !atual) || !senhaValida(nova, conf)}>
         {enviando ? 'Salvando…' : 'Salvar nova senha'}
       </Botao>
     </div>
