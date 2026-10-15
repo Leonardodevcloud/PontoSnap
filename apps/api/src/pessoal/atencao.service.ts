@@ -6,6 +6,7 @@ import {
 } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
+import { mesPadrao } from './mes-padrao';
 import { PessoalService } from './pessoal.service';
 
 /**
@@ -79,8 +80,7 @@ export class AtencaoService {
   async listar(tenantId: string): Promise<RespAtencao> {
     const painel = await this.trat.painel(tenantId);
     const hoje = painel.data;
-    const comp = hoje.slice(0, 7);
-    const anterior = compAnterior(comp);
+    const anterior = compAnterior(hoje.slice(0, 7));
     const itens: ItemAtencao[] = [];
 
     const base = await comTenant(this.db, tenantId, async (tx) => {
@@ -113,6 +113,9 @@ export class AtencaoService {
         .where(and(eq(empregadoFoto.tenantId, tenantId), eq(empregadoFoto.status, 'REVISAR')));
       return { emps, horarios, docs, ajustes, perfis, usaAssinatura, assinadasAnt, comApp, fechs, fotosRevisar };
     });
+
+    // Mês do cartão "fechar X": o anterior nos primeiros dias, se ainda não fechou.
+    const comp = mesPadrao(hoje, base.fechs.some((f) => f.c === anterior)).competencia;
 
     const empPorId = new Map(base.emps.map((e) => [e.id, e]));
     const horPorId = new Map(base.horarios.map((h) => [h.id, h]));

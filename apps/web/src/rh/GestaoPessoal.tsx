@@ -14,6 +14,7 @@ import type {
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
 import { Avatar } from '../components/Avatar';
+import { esquecerMesPadrao } from '../lib/mesPadrao';
 import css from './GestaoPessoal.module.css';
 
 /**
@@ -212,11 +213,11 @@ export function GestaoPessoal() {
     } catch (e) { setDialogo(null); setErro((e as Error).message); }
   }
   async function fecharMes() {
-    try { await api.post('/pessoal/fechar', { competencia: mes }); setDialogo(null); avisar(`${mesLongo(mes)} fechado.${d && (d.mei.length || d.motoristas.length) ? ' Agora é só liberar os valores para os prestadores.' : ''}`); await recarregar(); }
+    try { await api.post('/pessoal/fechar', { competencia: mes }); esquecerMesPadrao(); setDialogo(null); avisar(`${mesLongo(mes)} fechado.${d && (d.mei.length || d.motoristas.length) ? ' Agora é só liberar os valores para os prestadores.' : ''}`); await recarregar(); }
     catch (e) { setDialogo(null); setErro((e as Error).message); }
   }
   async function reabrir() {
-    try { await api.post('/pessoal/reabrir', { competencia: mes }); avisar(`${mesLongo(mes)} reaberto para edição.`); await recarregar(); }
+    try { await api.post('/pessoal/reabrir', { competencia: mes }); esquecerMesPadrao(); avisar(`${mesLongo(mes)} reaberto para edição.`); await recarregar(); }
     catch (e) { setErro((e as Error).message); }
   }
   async function encerrarDebito(ultima: string) {

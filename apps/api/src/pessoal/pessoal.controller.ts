@@ -19,6 +19,10 @@ export class PessoalController {
     return u.tenantId;
   }
 
+  /** Mês em que as telas de fechamento abrem (anterior até o dia 10, se ainda não fechou). */
+  @Get('mes-padrao') mesPadrao(@UsuarioAtual() u: PayloadAcesso) {
+    return this.pessoal.mesPadrao(this.tenant(u));
+  }
   @Get('competencia') competencia(@UsuarioAtual() u: PayloadAcesso, @Query('comp') comp: string) {
     return this.pessoal.competencia(this.tenant(u), comp);
   }

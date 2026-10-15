@@ -11,6 +11,7 @@ const mesCorrente = () => new Date(Date.now() - 3 * 3600_000).toISOString().slic
 import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
+import { mesPadrao, compAnterior as mesAnteriorDe, type MesPadrao } from './mes-padrao';
 import {
   calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, diasComVt, lerDiasSemana, faixaDoMes, parcelaNoMes, situacaoDebito,
   semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
@@ -159,6 +160,15 @@ export class PessoalService {
     private readonly trat: TratamentoService,
     private readonly cripto: CriptoService,
   ) {}
+
+  /** Mês que as telas de fechamento abrem por padrão (ver mes-padrao.ts). */
+  async mesPadrao(tenantId: string): Promise<MesPadrao> {
+    const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+    const anterior = mesAnteriorDe(hoje.slice(0, 7));
+    const fech = await comTenant(this.db, tenantId, (tx) => tx.select({ c: pessoalFechamento.competencia }).from(pessoalFechamento)
+      .where(and(eq(pessoalFechamento.tenantId, tenantId), eq(pessoalFechamento.competencia, anterior))).limit(1));
+    return mesPadrao(hoje, fech.length > 0);
+  }
 
   private validarComp(c: string) {
     if (!COMP_RE.test(c ?? '')) throw new BadRequestException('Competência inválida (use YYYY-MM)');

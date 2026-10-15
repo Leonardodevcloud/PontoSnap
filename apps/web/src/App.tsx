@@ -50,6 +50,7 @@ import { InicioPrestador, NotasPrestador, NotaPrestador, MenuPrestador } from '.
 import { EnviarNota } from './prestador/EnviarNota';
 import { PrimeiroAcesso } from './prestador/PrimeiroAcesso';
 import { Prestadores } from './rh/Prestadores';
+import { ComMesPadrao } from './lib/mesPadrao';
 import { ConferirNotas } from './rh/ConferirNotas';
 import { Flash } from './components/Flash';
 import { BarraProgresso } from './components/BarraProgresso';
@@ -136,10 +137,10 @@ export function App() {
         <Route index element={<Inicio />} />
         <Route path="funcionarios" element={<Funcionarios />} />
         <Route path="escalas" element={<Escalas />} />
-        <Route path="espelhos" element={<Espelhos />} />
-        <Route path="apuracao" element={<ApuracaoCLT />} />
-        <Route path="pessoal" element={<GestaoPessoal />} />
-        <Route path="prestadores" element={<Prestadores />} />
+        <Route path="espelhos" element={<ComMesPadrao><Espelhos /></ComMesPadrao>} />
+        <Route path="apuracao" element={<ComMesPadrao><ApuracaoCLT /></ComMesPadrao>} />
+        <Route path="pessoal" element={<ComMesPadrao><GestaoPessoal /></ComMesPadrao>} />
+        <Route path="prestadores" element={<ComMesPadrao><Prestadores /></ComMesPadrao>} />
         <Route path="prestadores/conferir" element={<ConferirNotas />} />
         <Route path="relatorios" element={<Relatorios />} />
         <Route path="feriados" element={<Feriados />} />
