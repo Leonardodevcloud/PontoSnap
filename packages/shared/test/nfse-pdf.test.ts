@@ -60,3 +60,29 @@ describe('lerNfsePdf — sem dados', () => {
     expect(l).toMatchObject({ numero: null, valorCent: null, leu: false });
   });
 });
+
+describe('lerNfsePdf — DANFSe da Reforma Tributária (IBS/CBS), réplica de nota real', () => {
+  // Mesmas posições da nota real; o campo "+ IBS/CBS" (R$ 0,00) vem ANTES na lista de propósito.
+  const base: Array<[string, number, number]> = [
+    ['CHAVE DE ACESSO DA NFS-e', 12, 791], [chave('62362759000171', '13', '2609'), 12, 781],
+    ['COMPETÊNCIA DA NFS-e', 156, 771], ['01/09/2026', 156, 763],
+    ['DATA E HORA DA EMISSÃO DA NFS-e', 301, 771], ['01/09/2026 17:03:39', 301, 763],
+    ['DATA E HORA DA EMISSÃO DA DPS', 301, 751], ['01/09/2026 17:03:39', 301, 743],
+    ['EMITENTE DA NFS-e', 12, 730], ['CNPJ / CPF / NIF', 156, 711], ['62.362.759/0001-71', 156, 703],
+    ['TOMADOR / ADQUIRENTE', 12, 633], ['CNPJ / CPF / NIF', 156, 634], ['42.246.432/0002-08', 156, 626],
+    ['Serviços administrativos prestados de 01/08/2026 - 31/08/2026', 12, 520],
+    ['VALOR TOTAL DA NFS-e', 12, 353], ['VALOR DA OPERAÇÃO / SERVIÇO', 156, 354], ['R$ 7.049,87', 156, 347],
+  ];
+  const ibsAntes: Array<[string, number, number]> = [
+    ['VALOR LÍQUIDO DA NFS-e + IBS/CBS', 446, 335], ['R$ 0,00', 446, 327],
+    ['VALOR LÍQUIDO DA NFS-e', 156, 335], ['R$ 7.049,87', 156, 327], ['R$ 0,00', 301, 327],
+  ];
+  it('pega o valor líquido da NFS-e, não o "+ IBS/CBS"', () => {
+    expect(lerNfsePdf(itens([...ibsAntes, ...base]))).toMatchObject({
+      numero: '13', data: '2026-09-01', valorCent: 704987, cnpjPrestador: '62362759000171', cnpjTomador: '42246432000208',
+    });
+  });
+  it('mesmo com a lista em outra ordem', () => {
+    expect(lerNfsePdf(itens([...base, ...ibsAntes].reverse())).valorCent).toBe(704987);
+  });
+});

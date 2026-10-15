@@ -86,7 +86,8 @@ function ordenar(itens: TextoPdf[]): TextoPdf[] {
 function valorDoRotulo(itens: TextoPdf[], rotulo: RegExp, valor: RegExp): string | null {
   for (const r of itens) {
     const n = norm(r.str);
-    if (!rotulo.test(n)) continue;
+    // Layout da Reforma Tributária: "VALOR LÍQUIDO DA NFS-e + IBS/CBS" não é o valor da nota.
+    if (!rotulo.test(n) || /\b(ibs|cbs)\b/.test(n)) continue;
     // Mesmo item: "Valor Líquido: R$ 1.234,56"
     const dp = r.str.indexOf(':');
     if (dp >= 0) { const m = valor.exec(r.str.slice(dp + 1).trim()); if (m) return m.groups?.v ?? m[0]; }
