@@ -1,6 +1,5 @@
 import { boolean, customType, index, integer, jsonb, pgTable, primaryKey, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
-import { empregado } from './empregado';
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 
@@ -31,8 +30,12 @@ export interface BlocoEnquete {
   encerraEm: string | null;
 }
 
-/** Para quem vai: todos, por cliente/loja, por escala ou pessoas escolhidas. */
-export interface PublicoComunicado { tipo: 'TODOS' | 'CLIENTE' | 'ESCALA' | 'PESSOAS'; valores: string[] }
+/**
+ * Para quem vai: todos, por cliente/loja, por escala ou pessoas escolhidas.
+ * grupo (só com TODOS): CLT, PRESTADORES ou TODOS. Sem grupo = CLT (comunicados
+ * de antes do portal do prestador). Cliente e escala são só de CLT.
+ */
+export interface PublicoComunicado { tipo: 'TODOS' | 'CLIENTE' | 'ESCALA' | 'PESSOAS'; valores: string[]; grupo?: 'CLT' | 'PRESTADORES' | 'TODOS' }
 
 /** Comunicação interna (migration 0055). */
 export const comunicado = pgTable('comunicado', {
@@ -63,7 +66,8 @@ export const comunicado = pgTable('comunicado', {
 /** Quem recebeu e o que fez com o comunicado (comprovante de ciência). */
 export const comunicadoDestinatario = pgTable('comunicado_destinatario', {
   comunicadoId: uuid('comunicado_id').notNull().references(() => comunicado.id, { onDelete: 'cascade' }),
-  empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
+  /** Pessoa: funcionário (empregado.id) ou prestador (pessoal_prestador.id) — migration 0057. */
+  empregadoId: uuid('empregado_id').notNull(),
   tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
   abertoEm: timestamp('aberto_em', { withTimezone: true }),
   midiaEm: timestamp('midia_em', { withTimezone: true }),
@@ -93,7 +97,8 @@ export const comunicadoMidia = pgTable('comunicado_midia', {
 /** Voto na enquete do comunicado (migration 0056). Fica só o último; dá para mudar até encerrar. */
 export const comunicadoVoto = pgTable('comunicado_voto', {
   comunicadoId: uuid('comunicado_id').notNull().references(() => comunicado.id, { onDelete: 'cascade' }),
-  empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
+  /** Pessoa: funcionário (empregado.id) ou prestador (pessoal_prestador.id) — migration 0057. */
+  empregadoId: uuid('empregado_id').notNull(),
   tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
   opcoes: jsonb('opcoes').$type<string[]>().notNull().default([]),
   votadoEm: timestamp('votado_em', { withTimezone: true }).notNull().defaultNow(),

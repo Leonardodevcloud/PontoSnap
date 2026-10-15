@@ -19,7 +19,9 @@ export interface EstadoEnquete {
   opcoes: { id: string; texto: string; votos: number | null }[];
   meuVoto: string[] | null; votadoEm: string | null; verResultado: boolean;
 }
-export interface Publico { tipo: 'TODOS' | 'CLIENTE' | 'ESCALA' | 'PESSOAS'; valores: string[] }
+/** grupo (só com TODOS): CLT, PRESTADORES ou TODOS. Sem grupo = CLT (comunicados antigos). */
+export type GrupoPublico = 'CLT' | 'PRESTADORES' | 'TODOS';
+export interface Publico { tipo: 'TODOS' | 'CLIENTE' | 'ESCALA' | 'PESSOAS'; valores: string[]; grupo?: GrupoPublico }
 export type StatusComunicado = 'RASCUNHO' | 'AGENDADO' | 'PUBLICADO' | 'ARQUIVADO';
 export const REACOES = ['👍', '❤️', '👏', '😂', '🙏'] as const;
 
@@ -128,3 +130,11 @@ export function quando(iso: string | null): string {
 }
 export const tamanho = (b: number) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 export const miniaturaVideo = (b: { provedor: string; videoId: string }) => (b.provedor === 'YOUTUBE' ? `https://i.ytimg.com/vi/${b.videoId}/hqdefault.jpg` : null);
+
+/** Rótulo do público na lista e no detalhe ("Todos · só prestadores"). */
+export function rotuloPublico(p: Publico): string {
+  if (p.tipo === 'CLIENTE') return 'Por cliente';
+  if (p.tipo === 'ESCALA') return 'Por escala';
+  if (p.tipo === 'PESSOAS') return 'Pessoas escolhidas';
+  return p.grupo === 'PRESTADORES' ? 'Só prestadores' : p.grupo === 'CLT' ? 'Só CLT' : 'Todos';
+}

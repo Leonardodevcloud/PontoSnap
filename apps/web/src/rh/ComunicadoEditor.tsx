@@ -9,9 +9,9 @@ import { ArquivoPdf, ComunicadoView, PlayerAudio, VideoEmbed } from '../componen
 import { PainelLateral } from '../components/PainelLateral';
 import css from './Comunicacao.module.css';
 
-interface Pessoa { id: string; nome: string; cliente: string | null; horarioId: string | null; temApp: boolean; temPush: boolean }
+interface Pessoa { id: string; nome: string; cliente: string | null; horarioId: string | null; temApp: boolean; temPush: boolean; grupo?: 'CLT' | 'PRESTADOR'; tipoPrestador?: 'MEI' | 'MOTORISTA' | null }
 interface Opcao { valor: string; rotulo: string; pessoas: number }
-interface Opcoes { pessoas: Pessoa[]; clientes: Opcao[]; escalas: Opcao[] }
+interface Opcoes { pessoas: Pessoa[]; clientes: Opcao[]; escalas: Opcao[]; grupos?: { clt: number; prestadores: number; prestadoresTotal: number } }
 interface Carregado {
   destinatarios: unknown[];
   id: string; titulo: string; blocos: Bloco[]; publico: Publico; status: StatusComunicado; agendadoPara: string | null;
@@ -145,7 +145,7 @@ export function ComunicadoEditor() {
   const [agendadoPara, setAgendadoPara] = useState<string | null>(null);
   const [titulo, setTitulo] = useState('');
   const [blocos, setBlocos] = useState<BlocoEd[]>([{ tipo: 'TEXTO', texto: '', k: novaChave() }]);
-  const [publico, setPublico] = useState<Publico>({ tipo: 'TODOS', valores: [] });
+  const [publico, setPublico] = useState<Publico>({ tipo: 'TODOS', valores: [], grupo: 'TODOS' });
   const [op, setOp] = useState({ pedirCiencia: false, fixado: false, notificar: true, lembrar: true, reacoes: true });
   const [autor, setAutor] = useState(() => { try { return localStorage.getItem(CHAVE_AUTOR) ?? 'RH'; } catch { return 'RH'; } });
   const [opcoes, setOpcoes] = useState<Opcoes | null>(null);
@@ -265,7 +265,10 @@ export function ComunicadoEditor() {
   const alvo = useMemo(() => {
     const ps = opcoes?.pessoas ?? [];
     const v = new Set(publico.valores);
-    const dentro = ps.filter((p) => (publico.tipo === 'TODOS' ? true : publico.tipo === 'CLIENTE' ? v.has(p.cliente ?? '') : publico.tipo === 'ESCALA' ? v.has(p.horarioId ?? '') : v.has(p.id)));
+    const clt = (p: Pessoa) => (p.grupo ?? 'CLT') === 'CLT';
+    const grupo = publico.grupo ?? 'CLT';
+    const dentro = ps.filter((p) => (publico.tipo === 'TODOS' ? grupo === 'TODOS' || (grupo === 'CLT') === clt(p)
+      : publico.tipo === 'CLIENTE' ? clt(p) && v.has(p.cliente ?? '') : publico.tipo === 'ESCALA' ? clt(p) && v.has(p.horarioId ?? '') : v.has(p.id)));
     return { com: dentro.filter((p) => p.temApp).length, push: dentro.filter((p) => p.temPush).length, semApp: dentro.filter((p) => !p.temApp).length };
   }, [opcoes, publico]);
   const alternarValor = (v: string) => {
@@ -472,9 +475,17 @@ export function ComunicadoEditor() {
             <div className={css.chips} role="radiogroup" aria-label="Público">
               {([['TODOS', 'Todos'], ['CLIENTE', 'Por cliente'], ['ESCALA', 'Por escala'], ['PESSOAS', 'Pessoas…']] as const).map(([t, rot]) => (
                 <button key={t} type="button" role="radio" aria-checked={publico.tipo === t} disabled={publicado || (t === 'CLIENTE' && !opcoes?.clientes.length) || (t === 'ESCALA' && !opcoes?.escalas.length)}
-                  className={`${css.chip} ${publico.tipo === t ? css.chipOn : ''}`} onClick={() => { setPublico({ tipo: t, valores: [] }); setSujo(true); }}>{rot}</button>
+                  className={`${css.chip} ${publico.tipo === t ? css.chipOn : ''}`} onClick={() => { setPublico({ tipo: t, valores: [], ...(t === 'TODOS' ? { grupo: 'TODOS' as const } : {}) }); setSujo(true); }}>{rot}</button>
               ))}
             </div>
+            {publico.tipo === 'TODOS' && !!opcoes?.grupos?.prestadoresTotal && (
+              <div className={css.chips} role="radiogroup" aria-label="Quem entra em todos">
+                {([['TODOS', 'CLT e prestadores'], ['CLT', 'Só CLT'], ['PRESTADORES', 'Só prestadores']] as const).map(([g, rot]) => (
+                  <button key={g} type="button" role="radio" aria-checked={(publico.grupo ?? 'CLT') === g} disabled={publicado}
+                    className={`${css.chip} ${(publico.grupo ?? 'CLT') === g ? css.chipOn : ''}`} onClick={() => { setPublico({ tipo: 'TODOS', valores: [], grupo: g }); setSujo(true); }}>{rot}</button>
+                ))}
+              </div>
+            )}
             {!publicado && (publico.tipo === 'CLIENTE' || publico.tipo === 'ESCALA') && (
               <div className={css.escolha}>
                 {lista.map((o) => (
@@ -486,7 +497,7 @@ export function ComunicadoEditor() {
               <input className={`${css.inp} ${css.busca}`} placeholder="Buscar pelo nome" aria-label="Buscar pessoa" value={buscaP} onChange={(e) => setBuscaP(e.target.value)} />
               <div className={css.escolha}>
                 {pessoasFiltradas.map((p) => (
-                  <label key={p.id}><input type="checkbox" checked={publico.valores.includes(p.id)} onChange={() => alternarValor(p.id)} /><span>{p.nome}</span><small>{p.temPush ? '🔔' : ''}</small></label>
+                  <label key={p.id}><input type="checkbox" checked={publico.valores.includes(p.id)} onChange={() => alternarValor(p.id)} /><span>{p.nome}{p.tipoPrestador ? <small> · {p.tipoPrestador === 'MEI' ? 'MEI' : 'motorista'}</small> : null}</span><small>{p.temPush ? '🔔' : ''}</small></label>
                 ))}
                 {pessoasFiltradas.length === 0 && <label><span>Ninguém encontrado.</span></label>}
               </div>

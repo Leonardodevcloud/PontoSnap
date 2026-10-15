@@ -60,7 +60,7 @@ export function LayoutColaborador() {
       <header className={css.topo}>
         <button className={css.logo} onClick={() => navegar('/')} aria-label="Início">
           <Flash tamanho={20} cor="var(--coral)" />
-          Ponto<b>Snap</b>
+          <span>Ponto<b>Snap</b></span>
         </button>
 
         <div className={css.menuZona}>

@@ -7,7 +7,7 @@ import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import css from './TrocarSenha.module.css';
 
-const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
+const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' || p === 'PRESTADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
 
 export function TrocarSenha() {
   const { sessao, alterarSenha } = useAuth();

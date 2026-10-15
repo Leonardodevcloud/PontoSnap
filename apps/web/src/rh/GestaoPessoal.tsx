@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import QRCode from 'qrcode';
@@ -90,6 +90,7 @@ type Toast = { msg: string; desfazer?: () => Promise<void> } | null;
 export function GestaoPessoal() {
   const { sessao } = useAuth();
   const [params, setParams] = useSearchParams();
+  const navegarRota = useNavigate();
   const mes = params.get('mes') ?? mesAtual();
   const abaBruta = params.get('aba');
   // Links antigos (?aba=mei / ?aba=motoristas) caem na aba única de prestadores.
@@ -209,7 +210,7 @@ export function GestaoPessoal() {
     } catch (e) { setDialogo(null); setErro((e as Error).message); }
   }
   async function fecharMes() {
-    try { await api.post('/pessoal/fechar', { competencia: mes }); setDialogo(null); avisar(`${mesLongo(mes)} fechado.`); await recarregar(); }
+    try { await api.post('/pessoal/fechar', { competencia: mes }); setDialogo(null); avisar(`${mesLongo(mes)} fechado.${d && (d.mei.length || d.motoristas.length) ? ' Agora é só liberar os valores para os prestadores.' : ''}`); await recarregar(); }
     catch (e) { setDialogo(null); setErro((e as Error).message); }
   }
   async function reabrir() {
@@ -278,6 +279,9 @@ export function GestaoPessoal() {
             : <span className={`${css.chip} ${css.chipAberto}`}>em aberto</span>)}
           <span className={css.esp} />
           {!fechado && <Botao variante="ghost" className={css.btnSec} onClick={() => ir({ novo: filtroTipo === 'MOTORISTA' ? 'MOTORISTA' : 'MEI' })}>Adicionar prestador</Botao>}
+          {fechado && d && (d.mei.length > 0 || d.motoristas.length > 0) && (
+            <Botao variante="ghost" className={css.btnSec} onClick={() => navegarRota(`/rh/prestadores?mes=${mes}&liberar=1`)}>Liberar para os prestadores</Botao>
+          )}
           {fechado
             ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
             : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}

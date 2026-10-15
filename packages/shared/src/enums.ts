@@ -21,4 +21,6 @@ export enum Perfil {
   ADMIN_CLIENTE = 'ADMIN_CLIENTE',
   RH = 'RH',
   COLABORADOR = 'COLABORADOR',
+  /** MEI/motorista: app restrito (valores, nota fiscal, avisos). */
+  PRESTADOR = 'PRESTADOR',
 }

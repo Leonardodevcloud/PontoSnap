@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, 
 import { Inject } from '@nestjs/common';
 import { eq, and, ne, desc } from 'drizzle-orm';
 import { Perfil } from '@ponto/shared';
-import { pushSubscription, notificacaoPreferencia, notificacaoEnvio, usuario, empregado, comTenant, type Db } from '@ponto/db';
+import { pushSubscription, notificacaoPreferencia, notificacaoEnvio, usuario, empregado, pessoalPrestador, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -183,8 +183,10 @@ export class NotificacaoController {
     return comTenant(this.db, tenantId, async (tx) => {
       const emps = await tx.select({ id: empregado.id, nome: empregado.nome })
         .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)));
-      const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId, ativo: usuario.ativo })
+      const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId, prestadorId: usuario.prestadorId, ativo: usuario.ativo })
         .from(usuario).where(eq(usuario.tenantId, tenantId));
+      // Prestadores (portal) também recebem push: o nome aparece no histórico de envios.
+      const prest = await tx.select({ id: pessoalPrestador.id, nome: pessoalPrestador.nome }).from(pessoalPrestador).where(eq(pessoalPrestador.tenantId, tenantId));
       const subs = await tx.select({
         id: pushSubscription.id, usuarioId: pushSubscription.usuarioId, dispositivo: pushSubscription.dispositivo,
         criadoEm: pushSubscription.criadoEm, ultimoSucessoEm: pushSubscription.ultimoSucessoEm,
@@ -195,8 +197,8 @@ export class NotificacaoController {
         .where(eq(notificacaoEnvio.tenantId, tenantId)).orderBy(desc(notificacaoEnvio.criadoEm)).limit(60);
 
       const usuarioDe = new Map(us.filter((x) => x.empregadoId && x.ativo).map((x) => [x.empregadoId!, x.id]));
-      const empDoUsuario = new Map(us.filter((x) => x.empregadoId).map((x) => [x.id, x.empregadoId!]));
-      const nomeDe = new Map(emps.map((e) => [e.id, e.nome]));
+      const empDoUsuario = new Map(us.filter((x) => x.empregadoId || x.prestadorId).map((x) => [x.id, (x.empregadoId ?? x.prestadorId)!]));
+      const nomeDe = new Map([...emps, ...prest].map((e) => [e.id, e.nome]));
       const prefDe = new Map(prefs.map((p) => [p.empregadoId, p]));
       const pessoas = emps.map((e) => {
         const uid = usuarioDe.get(e.id);

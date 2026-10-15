@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import { quando, type Bloco, type Publico, type StatusComunicado } from '../lib/comunicacao';
+import { quando, type Bloco, type Publico, type StatusComunicado, rotuloPublico } from '../lib/comunicacao';
 import { Avatar } from '../components/Avatar';
 import { ComunicadoView } from '../components/comunicado/ComunicadoView';
 import { PainelLateral } from '../components/PainelLateral';
@@ -25,7 +25,6 @@ interface Detalhe {
 }
 type Filtro = string;
 const caminhoRH = (id: string, mini?: boolean) => `/comunicacao/midia/${id}${mini ? '?mini=1' : ''}`;
-const PUBLICO: Record<string, string> = { TODOS: 'Todos', CLIENTE: 'Por cliente', ESCALA: 'Por escala', PESSOAS: 'Pessoas escolhidas' };
 
 function Anel({ ok, meio, total }: { ok: number; meio: number; total: number }) {
   const p = (n: number) => (total ? (n / total) * 100 : 0);
@@ -120,7 +119,7 @@ export function ComunicadoDetalhe() {
         <div style={{ minWidth: 0 }}>
           <button type="button" className={css.voltar} onClick={() => navegar('/rh/comunicacao')}>‹ Comunicação interna</button>
           <h2>{d.titulo}</h2>
-          <p>Publicado {quando(d.publicadoEm)}{d.autorNome ? ` por ${d.autorNome}` : ''} · {PUBLICO[d.publico.tipo]} ({ds.length}){d.pedirCiencia ? ' · ciência obrigatória' : ''}{arquivado ? ' · arquivado' : ''}</p>
+          <p>Publicado {quando(d.publicadoEm)}{d.autorNome ? ` por ${d.autorNome}` : ''} · {rotuloPublico(d.publico)} ({ds.length}){d.pedirCiencia ? ' · ciência obrigatória' : ''}{arquivado ? ' · arquivado' : ''}</p>
         </div>
         <div className={css.acoes}>
           <button type="button" className={css.btnSec} onClick={() => setConteudo(true)}>Ver conteúdo</button>

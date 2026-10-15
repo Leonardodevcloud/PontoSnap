@@ -45,10 +45,16 @@ import { Acessos } from './master/Acessos';
 import { CertificadoPlataforma } from './master/CertificadoPlataforma';
 import { Assinatura } from './rh/Assinatura';
 import { Quiosque } from './quiosque/Quiosque';
+import { LayoutPrestador } from './prestador/LayoutPrestador';
+import { InicioPrestador, NotasPrestador, NotaPrestador, MenuPrestador } from './prestador/TelasPrestador';
+import { EnviarNota } from './prestador/EnviarNota';
+import { PrimeiroAcesso } from './prestador/PrimeiroAcesso';
+import { Prestadores } from './rh/Prestadores';
+import { ConferirNotas } from './rh/ConferirNotas';
 import { Flash } from './components/Flash';
 import { BarraProgresso } from './components/BarraProgresso';
 
-const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
+const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' || p === 'PRESTADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
 
 function Splash() {
   return (
@@ -80,6 +86,10 @@ const PERFIS_RH: Perfil[] = ['RH', 'ADMIN_CLIENTE'];
 
 export function App() {
   const { sessao, carregando } = useAuth();
+  // As rotas do "/" dependem do perfil (funcionário x prestador): espera a
+  // sessão voltar antes de montar, senão um link direto (/notas, /avisos/…)
+  // cairia no "*" e voltaria para o início.
+  if (carregando) return <Splash />;
   return (
     <>
     <BarraProgresso />
@@ -92,7 +102,22 @@ export function App() {
       {/* Quiosque — tablet compartilhado, autenticado por token de dispositivo */}
       <Route path="/quiosque" element={<Quiosque />} />
 
-      {/* Colaborador (mobile) */}
+      {/* Convite do prestador (público: o código + CPF/CNPJ são a credencial) */}
+      <Route path="/c/:codigo" element={<PrimeiroAcesso />} />
+
+      {sessao?.perfil === 'PRESTADOR' ? (
+        /* Prestador MEI/motorista (mobile): app restrito, sem bater ponto */
+        <Route path="/" element={<Protegida perfis={['PRESTADOR']}><LayoutPrestador /></Protegida>}>
+          <Route index element={<InicioPrestador />} />
+          <Route path="notas" element={<NotasPrestador />} />
+          <Route path="notas/:id" element={<NotaPrestador />} />
+          <Route path="notas/:id/enviar" element={<EnviarNota />} />
+          <Route path="avisos" element={<Avisos />} />
+          <Route path="avisos/:id" element={<Aviso />} />
+          <Route path="menu" element={<MenuPrestador />} />
+        </Route>
+      ) : (
+      /* Colaborador (mobile) */
       <Route path="/" element={<Protegida perfis={['COLABORADOR']}><LayoutColaborador /></Protegida>}>
         <Route index element={<BaterPonto />} />
         <Route path="espelho" element={<EspelhoMes />} />
@@ -104,6 +129,7 @@ export function App() {
         <Route path="avisos" element={<Avisos />} />
         <Route path="avisos/:id" element={<Aviso />} />
       </Route>
+      )}
 
       {/* RH / Admin (desktop) */}
       <Route path="/rh" element={<Protegida perfis={PERFIS_RH}><LayoutRH /></Protegida>}>
@@ -113,6 +139,8 @@ export function App() {
         <Route path="espelhos" element={<Espelhos />} />
         <Route path="apuracao" element={<ApuracaoCLT />} />
         <Route path="pessoal" element={<GestaoPessoal />} />
+        <Route path="prestadores" element={<Prestadores />} />
+        <Route path="prestadores/conferir" element={<ConferirNotas />} />
         <Route path="relatorios" element={<Relatorios />} />
         <Route path="feriados" element={<Feriados />} />
         <Route path="fiscal" element={<Fiscal />} />

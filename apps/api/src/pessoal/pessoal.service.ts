@@ -140,6 +140,16 @@ export interface CompetenciaPessoal {
   padroes: PadraoBeneficio[];
 }
 
+/** Contato e tomador do prestador (portal). Só as chaves informadas entram. */
+function contatoPrestador(d: { telefone?: string | null; email?: string | null; tomadorNome?: string | null; tomadorCnpj?: string | null }) {
+  const set: Record<string, string | null> = {};
+  if (d.telefone !== undefined) set.telefone = d.telefone?.replace(/\D/g, '') || null;
+  if (d.email !== undefined) set.email = d.email?.trim().toLowerCase() || null;
+  if (d.tomadorNome !== undefined) set.tomadorNome = d.tomadorNome?.trim() || null;
+  if (d.tomadorCnpj !== undefined) set.tomadorCnpj = d.tomadorCnpj?.replace(/\D/g, '') || null;
+  return set;
+}
+
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 @Injectable()
@@ -595,6 +605,7 @@ export class PessoalService {
   async criarPrestador(tenantId: string, d: {
     tipo: 'MEI' | 'MOTORISTA'; nome: string; documento?: string | null; funcao?: string | null; empresa?: string | null; inicioAtividade?: string | null;
     valorMensal: number; baseDias: BaseDias; chavePix?: string | null; competenciaInicio: string;
+    telefone?: string | null; email?: string | null; tomadorNome?: string | null; tomadorCnpj?: string | null;
   }) {
     this.validarComp(d.competenciaInicio);
     return comTenant(this.db, tenantId, async (tx) => {
@@ -604,6 +615,7 @@ export class PessoalService {
         inicioAtividade: d.inicioAtividade || null,
         valorMensal: reais(centavos(d.valorMensal)), baseDias: d.baseDias, chavePix: d.chavePix?.trim() || null,
         competenciaInicio: d.competenciaInicio,
+        ...contatoPrestador(d),
       }).returning();
       await tx.insert(pessoalPrestadorValor).values({
         tenantId, prestadorId: r!.id, vigenteDesde: d.competenciaInicio,
@@ -620,7 +632,7 @@ export class PessoalService {
    */
   async editarPrestador(tenantId: string, id: string, d: Partial<{
     nome: string; documento: string | null; funcao: string | null; empresa: string | null; inicioAtividade: string | null; valorMensal: number; baseDias: BaseDias; chavePix: string | null;
-    vigenteDesde: string;
+    vigenteDesde: string; telefone: string | null; email: string | null; tomadorNome: string | null; tomadorCnpj: string | null;
   }>) {
     const reajuste = d.valorMensal !== undefined || d.baseDias !== undefined;
     if (reajuste) {
@@ -639,6 +651,7 @@ export class PessoalService {
       if (d.chavePix !== undefined) set.chavePix = d.chavePix?.trim() || null;
       if (d.empresa !== undefined) set.empresa = d.empresa?.trim() || null;
       if (d.inicioAtividade !== undefined) set.inicioAtividade = d.inicioAtividade || null;
+      Object.assign(set, contatoPrestador(d));
       if (reajuste) {
         if (d.vigenteDesde! < p.competenciaInicio) {
           throw new BadRequestException(`O contrato começa em ${p.competenciaInicio}. O reajuste não pode valer antes disso.`);

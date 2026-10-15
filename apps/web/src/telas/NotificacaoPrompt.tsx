@@ -4,7 +4,12 @@ import css from './NotificacaoPrompt.module.css';
 
 const CHAVE_DESCARTOU = 'pontosnap.push.descartou';
 
-export function NotificacaoPrompt() {
+const TEXTO_PADRAO = {
+  titulo: 'Quer receber lembretes de ponto?',
+  descricao: 'A gente te avisa se você esquecer de bater o ponto, quando o RH aprovar seus ajustes, e mais. Você escolhe o que receber.',
+};
+
+export function NotificacaoPrompt({ titulo = TEXTO_PADRAO.titulo, descricao = TEXTO_PADRAO.descricao }: { titulo?: string; descricao?: string } = {}) {
   const [visivel, setVisivel] = useState(false);
   const [ativando, setAtivando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -45,10 +50,8 @@ export function NotificacaoPrompt() {
       <div className={css.card}>
         <div className={css.ico}>🔔</div>
         <div className={css.corpo}>
-          <div className={css.tit}>Quer receber lembretes de ponto?</div>
-          <div className={css.desc}>
-            A gente te avisa se você esquecer de bater o ponto, quando o RH aprovar seus ajustes, e mais. Você escolhe o que receber.
-          </div>
+          <div className={css.tit}>{titulo}</div>
+          <div className={css.desc}>{descricao}</div>
           {erro && <div className={css.erro}>{erro}</div>}
           <div className={css.acoes}>
             <button className={css.btn} onClick={ativar} disabled={ativando}>

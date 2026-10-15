@@ -1,4 +1,4 @@
-export type Perfil = 'MASTER' | 'ADMIN_CLIENTE' | 'RH' | 'COLABORADOR';
+export type Perfil = 'MASTER' | 'ADMIN_CLIENTE' | 'RH' | 'COLABORADOR' | 'PRESTADOR';
 
 export interface RespLogin {
   accessToken: string;

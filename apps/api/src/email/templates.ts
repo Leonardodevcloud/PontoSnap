@@ -159,3 +159,18 @@ export function emailAjusteDecidido(
       ${botao('Ver meu ponto', urlApp)}`),
   };
 }
+
+/** Convite do portal do prestador: link pessoal para criar o acesso (login pelo CPF/CNPJ). */
+export function emailConvitePrestador(nome: string, empresa: string, url: string): { assunto: string; html: string } {
+  return {
+    assunto: `${empresa}: crie seu acesso ao PontoSnap`,
+    html: moldura(`
+      <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">Seus valores e notas no app</h1>
+      <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">Olá${nome ? `, ${nome}` : ''}!</p>
+      <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#55627A;">
+        A ${empresa} te convidou para o PontoSnap. Lá você vê quanto tem a receber, envia sua nota fiscal e recebe os avisos da empresa.
+        Seu usuário é o seu CPF ou CNPJ. O link vale 7 dias.
+      </p>
+      ${botao('Criar meu acesso', url)}`),
+  };
+}

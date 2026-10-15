@@ -10,6 +10,8 @@ interface AuthCtx {
   /** Empresas que este acesso administra. 0 ou 1 = não mostra o seletor. */
   empresas: EmpresaAcesso[];
   entrar: (email: string, senha: string) => Promise<void>;
+  /** Abre a sessão com tokens já emitidos (ex.: aceite do convite do prestador). */
+  aplicarSessao: (data: RespLogin) => void;
   alterarSenha: (atual: string, nova: string) => Promise<void>;
   trocarEmpresa: (tenantId: string) => Promise<void>;
   sair: () => void;
@@ -47,7 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function entrar(email: string, senha: string) {
-    const data = await api.post<RespLogin>('/auth/login', { email, senha });
+    aplicarSessao(await api.post<RespLogin>('/auth/login', { email, senha }));
+  }
+
+  function aplicarSessao(data: RespLogin) {
     definirAcesso(data.accessToken);
     definirRefresh(data.refreshToken);
     definirFusoAtivo(data.fuso);
@@ -81,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmpresas([]);
   }
 
-  return <Ctx.Provider value={{ sessao, carregando, empresas, entrar, alterarSenha, trocarEmpresa, sair }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ sessao, carregando, empresas, entrar, aplicarSessao, alterarSenha, trocarEmpresa, sair }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {

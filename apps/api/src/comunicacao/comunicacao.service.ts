@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import {
-  comunicado, comunicadoDestinatario, comunicadoMidia, comunicadoVoto, empregado, usuario, pushSubscription, pontoHorarioContratual, tenant, pontoRep,
+  comunicado, comunicadoDestinatario, comunicadoMidia, comunicadoVoto, empregado, pessoalPrestador, usuario, pushSubscription, pontoHorarioContratual, tenant, pontoRep,
   comTenant, comoMaster, type Db, type BlocoComunicado, type BlocoEnquete, type PublicoComunicado,
 } from '@ponto/db';
 import { reconhecerVideo } from '@ponto/shared';
@@ -102,11 +102,13 @@ export class ComunicacaoService {
 
   // ───────────────────────── apoio ─────────────────────────
 
+  /** Pessoa do destinatário: o funcionário, ou o prestador (portal do prestador). */
   async empregadoDoUsuario(tenantId: string, usuarioId: string): Promise<string> {
     return comTenant(this.db, tenantId, async (tx) => {
-      const u = (await tx.select({ e: usuario.empregadoId }).from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
-      if (!u?.e) throw new ForbiddenException('Este acesso não está vinculado a um funcionário.');
-      return u.e;
+      const u = (await tx.select({ e: usuario.empregadoId, p: usuario.prestadorId }).from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
+      const id = u?.e ?? u?.p;
+      if (!id) throw new ForbiddenException('Este acesso não está vinculado a um funcionário.');
+      return id;
     });
   }
 
@@ -115,28 +117,38 @@ export class ComunicacaoService {
     return t[0]?.fuso ?? '-0300';
   }
 
-  /** Funcionários ativos com acesso ao app (podem receber comunicados). */
+  /**
+   * Quem pode receber comunicados: funcionários ativos e prestadores (MEI e
+   * motorista), cada um com as contas de app e se tem push ativo.
+   */
   private async pessoasDoTenant(tx: Tx, tenantId: string) {
     const emps = await tx.select({ id: empregado.id, nome: empregado.nome, cpf: empregado.cpf, cliente: empregado.cliente, horarioId: empregado.horarioContratualId })
       .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true))).orderBy(empregado.nome);
-    const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId }).from(usuario)
-      .where(and(eq(usuario.tenantId, tenantId), eq(usuario.ativo, true), eq(usuario.perfil, 'COLABORADOR')));
+    const prest = await tx.select({ id: pessoalPrestador.id, nome: pessoalPrestador.nome, documento: pessoalPrestador.documento, empresa: pessoalPrestador.empresa, tipo: pessoalPrestador.tipo })
+      .from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.tipo, ['MEI', 'MOTORISTA']))).orderBy(pessoalPrestador.nome);
+    const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId, prestadorId: usuario.prestadorId }).from(usuario)
+      .where(and(eq(usuario.tenantId, tenantId), eq(usuario.ativo, true), inArray(usuario.perfil, ['COLABORADOR', 'PRESTADOR'])));
     const subs = await tx.selectDistinct({ u: pushSubscription.usuarioId }).from(pushSubscription).where(eq(pushSubscription.tenantId, tenantId));
     const comPush = new Set(subs.map((s) => s.u));
     const usuariosDe = new Map<string, string[]>();
-    for (const u of us) if (u.empregadoId) usuariosDe.set(u.empregadoId, [...(usuariosDe.get(u.empregadoId) ?? []), u.id]);
-    return emps.map((e) => {
-      const uids = usuariosDe.get(e.id) ?? [];
-      return { ...e, usuarios: uids, temApp: uids.length > 0, temPush: uids.some((u) => comPush.has(u)) };
-    });
+    for (const u of us) {
+      const dono = u.empregadoId ?? u.prestadorId;
+      if (dono) usuariosDe.set(dono, [...(usuariosDe.get(dono) ?? []), u.id]);
+    }
+    const contas = (id: string) => { const uids = usuariosDe.get(id) ?? []; return { usuarios: uids, temApp: uids.length > 0, temPush: uids.some((u) => comPush.has(u)) }; };
+    return [
+      ...emps.map((e) => ({ ...e, grupo: 'CLT' as const, ...contas(e.id) })),
+      ...prest.map((p) => ({ id: p.id, nome: p.nome, cpf: p.documento ?? '', cliente: p.empresa, horarioId: null as string | null, grupo: 'PRESTADOR' as const, tipoPrestador: p.tipo, ...contas(p.id) })),
+    ];
   }
 
-  private filtrarPublico<T extends { id: string; cliente: string | null; horarioId: string | null; temApp: boolean }>(pessoas: T[], p: PublicoComunicado): T[] {
+  private filtrarPublico<T extends { id: string; cliente: string | null; horarioId: string | null; temApp: boolean; grupo: 'CLT' | 'PRESTADOR' }>(pessoas: T[], p: PublicoComunicado): T[] {
     const v = new Set(p.valores);
+    const grupo = p.grupo ?? 'CLT';
     return pessoas.filter((x) => x.temApp && (
-      p.tipo === 'TODOS' ? true
-        : p.tipo === 'CLIENTE' ? v.has(x.cliente ?? '')
-          : p.tipo === 'ESCALA' ? v.has(x.horarioId ?? '')
+      p.tipo === 'TODOS' ? (grupo === 'TODOS' || (grupo === 'CLT') === (x.grupo === 'CLT'))
+        : p.tipo === 'CLIENTE' ? x.grupo === 'CLT' && v.has(x.cliente ?? '')
+          : p.tipo === 'ESCALA' ? x.grupo === 'CLT' && v.has(x.horarioId ?? '')
             : v.has(x.id)));
   }
 
@@ -144,7 +156,10 @@ export class ComunicacaoService {
     const tipo = p?.tipo ?? 'TODOS';
     if (!['TODOS', 'CLIENTE', 'ESCALA', 'PESSOAS'].includes(tipo)) throw new BadRequestException('Público inválido.');
     const valores = tipo === 'TODOS' ? [] : [...new Set((p?.valores ?? []).map(String).filter(Boolean))].slice(0, 2000);
-    return { tipo, valores };
+    if (tipo !== 'TODOS') return { tipo, valores };
+    const grupo = p?.grupo ?? 'CLT';
+    if (!['CLT', 'PRESTADORES', 'TODOS'].includes(grupo)) throw new BadRequestException('Público inválido.');
+    return { tipo, valores, grupo };
   }
 
   /** Confere e limpa os blocos. Fotos/áudios/PDFs precisam existir no tenant. */
@@ -244,12 +259,17 @@ export class ComunicacaoService {
       const hors = await tx.select({ id: pontoHorarioContratual.id, codigo: pontoHorarioContratual.codigo }).from(pontoHorarioContratual)
         .where(eq(pontoHorarioContratual.tenantId, tenantId));
       const contar = (f: (p: typeof pessoas[number]) => boolean) => pessoas.filter((p) => p.temApp && f(p)).length;
-      const clientes = [...new Set(pessoas.map((p) => p.cliente).filter((c): c is string => !!c))].sort()
+      const clientes = [...new Set(pessoas.filter((p) => p.grupo === 'CLT').map((p) => p.cliente).filter((c): c is string => !!c))].sort()
         .map((c) => ({ valor: c, rotulo: c, pessoas: contar((p) => p.cliente === c) }));
       const escalas = hors.map((h) => ({ valor: h.id, rotulo: h.codigo, pessoas: contar((p) => p.horarioId === h.id) })).filter((h) => h.pessoas > 0);
       return {
-        pessoas: pessoas.map((p) => ({ id: p.id, nome: p.nome, cliente: p.cliente, horarioId: p.horarioId, temApp: p.temApp, temPush: p.temPush })),
+        pessoas: pessoas.map((p) => ({ id: p.id, nome: p.nome, cliente: p.cliente, horarioId: p.horarioId, temApp: p.temApp, temPush: p.temPush, grupo: p.grupo,
+          tipoPrestador: 'tipoPrestador' in p ? p.tipoPrestador : null })),
         clientes, escalas,
+        grupos: {
+          clt: contar((p) => p.grupo === 'CLT'), prestadores: contar((p) => p.grupo === 'PRESTADOR'),
+          prestadoresTotal: pessoas.filter((p) => p.grupo === 'PRESTADOR').length,
+        },
       };
     });
   }
@@ -322,7 +342,10 @@ export class ComunicacaoService {
       const votoDe = new Map(votos.map((v) => [v.empregadoId, v]));
       const pessoas = new Map((await this.pessoasDoTenant(tx, tenantId)).map((p) => [p.id, p]));
       const faltantes = ds.filter((d) => !pessoas.has(d.empregadoId)).map((d) => d.empregadoId);
-      const extras = faltantes.length ? await tx.select({ id: empregado.id, nome: empregado.nome, cliente: empregado.cliente }).from(empregado).where(inArray(empregado.id, faltantes)) : [];
+      const extras = faltantes.length ? [
+        ...await tx.select({ id: empregado.id, nome: empregado.nome, cliente: empregado.cliente }).from(empregado).where(inArray(empregado.id, faltantes)),
+        ...await tx.select({ id: pessoalPrestador.id, nome: pessoalPrestador.nome, cliente: pessoalPrestador.empresa }).from(pessoalPrestador).where(inArray(pessoalPrestador.id, faltantes)),
+      ] : [];
       const nomeDe = (eid: string) => pessoas.get(eid) ?? extras.find((x) => x.id === eid);
       const destinatarios = ds.map((d) => {
         const p = nomeDe(d.empregadoId);
@@ -625,8 +648,12 @@ export class ComunicacaoService {
     const d = await this.obter(tenantId, id);
     if (d.status !== 'PUBLICADO' && d.status !== 'ARQUIVADO') throw new BadRequestException('O comunicado ainda não foi publicado.');
     const extra = await comTenant(this.db, tenantId, async (tx) => {
-      const cpfs = d.destinatarios.length ? await tx.select({ id: empregado.id, cpf: empregado.cpf }).from(empregado)
-        .where(inArray(empregado.id, d.destinatarios.map((x) => x.empregadoId))) : [];
+      const ids = d.destinatarios.map((x) => x.empregadoId);
+      const cpfs = ids.length ? [
+        ...await tx.select({ id: empregado.id, cpf: empregado.cpf }).from(empregado).where(inArray(empregado.id, ids)),
+        ...(await tx.select({ id: pessoalPrestador.id, cpf: pessoalPrestador.documento }).from(pessoalPrestador).where(inArray(pessoalPrestador.id, ids)))
+          .map((p) => ({ id: p.id, cpf: p.cpf ?? '' })),
+      ] : [];
       const rep = (await tx.select({ r: pontoRep.razaoSocial }).from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       return { cpfs: new Map(cpfs.map((c) => [c.id, c.cpf])), razao: rep?.r };
     });

@@ -59,6 +59,12 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   competenciaInicio: varchar('competencia_inicio', { length: 7 }).notNull(),
   /** Variação da caricatura (prestador não tem foto). Nulo = derivada do id. */
   avatarSemente: integer('avatar_semente'),
+  /** Contato para o portal (convite por WhatsApp/e-mail) — migration 0057. */
+  telefone: varchar('telefone', { length: 20 }),
+  email: varchar('email', { length: 180 }),
+  /** Tomador da nota. Vazio = razão social e CNPJ da empresa. */
+  tomadorNome: varchar('tomador_nome', { length: 160 }),
+  tomadorCnpj: varchar('tomador_cnpj', { length: 14 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
 
@@ -166,4 +172,68 @@ export const pessoalNfArquivo = pgTable('pessoal_nf_arquivo', {
 }, (t) => [
   unique('uq_pessoal_nf_arquivo').on(t.tenantId, t.pessoaTipo, t.pessoaId, t.competencia, t.periodo),
   index('idx_pessoal_nf_arquivo_comp').on(t.tenantId, t.competencia),
+]);
+
+/** Link de primeiro acesso do prestador (migration 0057). Uso único, vale 7 dias. */
+export const prestadorConvite = pgTable('prestador_convite', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  prestadorId: uuid('prestador_id').notNull().references(() => pessoalPrestador.id),
+  codigo: varchar('codigo', { length: 16 }).notNull().unique(),
+  expiraEm: timestamp('expira_em', { withTimezone: true }).notNull(),
+  usadoEm: timestamp('usado_em', { withTimezone: true }),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Linha do "como chegou nesse valor" que o prestador vê. */
+export interface LinhaDetalheNota { rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS' }
+/** Conferência automática da nota enviada (o que deu para checar). */
+export interface ConferenciaNota {
+  arquivo: 'PDF' | 'XML' | 'FOTO';
+  /** De onde vieram número/valor: lidos do XML da NFS-e ou informados pelo prestador. */
+  origem: 'XML' | 'INFORMADO';
+  valorBate: boolean | null; numeroRepetido: boolean; competenciaOk: boolean | null;
+  tomadorOk: boolean | null; prestadorOk: boolean | null;
+  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null };
+  bate: boolean;
+}
+
+/**
+ * Valor liberado para o prestador emitir a nota (migration 0057). Retrato do
+ * fechamento (MEI: mês; motorista: semana). Situação: AGUARDANDO → ENVIADA →
+ * APROVADA, ou RECUSADA (com motivo) → ENVIADA de novo.
+ */
+export const pessoalNota = pgTable('pessoal_nota', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  pessoaTipo: varchar('pessoa_tipo', { length: 10 }).notNull(),
+  pessoaId: uuid('pessoa_id').notNull().references(() => pessoalPrestador.id),
+  competencia: varchar('competencia', { length: 7 }).notNull(),
+  periodo: varchar('periodo', { length: 10 }).notNull().default('MES'),
+  valorCent: integer('valor_cent').notNull(),
+  detalhe: jsonb('detalhe').$type<LinhaDetalheNota[]>().notNull().default([]),
+  versao: integer('versao').notNull().default(1),
+  liberadoEm: timestamp('liberado_em', { withTimezone: true }).notNull().defaultNow(),
+  prazo: date('prazo'),
+  pedirConfirmacao: boolean('pedir_confirmacao').notNull().default(false),
+  /** AGUARDANDO | ENVIADA | APROVADA | RECUSADA */
+  status: varchar('status', { length: 12 }).notNull().default('AGUARDANDO'),
+  vistoEm: timestamp('visto_em', { withTimezone: true }),
+  /** CONFERE | CONTESTOU */
+  confirmacao: varchar('confirmacao', { length: 10 }),
+  confirmadoEm: timestamp('confirmado_em', { withTimezone: true }),
+  contestacao: text('contestacao'),
+  resposta: text('resposta'),
+  respondidoEm: timestamp('respondido_em', { withTimezone: true }),
+  enviadaEm: timestamp('enviada_em', { withTimezone: true }),
+  nfValorCent: integer('nf_valor_cent'),
+  conferencia: jsonb('conferencia').$type<ConferenciaNota>(),
+  conferidaEm: timestamp('conferida_em', { withTimezone: true }),
+  conferidaPor: varchar('conferida_por', { length: 160 }),
+  motivoRecusa: text('motivo_recusa'),
+  lembreteEm: timestamp('lembrete_em', { withTimezone: true }),
+  lembretes: integer('lembretes').notNull().default(0),
+}, (t) => [
+  unique('uq_pessoal_nota').on(t.tenantId, t.pessoaTipo, t.pessoaId, t.competencia, t.periodo),
+  index('idx_pessoal_nota_pessoa').on(t.tenantId, t.pessoaId),
 ]);

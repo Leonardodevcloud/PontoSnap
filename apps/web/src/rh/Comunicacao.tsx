@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { miniaturaVideo, quando, useMidia, type Publico, type StatusComunicado } from '../lib/comunicacao';
+import { miniaturaVideo, quando, useMidia, type Publico, type StatusComunicado, rotuloPublico } from '../lib/comunicacao';
 import css from './Comunicacao.module.css';
 
 interface Item {
@@ -19,7 +19,6 @@ interface Resp {
 }
 type Filtro = 'TODOS' | 'PENDENCIA' | 'AGENDADOS' | 'RASCUNHOS' | 'ARQUIVADOS';
 
-const PUBLICO: Record<string, string> = { TODOS: 'Todos', CLIENTE: 'Por cliente', ESCALA: 'Por escala', PESSOAS: 'Pessoas escolhidas' };
 
 /** Capa do card: a foto publicada (miniatura) ou a capa do vídeo; sem isso, o ícone do tipo. */
 function Miniatura({ i }: { i: Item }) {
@@ -119,7 +118,7 @@ export function Comunicacao() {
                 </h3>
                 <div className={css.meta}>
                   <span>{i.midias ? i.midias.charAt(0).toUpperCase() + i.midias.slice(1) : 'Texto'}</span><span aria-hidden="true">·</span>
-                  <span>{PUBLICO[i.publico.tipo]}{i.destinatarios ? ` (${i.destinatarios})` : ''}</span><span aria-hidden="true">·</span>
+                  <span>{rotuloPublico(i.publico)}{i.destinatarios ? ` (${i.destinatarios})` : ''}</span><span aria-hidden="true">·</span>
                   <span>{i.publicadoEm ? `${quando(i.publicadoEm)}${i.autorNome ? ` por ${i.autorNome}` : ''}` : `editado ${quando(i.atualizadoEm)}`}</span>
                 </div>
               </div>

@@ -43,7 +43,7 @@ export class AuthService {
   ): Promise<{ tenantId: string | null; perfil: string }> {
     // MASTER opera a plataforma (sem tenant); colaborador pertence a uma só.
     if (u.perfil === 'MASTER') return { tenantId: null, perfil: u.perfil };
-    if (u.perfil === 'COLABORADOR') return { tenantId: u.tenantId, perfil: u.perfil };
+    if (u.perfil === 'COLABORADOR' || u.perfil === 'PRESTADOR') return { tenantId: u.tenantId, perfil: u.perfil };
 
     const vinculos = await this.empresasDoUsuario(u.id);
     if (vinculos.length === 0) {
@@ -86,15 +86,35 @@ export class AuthService {
    * que autentica; o token carrega o tenant p/ as próximas requisições.
    */
   async login(email: string, senha: string) {
-    const rows = await comoMaster(this.db, (tx) =>
-      tx.select().from(usuario).where(eq(usuario.email, email)).limit(1));
-    const u = rows[0];
-    if (!u || !u.ativo) throw new UnauthorizedException('Credenciais inválidas');
-
-    const ok = await verificarSenha(senha, u.senhaHash);
-    if (!ok) throw new UnauthorizedException('Credenciais inválidas');
+    const u = await this.autenticar(email, senha);
 
     // Em qual empresa a sessão abre (e com qual papel) — decidido no servidor.
+    return this.sessaoDe(u);
+  }
+
+  /**
+   * Confere as credenciais. Com "@" é e-mail; sem, é CPF/CNPJ do prestador
+   * (o mesmo documento pode ter acesso em mais de uma empresa: vale a conta
+   * cuja senha confere).
+   */
+  private async autenticar(identificador: string, senha: string) {
+    const id = identificador.trim();
+    if (id.includes('@')) {
+      const u = (await comoMaster(this.db, (tx) =>
+        tx.select().from(usuario).where(eq(usuario.email, id)).limit(1)))[0];
+      if (!u || !u.ativo || !(await verificarSenha(senha, u.senhaHash))) throw new UnauthorizedException('Credenciais inválidas');
+      return u;
+    }
+    const doc = id.replace(/\D/g, '');
+    if (doc.length !== 11 && doc.length !== 14) throw new UnauthorizedException('Credenciais inválidas');
+    const contas = await comoMaster(this.db, (tx) =>
+      tx.select().from(usuario).where(and(eq(usuario.documento, doc), eq(usuario.perfil, 'PRESTADOR'), eq(usuario.ativo, true))));
+    for (const u of contas) if (await verificarSenha(senha, u.senhaHash)) return u;
+    throw new UnauthorizedException('Credenciais inválidas');
+  }
+
+  /** Abre a sessão de um usuário já autenticado (login ou aceite de convite). */
+  async sessaoDe(u: typeof usuario.$inferSelect) {
     const acesso = await this.resolverAcesso(u);
     const payload = await this.montarPayload({ ...u, tenantId: acesso.tenantId, perfil: acesso.perfil });
     const empresas = u.perfil === 'ADMIN_CLIENTE' || u.perfil === 'RH'

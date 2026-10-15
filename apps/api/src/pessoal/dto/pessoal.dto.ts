@@ -38,6 +38,10 @@ export class CriarPrestadorDto {
   @Type(() => Number) @IsNumber() @Min(0) valorMensal!: number;
   @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias!: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) telefone?: string | null;
+  @IsOptional() @IsString() @MaxLength(180) email?: string | null;
+  @IsOptional() @IsString() @MaxLength(160) tomadorNome?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) tomadorCnpj?: string | null;
   @Matches(COMP) competenciaInicio!: string;
 }
 
@@ -50,6 +54,10 @@ export class EditarPrestadorDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) valorMensal?: number;
   @IsOptional() @IsIn(['SEG_SAB', 'SEG_SEX']) baseDias?: 'SEG_SAB' | 'SEG_SEX';
   @IsOptional() @IsString() @MaxLength(120) chavePix?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) telefone?: string | null;
+  @IsOptional() @IsString() @MaxLength(180) email?: string | null;
+  @IsOptional() @IsString() @MaxLength(160) tomadorNome?: string | null;
+  @IsOptional() @IsString() @MaxLength(20) tomadorCnpj?: string | null;
   /** Obrigatório quando muda valor ou base: o reajuste vale a partir deste mês. */
   @IsOptional() @Matches(COMP) vigenteDesde?: string;
 }

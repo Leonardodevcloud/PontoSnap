@@ -20,6 +20,6 @@ const tokenProvider = {
 @Module({
   controllers: [AuthController],
   providers: [AuthService, KioskService, tokenProvider, JwtAuthGuard, RolesGuard, KioskGuard],
-  exports: [TokenService, KioskService, JwtAuthGuard, RolesGuard, KioskGuard],
+  exports: [AuthService, TokenService, KioskService, JwtAuthGuard, RolesGuard, KioskGuard],
 })
 export class AuthModule {}

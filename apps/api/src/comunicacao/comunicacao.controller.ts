@@ -36,43 +36,43 @@ export class ComunicacaoController {
   }
 
   // ───────── funcionário (rotas fixas antes de :id) ─────────
-  @Get('meus') @Perfis(Perfil.COLABORADOR)
+  @Get('meus') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async meus(@UsuarioAtual() u: PayloadAcesso) {
     const t = this.t(u);
     return this.svc.meus(t, await this.svc.empregadoDoUsuario(t, u.sub));
   }
-  @Get('meus/resumo') @Perfis(Perfil.COLABORADOR)
+  @Get('meus/resumo') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async meuResumo(@UsuarioAtual() u: PayloadAcesso) {
     const t = this.t(u);
     return this.svc.meuResumo(t, await this.svc.empregadoDoUsuario(t, u.sub));
   }
-  @Get('meus/midia/:mid') @Perfis(Perfil.COLABORADOR)
+  @Get('meus/midia/:mid') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async minhaMidia(@UsuarioAtual() u: PayloadAcesso, @Param('mid', ParseUUIDPipe) mid: string, @Query('mini') mini: string | undefined,
     @Res({ passthrough: true }) res: Response) {
     const t = this.t(u);
     return this.enviarMidia(res, await this.svc.midia(t, mid, await this.svc.empregadoDoUsuario(t, u.sub), mini === '1'), false);
   }
-  @Get('meus/:id') @Perfis(Perfil.COLABORADOR)
+  @Get('meus/:id') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async abrir(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
     const t = this.t(u);
     return this.svc.abrir(t, await this.svc.empregadoDoUsuario(t, u.sub), id);
   }
-  @Post('meus/:id/midia') @Perfis(Perfil.COLABORADOR)
+  @Post('meus/:id/midia') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async viuMidia(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
     const t = this.t(u);
     return this.svc.marcarMidia(t, await this.svc.empregadoDoUsuario(t, u.sub), id);
   }
-  @Post('meus/:id/ciente') @Perfis(Perfil.COLABORADOR)
+  @Post('meus/:id/ciente') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async ciente(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
     const t = this.t(u);
     return this.svc.ciente(t, await this.svc.empregadoDoUsuario(t, u.sub), id);
   }
-  @Post('meus/:id/voto') @Perfis(Perfil.COLABORADOR)
+  @Post('meus/:id/voto') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async votar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VotoDto) {
     const t = this.t(u);
     return this.svc.votar(t, await this.svc.empregadoDoUsuario(t, u.sub), id, dto.opcoes);
   }
-  @Post('meus/:id/reacao') @Perfis(Perfil.COLABORADOR)
+  @Post('meus/:id/reacao') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async reagir(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReacaoDto) {
     const t = this.t(u);
     return this.svc.reagir(t, await this.svc.empregadoDoUsuario(t, u.sub), id, dto.reacao ?? null);

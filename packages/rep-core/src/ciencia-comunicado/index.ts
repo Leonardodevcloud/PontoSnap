@@ -19,7 +19,9 @@ const ERRO = '#C2362B';
 const ASH = '#55627A';
 const LINHA = '#E2E7F0';
 const OK = '#0E7A50';
-const cpfFmt = (c: string) => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+const cpfFmt = (c: string) => c.length === 14
+  ? c.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
+  : c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 
 /** Comprovante de ciência de um comunicado interno (PDF retrato). */
 export function gerarCienciaComunicadoPdf(d: DadosCienciaComunicado): Promise<Buffer> {

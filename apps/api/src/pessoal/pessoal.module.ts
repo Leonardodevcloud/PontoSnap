@@ -11,5 +11,6 @@ import { AtencaoController } from './atencao.controller';
   imports: [AuthModule, TratamentoModule],
   controllers: [PessoalController, AtencaoController],
   providers: [PessoalService, CriptoService, AtencaoService],
+  exports: [PessoalService],
 })
 export class PessoalModule {}
