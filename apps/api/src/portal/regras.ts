@@ -57,7 +57,9 @@ function linhasDebito(debitos: LinhaDebito[], pessoaId: string): LinhaDetalheNot
  * vai numa linha de ajuste para o prestador nunca ver conta que não bate).
  */
 export function detalheMei(m: LinhaMei, debitos: LinhaDebito[], competencia: string): LinhaDetalheNota[] {
-  const l: LinhaDetalheNota[] = [{ rotulo: 'Contrato mensal', valorCent: m.valorCent, tipo: 'BASE' }];
+  const l: LinhaDetalheNota[] = [m.proporcional
+    ? { rotulo: `Contrato proporcional (${m.proporcional.dias} de ${m.proporcional.diasMes} dias)`, valorCent: m.proporcional.contratoCent, tipo: 'BASE' }
+    : { rotulo: 'Contrato mensal', valorCent: m.valorCent, tipo: 'BASE' }];
   if (m.heCent) l.push({ rotulo: `Horas extras (${horas(m.lanc.heMin)})`, valorCent: m.heCent, tipo: 'MAIS' });
   if (m.feriadosCent) l.push({ rotulo: `Feriados trabalhados (${m.lanc.feriadosTrab})`, valorCent: m.feriadosCent, tipo: 'MAIS' });
   if (m.lanc.metaCent) l.push({ rotulo: `Meta de ${nomeMes(competencia)}`, valorCent: m.lanc.metaCent, tipo: 'MAIS' });
@@ -65,7 +67,9 @@ export function detalheMei(m: LinhaMei, debitos: LinhaDebito[], competencia: str
   const debs = linhasDebito(debitos, m.id);
   const somaDebs = debs.reduce((a, d) => a + d.valorCent, 0);
   l.push(...debs);
-  if (m.debitosCent - somaDebs > 0) l.push({ rotulo: 'Outros descontos', valorCent: m.debitosCent - somaDebs, tipo: 'MENOS' });
+  const futuros = m.debitosFuturosCent ?? 0;
+  if (futuros > 0) l.push({ rotulo: 'Parcelas restantes de débitos (desligamento)', valorCent: futuros, tipo: 'MENOS' });
+  if (m.debitosCent - somaDebs - futuros > 0) l.push({ rotulo: 'Outros descontos', valorCent: m.debitosCent - somaDebs - futuros, tipo: 'MENOS' });
   if (m.metaDescontadaCent) l.push({ rotulo: 'Meta já paga antes', valorCent: m.metaDescontadaCent, tipo: 'MENOS' });
   return fechar(l, m.liquidoCent);
 }

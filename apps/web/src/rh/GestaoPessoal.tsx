@@ -11,9 +11,12 @@ import { brCodePix, normalizarChave } from '../lib/pix';
 import { Botao } from '../components/Botao';
 import type {
   BaseDias, PessoaTipo, PessoalCompetencia, PessoalSemanaMot, PessoalDebito, PessoalHistorico, PessoalPessoaHistorico, PessoalNfArquivo, PessoalPagamentoMes, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
+  FechadoIndividual,
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
 import { Avatar } from '../components/Avatar';
+import { ModalPessoa, type AbaModal } from '../components/ModalPessoa';
+import { FecharPessoa } from './FecharPessoa';
 import { esquecerMesPadrao } from '../lib/mesPadrao';
 import css from './GestaoPessoal.module.css';
 
@@ -133,6 +136,15 @@ export function GestaoPessoal() {
     finally { setCarregando(false); }
   }, [mes]);
   useEffect(() => { void recarregar(); }, [recarregar, sessao?.tenantId]);
+  // Vindo de "Notas de prestadores": ?abrir=MEI:<id> abre a pessoa direto.
+  useEffect(() => {
+    const alvo = params.get('abrir');
+    if (!alvo || !dados) return;
+    const [tipo, id] = alvo.split(':');
+    if (id && (tipo === 'MEI' || tipo === 'MOTORISTA')) abrir({ tipo: tipo === 'MEI' ? 'mei' : 'mot', id });
+    setParams((at) => { const n = new URLSearchParams(at); n.delete('abrir'); return n; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dados]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t); }, [toast]);
 
   /**
@@ -173,7 +185,9 @@ export function GestaoPessoal() {
     });
   }
 
-  const abrir = (p: Painel, el?: HTMLElement | null) => { gatilho.current = el ?? (document.activeElement as HTMLElement); setPainel(p); };
+  const [abaPainel, setAbaPainel] = useState<'lanc' | 'dados'>('lanc');
+  const [fecharP, setFecharP] = useState<{ tipo: 'MEI' | 'MOTORISTA'; id: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO' } | null>(null);
+  const abrir = (p: Painel, el?: HTMLElement | null) => { gatilho.current = el ?? (document.activeElement as HTMLElement); setAbaPainel('lanc'); setPainel(p); };
   const fecharPainel = () => { setPainel(null); setTimeout(() => gatilho.current?.focus?.(), 0); };
   const avisar = (msg: string, desfazer?: () => Promise<void>) => setToast({ msg, desfazer });
 
@@ -234,6 +248,10 @@ export function GestaoPessoal() {
     catch (e) { setDialogo(null); setErro((e as Error).message); }
   }
 
+  async function reabrirPessoa(fechamentoId: string, nome: string) {
+    try { await api.del(`/portal/rh/fechar-pessoa/${fechamentoId}`); await recarregar(); avisar(`${nome} reaberto: volta a calcular ao vivo.`); }
+    catch (e) { setErro((e as Error).message); }
+  }
   const linhaClt = painel?.tipo === 'clt' ? d?.clt.find((c) => c.empregadoId === painel.id) : undefined;
   const linhaMei = painel?.tipo === 'mei' ? d?.mei.find((m) => m.id === painel.id) : undefined;
   const linhaMot = painel?.tipo === 'mot' ? d?.motoristas.find((m) => m.id === painel.id) : undefined;
@@ -369,7 +387,12 @@ export function GestaoPessoal() {
       </>}
 
       {painel && d && (
-        <PainelLateral onFechar={fecharPainel} titulo={
+        <PainelLateral onFechar={fecharPainel} largo={!!(linhaClt || linhaMei || linhaMot)}
+          foto={linhaClt ? <Avatar id={linhaClt.empregadoId} nome={linhaClt.nome} tamanho={104} /> : (linhaMei ?? linhaMot) ? <Avatar id={(linhaMei ?? linhaMot)!.id} tipo="PRESTADOR" nome={(linhaMei ?? linhaMot)!.nome} tamanho={104} /> : undefined}
+          chips={(linhaMei ?? linhaMot) ? <ChipsPrestador l={(linhaMei ?? linhaMot)!} mes={mes} fechado={fechado} /> : undefined}
+          abas={(linhaMei || linhaMot) ? [{ id: 'lanc', rotulo: linhaMot ? 'Semanas e pagamento' : 'Lançamentos' }, { id: 'dados', rotulo: 'Dados e acesso' }] : undefined}
+          aba={abaPainel} onAba={(x) => setAbaPainel(x as 'lanc' | 'dados')}
+          titulo={
           linhaClt?.nome ?? linhaMei?.nome ?? linhaMot?.nome ?? (painel.tipo === 'padrao' ? 'Padrão de benefícios' : painel.tipo === 'debito' && painel.editar ? 'Editar débito' : 'Adicionar débito')}
           sub={linhaClt ? `${linhaClt.config.cargo ? `${linhaClt.config.cargo} · ` : ''}CLT · ${mesLongo(mes)}` : linhaMei ? `MEI · ${fmtDoc(linhaMei.documento) ?? 'sem CNPJ'} · ${mesLongo(mes)}`
             : linhaMot ? ['Motorista', linhaMot.empresa, linhaMot.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex', mesLongo(mes)].filter(Boolean).join(' · ')
@@ -377,9 +400,11 @@ export function GestaoPessoal() {
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
           {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} onSalvo={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
-          {linhaMei && <PainelMei key={linhaMei.id} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
+          {linhaMei && <PainelMei key={linhaMei.id} aba={abaPainel} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas}
+            onFecharPessoa={(motivo) => setFecharP({ tipo: 'MEI', id: linhaMei.id, motivo })} onReabrirPessoa={reabrirPessoa} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MEI', pessoaId: linhaMei.id, nome: linhaMei.nome })} />}
-          {linhaMot && <PainelMot key={linhaMot.id} l={linhaMot} mes={mes} fechado={fechado} empresas={empresas}
+          {linhaMot && <PainelMot key={linhaMot.id} aba={abaPainel} l={linhaMot} mes={mes} fechado={fechado} empresas={empresas}
+            onFecharPessoa={(motivo) => setFecharP({ tipo: 'MOTORISTA', id: linhaMot.id, motivo })} onReabrirPessoa={reabrirPessoa}
             onPagarSemana={(sm) => setPix(pixSemana(linhaMot, sm, d.debitos))}
             onDesfazerSemana={(sm) => { const a = pixSemana(linhaMot, sm, d.debitos); if (a.registro) registrarPagamento(a.registro, false, null); }} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MOTORISTA', pessoaId: linhaMot.id, nome: linhaMot.nome })} />}
@@ -387,6 +412,12 @@ export function GestaoPessoal() {
         </PainelLateral>
       )}
 
+      {fecharP && d && (() => {
+        const l = fecharP.tipo === 'MEI' ? d.mei.find((m) => m.id === fecharP.id) : d.motoristas.find((m) => m.id === fecharP.id);
+        return l ? <FecharPessoa pessoa={{ id: l.id, nome: l.nome, tipo: fecharP.tipo, empresa: l.empresa, avatarSemente: null }} mes={mes} motivoInicial={fecharP.motivo}
+          onFechar={() => setFecharP(null)}
+          onFechado={async (m) => { setFecharP(null); await recarregar(); avisar(m); }} /> : null;
+      })()}
       {dialogo?.tipo === 'tirar' && <DialogoTirar nome={dialogo.nome} mes={mes} onCancelar={() => setDialogo(null)} onConfirmar={tirar} />}
       {dialogo?.tipo === 'fechar' && d && (
         <Dialogo titulo={`Fechar ${mesLongo(mes)}?`} onCancelar={() => setDialogo(null)} confirmar={`Fechar ${mesCurto(mes)}`} onConfirmar={fecharMes}>
@@ -557,7 +588,7 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
             const l = x.l;
             return (
               <Linha key={l.id} rotulo={`Abrir lançamento de ${l.nome}`} onAbrir={(el) => onAbrir('MEI', l.id, el)}>
-                <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MEI')}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
+                <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MEI')}{l.fechadoIndividual && <SeloFechado fi={l.fechadoIndividual} />}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
                 <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
                 <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${l.diasMes} dias no mês`}>{brl(l.valorDiaCent)}/dia</small></td>
                 <td className={vt.n}>{l.heCent + l.feriadosCent ? <><span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span>
@@ -580,7 +611,7 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
           const adic = l.semanas.reduce((a, s) => a + s.adicionalCent, 0);
           return (
             <Linha key={l.id} rotulo={`Abrir semanas de ${l.nome}`} onAbrir={(el) => onAbrir('MOTORISTA', l.id, el)}>
-              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MOTORISTA')}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onAbrir('MOTORISTA', l.id, document.activeElement as HTMLElement)} /></span>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MOTORISTA')}{l.fechadoIndividual && <SeloFechado fi={l.fechadoIndividual} />}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onAbrir('MOTORISTA', l.id, document.activeElement as HTMLElement)} /></span>
                 <small>{[fmtDoc(l.documento), l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'].filter(Boolean).join(' · ')}</small></td>
               <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
               <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${dias} dia${dias === 1 ? '' : 's'} trabalhados no mês`}>{brl(l.diariaCent)}/dia · {dias}d</small></td>
@@ -650,25 +681,15 @@ function TabelaDebitos({ d, busca, fechado, onAbrir, onEditar, onRemover, onEnce
 
 // =================== painel lateral e diálogos ===================
 
-function PainelLateral({ titulo, sub, onFechar, children }: { titulo: string; sub: string; onFechar: () => void; children: ReactNode }) {
-  const x = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    x.current?.focus();
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[data-dialogo]')) onFechar(); };
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [onFechar]);
+/** Antes painel lateral; agora modal largo e centralizado (com foto quando é uma pessoa). */
+function PainelLateral({ titulo, sub, onFechar, children, foto, chips, abas, aba, onAba, largo }: {
+  titulo: string; sub: string; onFechar: () => void; children: ReactNode;
+  foto?: ReactNode; chips?: ReactNode; abas?: AbaModal[]; aba?: string; onAba?: (id: string) => void; largo?: boolean;
+}) {
   return (
-    <>
-      <div className={css.fundo} onClick={onFechar} />
-      <aside className={css.painel} role="dialog" aria-modal="true" aria-labelledby="painel-titulo">
-        <div className={css.pTopo}>
-          <div><h3 id="painel-titulo">{titulo}</h3><p>{sub}</p></div>
-          <button ref={x} className={css.pX} onClick={onFechar} aria-label="Fechar painel">✕</button>
-        </div>
-        {children}
-      </aside>
-    </>
+    <ModalPessoa aberto onFechar={onFechar} foto={foto} titulo={titulo} meta={sub} chips={chips} abas={abas} aba={aba} onAba={onAba} largura={largo ? 1000 : 640}>
+      <div className={largo ? css.mCorpo2 : css.mCorpo1}>{children}</div>
+    </ModalPessoa>
   );
 }
 
@@ -1159,14 +1180,20 @@ function DadosContrato({ p, mes, fechado, empresas, onSalvo }: { p: PessoalLinha
   );
 }
 
-function PainelMei({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, onRecarregar, onAviso }: {
-  l: PessoalLinhaMei; mes: string; fechado: boolean; empresas: string[]; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+function PainelMei({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onContrato, onTirar, onRecarregar, onAviso, onFecharPessoa, onReabrirPessoa }: {
+  l: PessoalLinhaMei; mes: string; fechado: boolean; empresas: string[]; aba: 'lanc' | 'dados'; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
   onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
+  onFecharPessoa: (motivo: 'DESLIGAMENTO' | 'ANTECIPADO') => void; onReabrirPessoa: (id: string, nome: string) => Promise<void>;
 }) {
+  // Fechada sozinha: valores congelados como no mês fechado (só NF e pagamento mudam).
+  const fi = l.fechadoIndividual;
+  const fechado = fechadoMes || !!fi;
   const [f, setF] = useState({ ...l.lanc });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const pv = useMemo(() => previaMei(l.valorCent, l.diasMes, f, l.debitosCent), [l.valorCent, l.diasMes, l.debitosCent, f]);
+  const pvVivo = useMemo(() => previaMei(l.valorCent, l.diasMes, f, l.debitosCent), [l.valorCent, l.diasMes, l.debitosCent, f]);
+  const pv = fi ? { heCent: l.heCent, feriadosCent: l.feriadosCent, faltasCent: l.faltasCent, brutoCent: l.brutoCent, abat: l.abatimentosCent, liquidoCent: l.liquidoCent } : pvVivo;
+  const contratoCent = l.proporcional?.contratoCent ?? l.valorCent;
   const hojeIso = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
   async function salvar() {
     setSalvando(true); setErro(null);
@@ -1187,9 +1214,12 @@ function PainelMei({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, on
   return (
     <>
       <div className={css.pCorpo}>
+        {aba === 'lanc' && <>
+        {fi && <BannerFechado fi={fi} />}
         <section className={css.bloco}>
           <span className={css.lb}>Base de {mesCurto(mes)}</span>
           <Linha2 k={`Contrato (desde ${mesCurto(l.valorDesde)})`} v={brl(l.valorCent)} />
+          {l.proporcional && <Linha2 k={`Proporcional · ${l.proporcional.dias} de ${l.proporcional.diasMes} dias`} v={brl(l.proporcional.contratoCent)} />}
           <Linha2 cls={css.grande} k={`${l.diasMes} dias (${l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}, sem feriados)`} v={brl(l.valorDiaCent)} />
           <Linha2 k={<span className={css.mute}>Valor-hora ({l.diasMes} × 8h) · extra × 1,5</span>} v={`${brl(l.valorHoraCent)} · ${brl(Math.round(l.valorHoraCent * 1.5))}`} />
         </section>
@@ -1220,30 +1250,39 @@ function PainelMei({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, on
           <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={f.pago ? 'sim' : 'nao'} onChange={(v) => setF({ ...f, pago: v === 'sim' })}
             opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
           {l.lanc.pago && l.lanc.pagoEm && <p className={css.formula}>Pago{l.lanc.valorPagoCent != null ? ` ${brl(l.lanc.valorPagoCent)}` : ''} em {fmtPagoEm(l.lanc.pagoEm)}.</p>}
-          {fechado && <p className={css.formula}>Mês fechado: os valores estão congelados, mas a nota e o pagamento ainda podem ser registrados.</p>}
+          {fechadoMes && <p className={css.formula}>Mês fechado: os valores estão congelados, mas a nota e o pagamento ainda podem ser registrados.</p>}
         </section>
         <Observacao pessoaTipo="MEI" pessoaId={l.id} mes={mes} inicial={l.lanc.observacao} disabled={fechado} />
-        <DadosContrato p={l} mes={mes} fechado={fechado} empresas={empresas} onSalvo={onContrato} />
+        </>}
+        {aba === 'dados' && <>
+        <DadosContrato p={l} mes={mes} fechado={fechadoMes} empresas={empresas} onSalvo={onContrato} />
         <AcessoPrestador key={`${l.id}-${l.documento ?? ''}`} prestadorId={l.id} nome={l.nome} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
+        </>}
       </div>
-      <div className={css.pRodape}>
+      {aba === 'lanc' && <div className={css.pRodape}>
         <Linha2 k="Bruto · valor da NF" v={brl(pv.brutoCent)} />
-        <Linha2 k={<span className={css.mute}>− débitos{f.metaPaga && f.metaCent ? ' − meta já paga' : ''}</span>} v={pv.abat ? brl(-pv.abat) : '—'} cls={css.neg} />
+        <Linha2 k={<span className={css.mute}>− débitos{l.debitosFuturosCent ? ' (com parcelas futuras)' : ''}{f.metaPaga && f.metaCent ? ' − meta já paga' : ''}</span>} v={pv.abat ? brl(-pv.abat) : '—'} cls={css.neg} />
         <Linha2 cls={css.grande} k="Líquido a pagar" v={brl(pv.liquidoCent)} />
-        <p className={css.formula}>{brl(l.valorCent)} + extras {brl(pv.heCent)} + feriados {brl(pv.feriadosCent)} − faltas {brl(pv.faltasCent)} + meta {brl(f.metaCent)}</p>
+        <p className={css.formula}>{brl(contratoCent)} + extras {brl(pv.heCent)} + feriados {brl(pv.feriadosCent)} − faltas {brl(pv.faltasCent)} + meta {brl(f.metaCent)}</p>
         {erro && <p className={css.alerta}>{erro}</p>}
-        <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : fechado ? 'Salvar nota e pagamento' : 'Salvar lançamento'}</Botao>
-      </div>
+        <div className={css.rodAcoes}>
+          <AcoesFechamento fechadoMes={fechadoMes} fi={fi} pago={l.lanc.pago} nome={l.nome} onFecharPessoa={onFecharPessoa} onReabrir={onReabrirPessoa} />
+          <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : fechado ? 'Salvar nota e pagamento' : 'Salvar lançamento'}</Botao>
+        </div>
+      </div>}
     </>
   );
 }
 
-function PainelMot({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, onRecarregar, onAviso, onPagarSemana, onDesfazerSemana }: {
-  l: PessoalLinhaMot; mes: string; fechado: boolean; empresas: string[]; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onContrato, onTirar, onRecarregar, onAviso, onPagarSemana, onDesfazerSemana, onFecharPessoa, onReabrirPessoa }: {
+  l: PessoalLinhaMot; mes: string; fechado: boolean; empresas: string[]; aba: 'lanc' | 'dados'; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
+  onFecharPessoa: (motivo: 'DESLIGAMENTO' | 'ANTECIPADO') => void; onReabrirPessoa: (id: string, nome: string) => Promise<void>;
   onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
   onPagarSemana: (s: PessoalSemanaMot) => void; onDesfazerSemana: (s: PessoalSemanaMot) => void;
 }) {
+  const fi = l.fechadoIndividual;
+  const fechado = fechadoMes || !!fi;
   // Só dias, adicionais e NF são editados aqui; pagamento e débito vêm ao vivo de `l`.
   const [ed, setEd] = useState(l.semanas.map((s) => ({ dias: s.dias, adicionalCent: s.adicionalCent, nfNumero: s.nfNumero ?? '' })));
   const [salvando, setSalvando] = useState(false);
@@ -1274,6 +1313,8 @@ function PainelMot({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, on
   return (
     <>
       <div className={css.pCorpo}>
+        {aba === 'lanc' && <>
+        {fi && <BannerFechado fi={fi} />}
         <section className={css.bloco}>
           <Linha2 cls={css.grande} k={`Diária · ${brl(l.valorCent)} ÷ ${l.diasMes} dias`} v={brl(l.diariaCent)} />
           <p className={css.formula}>{l.baseDias === 'SEG_SAB' ? 'Segunda a sábado' : 'Segunda a sexta'}, sem feriados. Cada semana já vem com os dias previstos da escala; ajuste se ele faltou ou trabalhou a mais. Cada semana tem a sua nota e o seu pagamento.</p>
@@ -1312,19 +1353,77 @@ function PainelMot({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, on
           );
         })}
         <Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} />
-        <DadosContrato p={l} mes={mes} fechado={fechado} empresas={empresas} onSalvo={onContrato} />
+        </>}
+        {aba === 'dados' && <>
+        <DadosContrato p={l} mes={mes} fechado={fechadoMes} empresas={empresas} onSalvo={onContrato} />
         <AcessoPrestador key={`${l.id}-${l.documento ?? ''}`} prestadorId={l.id} nome={l.nome} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
+        </>}
       </div>
-      <div className={css.pRodape}>
+      {aba === 'lanc' && <div className={css.pRodape}>
         <Linha2 k="Total das notas do mês" v={brl(total)} />
         <Linha2 k={<span className={css.mute}>− débitos do mês</span>} v={l.debitosCent ? brl(-l.debitosCent) : '—'} cls={css.neg} />
         <Linha2 k={<span className={css.mute}>Já pago ({nPagas} de {comDias.length} semanas)</span>} v={brl(pago)} />
         <Linha2 cls={css.grande} k="Falta pagar" v={brl(Math.max(0, total - l.debitosCent - pago))} />
         {erro && <p className={css.alerta}>{erro}</p>}
-        {fechado && <p className={css.formula}>Mês fechado: só nota e pagamento podem mudar.</p>}
-        {mudou && <Botao variante="ghost" className={css.btnSec} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar dias e notas'}</Botao>}
-      </div>
+        {fechadoMes && <p className={css.formula}>Mês fechado: só nota e pagamento podem mudar.</p>}
+        <div className={css.rodAcoes}>
+          <AcoesFechamento fechadoMes={fechadoMes} fi={fi} pago={l.semanas.some((s) => s.pago)} nome={l.nome} onFecharPessoa={onFecharPessoa} onReabrir={onReabrirPessoa} />
+          {mudou && <Botao variante="ghost" className={css.btnSec} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar dias e notas'}</Botao>}
+        </div>
+      </div>}
+    </>
+  );
+}
+
+/** Selo na tabela: fechado sozinho (ou desligado) no mês. */
+function SeloFechado({ fi }: { fi: FechadoIndividual }) {
+  const em = new Date(fi.em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return <span className={`${css.chipM} ${css.chipNv}`} title={fi.motivo === 'DESLIGAMENTO' ? `Desligado · último dia ${fmtDia(fi.ultimoDia ?? '')}` : 'Fechado antes do mês'}>{fi.motivo === 'DESLIGAMENTO' ? 'desligado' : 'fechado'} {em}</span>;
+}
+
+/** Faixa de quem foi fechado sozinho no mês. */
+function BannerFechado({ fi }: { fi: FechadoIndividual }) {
+  const em = new Date(fi.em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return (
+    <p className={css.bannerFechado}>
+      <b>{fi.motivo === 'DESLIGAMENTO' ? `Desligado · último dia ${fmtDia(fi.ultimoDia ?? '')}` : 'Fechado antes do mês'}</b>
+      Valores congelados em {em}{fi.por ? ` por ${fi.por}` : ''}{fi.proporcional ? ', com contrato proporcional' : ''}{fi.debitosFuturosCent ? ` e ${brl(fi.debitosFuturosCent)} de parcelas futuras de débito` : ''}. Nota e pagamento continuam editáveis.
+    </p>
+  );
+}
+
+/** Rodapé: fechar só esta pessoa / desligar, ou reabrir quem foi fechado. */
+function AcoesFechamento({ fechadoMes, fi, pago, nome, onFecharPessoa, onReabrir }: {
+  fechadoMes: boolean; fi?: FechadoIndividual; pago: boolean; nome: string;
+  onFecharPessoa: (motivo: 'DESLIGAMENTO' | 'ANTECIPADO') => void; onReabrir: (id: string, nome: string) => Promise<void>;
+}) {
+  const [confirmar, setConfirmar] = useState(false);
+  if (fechadoMes) return null;
+  if (fi) {
+    if (pago) return <span className={css.mute} style={{ fontSize: 12.5 }}>Pago: para reabrir, desfaça o pagamento.</span>;
+    return confirmar
+      ? <span className={css.rodConfirma}>Reabrir volta a calcular ao vivo{fi.motivo === 'DESLIGAMENTO' ? ' e desfaz o desligamento' : ''}.
+          <button type="button" className={css.link} onClick={() => void onReabrir(fi.id, nome)}>Confirmar</button>
+          <button type="button" className={css.link} onClick={() => setConfirmar(false)}>Cancelar</button></span>
+      : <button type="button" className={css.link} onClick={() => setConfirmar(true)}>Reabrir pessoa</button>;
+  }
+  return (
+    <>
+      <button type="button" className={`${css.link} ${css.linkPerigo}`} onClick={() => onFecharPessoa('DESLIGAMENTO')}>Desligar…</button>
+      <button type="button" className={css.btnSec2} onClick={() => onFecharPessoa('ANTECIPADO')}>Fechar só esta pessoa</button>
+    </>
+  );
+}
+
+/** Chips do cabeçalho do modal do prestador. */
+function ChipsPrestador({ l, mes, fechado }: { l: PessoalLinhaMei | PessoalLinhaMot; mes: string; fechado: boolean }) {
+  const fi = l.fechadoIndividual;
+  return (
+    <>
+      <span className={css.chipM}>{mesLongo(mes).toLowerCase()} · {fechado ? 'fechado' : 'em aberto'}</span>
+      {fi && <span className={`${css.chipM} ${css.chipNv}`}>{fi.motivo === 'DESLIGAMENTO' ? 'desligado' : 'fechado sozinho'} · {new Date(fi.em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>}
+      <span className={css.chipM}>contrato desde {mesCurto(l.competenciaInicio)}</span>
     </>
   );
 }

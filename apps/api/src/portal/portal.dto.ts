@@ -28,6 +28,18 @@ export class LerNotaDto {
   @IsString() @MaxLength(80) arquivoMime!: string;
 }
 
+export class FecharPessoaDto {
+  @IsIn(['MEI', 'MOTORISTA']) pessoaTipo!: 'MEI' | 'MOTORISTA';
+  @IsUUID() pessoaId!: string;
+  @Matches(COMP) competencia!: string;
+  @IsIn(['DESLIGAMENTO', 'ANTECIPADO']) motivo!: 'DESLIGAMENTO' | 'ANTECIPADO';
+  @IsOptional() @Matches(DATA) ultimoDia?: string | null;
+  @IsOptional() @IsBoolean() proporcional?: boolean;
+  @IsOptional() @IsBoolean() liberarNota?: boolean;
+  @IsOptional() @IsBoolean() cortarAcesso?: boolean;
+  @IsOptional() @Matches(DATA) prazo?: string | null;
+}
+
 export class LiberarDto {
   @Matches(COMP) competencia!: string;
   @IsIn(['MEI', 'MOTORISTA']) tipo!: 'MEI' | 'MOTORISTA';

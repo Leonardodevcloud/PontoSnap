@@ -414,6 +414,13 @@
       "when": 1785121440000,
       "tag": "0058_prestador_foto",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1785207840000,
+      "tag": "0059_fechamento_pessoa",
+      "breakpoints": true
     }
   ]
 }

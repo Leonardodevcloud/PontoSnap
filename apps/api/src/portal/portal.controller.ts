@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Header, Param, ParseUUIDPipe, Patch, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Patch, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -7,7 +7,7 @@ import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PortalService } from './portal.service';
 import {
-  AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, ConvidarDto, EnviarNotaDto, LerNotaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
+  AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, ConvidarDto, EnviarNotaDto, LerNotaDto, FecharPessoaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
 } from './portal.dto';
 
 const t = (u: PayloadAcesso): string => {
@@ -60,6 +60,16 @@ export class PortalRhController {
   @Get('conferir') conferir(@UsuarioAtual() u: PayloadAcesso) { return this.svc.filaConferir(t(u)); }
   @Get('notas/:id') nota(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.svc.notaRh(t(u), id); }
   @Post('liberar') liberar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LiberarDto) { return this.svc.liberar(t(u), dto); }
+  /** Fechar UMA pessoa (desligamento / pagar antes do fechamento). */
+  @Post('fechar-pessoa/previa') previaFechar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: FecharPessoaDto) {
+    return this.svc.previaFecharPessoa(t(u), { ...dto, ultimoDia: dto.ultimoDia ?? null, proporcional: !!dto.proporcional });
+  }
+  @Post('fechar-pessoa') fecharPessoa(@UsuarioAtual() u: PayloadAcesso, @Body() dto: FecharPessoaDto) {
+    return this.svc.fecharPessoa(t(u), { ...dto, ultimoDia: dto.ultimoDia ?? null, proporcional: !!dto.proporcional }, autor(u));
+  }
+  @Delete('fechar-pessoa/:id') reabrirPessoa(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.reabrirPessoa(t(u), id);
+  }
   @Post('aprovar') aprovar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: IdsDto) { return this.svc.aprovar(t(u), dto.ids, autor(u)); }
   @Post('notas/:id/recusar') recusar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RecusarDto) {
     return this.svc.recusar(t(u), id, dto.motivo, autor(u));

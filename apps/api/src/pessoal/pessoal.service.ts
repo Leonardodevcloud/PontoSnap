@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import {
   comTenant, comoMaster, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
-  pessoalDebito, pessoalFechamento, usuario, type Db,
+  pessoalDebito, pessoalFechamento, pessoalFechamentoPessoa, usuario, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
 
@@ -12,6 +12,7 @@ import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
 import { mesPadrao, compAnterior as mesAnteriorDe, type MesPadrao } from './mes-padrao';
+import { congelarMei, congelarMot, debitosDepois, type MotivoFechamento, type OpcoesFechamento } from './fechamento-pessoa';
 import {
   calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, diasComVt, lerDiasSemana, faixaDoMes, parcelaNoMes, situacaoDebito,
   semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
@@ -86,7 +87,17 @@ export interface ValorContrato { vigenteDesde: string; valorCent: number; baseDi
 
 /** Registro de pagamento do mês (motorista: linha MES, além do "pago" de cada semana). */
 export interface PagamentoMes { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }
+/** Pessoa fechada sozinha no mês (desligamento ou pagamento antecipado). */
+export interface FechadoIndividual {
+  id: string; em: string; por: string | null; motivo: MotivoFechamento; ultimoDia: string | null; proporcional: boolean; debitosFuturosCent: number;
+}
 export interface LinhaMei {
+  /** Fechada sozinha: valores congelados (o fechamento do mês usa esta linha). */
+  fechadoIndividual?: FechadoIndividual;
+  /** Desligamento com contrato proporcional aos dias até o último dia. */
+  proporcional?: { dias: number; diasMes: number; contratoCent: number };
+  /** Parcelas de débito que iam cair depois, cobradas neste mês (desligamento). */
+  debitosFuturosCent?: number;
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação e primeira competência no sistema. */
   inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
@@ -102,6 +113,8 @@ export interface SemanaMot {
   debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
 }
 export interface LinhaMot {
+  fechadoIndividual?: FechadoIndividual;
+  debitosFuturosCent?: number;
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação e primeira competência no sistema. */
   inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
@@ -245,7 +258,7 @@ export class PessoalService {
     return new Map(rows.map((r) => [`${r.pessoaTipo}:${r.pessoaId}:${r.periodo}`, { id: r.id, nome: r.nome, mime: r.mime, bytes: r.bytes, enviadoEm: r.criadoEm.toISOString() }]));
   }
 
-  private async calcular(tenantId: string, comp: string): Promise<CompetenciaPessoal> {
+  private async calcular(tenantId: string, comp: string, opts: { soPrestadores?: boolean } = {}): Promise<CompetenciaPessoal> {
     const { inicio, fim } = faixaDoMes(comp);
     const prox = somarMeses(comp, 1);
     const fx = faixaDoMes(prox);
@@ -268,7 +281,9 @@ export class PessoalService {
       const debs = await tx.select().from(pessoalDebito)
         .where(and(eq(pessoalDebito.tenantId, tenantId), lte(pessoalDebito.competenciaInicio, comp)));
       const fechAnt = await this.fechamento(tx, tenantId, somarMeses(comp, -1));
-      return { emps, configs, padroesRows, valoresRows, cestaRows, nfs, prest, excl, lancs, debs, fechAnt };
+      const congelados = await tx.select().from(pessoalFechamentoPessoa)
+        .where(and(eq(pessoalFechamentoPessoa.tenantId, tenantId), eq(pessoalFechamentoPessoa.competencia, comp)));
+      return { emps, configs, padroesRows, valoresRows, cestaRows, nfs, prest, excl, lancs, debs, fechAnt, congelados };
     });
 
     // Quem está fora deste mês: exclusão do próprio mês, ou "daqui em diante" de um mês anterior.
@@ -282,6 +297,12 @@ export class PessoalService {
     const debitosDe = (tipo: PessoaTipo, id: string) => dados.debs
       .filter((d) => d.pessoaTipo === tipo && d.pessoaId === id)
       .reduce((s, d) => s + (parcelaNoMes(debParc(d), comp)?.valorCent ?? 0), 0);
+
+    const congeladoDe = (tipo: PessoaTipo, id: string) => dados.congelados.find((c) => c.pessoaTipo === tipo && c.pessoaId === id);
+    const infoCongelado = (c: typeof dados.congelados[number]): FechadoIndividual => ({
+      id: c.id, em: c.fechadoEm.toISOString(), por: c.fechadoPor, motivo: c.motivo as MotivoFechamento, ultimoDia: c.ultimoDia,
+      proporcional: c.proporcional, debitosFuturosCent: centavos(c.debitosFuturos),
+    });
 
     const feriadosLista = (await this.trat.listarFeriados(tenantId, inicio, fim)).map((f) => f.data);
     const feriadosProx = (await this.trat.listarFeriados(tenantId, fx.inicio, fx.fim)).map((f) => f.data);
@@ -312,7 +333,7 @@ export class PessoalService {
 
     // ---------- CLT (base do ponto) ----------
     const clt: LinhaClt[] = [];
-    for (const e of dados.emps) {
+    for (const e of opts.soPrestadores ? [] : dados.emps) {
       const ex = exclusaoDe('CLT', e.id);
       if (ex) { foraDoMes.push({ exclusaoId: ex.id, pessoaTipo: 'CLT', pessoaId: e.id, nome: e.nome, escopo: ex.escopo as 'MES' | 'DIANTE', desde: ex.competencia }); continue; }
       if (e.dataInicioPonto && e.dataInicioPonto > fim) continue; // ainda não começou
@@ -451,9 +472,30 @@ export class PessoalService {
           ...pagamentoDe(l),
           nfArquivo: dados.nfs.get(`MEI:${p.id}:MES`) ?? null,
         };
+        const cg = congeladoDe('MEI', p.id);
+        if (cg) {
+          // Fechada sozinha: valores da linha congelada; NF e pagamento ao vivo.
+          const lin = cg.linha as LinhaMei;
+          const vivo = { nfNumero: lanc.nfNumero, nfData: lanc.nfData, pago: lanc.pago, valorPagoCent: lanc.valorPagoCent, pagoEm: lanc.pagoEm, nfArquivo: lanc.nfArquivo };
+          mei.push({ ...lin, lanc: { ...lin.lanc, ...vivo }, fechadoIndividual: infoCongelado(cg) });
+          continue;
+        }
         const r = calcularMei({ valorCent, diasMes, heMin: lanc.heMin, faltas: lanc.faltas, feriadosTrab: lanc.feriadosTrab, metaCent: lanc.metaCent, metaPaga: lanc.metaPaga, debitosCent });
         mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, inicioAtividade: p.inicioAtividade ?? null, competenciaInicio: p.competenciaInicio, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
       } else {
+        const cgm = congeladoDe('MOTORISTA', p.id);
+        if (cgm) {
+          const lin = cgm.linha as LinhaMot;
+          const sems = lin.semanas.map((s) => {
+            const l = lancDe('MOTORISTA', p.id, s.inicio);
+            return { ...s, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null,
+              debitoAplicadoCent: centavos(l?.debitoAplicado), ...pagamentoDe(l) };
+          });
+          motoristas.push({ ...lin, semanas: sems, fechadoIndividual: infoCongelado(cgm),
+            pagamento: { pago: lancDe('MOTORISTA', p.id)?.pago ?? false, ...pagamentoDe(lancDe('MOTORISTA', p.id)) },
+            debitoPendenteCent: Math.max(0, lin.debitosCent - sems.reduce((a, x) => a + x.debitoAplicadoCent, 0)) });
+          continue;
+        }
         const sem: SemanaMot[] = semanas.map((s) => {
           const l = lancDe('MOTORISTA', p.id, s.inicio);
           const diasAuto = s.dias.filter((d) => diasBase(comp, base, feriados).includes(d)).length;
@@ -708,7 +750,10 @@ export class PessoalService {
     const soPagamento = Object.entries(d)
       .filter(([k, v]) => v !== undefined && !['pessoaTipo', 'pessoaId', 'competencia', 'periodo'].includes(k))
       .every(([k]) => ['pago', 'valorPago', 'debitoAplicado', 'nfNumero', 'nfData'].includes(k));
-    if (!soPagamento) await this.exigirAberta(tenantId, d.competencia);
+    if (!soPagamento) {
+      await this.exigirAberta(tenantId, d.competencia);
+      await this.exigirPessoaAberta(tenantId, d.competencia, d.pessoaTipo, d.pessoaId);
+    }
     const periodo = d.periodo ?? 'MES';
     const set: Record<string, unknown> = { atualizadoEm: new Date() };
     for (const k of ['heMin', 'faltas', 'feriadosTrab', 'dias', 'metaPaga', 'pago'] as const) if (d[k] !== undefined) set[k] = d[k];
@@ -771,7 +816,7 @@ export class PessoalService {
         }
       }
       return { pago: d.pago, valorPagoCent: d.pago ? centavos(d.valorPago!) : null, pagoEm: pagoEm?.toISOString() ?? null };
-    });
+    }).then(async (r) => { if (d.pago) await this.cortarAcessoSePedido(tenantId, d.pessoaId, d.competencia); return r; });
   }
 
   /** Débitos de um prestador que caem neste mês (soma das parcelas). */
@@ -865,6 +910,7 @@ export class PessoalService {
   }) {
     this.validarDebito(d);
     await this.exigirAberta(tenantId, d.competenciaInicio);
+    await this.exigirPessoaAberta(tenantId, d.competenciaInicio, d.pessoaTipo, d.pessoaId);
     return comTenant(this.db, tenantId, async (tx) => {
       const [r] = await tx.insert(pessoalDebito).values({
         tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, descricao: d.descricao.trim(),
@@ -955,6 +1001,133 @@ export class PessoalService {
       await tx.delete(pessoalFechamento)
         .where(and(eq(pessoalFechamento.tenantId, tenantId), eq(pessoalFechamento.competencia, comp)));
       return { reaberto: true };
+    });
+  }
+
+  // ======================= fechar UMA pessoa =======================
+
+  private async congelado(tx: Tx, tenantId: string, comp: string, tipo: PessoaTipo, id: string) {
+    return (await tx.select().from(pessoalFechamentoPessoa).where(and(eq(pessoalFechamentoPessoa.tenantId, tenantId),
+      eq(pessoalFechamentoPessoa.competencia, comp), eq(pessoalFechamentoPessoa.pessoaTipo, tipo), eq(pessoalFechamentoPessoa.pessoaId, id))).limit(1))[0];
+  }
+
+  /** Bloqueia editar os valores de quem foi fechado sozinho no mês. */
+  private async exigirPessoaAberta(tenantId: string, comp: string, tipo: PessoaTipo, id: string) {
+    if (tipo === 'CLT') return;
+    const c = await comTenant(this.db, tenantId, (tx) => this.congelado(tx, tenantId, comp, tipo, id));
+    if (c) throw new BadRequestException(`Esta pessoa foi fechada em ${c.fechadoEm.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. Reabra a pessoa para editar.`);
+  }
+
+  private validarOpcoes(comp: string, o: OpcoesFechamento) {
+    if (!['DESLIGAMENTO', 'ANTECIPADO'].includes(o.motivo)) throw new BadRequestException('Motivo inválido.');
+    if (o.motivo === 'DESLIGAMENTO') {
+      if (!o.ultimoDia || !/^\d{4}-\d{2}-\d{2}$/.test(o.ultimoDia)) throw new BadRequestException('Informe o último dia trabalhado.');
+      if (!o.ultimoDia.startsWith(comp)) throw new BadRequestException(`O último dia precisa estar em ${comp}.`);
+    }
+  }
+
+  /**
+   * Prévia do fechamento de uma pessoa: a linha como está e como fica
+   * congelada (proporcional e débitos futuros). Não grava nada.
+   */
+  async previaFechamentoPessoa(tenantId: string, d: { pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string } & OpcoesFechamento) {
+    this.validarComp(d.competencia);
+    const o: OpcoesFechamento = { motivo: d.motivo, ultimoDia: d.motivo === 'DESLIGAMENTO' ? d.ultimoDia : null, proporcional: d.motivo === 'DESLIGAMENTO' && !!d.proporcional };
+    this.validarOpcoes(d.competencia, o);
+    if (await comTenant(this.db, tenantId, (tx) => this.fechamento(tx, tenantId, d.competencia))) {
+      throw new BadRequestException(`${d.competencia} já está fechado: os valores de todos já estão congelados.`);
+    }
+    const comp = await this.calcular(tenantId, d.competencia, { soPrestadores: true });
+    const atual = d.pessoaTipo === 'MEI' ? comp.mei.find((m) => m.id === d.pessoaId) : comp.motoristas.find((m) => m.id === d.pessoaId);
+    if (!atual) throw new NotFoundException('Esta pessoa não está no mês (saiu ou ainda não começou).');
+    if (atual.fechadoIndividual) throw new BadRequestException('Esta pessoa já foi fechada neste mês.');
+    const debs = await comTenant(this.db, tenantId, (tx) => tx.select().from(pessoalDebito).where(and(eq(pessoalDebito.tenantId, tenantId),
+      eq(pessoalDebito.pessoaTipo, d.pessoaTipo), eq(pessoalDebito.pessoaId, d.pessoaId))));
+    const futurosCent = o.motivo === 'DESLIGAMENTO' ? debitosDepois(debs.map(debParc), d.competencia) : 0;
+    const feriados = new Set(comp.feriados);
+    const congelada = d.pessoaTipo === 'MEI'
+      ? congelarMei(atual as LinhaMei, o, feriados, d.competencia, futurosCent)
+      : congelarMot(atual as LinhaMot, o, feriados, d.competencia, futurosCent);
+    const debitosMes = comp.debitos.filter((x) => x.pessoaId === d.pessoaId);
+    return { opcoes: o, atual, congelada, futurosCent, debitosMes };
+  }
+
+  /**
+   * Fecha UMA pessoa: grava a linha congelada. Desligamento: tira a pessoa dos
+   * meses seguintes (exclusão "daqui em diante") e, no motorista, desconta os
+   * débitos restantes na última semana trabalhada.
+   */
+  async fecharPessoa(tenantId: string, d: { pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string; cortarAcesso?: boolean } & OpcoesFechamento, autor: string | null) {
+    const prev = await this.previaFechamentoPessoa(tenantId, d);
+    const prox = somarMeses(d.competencia, 1);
+    return comTenant(this.db, tenantId, async (tx) => {
+      if (await this.congelado(tx, tenantId, d.competencia, d.pessoaTipo, d.pessoaId)) throw new BadRequestException('Esta pessoa já foi fechada neste mês.');
+      let exclusaoId: string | null = null;
+      if (prev.opcoes.motivo === 'DESLIGAMENTO') {
+        if (await this.fechamento(tx, tenantId, prox)) throw new BadRequestException(`${prox} já está fechado; reabra-o para desligar a pessoa.`);
+        const ja = (await tx.select().from(pessoalExclusao).where(and(eq(pessoalExclusao.tenantId, tenantId), eq(pessoalExclusao.pessoaTipo, d.pessoaTipo),
+          eq(pessoalExclusao.pessoaId, d.pessoaId), eq(pessoalExclusao.competencia, prox))).limit(1))[0];
+        if (!ja) {
+          const [ex] = await tx.insert(pessoalExclusao).values({ tenantId, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, competencia: prox, escopo: 'DIANTE' }).returning();
+          exclusaoId = ex!.id;
+        }
+      }
+      // Motorista: o que falta de débito (do mês + futuros) sai das últimas semanas
+      // trabalhadas ainda não pagas (da última para trás, até o valor de cada uma).
+      const ajustes: { periodo: string; antesCent: number }[] = [];
+      let linha: LinhaMei | LinhaMot = prev.congelada;
+      if (d.pessoaTipo === 'MOTORISTA') {
+        const m = prev.congelada as LinhaMot;
+        let falta = m.debitoPendenteCent;
+        const semanas = m.semanas.map((s) => ({ ...s }));
+        for (const s of [...semanas].reverse()) {
+          if (falta <= 0) break;
+          if (s.dias <= 0 || s.pago) continue;
+          const aplicar = Math.min(falta, Math.max(0, s.totalCent - s.debitoAplicadoCent));
+          if (aplicar <= 0) continue;
+          ajustes.push({ periodo: s.inicio, antesCent: s.debitoAplicadoCent });
+          s.debitoAplicadoCent += aplicar; falta -= aplicar;
+          await tx.insert(pessoalLancamento).values({ tenantId, pessoaTipo: 'MOTORISTA', pessoaId: d.pessoaId, competencia: d.competencia, periodo: s.inicio, debitoAplicado: reais(s.debitoAplicadoCent) })
+            .onConflictDoUpdate({ target: [pessoalLancamento.tenantId, pessoalLancamento.pessoaTipo, pessoalLancamento.pessoaId, pessoalLancamento.competencia, pessoalLancamento.periodo],
+              set: { debitoAplicado: reais(s.debitoAplicadoCent), atualizadoEm: new Date() } });
+        }
+        linha = { ...m, semanas, debitoPendenteCent: Math.max(0, m.debitosCent - semanas.reduce((x, s) => x + s.debitoAplicadoCent, 0)) };
+      }
+      const [r] = await tx.insert(pessoalFechamentoPessoa).values({
+        tenantId, competencia: d.competencia, pessoaTipo: d.pessoaTipo, pessoaId: d.pessoaId, motivo: prev.opcoes.motivo,
+        ultimoDia: prev.opcoes.ultimoDia, proporcional: prev.opcoes.proporcional, debitosFuturos: reais(prev.futurosCent),
+        linha: { ...linha, ...(ajustes.length ? { _ajustesSemana: ajustes } : {}) }, exclusaoId, cortarAcesso: !!d.cortarAcesso, fechadoPor: autor,
+      }).returning();
+      return { id: r!.id, linha, opcoes: prev.opcoes, futurosCent: prev.futurosCent };
+    });
+  }
+
+  /** Reabre UMA pessoa (antes do pagamento): volta a calcular ao vivo e desfaz o desligamento. */
+  async reabrirPessoa(tenantId: string, id: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const c = (await tx.select().from(pessoalFechamentoPessoa).where(and(eq(pessoalFechamentoPessoa.id, id), eq(pessoalFechamentoPessoa.tenantId, tenantId))).limit(1))[0];
+      if (!c) throw new NotFoundException('Fechamento não encontrado.');
+      if (await this.fechamento(tx, tenantId, c.competencia)) throw new BadRequestException(`${c.competencia} já foi fechado inteiro. Reabra o mês para mexer nesta pessoa.`);
+      const lancs = await tx.select().from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId),
+        eq(pessoalLancamento.pessoaId, c.pessoaId), eq(pessoalLancamento.competencia, c.competencia)));
+      if (lancs.some((l) => l.pago)) throw new BadRequestException('Esta pessoa já foi paga neste mês. Desfaça o pagamento antes de reabrir.');
+      if (c.exclusaoId) await tx.delete(pessoalExclusao).where(and(eq(pessoalExclusao.id, c.exclusaoId), eq(pessoalExclusao.tenantId, tenantId)));
+      for (const aj of (c.linha as { _ajustesSemana?: { periodo: string; antesCent: number }[] })._ajustesSemana ?? []) {
+        await tx.update(pessoalLancamento).set({ debitoAplicado: reais(aj.antesCent), atualizadoEm: new Date() }).where(and(eq(pessoalLancamento.tenantId, tenantId),
+          eq(pessoalLancamento.pessoaTipo, 'MOTORISTA'), eq(pessoalLancamento.pessoaId, c.pessoaId), eq(pessoalLancamento.competencia, c.competencia), eq(pessoalLancamento.periodo, aj.periodo)));
+      }
+      await tx.delete(pessoalFechamentoPessoa).where(eq(pessoalFechamentoPessoa.id, c.id));
+      return { reaberto: true, competencia: c.competencia, pessoaTipo: c.pessoaTipo, pessoaId: c.pessoaId };
+    });
+  }
+
+  /** Depois de pagar quem foi desligado com "cortar acesso": desativa o login do app. */
+  async cortarAcessoSePedido(tenantId: string, pessoaId: string, competencia: string) {
+    await comTenant(this.db, tenantId, async (tx) => {
+      const c = (await tx.select().from(pessoalFechamentoPessoa).where(and(eq(pessoalFechamentoPessoa.tenantId, tenantId),
+        eq(pessoalFechamentoPessoa.pessoaId, pessoaId), eq(pessoalFechamentoPessoa.competencia, competencia))).limit(1))[0];
+      if (!c?.cortarAcesso) return;
+      await tx.update(usuario).set({ ativo: false }).where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, pessoaId)));
     });
   }
 

@@ -139,6 +139,28 @@ export const pessoalFechamento = pgTable('pessoal_fechamento', {
   snapshot: jsonb('snapshot').notNull(),
 }, (t) => [unique('uq_pessoal_fechamento').on(t.tenantId, t.competencia)]);
 
+/**
+ * Fechamento de UMA pessoa no mês (migration 0059): ex. desligamento. Congela
+ * a linha dela; o fechamento do mês usa esta linha em vez de recalcular.
+ */
+export const pessoalFechamentoPessoa = pgTable('pessoal_fechamento_pessoa', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  competencia: varchar('competencia', { length: 7 }).notNull(),
+  pessoaTipo: varchar('pessoa_tipo', { length: 10 }).notNull(),
+  pessoaId: uuid('pessoa_id').notNull(),
+  /** DESLIGAMENTO | ANTECIPADO */
+  motivo: varchar('motivo', { length: 14 }).notNull(),
+  ultimoDia: date('ultimo_dia', { mode: 'string' }),
+  proporcional: boolean('proporcional').notNull().default(false),
+  debitosFuturos: numeric('debitos_futuros', { precision: 12, scale: 2 }).notNull().default('0'),
+  linha: jsonb('linha').notNull(),
+  exclusaoId: uuid('exclusao_id'),
+  cortarAcesso: boolean('cortar_acesso').notNull().default(false),
+  fechadoEm: timestamp('fechado_em', { withTimezone: true }).notNull().defaultNow(),
+  fechadoPor: varchar('fechado_por', { length: 160 }),
+}, (t) => [unique('uq_pessoal_fechamento_pessoa').on(t.tenantId, t.competencia, t.pessoaTipo, t.pessoaId)]);
+
 /** Valor do contrato do prestador com vigência (migration 0040). */
 export const pessoalPrestadorValor = pgTable('pessoal_prestador_valor', {
   id: uuid('id').primaryKey().defaultRandom(),

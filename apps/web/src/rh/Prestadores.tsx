@@ -9,7 +9,9 @@ import {
 } from '../lib/prestador';
 import { Caricatura, hash, useAvatares } from '../components/Avatar';
 import { Modal } from '../components/Modal';
-import { PainelLateral } from '../components/PainelLateral';
+import { ModalPessoa } from '../components/ModalPessoa';
+import { Icone } from '../components/Icone';
+import { FecharPessoa } from './FecharPessoa';
 import css from './Prestadores.module.css';
 
 const mesHoje = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
@@ -39,6 +41,15 @@ const passaFiltro = (l: LinhaRh, f: Filtro) => {
     case 'SEM_ACESSO': return l.acesso.status !== 'ATIVO';
   }
 };
+
+type Ordem = 'NOME' | 'VALOR' | 'SITUACAO' | 'EMPRESA';
+const ORDENS: { id: Ordem; rotulo: string }[] = [
+  { id: 'NOME', rotulo: 'Nome A–Z' }, { id: 'VALOR', rotulo: 'Maior valor' }, { id: 'SITUACAO', rotulo: 'Situação da nota' }, { id: 'EMPRESA', rotulo: 'Empresa' },
+];
+// Situação: o que pede ação primeiro.
+const PESO_SIT: Record<Situacao, number> = { CONFERIR: 0, CONTESTOU: 1, RECUSADA: 2, FALTA: 3, NAO_LIBERADO: 4, RH: 5, APROVADA: 6 };
+const lerOrdem = (): Ordem => { try { const o = localStorage.getItem('pontosnap.prestadores.ordem'); return (ORDENS.some((x) => x.id === o) ? o : 'NOME') as Ordem; } catch { return 'NOME'; } };
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /** Rosto do prestador: a foto que ele mandou no app ou, sem foto, a caricatura. */
 export function Rosto({ id, semente, tamanho = 34 }: { id: string; semente: number | null; tamanho?: number }) {
@@ -72,6 +83,9 @@ export function Prestadores() {
   const [msg, setMsg] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('TODOS');
   const [busca, setBusca] = useState('');
+  const [ordem, setOrdemSt] = useState<Ordem>(lerOrdem);
+  const setOrdem = (o: Ordem) => { setOrdemSt(o); try { localStorage.setItem('pontosnap.prestadores.ordem', o); } catch { /* sem storage */ } };
+  const [fechar, setFechar] = useState<{ id: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO' } | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [aberto, setAberto] = useState<string | null>(null);
   const [liberar, setLiberar] = useState(params.get('liberar') === '1');
@@ -87,9 +101,19 @@ export function Prestadores() {
   const ir = (m: string) => { const p = new URLSearchParams(params); p.set('mes', m); p.delete('liberar'); setParams(p, { replace: true }); };
 
   const linhas = useMemo(() => {
-    const b = busca.trim().toLowerCase();
-    return (d?.linhas ?? []).filter((l) => passaFiltro(l, filtro) && (!b || l.nome.toLowerCase().includes(b) || (l.empresa ?? '').toLowerCase().includes(b)));
-  }, [d, filtro, busca]);
+    // Busca por nome, empresa, função ou CPF/CNPJ (sem acento, sem máscara).
+    const b = semAcento(busca.trim());
+    const dig = busca.replace(/\D/g, '');
+    const achou = (l: LinhaRh) => !b || semAcento(`${l.nome} ${l.empresa ?? ''} ${l.funcao ?? ''}`).includes(b) || (dig.length >= 3 && (l.documento ?? '').includes(dig));
+    const nome = (a: LinhaRh, x: LinhaRh) => a.nome.localeCompare(x.nome, 'pt-BR');
+    const cmp: Record<Ordem, (a: LinhaRh, x: LinhaRh) => number> = {
+      NOME: nome,
+      VALOR: (a, x) => x.valorCent - a.valorCent || nome(a, x),
+      SITUACAO: (a, x) => PESO_SIT[a.situacao] - PESO_SIT[x.situacao] || nome(a, x),
+      EMPRESA: (a, x) => (a.empresa ?? '~').localeCompare(x.empresa ?? '~', 'pt-BR') || nome(a, x),
+    };
+    return (d?.linhas ?? []).filter((l) => passaFiltro(l, filtro) && achou(l)).sort(cmp[ordem]);
+  }, [d, filtro, busca, ordem]);
   const contagem = (f: Filtro) => (d?.linhas ?? []).filter((l) => passaFiltro(l, f)).length;
   const selecionadas = (d?.linhas ?? []).filter((l) => sel.has(l.id));
   const unidadesSel = selecionadas.flatMap((l) => l.unidades);
@@ -168,6 +192,20 @@ export function Prestadores() {
         </div>
       )}
 
+      <div className={css.ferramentas}>
+        <label className={css.buscaGrande}>
+          <Icone nome="busca" tamanho={18} />
+          <input type="search" placeholder="Buscar por nome, empresa ou CPF/CNPJ" aria-label="Buscar prestador" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          {busca && <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca">✕</button>}
+        </label>
+        <label className={css.ordem}>
+          <span>Ordem:</span>
+          <select value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)} aria-label="Ordenar por">
+            {ORDENS.map((o) => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
+          </select>
+        </label>
+        {busca && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.length}</span>}
+      </div>
       <div className={css.filtros} role="group" aria-label="Filtrar">
         {FILTROS.map((f) => (
           <button key={f.id} type="button" className={`${css.fl} ${filtro === f.id ? css.flOn : ''}`} aria-pressed={filtro === f.id} onClick={() => setFiltro(f.id)}>
@@ -175,7 +213,6 @@ export function Prestadores() {
           </button>
         ))}
         {faltamIds.length > 0 && <button type="button" className={css.btnSec + ' ' + css.pequeno} disabled={ocupado} onClick={() => lembrar(faltamIds)}>🔔 Lembrar os {faltamIds.length}</button>}
-        <input className={css.busca} type="search" placeholder="Buscar prestador ou empresa" aria-label="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
 
       {sel.size > 0 && (
@@ -192,7 +229,11 @@ export function Prestadores() {
 
       {!d && !erro && <div className={css.vazio}><p>Carregando…</p></div>}
       {d && d.linhas.length === 0 && <div className={css.vazio}><b>Nenhum prestador em {d.rotulo}</b><p>Cadastre MEI e motoristas na Folha e benefícios.</p></div>}
-      {d && d.linhas.length > 0 && (
+      {d && d.linhas.length > 0 && linhas.length === 0 && (
+        <div className={css.vazio}><b>Ninguém encontrado</b><p>{busca ? `Nada com "${busca}" neste filtro.` : 'Nenhum prestador neste filtro.'}</p>
+          <button type="button" className={css.btnSec} onClick={() => { setBusca(''); setFiltro('TODOS'); }}>Limpar busca e filtro</button></div>
+      )}
+      {d && linhas.length > 0 && (
         <div className={css.tabela}>
           <table>
             <thead>
@@ -213,12 +254,18 @@ export function Prestadores() {
       )}
       {d && <p className={css.hint}>Quem não tem acesso continua como hoje: o RH sobe a nota pela Folha e benefícios. Lembrete automático todo dia às 9h para quem ainda não mandou, até 7 dias depois do prazo.</p>}
 
-      <PainelLateral titulo={linhaAberta?.nome ?? ''} subtitulo={linhaAberta ? `${linhaAberta.tipo === 'MEI' ? 'MEI' : 'Motorista'}${linhaAberta.empresa ? ` · ${linhaAberta.empresa}` : ''}` : undefined}
-        aberto={!!linhaAberta} onFechar={() => setAberto(null)} largura={480}>
-        {linhaAberta && d && <DetalhePrestador l={linhaAberta} mes={mes} ocupado={ocupado}
+      {linhaAberta && d && !fechar && (
+        <DetalhePrestador key={linhaAberta.id} l={linhaAberta} d={d} mes={mes} ocupado={ocupado} onFechar={() => setAberto(null)}
           onLembrar={(ids) => lembrar(ids)} onPagar={(ids) => pagar(ids)} onConvidar={() => setConvidar([linhaAberta.id])}
-          onMudou={async (m) => { avisar(m); await carregar(); }} onErro={setErro} />}
-      </PainelLateral>
+          onFecharPessoa={(motivo) => setFechar({ id: linhaAberta.id, motivo })}
+          onMudou={async (m) => { avisar(m); await carregar(); }} onErro={setErro} />
+      )}
+      {fechar && d && (() => {
+        const l = d.linhas.find((x) => x.id === fechar.id);
+        return l ? <FecharPessoa pessoa={{ id: l.id, nome: l.nome, tipo: l.tipo, empresa: l.empresa, avatarSemente: l.avatarSemente }} mes={mes}
+          motivoInicial={fechar.motivo} temApp={l.acesso.status === 'ATIVO'} onFechar={() => setFechar(null)}
+          onFechado={async (m) => { setFechar(null); avisar(m); await carregar(); }} /> : null;
+      })()}
 
       {liberar && d && <ModalLiberar d={d} onFechar={() => setLiberar(false)}
         onLiberado={async (m) => { setLiberar(false); avisar(m); await carregar(); }} />}
@@ -247,6 +294,8 @@ function Linha({ l, marcado, ocupado, onMarcar, onAbrir, onLembrar, onConvidar, 
       <td>{mot ? 'Motorista' : 'MEI'}</td>
       <td className={`${css.r} ${css.mono}`}>{brl(l.valorCent)}{mot && <span className={css.sub}>{l.unidades.length} {l.unidades.length === 1 ? 'semana' : 'semanas'}</span>}</td>
       <td>
+        {l.fechadoIndividual && <span className={`${css.tag} ${css['t-nv']}`} title={l.fechadoIndividual.motivo === 'DESLIGAMENTO' ? `Desligamento · último dia ${dataBr(l.fechadoIndividual.ultimoDia ?? '')}` : 'Pago antes do fechamento do mês'}>
+          {l.fechadoIndividual.motivo === 'DESLIGAMENTO' ? 'desligado' : 'fechado'} {dataIsoBr(l.fechadoIndividual.em)}</span>}{' '}
         <TagSituacao s={l.situacao} atrasada={l.atrasada} />
         {mot && l.unidades.length > 0 && (
           <span className={css.semanas} aria-label={l.unidades.map((u) => `${u.rotulo}: ${ROTULO_SITUACAO[u.situacao]}`).join('; ')}>
@@ -270,12 +319,21 @@ function Linha({ l, marcado, ocupado, onMarcar, onAbrir, onLembrar, onConvidar, 
   );
 }
 
-/** Painel lateral: notas do mês (ou semanas), contestação, pagamento, contato e acesso. */
-function DetalhePrestador({ l, mes, ocupado, onLembrar, onPagar, onConvidar, onMudou, onErro }: {
-  l: LinhaRh; mes: string; ocupado: boolean; onLembrar: (ids: string[]) => void; onPagar: (ids: string[]) => void; onConvidar: () => void;
+/**
+ * Modal da pessoa (largo, com foto): notas do mês (ou semanas), contestação,
+ * pagamento, acesso ao app, contato e o fechamento individual.
+ */
+function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, onConvidar, onFecharPessoa, onMudou, onErro }: {
+  l: LinhaRh; d: PainelRh; mes: string; ocupado: boolean; onFechar: () => void; onLembrar: (ids: string[]) => void; onPagar: (ids: string[]) => void; onConvidar: () => void;
+  onFecharPessoa: (motivo: 'DESLIGAMENTO' | 'ANTECIPADO') => void;
   onMudou: (m: string) => Promise<void>; onErro: (m: string | null) => void;
 }) {
   const navegar = useNavigate();
+  const [aba, setAba] = useState<'mes' | 'acesso' | 'dados'>('mes');
+  const [confirmarReabrir, setConfirmarReabrir] = useState(false);
+  const fi = l.fechadoIndividual;
+  const pagoAlgo = l.unidades.some((u) => u.pago);
+  const doc = l.documento ? mascaraDoc(l.documento) : null;
   const [resp, setResp] = useState('');
   const [contato, setContato] = useState({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? '') });
   const [salvando, setSalvando] = useState(false);
@@ -295,8 +353,36 @@ function DetalhePrestador({ l, mes, ocupado, onLembrar, onPagar, onConvidar, onM
     } catch (e) { onErro((e as Error).message); }
   }
 
+  const rodape = (
+    <>
+      {!d.fechado && !fi && <button type="button" className={`${css.btnTxt} ${css.btnPerigo}`} onClick={() => onFecharPessoa('DESLIGAMENTO')}>Desligar…</button>}
+      {!d.fechado && fi && !pagoAlgo && (confirmarReabrir
+        ? <span className={css.confirma}>Reabrir volta a calcular ao vivo{fi.motivo === 'DESLIGAMENTO' ? ' e desfaz o desligamento' : ''}.
+            <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={salvando}
+              onClick={() => chamar(() => api.del(`/portal/rh/fechar-pessoa/${fi.id}`), `${l.nome} reaberto.`)}>Confirmar</button>
+            <button type="button" className={css.btnTxt} onClick={() => setConfirmarReabrir(false)}>Cancelar</button></span>
+        : <button type="button" className={css.btnTxt} onClick={() => setConfirmarReabrir(true)}>Reabrir pessoa</button>)}
+      <span style={{ flex: 1 }} />
+      <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/pessoal?mes=${mes}&aba=prestadores&abrir=${l.tipo}:${l.id}`)}>
+        {d.fechado || fi ? 'Abrir na Folha' : 'Lançar extras e faltas'}
+      </button>
+      {!d.fechado && !fi && <button type="button" className={css.btnPri} onClick={() => onFecharPessoa('ANTECIPADO')}>Fechar só esta pessoa</button>}
+    </>
+  );
+
   return (
-    <div>
+    <ModalPessoa aberto onFechar={onFechar} foto={<Rosto id={l.id} semente={l.avatarSemente} tamanho={104} />}
+      titulo={l.nome}
+      meta={[l.tipo === 'MEI' ? 'MEI' : 'Motorista', l.empresa, l.funcao, doc].filter(Boolean).join(' · ')}
+      chips={<>
+        <span className={`${css.tag} ${css['t-cz']}`}>{d.rotulo.toLowerCase()} · {d.fechado ? 'fechado' : 'em aberto'}</span>
+        {fi && <span className={`${css.tag} ${css['t-nv']}`}>{fi.motivo === 'DESLIGAMENTO' ? `desligado · último dia ${dataBr(fi.ultimoDia ?? '')}` : 'fechado antes do mês'} · {dataIsoBr(fi.em)}</span>}
+        <TagAcesso l={l} />
+      </>}
+      abas={[{ id: 'mes', rotulo: l.tipo === 'MEI' ? 'Este mês' : 'Semanas do mês' }, { id: 'acesso', rotulo: 'Acesso ao app' }, { id: 'dados', rotulo: 'Dados e contato' }]}
+      aba={aba} onAba={(x) => setAba(x as typeof aba)} rodape={rodape}>
+    {aba === 'mes' && (
+    <div className={css.mGrade}>
       <div className={css.bloco}>
         <h4>{l.tipo === 'MEI' ? `Nota de ${mes.slice(5)}/${mes.slice(0, 4)}` : 'Semanas'}</h4>
         {l.unidades.length === 0 && <p className={css.hint}>Nenhuma semana trabalhada neste mês.</p>}
@@ -335,7 +421,11 @@ function DetalhePrestador({ l, mes, ocupado, onLembrar, onPagar, onConvidar, onM
           );
         })}
       </div>
+      <ResumoPessoa l={l} d={d} />
+    </div>
+    )}
 
+    {aba === 'acesso' && (
       <div className={css.bloco}>
         <h4>Acesso ao app</h4>
         <div className={css.lin}><span>Situação</span><TagAcesso l={l} /></div>
@@ -346,8 +436,11 @@ function DetalhePrestador({ l, mes, ocupado, onLembrar, onPagar, onConvidar, onM
           {l.acesso.status === 'BLOQUEADO' && <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={salvando}
             onClick={() => chamar(() => api.post(`/portal/rh/prestadores/${l.id}/acesso`, { ativo: true }), `Acesso de ${l.nome} devolvido.`)}>Devolver acesso</button>}
         </div>
+        <p className={css.hint}>{l.acesso.status === 'ATIVO' ? 'Entra com o e-mail cadastrado em Dados e contato.' : 'Sem acesso, o RH sobe a nota pela Folha e benefícios.'}</p>
       </div>
+    )}
 
+    {aba === 'dados' && (
       <form className={css.bloco} onSubmit={(e) => {
         e.preventDefault();
         void chamar(() => api.patch(`/portal/rh/prestadores/${l.id}/contato`, {
@@ -365,6 +458,39 @@ function DetalhePrestador({ l, mes, ocupado, onLembrar, onPagar, onConvidar, onM
         </div>
         <div className={css.acoes}><button type="submit" className={`${css.btnSec} ${css.pequeno}`} disabled={salvando}>Salvar dados</button></div>
       </form>
+    )}
+    </ModalPessoa>
+  );
+}
+
+/** Lado direito do "Este mês": valor, fechamento individual e o caminho da nota. */
+function ResumoPessoa({ l, d }: { l: LinhaRh; d: PainelRh }) {
+  const fi = l.fechadoIndividual;
+  const temNota = l.unidades.some((u) => u.nota);
+  const enviada = l.unidades.some((u) => ['CONFERIR', 'APROVADA', 'RH'].includes(u.situacao));
+  const aprovada = l.unidades.length > 0 && l.unidades.every((u) => u.situacao === 'APROVADA' || u.situacao === 'RH');
+  const passo = l.pago ? 4 : aprovada ? 3 : enviada ? 2 : temNota ? 1 : 0;
+  const etapa = (n: number, titulo: string, sub: string) => (
+    <div className={`${css.tli} ${passo >= n ? css.tliFeito : passo + 1 === n ? css.tliAgora : ''}`}>
+      <i aria-hidden="true">{passo >= n ? '✓' : n}</i><div><b>{titulo}</b><small>{sub}</small></div>
+    </div>
+  );
+  return (
+    <div className={css.bloco}>
+      <h4>{d.rotulo}</h4>
+      <div className={css.lin}><span>{l.tipo === 'MEI' ? 'Valor da nota' : 'Total das semanas'}</span><span className={css.mono}><b>{brl(l.valorCent)}</b></span></div>
+      {l.pagoCent > 0 && <div className={css.lin}><span>Pago</span><span className={css.mono}>{brl(l.pagoCent)}</span></div>}
+      {fi && <p className={css.infoFech}>{fi.motivo === 'DESLIGAMENTO'
+        ? `Desligamento: valores congelados até ${dataBr(fi.ultimoDia ?? '')}${fi.proporcional ? ' (contrato proporcional)' : ''}${fi.debitosFuturosCent ? `, com ${brl(fi.debitosFuturosCent)} de parcelas futuras de débito` : ''}. Fechado por ${fi.por ?? 'RH'} em ${dataIsoBr(fi.em)}.`
+        : `Fechado antes do mês por ${fi.por ?? 'RH'} em ${dataIsoBr(fi.em)}. Continua ativo nos próximos meses.`}</p>}
+      {!fi && !d.fechado && <p className={css.hint}>O mês está aberto: o valor final sai no fechamento, ou agora, se você fechar só esta pessoa.</p>}
+      <h4 style={{ marginTop: 6 }}>Caminho da nota</h4>
+      <div className={css.tl}>
+        {etapa(1, 'Valor fechado e liberado', d.fechado || fi ? 'pronto para emitir' : 'no fechamento do mês ou individual')}
+        {etapa(2, 'Prestador envia a nota', l.acesso.status === 'ATIVO' ? 'pelo app (leitura automática do PDF)' : 'sem app: o RH anexa')}
+        {etapa(3, 'RH confere e aprova', 'em Conferir notas')}
+        {etapa(4, 'Pagamento', l.pago ? 'pago' : 'marcar como pago depois do Pix')}
+      </div>
     </div>
   );
 }

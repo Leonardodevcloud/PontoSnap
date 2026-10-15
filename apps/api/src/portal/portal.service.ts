@@ -377,9 +377,13 @@ export class PortalService {
     type Item = { pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; nome: string; periodo: string; valorCent: number; detalhe: LinhaDetalheNota[] };
     const itens: Item[] = [];
     if (d.tipo === 'MEI') {
-      if (!comp.fechado) throw new BadRequestException(`Feche ${rotuloMes(d.competencia)} antes de liberar os valores dos MEI.`);
+      // Mês aberto: só quem foi fechado sozinho (desligamento/antecipado) pode ser liberado.
+      if (!comp.fechado && !comp.mei.some((m) => m.fechadoIndividual && (!filtro || filtro.has(m.id)))) {
+        throw new BadRequestException(`Feche ${rotuloMes(d.competencia)} antes de liberar os valores dos MEI.`);
+      }
       for (const m of comp.mei) {
         if (filtro && !filtro.has(m.id)) continue;
+        if (!comp.fechado && !m.fechadoIndividual) continue;
         if (m.liquidoCent <= 0) continue;
         itens.push({ pessoaTipo: 'MEI', pessoaId: m.id, nome: m.nome, periodo: 'MES', valorCent: m.liquidoCent, detalhe: detalheMei(m, comp.debitos, d.competencia) });
       }
@@ -493,9 +497,9 @@ export class PortalService {
     };
 
     const linhas = [
-      ...comp.mei.map((m) => ({ id: m.id, tipo: 'MEI' as const, nome: m.nome, valorCent: m.liquidoCent, unidades: [unidade(m.id, 'MEI', 'MES', m.liquidoCent)] })),
+      ...comp.mei.map((m) => ({ id: m.id, tipo: 'MEI' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null, unidades: [unidade(m.id, 'MEI', 'MES', m.liquidoCent)] })),
       ...comp.motoristas.map((m) => ({
-        id: m.id, tipo: 'MOTORISTA' as const, nome: m.nome, valorCent: m.liquidoCent,
+        id: m.id, tipo: 'MOTORISTA' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null,
         unidades: m.semanas.filter((s) => s.dias > 0).map((s) => unidade(m.id, 'MOTORISTA', s.inicio, valorSemana(s))),
       })),
     ].map((l) => {
@@ -651,6 +655,54 @@ export class PortalService {
   }
 
   /** Marca como pago (valor = o liberado) e avisa o prestador. */
+  // ───────────────────────── RH: fechar UMA pessoa ─────────────────────────
+
+  /** Prévia do fechamento individual (valor congelado, proporcional e débitos futuros). */
+  previaFecharPessoa(tenantId: string, d: { pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO'; ultimoDia: string | null; proporcional: boolean }) {
+    return this.pessoal.previaFechamentoPessoa(tenantId, d);
+  }
+
+  /**
+   * Fecha UMA pessoa com o mês aberto (ex.: desligamento) e, se pedido, libera
+   * a nota dela na hora (MEI: o mês; motorista: as semanas trabalhadas).
+   */
+  async fecharPessoa(tenantId: string, d: {
+    pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; competencia: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO'; ultimoDia: string | null; proporcional: boolean;
+    liberarNota?: boolean; cortarAcesso?: boolean; prazo?: string | null;
+  }, autorNome: string) {
+    const r = await this.pessoal.fecharPessoa(tenantId, d, autorNome);
+    let liberacao: Awaited<ReturnType<PortalService['liberar']>> | null = null;
+    if (d.liberarNota) {
+      const semanas = d.pessoaTipo === 'MOTORISTA' ? (r.linha as { semanas: { inicio: string; dias: number }[] }).semanas.filter((s) => s.dias > 0).map((s) => s.inicio) : undefined;
+      try {
+        liberacao = await this.liberar(tenantId, { competencia: d.competencia, tipo: d.pessoaTipo, prestadorIds: [d.pessoaId], semanas, prazo: d.prazo ?? null });
+      } catch { liberacao = null; } // sem valor a liberar (ex.: líquido zero): o fechamento vale assim mesmo
+    }
+    return { ...r, liberacao };
+  }
+
+  /**
+   * Reabre a pessoa (antes de pagar). Nota liberada e ainda não enviada some;
+   * nota já enviada volta para o prestador como "aguarde o novo valor".
+   */
+  async reabrirPessoa(tenantId: string, id: string) {
+    const r = await this.pessoal.reabrirPessoa(tenantId, id);
+    const contas = await comTenant(this.db, tenantId, async (tx) => {
+      const ns = await tx.select().from(pessoalNota).where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.pessoaId, r.pessoaId), eq(pessoalNota.competencia, r.competencia)));
+      for (const n of ns) {
+        if (n.status === 'ENVIADA' || n.status === 'APROVADA') {
+          await tx.update(pessoalNota).set({ status: 'RECUSADA', motivoRecusa: 'O RH reabriu o valor para ajuste. Aguarde o novo valor antes de emitir outra nota.', conferidaEm: new Date(), conferidaPor: 'RH' })
+            .where(eq(pessoalNota.id, n.id));
+        } else {
+          await tx.delete(pessoalNota).where(eq(pessoalNota.id, n.id));
+        }
+      }
+      return this.contasDe(tx, tenantId, [r.pessoaId]);
+    });
+    await this.avisar(tenantId, contas.get(r.pessoaId), { titulo: `${rotuloMes(r.competencia)}: valor em ajuste`, corpo: 'O RH reabriu seu valor para ajuste. Você recebe um aviso quando sair o novo.', url: '/', tag: `reaberto-${id}` });
+    return r;
+  }
+
   async pagar(tenantId: string, notaIds: string[]) {
     if (!notaIds.length) throw new BadRequestException('Escolha as notas.');
     const ns = await comTenant(this.db, tenantId, (tx) => tx.select().from(pessoalNota)
@@ -664,6 +716,17 @@ export class PortalService {
       await this.avisar(tenantId, contas.get(n.pessoaId), {
         titulo: `Pagamento registrado · ${rotuloPeriodo(n.competencia, n.periodo)}`, corpo: `R$ ${reaisBr(n.valorCent)} pagos.`, url: '/notas', tag: `nota-paga-${n.id}`,
       });
+    }
+    // Desligado com "cortar acesso depois do pagamento": corta quando tudo do mês foi pago.
+    for (const chave of new Set(ns.map((n) => `${n.pessoaId}|${n.competencia}`))) {
+      const [pessoaId, competencia] = chave.split('|') as [string, string];
+      const tudoPago = await comTenant(this.db, tenantId, async (tx) => {
+        const todas = await tx.select({ periodo: pessoalNota.periodo }).from(pessoalNota).where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.pessoaId, pessoaId), eq(pessoalNota.competencia, competencia)));
+        const lancs = await tx.select({ periodo: pessoalLancamento.periodo, pago: pessoalLancamento.pago }).from(pessoalLancamento)
+          .where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.pessoaId, pessoaId), eq(pessoalLancamento.competencia, competencia)));
+        return todas.every((x) => lancs.some((l) => l.periodo === x.periodo && l.pago));
+      });
+      if (tudoPago) await this.pessoal.cortarAcessoSePedido(tenantId, pessoaId, competencia);
     }
     return { pagas: ns.length };
   }

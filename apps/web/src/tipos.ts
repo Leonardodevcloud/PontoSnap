@@ -738,7 +738,14 @@ export interface PessoalLancMei {
 /** Arquivo da NF enviado (metadados; o conteúdo vem de /pessoal/nf/:id). */
 export interface PessoalNfArquivo { id: string; nome: string; mime: string; bytes: number; enviadoEm: string }
 export interface PessoalPagamentoMes { pago: boolean; valorPagoCent: number | null; pagoEm: string | null }
+/** Pessoa fechada sozinha no mês (desligamento ou pagamento antecipado). */
+export interface FechadoIndividual {
+  id: string; em: string; por: string | null; motivo: 'DESLIGAMENTO' | 'ANTECIPADO'; ultimoDia: string | null; proporcional: boolean; debitosFuturosCent: number;
+}
 export interface PessoalLinhaMei {
+  fechadoIndividual?: FechadoIndividual;
+  proporcional?: { dias: number; diasMes: number; contratoCent: number };
+  debitosFuturosCent?: number;
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação (pode ser antes do sistema) e 1ª competência no sistema. */
   inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
@@ -754,6 +761,8 @@ export interface PessoalSemanaMot {
   debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
 }
 export interface PessoalLinhaMot {
+  fechadoIndividual?: FechadoIndividual;
+  debitosFuturosCent?: number;
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação (pode ser antes do sistema) e 1ª competência no sistema. */
   inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;

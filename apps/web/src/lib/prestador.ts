@@ -1,3 +1,4 @@
+import type { FechadoIndividual } from '../tipos';
 /** Tipos e utilidades do portal do prestador (app restrito e telas do RH). */
 
 export type StatusNota = 'AGUARDANDO' | 'ENVIADA' | 'APROVADA' | 'RECUSADA';
@@ -85,6 +86,8 @@ export interface LinhaRh {
   tomadorNome: string | null; tomadorCnpj: string | null; avatarSemente: number | null;
   acesso: { status: StatusAcesso; temPush: boolean; conviteExpiraEm: string | null };
   situacao: Situacao; atrasada: boolean; vistoEm: string | null; pago: boolean; pagoCent: number;
+  /** Fechado sozinho no mês (desligamento / pagar antes do fechamento). */
+  fechadoIndividual: FechadoIndividual | null;
 }
 export interface PainelRh {
   competencia: string; rotulo: string; fechado: boolean; fechadoEm: string | null; hoje: string; meiLiberado: boolean;
