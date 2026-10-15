@@ -223,5 +223,6 @@ export function ConfeteCanvas({ ativo }: { ativo: boolean }) {
     return () => cancelAnimationFrame(raf);
   }, [ativo]);
 
-  return <canvas ref={ref} aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />;
+  // pointer-events:none: o confete fica por cima, mas os toques passam para os botões.
+  return <canvas ref={ref} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />;
 }

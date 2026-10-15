@@ -56,6 +56,13 @@ export function BaterPonto() {
   useEffect(() => { void carregar(); }, [carregar]);
   useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
 
+  // Depois do "Bateu!", volta sozinho para o início (sem botão de voltar).
+  useEffect(() => {
+    if (!confirmada) return;
+    const t = setTimeout(() => { setConfirmada(null); void carregar(); }, (confirmada.offline || confirmada.obs ? 7 : 4) * 1000);
+    return () => clearTimeout(t);
+  }, [confirmada, carregar]);
+
   // Posição só no momento em que a tela é usada — nunca em segundo plano.
   useEffect(() => { void capturarPosicao().then(setGeo); }, []);
 
@@ -169,6 +176,7 @@ export function BaterPonto() {
 
   // ----- Tela "Bateu!" -----
   if (confirmada) {
+    const segundos = confirmada.offline || confirmada.obs ? 7 : 4; // com aviso, dá tempo de ler
     return (
       <div className={`appshell ${css.conf}`}>
         <ConfeteCanvas ativo />
@@ -190,7 +198,10 @@ export function BaterPonto() {
         {confirmada.obs && <div className={css.bateuObs}>Anotado: {confirmada.obs}. O RH vai ver.</div>}
         <div className={css.espaco} />
         <Botao variante="lime" onClick={() => navegar('/espelho')}>Ver espelho do dia</Botao>
-        <Botao variante="ghost" onClick={() => setConfirmada(null)}>Voltar</Botao>
+        <div className={css.voltando} role="status">
+          <span>Voltando para o início…</span>
+          <i key={confirmada.batida.dtMarcacao} style={{ animationDuration: `${segundos}s` }} aria-hidden="true" />
+        </div>
       </div>
     );
   }

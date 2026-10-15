@@ -147,3 +147,10 @@
   margin-top:20px; background:none; border:none; color:var(--ash);
   font-size:14px; text-decoration:underline; cursor:pointer;
 }
+
+/* "Bateu!" volta sozinho: barrinha mostrando o tempo */
+.voltando{ width:100%; max-width:280px; margin:14px auto 4px; display:flex; flex-direction:column; gap:8px; align-items:center; color:var(--ash); font-size:13px; position:relative; z-index:2; }
+.voltando i{ display:block; width:100%; height:4px; border-radius:4px; background:rgba(var(--ink-rgb),.12); position:relative; overflow:hidden; }
+.voltando i::after{ content:''; position:absolute; inset:0; background:var(--coral); transform-origin:left; animation:voltandoBarra linear forwards; animation-duration:inherit; }
+@keyframes voltandoBarra{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+@media (prefers-reduced-motion: reduce){ .voltando i::after{ animation:none; transform:scaleX(1); opacity:.4; } }
