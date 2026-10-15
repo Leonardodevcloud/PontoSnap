@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsString() @IsNotEmpty() @MaxLength(180) email!: string;
@@ -10,7 +10,8 @@ export class RefreshDto {
 }
 
 export class AlterarSenhaDto {
-  @IsString() senhaAtual!: string;
+  /** Dispensada no primeiro acesso (quem já entrou com a senha provisória). */
+  @IsOptional() @IsString() senhaAtual?: string;
   @IsString() @MinLength(8) senhaNova!: string;
 }
 

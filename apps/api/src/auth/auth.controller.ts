@@ -36,7 +36,7 @@ export class AuthController {
   @Post('alterar-senha')
   @UseGuards(JwtAuthGuard)
   alterarSenha(@UsuarioAtual() u: PayloadAcesso, @Body() dto: AlterarSenhaDto) {
-    return this.auth.alterarSenha(u.sub, dto.senhaAtual, dto.senhaNova);
+    return this.auth.alterarSenha(u.sub, dto.senhaAtual ?? '', dto.senhaNova);
   }
 
   /** Pede o link de recuperação. Público — resposta não revela se o e-mail existe. */

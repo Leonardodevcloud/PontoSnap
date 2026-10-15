@@ -36,11 +36,13 @@ export function TrocarSenha() {
       <div className={css.topo}>
         <Flash tamanho={40} />
         <h1 className={css.h}>{primeiro ? 'Bem-vindo! Defina sua senha' : 'Trocar senha'}</h1>
-        <p className={css.sub}>{primeiro ? 'É seu primeiro acesso — troque a senha provisória pra continuar.' : 'Escolha uma nova senha.'}</p>
+        <p className={css.sub}>{primeiro ? 'É seu primeiro acesso — crie a sua senha para continuar.' : 'Escolha uma nova senha.'}</p>
       </div>
 
-      <Campo rotulo={primeiro ? 'Senha provisória' : 'Senha atual'} type="password" autoComplete="current-password"
-        value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••••" />
+      {!primeiro && (
+        <Campo rotulo="Senha atual" type="password" autoComplete="current-password"
+          value={atual} onChange={(e) => setAtual(e.target.value)} placeholder="••••••••" />
+      )}
       <Campo rotulo="Nova senha" type="password" autoComplete="new-password"
         value={nova} onChange={(e) => setNova(e.target.value)} placeholder="mínimo 8 caracteres" />
       <Campo rotulo="Confirmar nova senha" type="password" autoComplete="new-password"
@@ -48,7 +50,7 @@ export function TrocarSenha() {
         onKeyDown={(e) => e.key === 'Enter' && submeter()} />
 
       {erro && <p className={css.erro}>{erro}</p>}
-      <Botao variante="coral" onClick={submeter} disabled={enviando || !atual || !nova || !conf}>
+      <Botao variante="coral" onClick={submeter} disabled={enviando || (!primeiro && !atual) || !nova || !conf}>
         {enviando ? 'Salvando…' : 'Salvar nova senha'}
       </Botao>
     </div>

@@ -66,7 +66,7 @@ function TagAcesso({ l }: { l: LinhaRh }) {
 export function Prestadores() {
   const [params, setParams] = useSearchParams();
   const navegar = useNavigate();
-  const mes = params.get('mes') ?? somarMes(mesHoje(), -1);
+  const mes = params.get('mes') ?? mesHoje();
   const [d, setD] = useState<PainelRh | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);

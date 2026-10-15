@@ -164,15 +164,21 @@ export class AuthService {
     };
   }
 
-  /** Troca a própria senha (verifica a atual) e limpa a obrigação de trocar. */
+  /**
+   * Troca a própria senha e limpa a obrigação de trocar. No primeiro acesso
+   * (deveTrocarSenha) a pessoa acabou de entrar com a senha provisória, então
+   * não pedimos de novo; nas demais trocas a senha atual é conferida.
+   */
   async alterarSenha(usuarioId: string, senhaAtual: string, senhaNova: string) {
     const rows = await comoMaster(this.db, (tx) =>
       tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1));
     const u = rows[0];
     if (!u) throw new UnauthorizedException('Usuário não encontrado');
 
-    const ok = await verificarSenha(senhaAtual, u.senhaHash);
-    if (!ok) throw new UnauthorizedException('Senha atual incorreta');
+    if (!u.deveTrocarSenha) {
+      const ok = await verificarSenha(senhaAtual, u.senhaHash);
+      if (!ok) throw new UnauthorizedException('Senha atual incorreta');
+    }
 
     const novoHash = await hashSenha(senhaNova);
     await comoMaster(this.db, (tx) =>
