@@ -1,10 +1,10 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { lerNfseXml, type LidoNfse } from '@ponto/shared';
+import { lerNfseXml } from '@ponto/shared';
 import { api } from '../lib/api';
 import { prepararArquivo, type ArquivoPronto } from '../lib/imagem';
 import { lerReais } from '../lib/formato';
-import { brl, dataBr, dataIsoBr, fmtCnpj, reais, type Conferencia, type Nota } from '../lib/prestador';
+import { brl, dataBr, dataIsoBr, fmtCnpj, reais, type Conferencia, type Eu, type Nota } from '../lib/prestador';
 import { usePrestador } from './LayoutPrestador';
 import css from './Prestador.module.css';
 
@@ -28,6 +28,31 @@ function Cl({ ok, titulo, detalhe }: { ok: boolean | null; titulo: string; detal
   );
 }
 
+/** O que a API leu do arquivo (prévia, antes de enviar). */
+interface Lido { numero: string | null; data: string | null; valorCent: number | null; cnpjPrestador: string | null; cnpjTomador: string | null }
+interface Leitura { lido: Lido | null; conferencia: Conferencia | null }
+interface ItemConf { ok: boolean | null; titulo: string; detalhe?: string }
+
+/** Itens da conferência a partir do que foi lido (só mostra o que deu para checar). */
+function itensConferencia(c: Conferencia, nota: Nota, eu: Eu): ItemConf[] {
+  const l = c.lido ?? {};
+  const r: ItemConf[] = [];
+  if (c.valorBate !== null) r.push(c.valorBate
+    ? { ok: true, titulo: 'Valor igual ao fechamento', detalhe: brl(nota.valorCent) }
+    : { ok: false, titulo: 'Valor diferente do fechamento', detalhe: `na nota ${l.valorCent != null ? brl(l.valorCent) : '—'} · esperado ${brl(nota.valorCent)}` });
+  if (l.cnpjPrestador) r.push(c.prestadorOk === false
+    ? { ok: false, titulo: 'Emitida em outro CNPJ', detalhe: `na nota ${fmtCnpj(l.cnpjPrestador)}${eu.prestador.documento ? ` · o seu ${fmtCnpj(eu.prestador.documento)}` : ''}` }
+    : { ok: c.prestadorOk, titulo: 'Emitida no seu CNPJ', detalhe: fmtCnpj(l.cnpjPrestador) });
+  if (l.cnpjTomador) r.push(c.tomadorOk === false
+    ? { ok: false, titulo: 'Emitida para outra empresa', detalhe: `na nota ${fmtCnpj(l.cnpjTomador)} · certo ${fmtCnpj(eu.tomador.cnpj)}` }
+    : { ok: c.tomadorOk, titulo: 'Para a empresa certa', detalhe: `${eu.tomador.nome} · ${fmtCnpj(l.cnpjTomador)}` });
+  if (l.data) r.push(c.competenciaOk === false
+    ? { ok: false, titulo: 'Emitida antes do serviço', detalhe: `emitida em ${dataBr(l.data)}` }
+    : { ok: true, titulo: 'Emitida depois do serviço', detalhe: `emitida em ${dataBr(l.data)}` });
+  if (c.numeroRepetido) r.push({ ok: false, titulo: 'Número de nota já usado antes', detalhe: l.numero ? `nº ${l.numero}` : undefined });
+  return r;
+}
+
 /**
  * Enviar a nota: PDF (o melhor), XML da NFS-e (lido na hora) ou foto. Número,
  * data e valor vêm preenchidos quando dá; o prestador confere e envia.
@@ -39,7 +64,9 @@ export function EnviarNota() {
   const nota = eu?.notas.find((n) => n.id === id) ?? null;
   const [arq, setArq] = useState<ArquivoPronto | null>(null);
   const [previa, setPrevia] = useState<string | null>(null);
-  const [lido, setLido] = useState<LidoNfse | null>(null);
+  const [lendo, setLendo] = useState(false);
+  const [leitura, setLeitura] = useState<Leitura | null>(null);
+  const lido = leitura?.lido ?? null;
   const [numero, setNumero] = useState('');
   const [data, setData] = useState(hoje());
   const [valor, setValor] = useState('');
@@ -53,33 +80,54 @@ export function EnviarNota() {
   if (!eu) return <div className={css.tela}><div className={css.esqueleto} aria-busy="true" /></div>;
   if (!nota) return <div className={css.tela}><button type="button" className={css.voltar} onClick={() => navegar('/')}>‹ Voltar</button><p className={css.erro}>Nota não encontrada.</p></div>;
 
+  /** Manda o arquivo para a API ler e conferir (não grava) e preenche os campos. */
+  async function ler(a: ArquivoPronto) {
+    if (!nota) return;
+    setLendo(true); setLeitura(null);
+    try {
+      const r = await api.post<Leitura>(`/portal/eu/notas/${nota.id}/ler`, { arquivoBase64: a.base64, arquivoMime: a.mime });
+      setLeitura(r);
+      if (r.lido?.numero) setNumero(r.lido.numero);
+      if (r.lido?.data) setData(r.lido.data);
+      if (r.lido?.valorCent != null) setValor(reais(r.lido.valorCent));
+    } catch { setLeitura({ lido: null, conferencia: null }); }
+    finally { setLendo(false); }
+  }
+
   async function escolher(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
-    setErro(null); setLido(null);
+    setErro(null); setLeitura(null); setNumero(''); setData(hoje());
+    if (nota) setValor(reais(nota.valorCent));
     try {
       const ehXml = /xml/.test(f.type) || /\.xml$/i.test(f.name);
       if (ehXml) {
         const txt = await lerTexto(f);
         const l = lerNfseXml(txt);
         if (!l.numero && !l.valorCent) throw new Error('Esse XML não parece uma NFS-e. Envie o PDF da nota.');
-        setArq({ base64: paraBase64Texto(txt), nome: f.name, mime: 'application/xml', bytes: f.size });
-        setLido(l); setPrevia(null);
-        if (l.numero) setNumero(l.numero);
-        if (l.data) setData(l.data);
-        if (l.valorCent != null) setValor(reais(l.valorCent));
+        const a: ArquivoPronto = { base64: paraBase64Texto(txt), nome: f.name, mime: 'application/xml', bytes: f.size };
+        setArq(a); setPrevia(null);
+        await ler(a);
         return;
       }
-      const p = await prepararArquivo(f);
+      // Alguns celulares mandam o PDF sem tipo: confia na extensão.
+      const arquivo = !f.type && /\.pdf$/i.test(f.name) ? new File([f], f.name, { type: 'application/pdf' }) : f;
+      const p = await prepararArquivo(arquivo);
       if (p.bytes > MAX) throw new Error('Arquivo maior que 5 MB. Envie um PDF menor.');
       setArq(p);
-      setPrevia(p.mime.startsWith('image/') ? URL.createObjectURL(f) : null);
+      setPrevia(p.mime.startsWith('image/') ? URL.createObjectURL(arquivo) : null);
+      if (p.mime === 'application/pdf') await ler(p);
     } catch (x) { setErro((x as Error).message); }
   }
 
   const valorCent = Math.round(lerReais(valor) * 100);
   const valorDifere = valor.trim() !== '' && valorCent !== nota.valorCent;
+  const conf = leitura?.conferencia ?? null;
+  const itensConf = conf ? itensConferencia(conf, nota, eu) : [];
+  const problemas = itensConf.filter((i) => i.ok === false);
+  const fonte = arq?.mime.includes('xml') ? 'do XML' : 'do PDF';
+  const valorDoArq = lido?.valorCent != null && valor.trim() !== '' && valorCent === lido.valorCent;
 
   async function enviar() {
     if (!arq || !nota) return;
@@ -108,7 +156,7 @@ export function EnviarNota() {
               detalhe={feito.nfValorCent != null ? `Esperado ${brl(nota.valorCent)} · na nota ${brl(feito.nfValorCent)}` : undefined} />
             <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota já usado antes' : 'Número da nota não repetido'} />
             <Cl ok={c.competenciaOk} titulo={c.competenciaOk === false ? 'Data de emissão antes do período' : 'Data de emissão'} />
-            {c.origem === 'XML' && <Cl ok={c.tomadorOk} titulo={c.tomadorOk === false ? 'Tomador diferente' : 'Tomador certo'} detalhe={c.lido?.cnpjTomador ? fmtCnpj(c.lido.cnpjTomador) : undefined} />}
+            {c.origem !== 'INFORMADO' && c.lido?.cnpjTomador && <Cl ok={c.tomadorOk} titulo={c.tomadorOk === false ? 'Tomador diferente' : 'Tomador certo'} detalhe={c.lido?.cnpjTomador ? fmtCnpj(c.lido.cnpjTomador) : undefined} />}
             {c.arquivo === 'FOTO' && <Cl ok={null} titulo="Foto: o RH confere a olho" />}
           </div>
         </section>
@@ -146,43 +194,75 @@ export function EnviarNota() {
         <div className={css.arq}>
           <span className={css.arqIc}>{previa ? <img src={previa} alt="" /> : arq.mime.includes('xml') ? 'XML' : 'PDF'}</span>
           <div><b>{arq.nome}</b><small>{kb(arq.bytes)}</small></div>
-          <button type="button" onClick={() => { setArq(null); setLido(null); setPrevia(null); }}>trocar</button>
+          <button type="button" onClick={() => { setArq(null); setLeitura(null); setPrevia(null); setNumero(''); setData(hoje()); setValor(reais(nota.valorCent)); }}>trocar</button>
         </div>
       )}
 
-      {lido && (
-        <div className={css.lido} role="status">
-          <b>✓ Li a sua nota</b>
-          {[lido.numero && `Nº ${lido.numero}`, lido.data && dataBr(lido.data), lido.valorCent != null && brl(lido.valorCent),
-            lido.cnpjTomador && `tomador ${fmtCnpj(lido.cnpjTomador)}`].filter(Boolean).join(' · ')}.
-          {' '}{lido.valorCent === nota.valorCent ? 'Bate com o valor do fechamento.' : lido.valorCent != null ? 'O valor não bate com o fechamento.' : ''}
+      {lendo && (
+        <div className={css.lendo} role="status" aria-live="polite">
+          <span className={css.spin} aria-hidden="true" />
+          <div><b>Lendo sua nota…</b><small>número, data, valor e CNPJs</small></div>
         </div>
+      )}
+
+      {!lendo && arq?.mime === 'application/pdf' && leitura && !leitura.lido && (
+        <div className={`${css.alerta} ${css.alertaInfo}`} role="status">
+          <b>Não consegui ler esse PDF sozinho</b>
+          Pode ser uma nota escaneada. Preencha os dados abaixo, que o RH confere olhando o arquivo.
+        </div>
+      )}
+
+      {!lendo && conf && problemas.length > 0 && (
+        <div className={css.alerta} role="alert">
+          <b>{problemas.length === 1 ? 'Essa nota tem 1 problema' : `Essa nota tem ${problemas.length} problemas`}</b>
+          O mais seguro é emitir de novo e enviar o arquivo certo. Se enviar assim, o RH provavelmente vai recusar.
+        </div>
+      )}
+
+      {!lendo && conf && itensConf.length > 0 && (
+        <section className={css.card} aria-label="Conferência da nota">
+          {problemas.length === 0 && <h3><span style={{ color: 'var(--ok-text)' }}>✓</span> {conf.valorBate ? 'Li sua nota e está tudo certo' : 'Li sua nota'}</h3>}
+          <div className={css.chk}>
+            {itensConf.map((i) => <Cl key={i.titulo} ok={i.ok} titulo={i.titulo} detalhe={i.detalhe} />)}
+          </div>
+        </section>
       )}
 
       {arq && (
         <>
           <div className={css.duo}>
             <div className={css.campo}>
-              <label htmlFor="nf-numero">Número da nota</label>
-              <input id="nf-numero" inputMode="numeric" value={numero} onChange={(e) => setNumero(e.target.value)} maxLength={60} autoComplete="off" />
+              <label htmlFor="nf-numero">Número da nota{lido?.numero && numero === lido.numero && <em className={css.doArq}>{fonte}</em>}</label>
+              <input id="nf-numero" inputMode="numeric" className={lido?.numero && numero === lido.numero ? css.auto : undefined} value={numero} onChange={(e) => setNumero(e.target.value)} maxLength={60} autoComplete="off" />
             </div>
             <div className={css.campo}>
-              <label htmlFor="nf-data">Data de emissão</label>
-              <input id="nf-data" type="date" value={data} onChange={(e) => setData(e.target.value)} max={hoje()} />
+              <label htmlFor="nf-data">Data de emissão{lido?.data && data === lido.data && <em className={css.doArq}>{fonte}</em>}</label>
+              <input id="nf-data" type="date" className={lido?.data && data === lido.data ? css.auto : undefined} value={data} onChange={(e) => setData(e.target.value)} max={hoje()} />
             </div>
           </div>
           <div className={css.campo}>
-            <label htmlFor="nf-valor">Valor da nota (R$)</label>
-            <input id="nf-valor" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} aria-describedby="nf-valor-ajuda" />
+            <label htmlFor="nf-valor">Valor da nota (R$){valorDoArq && <em className={css.doArq}>{fonte}</em>}</label>
+            <input id="nf-valor" inputMode="decimal" className={valorDoArq ? css.auto : undefined} value={valor} onChange={(e) => setValor(e.target.value)} aria-describedby="nf-valor-ajuda" />
             <small id="nf-valor-ajuda">{valorDifere ? `⚠ Diferente do fechamento (${brl(nota.valorCent)}). O RH pode pedir outra nota.` : 'Igual ao valor do fechamento.'}</small>
           </div>
         </>
       )}
 
       {erro && <div className={css.erro} role="alert">{erro}</div>}
-      <button type="button" className={css.btn} disabled={!arq || !numero.trim() || !data || enviando} onClick={enviar}>
-        {enviando ? 'Enviando…' : 'Enviar para o RH'}
-      </button>
+      {problemas.length > 0 && !lendo ? (
+        <>
+          <label className={`${css.btn} ${css.btnArq}`}>Trocar o arquivo
+            <input type="file" accept="application/pdf,.pdf,.xml,text/xml,application/xml" onChange={escolher} />
+          </label>
+          <button type="button" className={css.linkBtn} disabled={!numero.trim() || !data || enviando} onClick={enviar}>
+            {enviando ? 'Enviando…' : 'Enviar assim mesmo'}
+          </button>
+        </>
+      ) : (
+        <button type="button" className={css.btn} disabled={!arq || lendo || !numero.trim() || !data || enviando} onClick={enviar}>
+          {enviando ? 'Enviando…' : 'Enviar para o RH'}
+        </button>
+      )}
     </div>
   );
 }

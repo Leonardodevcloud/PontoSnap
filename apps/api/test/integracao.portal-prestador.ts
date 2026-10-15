@@ -30,6 +30,23 @@ const recebidas: { titulo: string; corpo: string; endpoint: string }[] = [];
 };
 async function falha(p: Promise<unknown>) { try { await p; return null; } catch (e) { return (e as Error).message; } }
 const b64 = (s: string) => Buffer.from(s).toString('base64');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const PDFDocument = require('../../../packages/rep-core/node_modules/pdfkit');
+/** DANFSe de teste (layout em tabela, como o emissor nacional) → base64. */
+function danfse(o: { numero: string; emissao: string; prest: string; toma: string; valor: string }): Promise<string> {
+  return new Promise((ok) => {
+    const d = new PDFDocument({ size: 'A4', margin: 30 }); const partes: Buffer[] = [];
+    d.on('data', (b: Buffer) => partes.push(b)); d.on('end', () => ok(Buffer.concat(partes).toString('base64')));
+    const tp = o.prest.length === 11 ? '1' : '2'; const insc = o.prest.padStart(14, '0');
+    d.fontSize(8).text('Chave de Acesso da NFS-e', 30, 40).text(`2704302${'1'}${tp}${insc}${o.numero.padStart(13, '0')}2610${'123456789'}7`, 30, 50);
+    d.text('Número da NFS-e', 30, 70).text('Data e Hora da emissão da NFS-e', 300, 70).text(o.numero, 30, 80).text(o.emissao, 300, 80);
+    d.text('EMITENTE DA NFS-e', 30, 100).text('CNPJ / CPF / NIF', 200, 110).text(o.prest, 200, 120);
+    d.text('TOMADOR DO SERVIÇO', 30, 140).text('CNPJ / CPF / NIF', 30, 150).text(o.toma, 30, 160);
+    d.text('Valor do Serviço', 30, 190).text('Valor Líquido da NFS-e', 300, 190).text(o.valor, 30, 200).text(o.valor, 300, 200);
+    d.end();
+  });
+}
+const brlTxt = (c: number) => `R$ ${(c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
 async function main() {
   const push = new PushService(db);
@@ -102,8 +119,22 @@ async function main() {
   recebidas.length = 0;
   await portal.responder(t.id, nota.id, 'Conferimos o ponto: foram 6h. Valor mantido.');
   ok(recebidas.some((r) => r.titulo.startsWith('O RH respondeu')), 'prestador recebe a resposta no celular');
+  // PDF de verdade: prévia (ler) antes de enviar
+  const pdfBom = await danfse({ numero: '127', emissao: '02/10/2026 09:00:00', prest: cpf, toma: CNPJ, valor: brlTxt(liqCarlos) });
+  const prev = await portal.lerNota(t.id, uCarlos.id, nota.id, { arquivoBase64: pdfBom, arquivoMime: 'application/pdf' });
+  ok(prev.lido?.numero === '127' && prev.lido?.data === '2026-10-02' && prev.lido?.valorCent === liqCarlos && prev.conferencia?.origem === 'PDF'
+    && prev.conferencia.bate && prev.conferencia.prestadorOk === true && prev.conferencia.tomadorOk === true, 'PDF: prévia lê número, data, valor e CNPJs, tudo confere');
+  const pdfRuim = await danfse({ numero: '127', emissao: '02/10/2026 09:00:00', prest: cpf, toma: '11222333000181', valor: brlTxt(liqCarlos - 8000) });
+  const prevRuim = await portal.lerNota(t.id, uCarlos.id, nota.id, { arquivoBase64: pdfRuim, arquivoMime: 'application/pdf' });
+  ok(prevRuim.conferencia?.valorBate === false && prevRuim.conferencia?.tomadorOk === false && !prevRuim.conferencia?.bate, 'PDF: prévia aponta valor e tomador errados');
+  const prevNada = await portal.lerNota(t.id, uCarlos.id, nota.id, { arquivoBase64: pdf.arquivoBase64, arquivoMime: 'application/pdf' });
+  ok(prevNada.lido === null && prevNada.conferencia === null, 'PDF sem texto: prévia não inventa nada');
+  ok((await portal.eu(t.id, uCarlos.id)).notas[0]!.status !== 'ENVIADA', 'prévia não grava');
+
   let env = await portal.enviarNota(t.id, uCarlos.id, nota.id, pdf);
-  ok(env.status === 'ENVIADA' && env.conferencia.bate && env.conferencia.origem === 'INFORMADO', 'nota enviada (PDF), conferência: bate');
+  ok(env.status === 'ENVIADA' && env.conferencia.bate && env.conferencia.origem === 'INFORMADO', 'nota enviada (PDF sem texto), conferência pelo informado: bate');
+  env = await portal.enviarNota(t.id, uCarlos.id, nota.id, { ...pdf, arquivoBase64: pdfBom, numero: '127' });
+  ok(env.conferencia.origem === 'PDF' && env.conferencia.bate && env.conferencia.lido?.cnpjTomador === CNPJ, 'envio com PDF lido: conferência vem do PDF');
   const fila = await portal.filaConferir(t.id);
   ok(fila.length === 1 && fila[0]!.nome === 'Carlos Andrade' && fila[0]!.nf.numero === '127' && !!fila[0]!.nf.arquivo, 'fila de conferência com número e arquivo');
   const snap2 = await pes.competencia(t.id, COMP);

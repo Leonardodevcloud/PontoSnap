@@ -165,3 +165,16 @@
   .campos{ grid-template-columns:1fr; }
   .busca{ margin-left:0; width:100%; }
 }
+
+/* Conferência: "na nota × esperado" (XML ou PDF lido) */
+.tabConf{ width:100%; border-collapse:collapse; font-size:13px; }
+.tabConf th{ text-align:left; font-size:11px; color:var(--ash); font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:0 6px 6px; }
+.tabConf td{ padding:7px 6px; border-top:1px solid var(--row-border); vertical-align:top; }
+.tabConf small{ display:block; color:var(--ash); font-size:11.5px; }
+.confV{ font-family:var(--ff-mono); font-size:11.5px; white-space:nowrap; }
+.confSt{ width:24px; text-align:center; font-weight:900; color:var(--ok-text); }
+.confRuim .confSt, .confRuim .confV{ color:var(--erro-text); }
+.confRuim .confV{ font-weight:700; }
+.confTalvez .confSt{ color:var(--ash); }
+.confRot{ color:var(--ash); font-size:12px; white-space:nowrap; width:1%; }
+.confEsp{ display:block; font-family:var(--ff-mono); font-size:11.5px; color:var(--ash); margin-top:2px; }

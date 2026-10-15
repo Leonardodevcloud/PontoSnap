@@ -7,7 +7,7 @@ import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PortalService } from './portal.service';
 import {
-  AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, ConvidarDto, EnviarNotaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
+  AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, ConvidarDto, EnviarNotaDto, LerNotaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
 } from './portal.dto';
 
 const t = (u: PayloadAcesso): string => {
@@ -34,6 +34,10 @@ export class PortalPrestadorController {
   @Post('notas/:id/visto') visto(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.svc.marcarVisto(t(u), u.sub, id); }
   @Post('notas/:id/confirmar') confirmar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ConfirmarValorDto) {
     return this.svc.confirmar(t(u), u.sub, id, dto);
+  }
+  /** Prévia: lê o PDF/XML escolhido e confere, sem gravar. */
+  @Post('notas/:id/ler') ler(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LerNotaDto) {
+    return this.svc.lerNota(t(u), u.sub, id, dto);
   }
   @Post('notas/:id/enviar') enviar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: EnviarNotaDto) {
     return this.svc.enviarNota(t(u), u.sub, id, dto);

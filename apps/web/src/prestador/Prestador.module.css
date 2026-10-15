@@ -148,3 +148,21 @@
 .olho button{ position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:0; color:var(--coral-dark); font:inherit; font-weight:800; font-size:12.5px; cursor:pointer; padding:6px; }
 
 @media (prefers-reduced-motion:reduce){ .esqueleto{ animation:none; } }
+
+/* Leitura automática do PDF/XML da nota */
+.lendo{ display:flex; gap:12px; align-items:center; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:16px; padding:14px 15px; }
+.lendo b{ display:block; font-size:14.5px; }
+.lendo small{ color:var(--ash); font-size:12.5px; }
+.spin{ width:22px; height:22px; flex:none; border-radius:50%; border:3px solid var(--peach); border-top-color:var(--coral); animation:girar .8s linear infinite; }
+@keyframes girar{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){ .spin{ animation-duration:2.4s; } }
+.alertaInfo{ background:var(--info-bg); border-color:transparent; }
+.alertaInfo b{ color:var(--info-text); }
+.doArq{ font-style:normal; font-weight:700; color:var(--ok-text); font-size:11.5px; margin-left:6px; }
+.campo input.auto{ background:var(--ok-bg); border-color:var(--ok-border); }
+.btnArq{ display:grid; place-items:center; position:relative; }
+.btnArq input{ position:absolute; width:1px; height:1px; opacity:0; }
+.btnArq:focus-within{ outline:3px solid var(--ink); outline-offset:2px; }
+.linkBtn{ background:none; border:0; color:var(--coral-dark); font:inherit; font-weight:800; font-size:14px; cursor:pointer; padding:8px; min-height:40px; }
+.linkBtn:disabled{ opacity:.5; cursor:default; }
+.linkBtn:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; border-radius:8px; }

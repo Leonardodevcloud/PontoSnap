@@ -193,11 +193,11 @@ export interface LinhaDetalheNota { rotulo: string; valorCent: number; tipo?: 'B
 /** Conferência automática da nota enviada (o que deu para checar). */
 export interface ConferenciaNota {
   arquivo: 'PDF' | 'XML' | 'FOTO';
-  /** De onde vieram número/valor: lidos do XML da NFS-e ou informados pelo prestador. */
-  origem: 'XML' | 'INFORMADO';
+  /** De onde vieram número/valor: lidos do XML ou do PDF da NFS-e, ou informados pelo prestador. */
+  origem: 'XML' | 'PDF' | 'INFORMADO';
   valorBate: boolean | null; numeroRepetido: boolean; competenciaOk: boolean | null;
   tomadorOk: boolean | null; prestadorOk: boolean | null;
-  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null };
+  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null; chave?: string | null };
   bate: boolean;
 }
 

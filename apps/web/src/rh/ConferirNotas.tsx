@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { brl, dataBr, dataIsoBr, fmtCnpj, type NotaFila } from '../lib/prestador';
+import { brl, dataBr, dataIsoBr, fmtCnpj, type Conferencia, type NotaFila } from '../lib/prestador';
 import { Rosto } from './Prestadores';
 import css from './Prestadores.module.css';
 
@@ -56,6 +56,22 @@ function Cl({ ok, titulo, det }: { ok: boolean | null; titulo: string; det?: str
  * Conferir notas em sequência: fila à esquerda, a nota no meio e a
  * conferência automática à direita. Atalhos: A aprova, R recusa, ↓/↑ navega.
  */
+const faltas = (c: Conferencia) => [c.valorBate, c.prestadorOk, c.tomadorOk, c.competenciaOk, !c.numeroRepetido].filter((x) => x === false).length;
+
+/** Linha da conferência: o que está na nota e, quando diverge, o esperado. */
+function LinhaConf({ ok, rot, nota, esp }: { ok: boolean | null; rot: string; nota: string; esp: string }) {
+  return (
+    <tr className={ok === false ? css.confRuim : ok === null ? css.confTalvez : undefined}>
+      <td className={css.confSt}><span aria-hidden="true">{ok === true ? '✓' : ok === false ? '✗' : '?'}</span><span className="sr-only">{ok === true ? 'confere' : ok === false ? 'não confere' : 'não verificado'}</span></td>
+      <td className={css.confRot}>{rot}</td>
+      <td>
+        <span className={css.confV}>{nota}</span>
+        {ok !== true && <small className={css.confEsp}>esperado {esp}</small>}
+      </td>
+    </tr>
+  );
+}
+
 export function ConferirNotas() {
   const navegar = useNavigate();
   const [fila, setFila] = useState<NotaFila[] | null>(null);
@@ -164,16 +180,32 @@ export function ConferirNotas() {
               <h4>{n.nome}</h4>
               <p className={css.hint}>{n.rotulo} · enviada {dataIsoBr(n.enviadaEm)}{n.nf.numero ? ` · NF ${n.nf.numero}` : ''}{n.nf.data ? ` de ${dataBr(n.nf.data)}` : ''}</p>
               <h4>Conferência automática</h4>
-              <Cl ok={c.valorBate} titulo={c.valorBate ? 'Valor bate com o fechamento' : c.valorBate === false ? 'Valor diferente do fechamento' : 'Valor não informado'}
-                det={`Esperado ${brl(n.valorCent)}${n.nfValorCent != null ? ` · na nota ${brl(n.nfValorCent)}` : ''}${c.origem === 'INFORMADO' ? ' (informado pelo prestador)' : ' (lido do XML)'}`} />
-              {c.origem === 'XML' && <Cl ok={c.tomadorOk} titulo={c.tomadorOk === false ? 'Tomador diferente' : 'Tomador certo'} det={c.lido?.cnpjTomador ? fmtCnpj(c.lido.cnpjTomador) : undefined} />}
-              {c.origem === 'XML' && <Cl ok={c.prestadorOk} titulo={c.prestadorOk === false ? 'CNPJ do prestador não confere' : 'CNPJ do prestador confere'} det={c.lido?.cnpjPrestador ? fmtCnpj(c.lido.cnpjPrestador) : undefined} />}
-              <Cl ok={c.competenciaOk} titulo="Emitida depois do período" det={n.nf.data ? dataBr(n.nf.data) : undefined} />
-              <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota repetido' : 'Número da nota não repetido'} det={n.nf.numero ? `NF ${n.nf.numero}` : undefined} />
-              {c.arquivo === 'FOTO' && <Cl ok={null} titulo="Foto: confira a olho" />}
-              {c.origem === 'INFORMADO' && c.arquivo === 'PDF' && <p className={css.hint}>PDF: número, data e valor foram informados pelo prestador. Confira com o arquivo ao lado.</p>}
+              {c.origem !== 'INFORMADO' ? (
+                <>
+                  <p className={css.hint}>Lido do {c.origem === 'PDF' ? 'PDF' : 'XML'} da nota{faltas(c) > 0 ? ` · ${faltas(c) === 1 ? '1 divergência' : `${faltas(c)} divergências`}` : ' · tudo confere'}</p>
+                  <table className={css.tabConf}>
+                    <thead><tr><th aria-label="Situação" /><th /><th>Na nota</th></tr></thead>
+                    <tbody>
+                      <LinhaConf ok={c.valorBate} rot="valor" nota={c.lido?.valorCent != null ? brl(c.lido.valorCent) : '—'} esp={brl(n.valorCent)} />
+                      {c.lido?.cnpjPrestador && <LinhaConf ok={c.prestadorOk} rot="prestador" nota={fmtCnpj(c.lido.cnpjPrestador)} esp={n.documento ? fmtCnpj(n.documento) : 'sem CNPJ no cadastro'} />}
+                      {c.lido?.cnpjTomador && <LinhaConf ok={c.tomadorOk} rot="tomador" nota={fmtCnpj(c.lido.cnpjTomador)} esp={n.tomadorEsperado ? fmtCnpj(n.tomadorEsperado) : '—'} />}
+                      <LinhaConf ok={c.competenciaOk} rot="emissão" nota={n.nf.data ? dataBr(n.nf.data) : '—'} esp={`a partir de ${dataBr(n.periodo === 'MES' ? `${n.competencia}-01` : n.periodo)}`} />
+                      <LinhaConf ok={!c.numeroRepetido} rot="número" nota={n.nf.numero ? `nº ${n.nf.numero}` : '—'} esp="não repetido" />
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <>
+                  <Cl ok={c.valorBate} titulo={c.valorBate ? 'Valor bate com o fechamento' : c.valorBate === false ? 'Valor diferente do fechamento' : 'Valor não informado'}
+                    det={`Esperado ${brl(n.valorCent)}${n.nfValorCent != null ? ` · na nota ${brl(n.nfValorCent)}` : ''} (informado pelo prestador)`} />
+                  <Cl ok={c.competenciaOk} titulo="Emitida depois do período" det={n.nf.data ? dataBr(n.nf.data) : undefined} />
+                  <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota repetido' : 'Número da nota não repetido'} det={n.nf.numero ? `NF ${n.nf.numero}` : undefined} />
+                  {c.arquivo === 'FOTO' && <Cl ok={null} titulo="Foto: confira a olho" />}
+                  {c.arquivo === 'PDF' && <p className={css.hint}>Não deu para ler este PDF (escaneado ou modelo diferente): número, data e valor foram informados pelo prestador. Confira com o arquivo ao lado.</p>}
+                </>
+              )}
 
-              <button type="button" className={css.btnPri} disabled={ocupado} onClick={() => aprovar([n.id])}>Aprovar nota (A)</button>
+              <button type="button" className={css.btnPri} disabled={ocupado} onClick={() => aprovar([n.id])}>{faltas(c) > 0 ? 'Aprovar mesmo assim (A)' : 'Aprovar nota (A)'}</button>
               <div className={css.motivos} role="group" aria-label="Motivo da recusa">
                 {[...MOTIVOS, 'Outro'].map((m) => <button key={m} type="button" aria-pressed={motivo === m} onClick={() => setMotivo(motivo === m ? null : m)}>{m}</button>)}
               </div>

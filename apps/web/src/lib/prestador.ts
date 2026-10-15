@@ -5,7 +5,7 @@ export type Situacao = 'NAO_LIBERADO' | 'FALTA' | 'CONFERIR' | 'RECUSADA' | 'CON
 
 export interface LinhaDetalhe { rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS' }
 export interface Conferencia {
-  arquivo: 'PDF' | 'XML' | 'FOTO'; origem: 'XML' | 'INFORMADO';
+  arquivo: 'PDF' | 'XML' | 'FOTO'; origem: 'XML' | 'PDF' | 'INFORMADO';
   valorBate: boolean | null; numeroRepetido: boolean; competenciaOk: boolean | null; tomadorOk: boolean | null; prestadorOk: boolean | null;
   lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null };
   bate: boolean;
@@ -95,7 +95,7 @@ export interface PainelRh {
   };
   linhas: LinhaRh[];
 }
-export interface NotaFila extends Nota { pessoaId: string; nome: string; documento: string | null; empresa: string | null; avatarSemente: number | null }
+export interface NotaFila extends Nota { pessoaId: string; nome: string; documento: string | null; empresa: string | null; avatarSemente: number | null; tomadorEsperado: string | null }
 export interface ConviteGerado { prestadorId: string; nome: string; erro?: string; telefone?: string | null; email?: string | null; codigo?: string; link?: string; mensagem?: string; whatsapp?: string | null; emailEnviado?: boolean; expiraEm?: string }
 
 /** "há 2 dias", "hoje", "ontem". */

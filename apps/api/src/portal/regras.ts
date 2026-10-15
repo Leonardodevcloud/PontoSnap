@@ -122,7 +122,9 @@ export { lerNfseXml, type LidoNfse } from '@ponto/shared';
 export function conferir(e: {
   mime: string; esperadoCent: number; competencia: string; periodo: string;
   informado: { numero: string; data: string; valorCent: number | null };
-  lido: LidoNfse | null;
+  lido: (LidoNfse & { chave?: string | null }) | null;
+  /** De onde veio o "lido" (padrão: XML). */
+  fonte?: 'XML' | 'PDF';
   documentoPrestador: string | null; cnpjTomador: string | null;
   numerosAnteriores: string[];
 }): ConferenciaNota {
@@ -140,8 +142,8 @@ export function conferir(e: {
   const prestadorOk = lido?.cnpjPrestador && e.documentoPrestador ? lido.cnpjPrestador === e.documentoPrestador : null;
   const falhou = valorBate === false || numeroRepetido || competenciaOk === false || tomadorOk === false || prestadorOk === false;
   return {
-    arquivo, origem: lido ? 'XML' : 'INFORMADO', valorBate, numeroRepetido, competenciaOk, tomadorOk, prestadorOk,
-    lido: lido ? { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjTomador: lido.cnpjTomador, cnpjPrestador: lido.cnpjPrestador } : undefined,
+    arquivo, origem: lido ? (e.fonte ?? 'XML') : 'INFORMADO', valorBate, numeroRepetido, competenciaOk, tomadorOk, prestadorOk,
+    lido: lido ? { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjTomador: lido.cnpjTomador, cnpjPrestador: lido.cnpjPrestador, ...(lido.chave ? { chave: lido.chave } : {}) } : undefined,
     bate: !falhou && arquivo !== 'FOTO' && valorBate === true,
   };
 }

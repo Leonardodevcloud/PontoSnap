@@ -23,6 +23,11 @@ export class EnviarNotaDto {
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsNumber() @Min(0) valor?: number | null;
 }
 
+export class LerNotaDto {
+  @IsString() arquivoBase64!: string;
+  @IsString() @MaxLength(80) arquivoMime!: string;
+}
+
 export class LiberarDto {
   @Matches(COMP) competencia!: string;
   @IsIn(['MEI', 'MOTORISTA']) tipo!: 'MEI' | 'MOTORISTA';

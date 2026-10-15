@@ -18,6 +18,8 @@ import {
   conferir, dataBr, detalheMei, detalheSemana, diaMes, fimDaSemana, gerarCodigo, lerNfseXml, linkWhatsapp, maisUrgente, mascararPix,
   mensagemConvite, emailLogin, reaisBr, rotuloMes, rotuloPeriodo, situacaoDe, valorSemana, type Situacao, type StatusNota,
 } from './regras';
+import { lerNfseDoPdf } from './pdf-texto';
+import type { LidoNfse } from '@ponto/shared';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Nota = typeof pessoalNota.$inferSelect;
@@ -285,25 +287,14 @@ export class PortalService {
     const numero = (d.numero ?? '').trim();
     if (!numero) throw new BadRequestException('Informe o número da nota.');
 
-    let lido = null;
     const mime = d.arquivoMime === 'text/xml' ? 'application/xml' : d.arquivoMime;
-    if (mime === 'application/xml') {
-      lido = lerNfseXml(Buffer.from(d.arquivoBase64, 'base64').toString('utf8'));
-    }
+    const { lido, fonte } = await this.lerArquivo(d.arquivoBase64, mime);
     const arq = await this.pessoal.salvarNf(tenantId, {
       pessoaTipo: n.pessoaTipo as 'MEI' | 'MOTORISTA', pessoaId: p.id, competencia: n.competencia, periodo: n.periodo,
       arquivoBase64: d.arquivoBase64, arquivoNome: d.arquivoNome, arquivoMime: d.arquivoMime,
     });
-    const emp = await this.empresaDo(tenantId);
-    const outras = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ nf: pessoalLancamento.nfNumero, comp: pessoalLancamento.competencia, per: pessoalLancamento.periodo })
-      .from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.pessoaId, p.id))))
-      .filter((x) => x.nf && !(x.comp === n.competencia && x.per === n.periodo)).map((x) => x.nf!));
     const valorCent = d.valor != null ? Math.round(d.valor * 100) : null;
-    const conf: ConferenciaNota = conferir({
-      mime, esperadoCent: n.valorCent, competencia: n.competencia, periodo: n.periodo,
-      informado: { numero, data: d.data, valorCent }, lido,
-      documentoPrestador: p.documento, cnpjTomador: this.tomadorDe(p, emp).cnpj || null, numerosAnteriores: outras,
-    });
+    const conf = await this.conferirNota(tenantId, p, n, { mime, lido, fonte, informado: { numero, data: d.data, valorCent } });
     await this.pessoal.salvarLancamento(tenantId, {
       pessoaTipo: n.pessoaTipo as 'MEI' | 'MOTORISTA', pessoaId: p.id, competencia: n.competencia, periodo: n.periodo,
       nfNumero: (lido?.numero ?? numero).slice(0, 60), nfData: lido?.data ?? d.data,
@@ -314,6 +305,45 @@ export class PortalService {
       ...(n.pedirConfirmacao && !n.confirmacao ? { confirmacao: 'CONFERE', confirmadoEm: new Date() } : {}),
     }).where(eq(pessoalNota.id, id)).returning())[0]!);
     return { ...this.visao(r, { arquivo: arq ? { id: arq.id, nome: arq.nome, mime, bytes: arq.bytes } : null }), conferencia: conf };
+  }
+
+  /** Lê a NFS-e do arquivo: XML (sempre dá) ou PDF com texto. Foto/escaneado → null. */
+  private async lerArquivo(base64: string, mime: string): Promise<{ lido: (LidoNfse & { chave?: string | null }) | null; fonte?: 'XML' | 'PDF' }> {
+    if (mime === 'application/xml') return { lido: lerNfseXml(Buffer.from(base64, 'base64').toString('utf8')), fonte: 'XML' };
+    if (mime === 'application/pdf') { const l = await lerNfseDoPdf(base64); return l ? { lido: l, fonte: 'PDF' } : { lido: null }; }
+    return { lido: null };
+  }
+
+  /** Conferência automática da nota (mesma regra na prévia e no envio). */
+  private async conferirNota(tenantId: string, p: Prestador, n: Nota, e: {
+    mime: string; lido: (LidoNfse & { chave?: string | null }) | null; fonte?: 'XML' | 'PDF'; informado: { numero: string; data: string; valorCent: number | null };
+  }): Promise<ConferenciaNota> {
+    const emp = await this.empresaDo(tenantId);
+    const outras = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ nf: pessoalLancamento.nfNumero, comp: pessoalLancamento.competencia, per: pessoalLancamento.periodo })
+      .from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.pessoaId, p.id))))
+      .filter((x) => x.nf && !(x.comp === n.competencia && x.per === n.periodo)).map((x) => x.nf!));
+    return conferir({
+      mime: e.mime, esperadoCent: n.valorCent, competencia: n.competencia, periodo: n.periodo,
+      informado: e.informado, lido: e.lido, fonte: e.fonte,
+      documentoPrestador: p.documento, cnpjTomador: this.tomadorDe(p, emp).cnpj || null, numerosAnteriores: outras,
+    });
+  }
+
+  /**
+   * Prévia: lê o arquivo escolhido (antes de enviar) e já confere, para o
+   * prestador corrigir na hora. Não grava nada.
+   */
+  async lerNota(tenantId: string, usuarioId: string, id: string, d: { arquivoBase64: string; arquivoMime: string }) {
+    const p = await this.prestadorDoUsuario(tenantId, usuarioId);
+    const n = await comTenant(this.db, tenantId, (tx) => this.minhaNota(tx, tenantId, p.id, id));
+    const mime = d.arquivoMime === 'text/xml' ? 'application/xml' : d.arquivoMime;
+    if (Buffer.byteLength(d.arquivoBase64, 'base64') > 6 * 1024 * 1024) throw new BadRequestException('Arquivo maior que 5 MB.');
+    const { lido, fonte } = await this.lerArquivo(d.arquivoBase64, mime);
+    if (!lido) return { lido: null, conferencia: null };
+    const conferencia = await this.conferirNota(tenantId, p, n, {
+      mime, lido, fonte, informado: { numero: lido.numero ?? '', data: lido.data ?? '', valorCent: lido.valorCent },
+    });
+    return { lido: { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjPrestador: lido.cnpjPrestador, cnpjTomador: lido.cnpjTomador }, conferencia };
   }
 
   /** O próprio arquivo enviado (o prestador só abre os dele). */
@@ -517,18 +547,21 @@ export class PortalService {
   /** Fila de conferência: notas enviadas pelo app, mais antigas primeiro. */
   async filaConferir(tenantId: string) {
     const r = await comTenant(this.db, tenantId, async (tx) => {
-      const notas = await tx.select({ n: pessoalNota, nome: pessoalPrestador.nome, documento: pessoalPrestador.documento, empresa: pessoalPrestador.empresa, avatarSemente: pessoalPrestador.avatarSemente })
+      const notas = await tx.select({ n: pessoalNota, nome: pessoalPrestador.nome, documento: pessoalPrestador.documento, empresa: pessoalPrestador.empresa, avatarSemente: pessoalPrestador.avatarSemente, tomadorCnpj: pessoalPrestador.tomadorCnpj })
         .from(pessoalNota).innerJoin(pessoalPrestador, eq(pessoalPrestador.id, pessoalNota.pessoaId))
         .where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.status, 'ENVIADA'))).orderBy(pessoalNota.enviadaEm);
       const ids = [...new Set(notas.map((x) => x.n.pessoaId))];
       return { notas, lancs: await this.lancamentosDe(tx, tenantId, ids), arqs: await this.arquivosDe(tx, tenantId, ids) };
     });
-    return r.notas.map(({ n, nome, documento, empresa, avatarSemente }) => ({
+    const emp = await this.empresaDo(tenantId);
+    return r.notas.map(({ n, nome, documento, empresa, avatarSemente, tomadorCnpj }) => ({
       ...this.visao(n, {
         lanc: r.lancs.find((l) => l.pessoaId === n.pessoaId && l.competencia === n.competencia && l.periodo === n.periodo),
         arquivo: r.arqs.find((a) => a.pessoaId === n.pessoaId && a.competencia === n.competencia && a.periodo === n.periodo) ?? null,
       }),
       pessoaId: n.pessoaId, nome, documento, empresa, avatarSemente,
+      /** CNPJ que deveria estar como tomador na nota (o do prestador ou o da empresa). */
+      tomadorEsperado: tomadorCnpj || emp.cnpj || null,
     }));
   }
 
