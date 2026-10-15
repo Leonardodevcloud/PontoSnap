@@ -32,6 +32,22 @@ export class EmailService {
     }
   }
 
+  /** Tem chave do Resend (envia de verdade)? Sem ela, só registra no log. */
+  get ativo(): boolean { return !!this.resend; }
+  get de(): string { return this.remetente; }
+
+  /** Envia e devolve o motivo da recusa (para o teste de e-mail do painel). */
+  async enviarComDetalhe(e: Email): Promise<{ ok: boolean; erro: string | null; id: string | null }> {
+    if (!this.resend) return { ok: false, erro: 'RESEND_API_KEY não está configurada no servidor da API.', id: null };
+    try {
+      const { data, error } = await this.resend.emails.send({ from: this.remetente, to: e.para, subject: e.assunto, html: e.html });
+      if (error) { this.log.error(`Resend recusou para ${e.para}: ${error.message}`); return { ok: false, erro: error.message, id: null }; }
+      return { ok: true, erro: null, id: data?.id ?? null };
+    } catch (err) {
+      return { ok: false, erro: (err as Error).message, id: null };
+    }
+  }
+
   /** Envia. Devolve true se saiu (ou foi logado), false em erro de envio. */
   async enviar(e: Email): Promise<boolean> {
     if (!this.resend) {

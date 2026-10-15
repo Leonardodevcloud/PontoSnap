@@ -668,7 +668,7 @@ export class PortalService {
       let emailEnviado = false;
       if (porEmail) {
         const { assunto, html } = emailConvitePrestador(p.nome.split(/\s+/)[0] ?? p.nome, nomeEmpresa, link, email);
-        emailEnviado = await this.email.enviar({ para: email, assunto, html }).catch(() => false);
+        emailEnviado = this.email.ativo && await this.email.enviar({ para: email, assunto, html }).catch(() => false);
       }
       saida.push({ prestadorId: p.id, nome: p.nome, telefone: p.telefone, email: p.email, codigo, link, mensagem,
         whatsapp: linkWhatsapp(p.telefone, mensagem), emailEnviado, expiraEm: expiraEm.toISOString() });

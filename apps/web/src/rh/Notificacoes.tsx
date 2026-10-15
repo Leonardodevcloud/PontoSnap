@@ -69,6 +69,8 @@ export function Notificacoes() {
         </div>
       )}
 
+      <TesteEmail />
+
       {r && (
         <section className={css.resumo}>
           <div className={css.resumoTxt}>
@@ -153,5 +155,35 @@ export function Notificacoes() {
         </section>
       )}
     </div>
+  );
+}
+
+/** Envio de e-mail (Resend): mostra se está ligado e manda um teste com o erro real, se houver. */
+function TesteEmail() {
+  const [st, setSt] = useState<{ ativo: boolean; remetente: string } | null>(null);
+  const [para, setPara] = useState('');
+  const [res, setRes] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  useEffect(() => { api.get<{ ativo: boolean; remetente: string }>('/email/status').then(setSt).catch(() => {}); }, []);
+  async function testar() {
+    setEnviando(true); setRes(null);
+    try {
+      const r = await api.post<{ ok: boolean; erro: string | null; para: string; remetente: string }>('/email/teste', para.trim() ? { para: para.trim() } : {});
+      setRes(r.ok ? `✓ Enviado para ${r.para} (de ${r.remetente}). Confira a caixa de entrada e o spam.` : `✗ Não saiu: ${r.erro}`);
+    } catch (e) { setRes(`✗ ${(e as Error).message}`); }
+    finally { setEnviando(false); }
+  }
+  if (!st) return null;
+  return (
+    <section className={st.ativo ? css.resumo : css.alerta} style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
+      <b>E-mail {st.ativo ? `ligado · remetente ${st.remetente}` : 'desligado'}</b>
+      {!st.ativo && <span>Falta a variável <code>RESEND_API_KEY</code> no serviço da API (Railway). Sem ela, convites e recuperação de senha não chegam.</span>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input aria-label="Enviar o teste para" placeholder="seu e-mail (vazio = o do seu login)" value={para} onChange={(e) => setPara(e.target.value)}
+          style={{ minHeight: 34, borderRadius: 10, border: '1px solid rgba(var(--ink-rgb),.24)', padding: '4px 10px', font: 'inherit', minWidth: 240, background: 'var(--field-bg)', color: 'var(--ink)' }} />
+        <button className={css.btn} onClick={testar} disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar e-mail de teste'}</button>
+      </div>
+      {res && <small role="status" style={{ fontWeight: 700 }}>{res}</small>}
+    </section>
   );
 }
