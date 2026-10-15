@@ -665,6 +665,25 @@ export class PortalService {
     return saida;
   }
 
+  /** Situação do acesso de um prestador (cadastro na Folha e benefícios). */
+  async acessoDe(tenantId: string, prestadorId: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const p = (await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), eq(pessoalPrestador.id, prestadorId))).limit(1))[0];
+      if (!p) throw new NotFoundException('Prestador não encontrado');
+      const conta = (await tx.select({ id: usuario.id, ativo: usuario.ativo }).from(usuario)
+        .where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, prestadorId), eq(usuario.perfil, 'PRESTADOR'))).limit(1))[0];
+      const conv = (await tx.select().from(prestadorConvite).where(and(eq(prestadorConvite.tenantId, tenantId), eq(prestadorConvite.prestadorId, prestadorId), isNull(prestadorConvite.usadoEm)))
+        .orderBy(desc(prestadorConvite.criadoEm)).limit(1))[0];
+      const temPush = conta ? (await tx.select({ id: pushSubscription.id }).from(pushSubscription).where(eq(pushSubscription.usuarioId, conta.id)).limit(1)).length > 0 : false;
+      const agora = new Date();
+      const status = conta?.ativo ? 'ATIVO' : conv && conv.expiraEm > agora ? 'CONVIDADO' : conta ? 'BLOQUEADO' : conv ? 'CONVITE_VENCIDO' : 'SEM';
+      return {
+        status, temPush, conviteExpiraEm: status === 'CONVIDADO' ? conv!.expiraEm.toISOString() : null,
+        documento: p.documento, telefone: p.telefone, email: p.email,
+      };
+    });
+  }
+
   /** Corta (ou devolve) o acesso de um prestador ao app. */
   async definirAcesso(tenantId: string, prestadorId: string, ativo: boolean) {
     const r = await comTenant(this.db, tenantId, (tx) => tx.update(usuario).set({ ativo })
@@ -678,10 +697,7 @@ export class PortalService {
     if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim())) throw new BadRequestException('E-mail inválido.');
     const doc = d.documento === undefined ? undefined : d.documento?.replace(/\D/g, '') || null;
     if (doc && doc.length !== 11 && doc.length !== 14) throw new BadRequestException('CPF/CNPJ inválido.');
-    const r = await this.pessoal.editarPrestador(tenantId, id, d);
-    if (doc) await comTenant(this.db, tenantId, (tx) => tx.update(usuario).set({ documento: doc })
-      .where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, id))));
-    return r;
+    return this.pessoal.editarPrestador(tenantId, id, d);
   }
 
   /** Todas as notas (arquivos) da competência num ZIP, para o contador. */

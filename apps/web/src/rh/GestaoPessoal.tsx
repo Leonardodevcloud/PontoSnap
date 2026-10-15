@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { AcessoPrestador, BlocoConvite } from './AcessoPrestador';
+import type { ConviteGerado } from '../lib/prestador';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import QRCode from 'qrcode';
@@ -1221,6 +1223,7 @@ function PainelMei({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, on
         </section>
         <Observacao pessoaTipo="MEI" pessoaId={l.id} mes={mes} inicial={l.lanc.observacao} disabled={fechado} />
         <DadosContrato p={l} mes={mes} fechado={fechado} empresas={empresas} onSalvo={onContrato} />
+        <AcessoPrestador key={`${l.id}-${l.documento ?? ''}`} prestadorId={l.id} nome={l.nome} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
       <div className={css.pRodape}>
@@ -1309,6 +1312,7 @@ function PainelMot({ l, mes, fechado, empresas, onSalvo, onContrato, onTirar, on
         })}
         <Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} />
         <DadosContrato p={l} mes={mes} fechado={fechado} empresas={empresas} onSalvo={onContrato} />
+        <AcessoPrestador key={`${l.id}-${l.documento ?? ''}`} prestadorId={l.id} nome={l.nome} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
       <div className={css.pRodape}>
@@ -1415,7 +1419,9 @@ function PainelDebito({ mes, editar, onSalvo }: { mes: string; editar?: PessoalD
 // =================== cadastro de prestador (página) ===================
 
 function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tipoInicial: 'MEI' | 'MOTORISTA'; mes: string; empresas: string[]; onVoltar: () => void; onCriado: (nome: string, tipo: 'MEI' | 'MOTORISTA') => void }) {
-  const [f, setF] = useState({ tipo: tipoInicial, nome: '', empresa: '', inicioAtividade: '', documento: '', funcao: '', valorCent: 0, baseDias: (tipoInicial === 'MEI' ? 'SEG_SAB' : 'SEG_SEX') as BaseDias, chavePix: '', inicio: mes });
+  const [f, setF] = useState({ tipo: tipoInicial, nome: '', empresa: '', inicioAtividade: '', documento: '', funcao: '', valorCent: 0, baseDias: (tipoInicial === 'MEI' ? 'SEG_SAB' : 'SEG_SEX') as BaseDias, chavePix: '', inicio: mes,
+    telefone: '', email: '', darAcesso: true });
+  const [convite, setConvite] = useState<ConviteGerado | null>(null);
   const [tocado, setTocado] = useState<Record<string, boolean>>({});
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -1423,21 +1429,44 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
     nome: !f.nome.trim() ? 'Informe o nome completo.' : '',
     valor: f.valorCent <= 0 ? `Informe o valor ${f.tipo === 'MEI' ? 'do contrato' : 'mensal'}.` : '',
     documento: docIncompleto(f.documento, f.tipo === 'MEI'),
+    email: f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim()) ? 'E-mail inválido.' : '',
   };
+  const docValido = [11, 14].includes(f.documento.replace(/\D/g, '').length);
   const mei = f.tipo === 'MEI';
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setTocado({ nome: true, valor: true });
     if (erros.nome || erros.valor) return;
     if (erros.documento) { document.getElementById('p-doc')?.focus(); return; }
+    if (erros.email) { document.getElementById('p-email')?.focus(); return; }
     setSalvando(true); setErro(null);
     try {
-      await api.post('/pessoal/prestadores', {
+      const novo = await api.post<{ id: string }>('/pessoal/prestadores', {
         tipo: f.tipo, nome: f.nome, empresa: f.empresa, inicioAtividade: f.inicioAtividade || null, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100,
-        baseDias: f.baseDias, chavePix: f.chavePix, competenciaInicio: f.inicio,
+        baseDias: f.baseDias, chavePix: f.chavePix, competenciaInicio: f.inicio, telefone: f.telefone || null, email: f.email.trim() || null,
       });
+      if (f.darAcesso && docValido) {
+        try {
+          const [c] = await api.post<ConviteGerado[]>('/portal/rh/convites', { prestadorIds: [novo.id], porEmail: !!f.email.trim() });
+          if (c) { setConvite(c); setSalvando(false); return; }
+        } catch (err) { setErro(`${f.nome.trim()} foi adicionado, mas o convite não saiu: ${(err as Error).message}. Gere de novo no painel dele.`); setSalvando(false); return; }
+      }
       onCriado(f.nome.trim(), f.tipo);
     } catch (err) { setErro((err as Error).message); setSalvando(false); }
+  }
+  if (convite) {
+    return (
+      <div className={css.pagina}>
+        <div className={css.form}>
+          <h2>{f.nome.trim().split(' ')[0]} foi adicionado ✓</h2>
+          <p className={css.hint}>Agora é só mandar o convite. Ele abre o link, confirma o {f.documento.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF'}, cria a senha e já entra no app.</p>
+          <BlocoConvite c={convite} />
+          <div className={css.barraFixa}>
+            <Botao type="button" variante="coral" className={css.btnPri} onClick={() => onCriado(f.nome.trim(), f.tipo)}>Concluir</Botao>
+          </div>
+        </div>
+      </div>
+    );
   }
   return (
     <div className={css.pagina}>
@@ -1486,10 +1515,21 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
             <span className={css.input}><input id="p-ini" type="month" value={f.inicio} onChange={(e) => e.target.value && setF({ ...f, inicio: e.target.value })} /></span>
             <small>Aparece desta competência em diante. Meses anteriores não mudam.</small></label>
         </section>
+        <section className={css.secao}>
+          <h3><span className={css.num}>5</span>Acesso ao app</h3>
+          <p className={css.hint}>Com acesso, o prestador vê o valor quando você liberar, manda a nota fiscal pelo app e recebe os avisos da empresa. O usuário é o {mei ? 'CNPJ' : 'CPF/CNPJ'}.</p>
+          <div className={css.grade2}>
+            <CampoTexto id="p-tel" rotulo="Celular (WhatsApp)" valor={f.telefone} numerico placeholder="(82) 99999-0000" onChange={(v) => setF({ ...f, telefone: v })} ajuda="O convite vai por aqui." />
+            <CampoTexto id="p-email" tipo="email" rotulo="E-mail (opcional)" valor={f.email} placeholder="nome@email.com" onChange={(v) => setF({ ...f, email: v })} erro={erros.email} />
+          </div>
+          <Alternar<'S' | 'N'> rotulo="Dar acesso ao app agora?" valor={f.darAcesso && docValido ? 'S' : 'N'} onChange={(v) => setF({ ...f, darAcesso: v === 'S' })}
+            opcoes={[['S', 'Sim: gerar o convite'], ['N', 'Agora não']]} />
+          {f.darAcesso && !docValido && <p className={css.hint}>Para gerar o convite, preencha o {mei ? 'CNPJ' : 'CPF ou CNPJ'} lá em cima. Dá para dar o acesso depois, no painel do prestador.</p>}
+        </section>
         {erro && <p className={css.erro} role="alert">{erro}</p>}
         <div className={css.barraFixa}>
           <button type="button" className={css.btnTexto} onClick={onVoltar}>Cancelar</button>
-          <Botao type="submit" variante="coral" className={css.btnPri} disabled={salvando}>{salvando ? 'Adicionando…' : `Adicionar ${mei ? 'MEI' : 'motorista'}`}</Botao>
+          <Botao type="submit" variante="coral" className={css.btnPri} disabled={salvando}>{salvando ? 'Adicionando…' : f.darAcesso && docValido ? `Adicionar e gerar convite` : `Adicionar ${mei ? 'MEI' : 'motorista'}`}</Botao>
         </div>
       </form>
     </div>

@@ -66,6 +66,9 @@ export class PortalRhController {
   @Post('lembrar') lembrar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: LembrarNotasDto) { return this.svc.lembrar(t(u), dto); }
   @Post('pagar') pagar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: IdsDto) { return this.svc.pagar(t(u), dto.ids); }
   @Post('convites') convidar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: ConvidarDto) { return this.svc.convidar(t(u), dto.prestadorIds, !!dto.porEmail); }
+  @Get('prestadores/:id/acesso') verAcesso(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.acessoDe(t(u), id);
+  }
   @Post('prestadores/:id/acesso') acesso(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AcessoDto) {
     return this.svc.definirAcesso(t(u), id, dto.ativo);
   }

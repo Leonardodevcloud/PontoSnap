@@ -179,9 +179,20 @@ async function main() {
   const pdfC = await com.pdfCiencia(t.id, c1.id);
   ok(pdfC.buffer.length > 1000, 'PDF de ciência com prestador');
 
+  // ── acesso pelo cadastro ──
+  const ac = await portal.acessoDe(t.id, carlos!.id);
+  const acR = await portal.acessoDe(t.id, renata!.id);
+  ok(ac.status === 'ATIVO' && ac.temPush && acR.status === 'SEM', 'situação do acesso no cadastro (ativo / sem)');
+  const novoCpf = `5${CNPJ.slice(-10)}`;
+  await pes.editarPrestador(t.id, carlos!.id, { documento: novoCpf });
+  ok((await auth.login(novoCpf, 'Senha123!')).perfil === 'PRESTADOR', 'mudou o CPF no cadastro: o login acompanha');
+  const nv = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Novo Cadastro', documento: `6${CNPJ.slice(-13)}`, valorMensal: 1000, baseDias: 'SEG_SAB', competenciaInicio: '2026-11', telefone: '82 91234-5678', email: 'Novo@X.com' });
+  const cn = (await portal.convidar(t.id, [nv!.id]))[0] as { whatsapp: string | null };
+  ok(!!cn.whatsapp && (await portal.acessoDe(t.id, nv!.id)).status === 'CONVIDADO' && (await portal.acessoDe(t.id, nv!.id)).email === 'novo@x.com', 'convite logo no cadastro, sem mês fechado');
+
   // ── cortar acesso ──
   await portal.definirAcesso(t.id, carlos!.id, false);
-  ok(!!(await falha(auth.login(cpf, 'Senha123!'))), 'acesso cortado: login recusado');
+  ok(!!(await falha(auth.login(novoCpf, 'Senha123!'))), 'acesso cortado: login recusado');
   painel = await portal.painel(t.id, COMP);
   ok(painel.linhas.find((l) => l.id === carlos!.id)!.acesso.status === 'BLOQUEADO', 'painel mostra bloqueado');
 
