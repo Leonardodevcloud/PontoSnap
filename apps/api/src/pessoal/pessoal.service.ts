@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import {
-  comTenant, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
+  comTenant, comoMaster, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, usuario, type Db,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
@@ -669,9 +669,15 @@ export class PessoalService {
         if (maisRecente === d.vigenteDesde) { set.valorMensal = valorMensal; set.baseDias = baseDias; }
       }
       if (Object.keys(set).length === 0) return p;
-      // Portal do prestador: o login é o CPF/CNPJ — muda junto.
-      if (typeof set.documento === 'string' && [11, 14].includes(set.documento.length)) {
-        await tx.update(usuario).set({ documento: set.documento }).where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, id)));
+      // Portal do prestador: o login é o e-mail cadastrado — muda junto (e não pode ser de outra conta).
+      if (set.email !== undefined) {
+        const conta = (await tx.select({ id: usuario.id }).from(usuario).where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, id))).limit(1))[0];
+        if (conta) {
+          if (!set.email) throw new BadRequestException('Este prestador tem acesso ao app: o e-mail é o login dele e não pode ficar vazio.');
+          const dono = await comoMaster(this.db, (m) => m.select({ id: usuario.id }).from(usuario).where(sql`lower(${usuario.email}) = ${set.email as string}`).limit(1));
+          if (dono[0] && dono[0].id !== conta.id) throw new BadRequestException('Este e-mail já é usado por outro acesso do PontoSnap.');
+          await comoMaster(this.db, (m) => m.update(usuario).set({ email: set.email as string }).where(eq(usuario.id, conta.id)));
+        }
       }
       const rows = await tx.update(pessoalPrestador).set(set)
         .where(and(eq(pessoalPrestador.id, id), eq(pessoalPrestador.tenantId, tenantId))).returning();

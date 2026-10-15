@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import JSZip from 'jszip';
 import {
@@ -16,7 +16,7 @@ import { hashSenha } from '../auth/senha';
 import { centavos } from '../pessoal/calculo';
 import {
   conferir, dataBr, detalheMei, detalheSemana, diaMes, fimDaSemana, gerarCodigo, lerNfseXml, linkWhatsapp, maisUrgente, mascararPix,
-  mensagemConvite, reaisBr, rotuloMes, rotuloPeriodo, situacaoDe, valorSemana, type Situacao, type StatusNota,
+  mensagemConvite, emailLogin, reaisBr, rotuloMes, rotuloPeriodo, situacaoDe, valorSemana, type Situacao, type StatusNota,
 } from './regras';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -148,41 +148,50 @@ export class PortalService {
     });
   }
 
-  /** Dados do convite para a tela de primeiro acesso (sem expor o documento inteiro). */
+  /** Dados do convite para a tela de primeiro acesso. O usuário é o e-mail cadastrado pelo RH. */
   async convite(codigo: string) {
     const r = await this.conviteValido(codigo);
     if (!r) throw new NotFoundException('Convite não encontrado. Peça um novo link ao RH.');
-    const doc = r.p.documento ?? '';
     return {
       nome: r.p.nome.split(/\s+/)[0], empresa: r.emp, tipo: r.p.tipo,
-      tipoDocumento: doc.length === 14 ? 'CNPJ' : 'CPF',
-      finalDocumento: doc.slice(-2),
+      email: emailLogin(r.p.email),
       telefone: r.p.telefone,
       expirado: r.conv.expiraEm < new Date(), usado: !!r.conv.usadoEm,
     };
   }
 
-  /** Cria (ou recria) a conta do prestador e já abre a sessão. */
-  async aceitarConvite(codigo: string, d: { documento: string; senha: string; telefone?: string | null }) {
+  /**
+   * O e-mail já é login de outra conta? (é único no sistema). Devolve a
+   * mensagem de erro, ou null se está livre (ou é desta mesma conta).
+   */
+  private async emailOcupado(tx: Tx, email: string, prestadorId: string): Promise<string | null> {
+    const outro = (await tx.select({ id: usuario.id, p: usuario.prestadorId }).from(usuario)
+      .where(sql`lower(${usuario.email}) = ${email}`).limit(1))[0];
+    return outro && outro.p !== prestadorId ? 'Este e-mail já é usado por outro acesso do PontoSnap. Cadastre outro e-mail para o prestador.' : null;
+  }
+
+  /** Cria (ou recria) a conta do prestador — login = e-mail cadastrado — e já abre a sessão. */
+  async aceitarConvite(codigo: string, d: { senha: string; telefone?: string | null }) {
     const r = await this.conviteValido(codigo);
     if (!r) throw new NotFoundException('Convite não encontrado. Peça um novo link ao RH.');
-    if (r.conv.usadoEm) throw new BadRequestException('Este link já foi usado. Entre com seu CPF/CNPJ e senha.');
+    if (r.conv.usadoEm) throw new BadRequestException('Este link já foi usado. Entre com seu e-mail e senha.');
     if (r.conv.expiraEm < new Date()) throw new BadRequestException('Este link venceu. Peça um novo ao RH.');
-    const doc = d.documento.replace(/\D/g, '');
-    if (!r.p.documento || doc !== r.p.documento) throw new BadRequestException('O CPF/CNPJ não confere com o cadastro. Fale com o RH.');
+    const email = emailLogin(r.p.email);
+    if (!email) throw new BadRequestException('O RH ainda não cadastrou seu e-mail. Fale com o RH.');
     if (d.senha.length < 8) throw new BadRequestException('A senha precisa ter pelo menos 8 caracteres.');
     const senhaHash = await hashSenha(d.senha);
     const tel = d.telefone?.replace(/\D/g, '') || null;
     const u = await comoMaster(this.db, async (tx) => {
+      const ocupado = await this.emailOcupado(tx, email, r.p.id);
+      if (ocupado) throw new BadRequestException('Este e-mail já tem um acesso no PontoSnap. Fale com o RH.');
       const atual = (await tx.select().from(usuario).where(eq(usuario.prestadorId, r.p.id)).limit(1))[0];
       let conta: typeof usuario.$inferSelect;
       if (atual) {
-        [conta] = await tx.update(usuario).set({ senhaHash, ativo: true, deveTrocarSenha: false, documento: doc })
+        [conta] = await tx.update(usuario).set({ email, senhaHash, ativo: true, deveTrocarSenha: false })
           .where(eq(usuario.id, atual.id)).returning() as [typeof usuario.$inferSelect];
       } else {
         [conta] = await tx.insert(usuario).values({
-          tenantId: r.conv.tenantId, email: `prestador.${r.p.id}@portal.pontosnap.app.br`, senhaHash,
-          perfil: 'PRESTADOR', prestadorId: r.p.id, documento: doc, deveTrocarSenha: false,
+          tenantId: r.conv.tenantId, email, senhaHash, perfil: 'PRESTADOR', prestadorId: r.p.id, documento: r.p.documento, deveTrocarSenha: false,
         }).returning() as [typeof usuario.$inferSelect];
       }
       await tx.update(prestadorConvite).set({ usadoEm: new Date() }).where(eq(prestadorConvite.id, r.conv.id));
@@ -211,7 +220,7 @@ export class PortalService {
     const tomador = this.tomadorDe(p, emp);
     return {
       prestador: {
-        id: p.id, nome: p.nome, tipo: p.tipo, funcao: p.funcao, empresa: p.empresa, documento: p.documento,
+        id: p.id, nome: p.nome, tipo: p.tipo, funcao: p.funcao, empresa: p.empresa, documento: p.documento, email: p.email,
         chavePix: mascararPix(p.chavePix), telefone: p.telefone, avatarSemente: p.avatarSemente,
       },
       empresa: emp.razao,
@@ -633,7 +642,7 @@ export class PortalService {
    * anterior). Volta a mensagem pronta e o link do WhatsApp; com e-mail
    * cadastrado e porEmail, manda também por e-mail.
    */
-  async convidar(tenantId: string, prestadorIds: string[], porEmail = false) {
+  async convidar(tenantId: string, prestadorIds: string[], porEmail = true) {
     if (!prestadorIds.length) throw new BadRequestException('Escolha os prestadores.');
     const emp = await this.empresaDo(tenantId);
     const nomeEmpresa = emp.razao.replace(/\s+(LTDA|S\/?A|EIRELI|ME|EPP)\.?$/i, '').trim() || emp.razao;
@@ -641,11 +650,13 @@ export class PortalService {
       .where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.id, prestadorIds))));
     const saida = [];
     for (const p of ps) {
-      const doc = p.documento ?? '';
-      if (doc.length !== 11 && doc.length !== 14) {
-        saida.push({ prestadorId: p.id, nome: p.nome, erro: 'Cadastre o CPF/CNPJ dele antes (é o usuário de login).' });
+      const email = emailLogin(p.email);
+      if (!email) {
+        saida.push({ prestadorId: p.id, nome: p.nome, erro: 'Cadastre o e-mail dele antes (é o usuário de login).' });
         continue;
       }
+      const ocupado = await comoMaster(this.db, (tx) => this.emailOcupado(tx, email, p.id));
+      if (ocupado) { saida.push({ prestadorId: p.id, nome: p.nome, erro: ocupado }); continue; }
       const codigo = gerarCodigo(randomBytes);
       const expiraEm = new Date(Date.now() + 7 * DIA_MS);
       await comTenant(this.db, tenantId, async (tx) => {
@@ -653,11 +664,11 @@ export class PortalService {
         await tx.insert(prestadorConvite).values({ tenantId, prestadorId: p.id, codigo, expiraEm });
       });
       const link = `${urlWeb()}/c/${codigo}`;
-      const mensagem = mensagemConvite(p.nome, nomeEmpresa, link, doc.length === 14 ? 'CNPJ' : 'CPF');
+      const mensagem = mensagemConvite(p.nome, nomeEmpresa, link, email);
       let emailEnviado = false;
-      if (porEmail && p.email) {
-        const { assunto, html } = emailConvitePrestador(p.nome.split(/\s+/)[0] ?? p.nome, nomeEmpresa, link);
-        emailEnviado = await this.email.enviar({ para: p.email, assunto, html }).catch(() => false);
+      if (porEmail) {
+        const { assunto, html } = emailConvitePrestador(p.nome.split(/\s+/)[0] ?? p.nome, nomeEmpresa, link, email);
+        emailEnviado = await this.email.enviar({ para: email, assunto, html }).catch(() => false);
       }
       saida.push({ prestadorId: p.id, nome: p.nome, telefone: p.telefone, email: p.email, codigo, link, mensagem,
         whatsapp: linkWhatsapp(p.telefone, mensagem), emailEnviado, expiraEm: expiraEm.toISOString() });
@@ -683,7 +694,7 @@ export class PortalService {
         const emp = await this.empresaDo(tenantId);
         const nomeEmpresa = emp.razao.replace(/\s+(LTDA|S\/?A|EIRELI|ME|EPP)\.?$/i, '').trim() || emp.razao;
         const link = `${urlWeb()}/c/${conv!.codigo}`;
-        const mensagem = mensagemConvite(p.nome, nomeEmpresa, link, (p.documento ?? '').length === 14 ? 'CNPJ' : 'CPF');
+        const mensagem = mensagemConvite(p.nome, nomeEmpresa, link, emailLogin(p.email) ?? '(e-mail não cadastrado)');
         convite = { prestadorId: p.id, nome: p.nome, telefone: p.telefone, email: p.email, codigo: conv!.codigo, link, mensagem,
           whatsapp: linkWhatsapp(p.telefone, mensagem), emailEnviado: false, expiraEm: conv!.expiraEm.toISOString() };
       }
@@ -704,7 +715,7 @@ export class PortalService {
 
   /** Contato, documento e tomador. Mudou o CPF/CNPJ: o login acompanha. */
   async salvarContato(tenantId: string, id: string, d: { telefone?: string | null; email?: string | null; documento?: string | null; tomadorNome?: string | null; tomadorCnpj?: string | null }) {
-    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email.trim())) throw new BadRequestException('E-mail inválido.');
+    if (d.email && !emailLogin(d.email)) throw new BadRequestException('E-mail inválido.');
     const doc = d.documento === undefined ? undefined : d.documento?.replace(/\D/g, '') || null;
     if (doc && doc.length !== 11 && doc.length !== 14) throw new BadRequestException('CPF/CNPJ inválido.');
     return this.pessoal.editarPrestador(tenantId, id, d);

@@ -5,7 +5,6 @@ const COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 
 export class AceitarConviteDto {
-  @IsString() @MaxLength(20) documento!: string;
   @IsString() @MinLength(8) @MaxLength(100) senha!: string;
   @IsOptional() @IsString() @MaxLength(20) telefone?: string | null;
 }

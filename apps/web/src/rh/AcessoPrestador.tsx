@@ -8,7 +8,7 @@ interface Acesso { status: StatusAcesso; temPush: boolean; conviteExpiraEm: stri
 const ROTULO: Record<StatusAcesso, [string, string]> = {
   ATIVO: ['tem acesso', 'ok'], CONVIDADO: ['convite enviado', 'av'], SEM: ['sem acesso', 'cz'], BLOQUEADO: ['acesso cortado', 'er'], CONVITE_VENCIDO: ['convite venceu', 'cz'],
 };
-const docOk = (d: string | null | undefined) => { const n = (d ?? '').replace(/\D/g, '').length; return n === 11 || n === 14; };
+const emailOk = (e: string | null | undefined) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e ?? '').trim());
 
 /** Mensagem pronta do convite: WhatsApp, copiar mensagem e copiar link. */
 export function BlocoConvite({ c }: { c: ConviteGerado }) {
@@ -81,7 +81,7 @@ export function AcessoPrestador({ prestadorId, nome }: { prestadorId: string; no
 
   if (!a) return <section className={css.bloco}><span className={css.lb}>Acesso ao app</span>{erro ? <p className={css.erro}>{erro}</p> : <p className={css.hint}>Carregando…</p>}</section>;
   const [rot, tom] = ROTULO[a.status];
-  const semDoc = !docOk(a.documento);
+  const semEmail = !emailOk(email);
   return (
     <section className={css.bloco}>
       <div className={css.topo}>
@@ -89,26 +89,26 @@ export function AcessoPrestador({ prestadorId, nome }: { prestadorId: string; no
         <span className={`${css.tag} ${css[`t-${tom}`]}`}>{rot}{a.status === 'ATIVO' && !a.temPush ? ' · sem notificação' : ''}{a.status === 'CONVIDADO' && a.conviteExpiraEm ? ` · até ${dataIsoBr(a.conviteExpiraEm)}` : ''}</span>
       </div>
       <p className={css.hint}>
-        {a.status === 'ATIVO' ? 'Entra com o CPF/CNPJ e a senha dele. Vê o valor, manda a nota e recebe os avisos.'
-          : 'Com acesso, ele vê o valor quando você liberar, manda a nota pelo app e recebe os avisos. O usuário é o CPF/CNPJ.'}
+        {a.status === 'ATIVO' ? 'Entra com o e-mail e a senha dele. Vê o valor, manda a nota e recebe os avisos.'
+          : 'Com acesso, ele vê o valor quando você liberar, manda a nota pelo app e recebe os avisos. O usuário é o e-mail abaixo — use o e-mail real dele (a recuperação de senha chega lá).'}
       </p>
       <div className={css.grade}>
         <label className={css.campo}><span>Celular (WhatsApp)</span><input inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="(82) 99999-0000" /></label>
-        <label className={css.campo}><span>E-mail (opcional)</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@email.com" /></label>
+        <label className={css.campo}><span>E-mail (usuário de login)</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@email.com" /></label>
       </div>
-      {semDoc && a.status !== 'ATIVO' && <p className={css.aviso}>Cadastre o CPF/CNPJ dele em "Editar nome, empresa, documento ou Pix" — é o usuário de login.</p>}
+      {semEmail && a.status !== 'ATIVO' && <p className={css.aviso}>Preencha o e-mail real dele: é o usuário de login e para onde vai a recuperação de senha.</p>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {ok && <p className={css.ok} role="status">{ok}</p>}
       <div className={css.acoes}>
         {a.status !== 'ATIVO' && a.status !== 'BLOQUEADO' && (
-          <button type="button" className={css.btnPri} disabled={ocupado || semDoc} onClick={convidar}>
+          <button type="button" className={css.btnPri} disabled={ocupado || semEmail} onClick={convidar}>
             {a.status === 'CONVIDADO' || a.status === 'CONVITE_VENCIDO' ? 'Gerar novo convite' : 'Dar acesso ao app'}
           </button>
         )}
         {a.status === 'BLOQUEADO' && <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => definir(true)}>Devolver acesso</button>}
         {sujo && <button type="button" className={css.btnSec} disabled={ocupado} onClick={salvarContato}>Salvar contato</button>}
         {a.status === 'ATIVO' && <button type="button" className={`${css.btnTxt} ${css.perigo}`} disabled={ocupado} onClick={() => definir(false)}>Cortar acesso</button>}
-        {a.status !== 'ATIVO' && email.trim() && (
+        {a.status !== 'ATIVO' && !semEmail && (
           <label className={css.chk}><input type="checkbox" checked={porEmail} onChange={(e) => setPorEmail(e.target.checked)} /> mandar também por e-mail</label>
         )}
       </div>
@@ -119,7 +119,7 @@ export function AcessoPrestador({ prestadorId, nome }: { prestadorId: string; no
         </>
       )}
       {a.status !== 'ATIVO' && (
-        <p className={css.nota}>Como ele entra: abre o link, digita o {(a.documento ?? '').length === 14 ? 'CNPJ' : 'CPF'}, cria a senha e já cai no app. Sem o link? Na tela de login, "Recebi um convite" e cola o código.</p>
+        <p className={css.nota}>Como ele entra: abre o link, confere o e-mail, cria a senha e já cai no app. Depois, entra com o e-mail e a senha. Sem o link? Na tela de login, "Criar meu acesso" e cola o código.</p>
       )}
     </section>
   );

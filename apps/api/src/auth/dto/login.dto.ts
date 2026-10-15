@@ -1,7 +1,6 @@
 import { IsEmail, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class LoginDto {
-  /** E-mail, ou CPF/CNPJ (prestador — só os dígitos contam). */
   @IsString() @IsNotEmpty() @MaxLength(180) email!: string;
   @IsString() @MinLength(8) senha!: string;
 }

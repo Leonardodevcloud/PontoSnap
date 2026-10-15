@@ -135,6 +135,7 @@ export function MenuPrestador() {
       <section className={css.card}>
         <h3>Meus dados</h3>
         {p?.documento && <div className={css.lin}><span>{p.documento.length === 14 ? 'CNPJ' : 'CPF'}</span><span className={css.mono}>{fmtCnpj(p.documento)}</span></div>}
+        {p?.email && <div className={css.lin}><span>E-mail (login)</span><span className={css.mono}>{p.email}</span></div>}
         <div className={css.lin}><span>Chave Pix</span><span className={css.mono}>{p?.chavePix ?? '—'}</span></div>
         <div className={css.lin}><span>Celular</span><span className={css.mono}>{p?.telefone ? fmtTel(p.telefone) : '—'}</span></div>
         <p className={css.s} style={{ margin: '8px 0 0' }}>Algo errado? Fale com o RH da {eu?.empresa ?? 'empresa'}.</p>

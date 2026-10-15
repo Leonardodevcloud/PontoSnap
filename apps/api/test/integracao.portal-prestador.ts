@@ -44,7 +44,8 @@ async function main() {
   const t2 = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: `62${CNPJ.slice(2)}`, razaoSocial: 'Outra LTDA' }).returning()))[0]!;
   const COMP = '2026-09';
   const cpf = `3${CNPJ.slice(-10)}`;
-  const carlos = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Carlos Andrade', documento: cpf, valorMensal: 2200, baseDias: 'SEG_SAB', competenciaInicio: COMP, funcao: 'Serviço de instalação', telefone: '(82) 99999-1234' });
+  const emailC = `Carlos.${CNPJ}@Gmail.com`;
+  const carlos = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Carlos Andrade', documento: cpf, valorMensal: 2200, baseDias: 'SEG_SAB', competenciaInicio: COMP, funcao: 'Serviço de instalação', telefone: '(82) 99999-1234', email: emailC });
   const paula = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Paula Santos', documento: null, valorMensal: 2100, baseDias: 'SEG_SAB', competenciaInicio: COMP });
   const renata = await pes.criarPrestador(t.id, { tipo: 'MOTORISTA', nome: 'Renata Lima', documento: `4${CNPJ.slice(-10)}`, valorMensal: 2652, baseDias: 'SEG_SAB', competenciaInicio: COMP });
   await pes.salvarLancamento(t.id, { pessoaTipo: 'MEI', pessoaId: carlos!.id, competencia: COMP, heMin: 360, faltas: 1, meta: 100 });
@@ -61,17 +62,23 @@ async function main() {
   const conv = await portal.convidar(t.id, [carlos!.id, paula!.id]);
   const cc = conv.find((c) => c.prestadorId === carlos!.id)! as { codigo: string; whatsapp: string | null; mensagem: string };
   const cp = conv.find((c) => c.prestadorId === paula!.id)! as { erro?: string };
-  ok(!!cp.erro, 'sem CPF/CNPJ não gera convite');
-  ok(!!cc.whatsapp?.startsWith('https://wa.me/5582999991234') && cc.mensagem.includes('Auto Norte Maceió') && !cc.mensagem.includes('LTDA'), 'convite com WhatsApp e nome da empresa sem "LTDA"');
+  ok(!!cp.erro && cp.erro.includes('e-mail'), 'sem e-mail não gera convite');
+  ok(!!cc.whatsapp?.startsWith('https://wa.me/5582999991234') && cc.mensagem.includes('Auto Norte Maceió') && !cc.mensagem.includes('LTDA')
+    && cc.mensagem.includes(`Seu usuário é o seu e-mail: ${emailC.toLowerCase()}`), 'convite com WhatsApp, empresa sem "LTDA" e o e-mail como usuário');
   const info = await portal.convite(cc.codigo.toLowerCase().replace('-', ''));
-  ok(info.nome === 'Carlos' && info.tipoDocumento === 'CPF' && !info.expirado, 'link abre com o nome e pede o CPF (código sem hífen/minúsculo também vale)');
-  ok(!!(await falha(portal.aceitarConvite(cc.codigo, { documento: '00000000000', senha: 'Senha123!' }))), 'CPF errado não cria acesso');
-  const sess = await portal.aceitarConvite(cc.codigo, { documento: cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'), senha: 'Senha123!', telefone: '82 98888-7777' });
+  ok(info.nome === 'Carlos' && info.email === emailC.toLowerCase() && !info.expirado, 'link abre com o nome e o e-mail (código sem hífen/minúsculo também vale)');
+  const sess = await portal.aceitarConvite(cc.codigo, { senha: 'Senha123!', telefone: '82 98888-7777' });
   ok(sess.perfil === 'PRESTADOR' && !!sess.accessToken && sess.tenantId === t.id, 'aceite cria a conta PRESTADOR e já entra');
-  ok(!!(await falha(portal.aceitarConvite(cc.codigo, { documento: cpf, senha: 'Senha123!' }))), 'link é de uso único');
-  const login = await auth.login(cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'), 'Senha123!');
-  ok(login.perfil === 'PRESTADOR', 'login pelo CPF formatado');
-  ok(!!(await falha(auth.login(cpf, 'errada123'))), 'senha errada recusa');
+  ok(!!(await falha(portal.aceitarConvite(cc.codigo, { senha: 'Senha123!' }))), 'link é de uso único');
+  const login = await auth.login(emailC.toUpperCase(), 'Senha123!');
+  ok(login.perfil === 'PRESTADOR', 'login pelo e-mail (sem diferenciar maiúsculas)');
+  ok(!!(await falha(auth.login(cpf, 'Senha123!'))), 'CPF não é mais login');
+  ok(!!(await falha(auth.login(emailC, 'errada123'))), 'senha errada recusa');
+  // e-mail já usado por outra conta
+  await pes.editarPrestador(t.id, paula!.id, { email: emailC });
+  const cpDup = (await portal.convidar(t.id, [paula!.id]))[0] as { erro?: string };
+  ok(!!cpDup.erro?.includes('já é usado'), 'e-mail de outra conta não gera convite');
+  await pes.editarPrestador(t.id, paula!.id, { email: null });
   const uCarlos = (await comoMaster(db, (tx) => tx.select().from(usuario).where(eq(usuario.prestadorId, carlos!.id))))[0]!;
   await comoMaster(db, (tx) => tx.insert(pushSubscription).values({ tenantId: t.id, usuarioId: uCarlos.id, endpoint: `https://push.exemplo/${CNPJ}/carlos`, p256dh: 'p', auth: 'a' }));
 
@@ -183,16 +190,17 @@ async function main() {
   const ac = await portal.acessoDe(t.id, carlos!.id);
   const acR = await portal.acessoDe(t.id, renata!.id);
   ok(ac.status === 'ATIVO' && ac.temPush && acR.status === 'SEM', 'situação do acesso no cadastro (ativo / sem)');
-  const novoCpf = `5${CNPJ.slice(-10)}`;
-  await pes.editarPrestador(t.id, carlos!.id, { documento: novoCpf });
-  ok((await auth.login(novoCpf, 'Senha123!')).perfil === 'PRESTADOR', 'mudou o CPF no cadastro: o login acompanha');
+  const novoEmail = `carlos.novo.${CNPJ}@gmail.com`;
+  await pes.editarPrestador(t.id, carlos!.id, { email: novoEmail });
+  ok((await auth.login(novoEmail, 'Senha123!')).perfil === 'PRESTADOR', 'mudou o e-mail no cadastro: o login acompanha');
+  ok(!!(await falha(pes.editarPrestador(t.id, carlos!.id, { email: null }))), 'com acesso, o e-mail não pode ficar vazio');
   const nv = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Novo Cadastro', documento: `6${CNPJ.slice(-13)}`, valorMensal: 1000, baseDias: 'SEG_SAB', competenciaInicio: '2026-11', telefone: '82 91234-5678', email: 'Novo@X.com' });
   const cn = (await portal.convidar(t.id, [nv!.id]))[0] as { whatsapp: string | null };
   ok(!!cn.whatsapp && (await portal.acessoDe(t.id, nv!.id)).status === 'CONVIDADO' && (await portal.acessoDe(t.id, nv!.id)).email === 'novo@x.com', 'convite logo no cadastro, sem mês fechado');
 
   // ── cortar acesso ──
   await portal.definirAcesso(t.id, carlos!.id, false);
-  ok(!!(await falha(auth.login(novoCpf, 'Senha123!'))), 'acesso cortado: login recusado');
+  ok(!!(await falha(auth.login(novoEmail, 'Senha123!'))), 'acesso cortado: login recusado');
   painel = await portal.painel(t.id, COMP);
   ok(painel.linhas.find((l) => l.id === carlos!.id)!.acesso.status === 'BLOQUEADO', 'painel mostra bloqueado');
 

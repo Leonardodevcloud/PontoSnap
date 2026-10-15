@@ -352,9 +352,9 @@ function DetalhePrestador({ l, mes, ocupado, onLembrar, onPagar, onConvidar, onM
       }}>
         <h4>Contato e nota</h4>
         <div className={css.campos}>
-          <div className={css.campo}><label htmlFor="c-doc">CPF/CNPJ (usuário)</label><input id="c-doc" value={contato.documento} onChange={(e) => setContato({ ...contato, documento: mascaraDoc(e.target.value) })} /></div>
+          <div className={css.campo}><label htmlFor="c-doc">CPF/CNPJ</label><input id="c-doc" value={contato.documento} onChange={(e) => setContato({ ...contato, documento: mascaraDoc(e.target.value) })} /></div>
           <div className={css.campo}><label htmlFor="c-tel">Celular (WhatsApp)</label><input id="c-tel" inputMode="tel" value={contato.telefone} onChange={(e) => setContato({ ...contato, telefone: e.target.value })} /></div>
-          <div className={`${css.campo} ${css.campoInteiro}`}><label htmlFor="c-email">E-mail</label><input id="c-email" type="email" value={contato.email} onChange={(e) => setContato({ ...contato, email: e.target.value })} /></div>
+          <div className={`${css.campo} ${css.campoInteiro}`}><label htmlFor="c-email">E-mail (usuário de login)</label><input id="c-email" type="email" value={contato.email} onChange={(e) => setContato({ ...contato, email: e.target.value })} /></div>
           <div className={css.campo}><label htmlFor="c-tom">Tomador da nota</label><input id="c-tom" value={contato.tomadorNome} onChange={(e) => setContato({ ...contato, tomadorNome: e.target.value })} placeholder="Vazio = razão social da empresa" /></div>
           <div className={css.campo}><label htmlFor="c-tomc">CNPJ do tomador</label><input id="c-tomc" value={contato.tomadorCnpj} onChange={(e) => setContato({ ...contato, tomadorCnpj: mascaraDoc(e.target.value) })} placeholder="Vazio = CNPJ da empresa" /></div>
         </div>
@@ -453,7 +453,7 @@ function ModalConvites({ ids, linhas, onFechar }: { ids: string[]; linhas: Linha
   const [enviando, setEnviando] = useState(false);
   const pessoas = linhas.filter((l) => ids.includes(l.id));
   const comEmail = pessoas.filter((l) => l.email).length;
-  const semDoc = pessoas.filter((l) => !l.documento || (l.documento.length !== 11 && l.documento.length !== 14));
+  const semDoc = pessoas.filter((l) => !l.email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(l.email));
 
   async function gerar() {
     setEnviando(true); setErro(null);
@@ -471,10 +471,10 @@ function ModalConvites({ ids, linhas, onFechar }: { ids: string[]; linhas: Linha
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {!gerados ? (
           <>
-            <p className={css.hint}>Cada um recebe um link pessoal. Ele entra com o CPF/CNPJ, cria a senha e pronto. O link vale 7 dias.</p>
-            {semDoc.length > 0 && <p className={css.erro}>{semDoc.length} sem CPF/CNPJ cadastrado ({semDoc.slice(0, 3).map((l) => l.nome.split(' ')[0]).join(', ')}{semDoc.length > 3 ? '…' : ''}) — o convite deles não sai. Cadastre no painel do prestador.</p>}
+            <p className={css.hint}>Cada um recebe um link pessoal. O usuário de login é o e-mail cadastrado: ele abre o link, cria a senha e pronto. O link vale 7 dias.</p>
+            {semDoc.length > 0 && <p className={css.erro}>{semDoc.length} sem e-mail cadastrado ({semDoc.slice(0, 3).map((l) => l.nome.split(' ')[0]).join(', ')}{semDoc.length > 3 ? '…' : ''}) — o convite deles não sai. Cadastre o e-mail no painel do prestador.</p>}
             <label className={css.opc}><input type="checkbox" checked={porEmail} onChange={(e) => setPorEmail(e.target.checked)} />
-              <span><b>Enviar também por e-mail</b><small>Para quem tem e-mail cadastrado ({comEmail} de {pessoas.length}).</small></span></label>
+              <span><b>Enviar também por e-mail</b><small>O convite chega no e-mail de login ({comEmail} de {pessoas.length} com e-mail).</small></span></label>
             {erro && <p className={css.erro}>{erro}</p>}
             <div className={css.rodape}>
               <button type="button" className={css.btnSec} onClick={onFechar}>Cancelar</button>

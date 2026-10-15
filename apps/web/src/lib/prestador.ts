@@ -23,7 +23,7 @@ export interface Nota {
   descricao?: string;
 }
 export interface Eu {
-  prestador: { id: string; nome: string; tipo: 'MEI' | 'MOTORISTA'; funcao: string | null; empresa: string | null; documento: string | null; chavePix: string | null; telefone: string | null; avatarSemente: number | null };
+  prestador: { id: string; nome: string; tipo: 'MEI' | 'MOTORISTA'; funcao: string | null; empresa: string | null; documento: string | null; email: string | null; chavePix: string | null; telefone: string | null; avatarSemente: number | null };
   empresa: string; tomador: { nome: string; cnpj: string }; emissorUrl: string; notas: Nota[];
 }
 

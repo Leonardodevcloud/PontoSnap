@@ -161,7 +161,7 @@ export function emailAjusteDecidido(
 }
 
 /** Convite do portal do prestador: link pessoal para criar o acesso (login pelo CPF/CNPJ). */
-export function emailConvitePrestador(nome: string, empresa: string, url: string): { assunto: string; html: string } {
+export function emailConvitePrestador(nome: string, empresa: string, url: string, email: string): { assunto: string; html: string } {
   return {
     assunto: `${empresa}: crie seu acesso ao PontoSnap`,
     html: moldura(`
@@ -169,7 +169,7 @@ export function emailConvitePrestador(nome: string, empresa: string, url: string
       <p style="margin:0 0 8px;font-size:15px;line-height:1.6;">Olá${nome ? `, ${nome}` : ''}!</p>
       <p style="margin:0 0 4px;font-size:15px;line-height:1.6;color:#55627A;">
         A ${empresa} te convidou para o PontoSnap. Lá você vê quanto tem a receber, envia sua nota fiscal e recebe os avisos da empresa.
-        Seu usuário é o seu CPF ou CNPJ. O link vale 7 dias.
+        Seu usuário é este e-mail (<b>${email}</b>). O link vale 7 dias.
       </p>
       ${botao('Criar meu acesso', url)}`),
   };

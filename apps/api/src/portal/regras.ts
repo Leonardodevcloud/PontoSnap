@@ -156,9 +156,15 @@ export function gerarCodigo(aleatorio: (n: number) => Buffer): string {
 }
 
 /** Mensagem pronta para o WhatsApp. */
-export function mensagemConvite(nome: string, empresa: string, link: string, tipoDoc: 'CPF' | 'CNPJ'): string {
+export function mensagemConvite(nome: string, empresa: string, link: string, email: string): string {
   const primeiro = nome.trim().split(/\s+/)[0] ?? nome;
-  return `Oi, ${primeiro}! Aqui é o RH da ${empresa}. Agora você vê seus valores e manda sua nota fiscal pelo app PontoSnap.\n\n📲 Crie seu acesso: ${link}\n\nSeu usuário é o seu ${tipoDoc}.`;
+  return `Oi, ${primeiro}! Aqui é o RH da ${empresa}. Agora você vê seus valores e manda sua nota fiscal pelo app PontoSnap.\n\n📲 Crie seu acesso: ${link}\n\nSeu usuário é o seu e-mail: ${email}`;
+}
+
+/** E-mail que serve de login: válido e em minúsculas (null se não serve). */
+export function emailLogin(e: string | null | undefined): string | null {
+  const v = (e ?? '').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? v : null;
 }
 
 /** Celular BR só com dígitos → link do WhatsApp (null se não parece celular). */

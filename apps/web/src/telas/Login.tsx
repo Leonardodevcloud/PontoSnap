@@ -107,11 +107,11 @@ export function Login() {
           <p className={css.sub}>Acesse a área da sua empresa.</p>
 
           <div className={css.campo}>
-            <label htmlFor="email">E-mail ou CPF/CNPJ</label>
+            <label htmlFor="email">E-mail</label>
             <div className={css.entrada}>
               <IconeEmail />
               <input
-                id="email" type="text" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
+                id="email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
                 placeholder="voce@empresa.com.br" value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void submeter()}

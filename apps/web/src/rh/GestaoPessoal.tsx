@@ -1429,13 +1429,13 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
     nome: !f.nome.trim() ? 'Informe o nome completo.' : '',
     valor: f.valorCent <= 0 ? `Informe o valor ${f.tipo === 'MEI' ? 'do contrato' : 'mensal'}.` : '',
     documento: docIncompleto(f.documento, f.tipo === 'MEI'),
-    email: f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim()) ? 'E-mail inválido.' : '',
+    email: !f.email.trim() ? 'Informe o e-mail real do prestador: é o login dele no app.' : !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim()) ? 'E-mail inválido.' : '',
   };
-  const docValido = [11, 14].includes(f.documento.replace(/\D/g, '').length);
+  const emailValido = !erros.email;
   const mei = f.tipo === 'MEI';
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    setTocado({ nome: true, valor: true });
+    setTocado({ nome: true, valor: true, email: true });
     if (erros.nome || erros.valor) return;
     if (erros.documento) { document.getElementById('p-doc')?.focus(); return; }
     if (erros.email) { document.getElementById('p-email')?.focus(); return; }
@@ -1445,9 +1445,9 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
         tipo: f.tipo, nome: f.nome, empresa: f.empresa, inicioAtividade: f.inicioAtividade || null, documento: f.documento, funcao: f.funcao, valorMensal: f.valorCent / 100,
         baseDias: f.baseDias, chavePix: f.chavePix, competenciaInicio: f.inicio, telefone: f.telefone || null, email: f.email.trim() || null,
       });
-      if (f.darAcesso && docValido) {
+      if (f.darAcesso && emailValido) {
         try {
-          const [c] = await api.post<ConviteGerado[]>('/portal/rh/convites', { prestadorIds: [novo.id], porEmail: !!f.email.trim() });
+          const [c] = await api.post<ConviteGerado[]>('/portal/rh/convites', { prestadorIds: [novo.id], porEmail: true });
           if (c) { setConvite(c); setSalvando(false); return; }
         } catch (err) { setErro(`${f.nome.trim()} foi adicionado, mas o convite não saiu: ${(err as Error).message}. Gere de novo no painel dele.`); setSalvando(false); return; }
       }
@@ -1458,8 +1458,8 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
     return (
       <div className={css.pagina}>
         <div className={css.form}>
-          <h2>{f.nome.trim().split(' ')[0]} foi adicionado ✓</h2>
-          <p className={css.hint}>Agora é só mandar o convite. Ele abre o link, confirma o {f.documento.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF'}, cria a senha e já entra no app.</p>
+          <h2>Cadastro de {f.nome.trim().split(' ')[0]} feito ✓</h2>
+          <p className={css.hint}>O convite já foi para {f.email.trim().toLowerCase()}. Mande também pelo WhatsApp: ele abre o link, cria a senha e já entra no app. O usuário é o e-mail.</p>
           <BlocoConvite c={convite} />
           <div className={css.barraFixa}>
             <Botao type="button" variante="coral" className={css.btnPri} onClick={() => onCriado(f.nome.trim(), f.tipo)}>Concluir</Botao>
@@ -1517,19 +1517,22 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
         </section>
         <section className={css.secao}>
           <h3><span className={css.num}>5</span>Acesso ao app</h3>
-          <p className={css.hint}>Com acesso, o prestador vê o valor quando você liberar, manda a nota fiscal pelo app e recebe os avisos da empresa. O usuário é o {mei ? 'CNPJ' : 'CPF/CNPJ'}.</p>
+          <p className={css.hint}>O e-mail é o usuário do prestador no app (e para onde vai a recuperação de senha). Use o e-mail real dele. Com acesso, ele vê o valor quando você liberar, manda a nota fiscal pelo app e recebe os avisos.</p>
           <div className={css.grade2}>
-            <CampoTexto id="p-tel" rotulo="Celular (WhatsApp)" valor={f.telefone} numerico placeholder="(82) 99999-0000" onChange={(v) => setF({ ...f, telefone: v })} ajuda="O convite vai por aqui." />
-            <CampoTexto id="p-email" tipo="email" rotulo="E-mail (opcional)" valor={f.email} placeholder="nome@email.com" onChange={(v) => setF({ ...f, email: v })} erro={erros.email} />
+            <div onBlur={() => setTocado((t) => ({ ...t, email: true }))}>
+              <CampoTexto id="p-email" tipo="email" rotulo="E-mail do prestador" valor={f.email} placeholder="nome@email.com" onChange={(v) => setF({ ...f, email: v })} />
+              {tocado.email && erros.email && <small className={css.erroCampo}>{erros.email}</small>}
+            </div>
+            <CampoTexto id="p-tel" rotulo="Celular (WhatsApp)" valor={f.telefone} numerico placeholder="(82) 99999-0000" onChange={(v) => setF({ ...f, telefone: v })} ajuda="O convite também vai por aqui." />
           </div>
-          <Alternar<'S' | 'N'> rotulo="Dar acesso ao app agora?" valor={f.darAcesso && docValido ? 'S' : 'N'} onChange={(v) => setF({ ...f, darAcesso: v === 'S' })}
+          <Alternar<'S' | 'N'> rotulo="Dar acesso ao app agora?" valor={f.darAcesso ? 'S' : 'N'} onChange={(v) => setF({ ...f, darAcesso: v === 'S' })}
             opcoes={[['S', 'Sim: gerar o convite'], ['N', 'Agora não']]} />
-          {f.darAcesso && !docValido && <p className={css.hint}>Para gerar o convite, preencha o {mei ? 'CNPJ' : 'CPF ou CNPJ'} lá em cima. Dá para dar o acesso depois, no painel do prestador.</p>}
+
         </section>
         {erro && <p className={css.erro} role="alert">{erro}</p>}
         <div className={css.barraFixa}>
           <button type="button" className={css.btnTexto} onClick={onVoltar}>Cancelar</button>
-          <Botao type="submit" variante="coral" className={css.btnPri} disabled={salvando}>{salvando ? 'Adicionando…' : f.darAcesso && docValido ? `Adicionar e gerar convite` : `Adicionar ${mei ? 'MEI' : 'motorista'}`}</Botao>
+          <Botao type="submit" variante="coral" className={css.btnPri} disabled={salvando}>{salvando ? 'Adicionando…' : f.darAcesso ? `Adicionar e gerar convite` : `Adicionar ${mei ? 'MEI' : 'motorista'}`}</Botao>
         </div>
       </form>
     </div>

@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { usuario, usuarioTenant, tenant, tokenSenha, comoMaster, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { hashSenha, verificarSenha } from './senha';
@@ -92,25 +92,13 @@ export class AuthService {
     return this.sessaoDe(u);
   }
 
-  /**
-   * Confere as credenciais. Com "@" é e-mail; sem, é CPF/CNPJ do prestador
-   * (o mesmo documento pode ter acesso em mais de uma empresa: vale a conta
-   * cuja senha confere).
-   */
-  private async autenticar(identificador: string, senha: string) {
-    const id = identificador.trim();
-    if (id.includes('@')) {
-      const u = (await comoMaster(this.db, (tx) =>
-        tx.select().from(usuario).where(eq(usuario.email, id)).limit(1)))[0];
-      if (!u || !u.ativo || !(await verificarSenha(senha, u.senhaHash))) throw new UnauthorizedException('Credenciais inválidas');
-      return u;
-    }
-    const doc = id.replace(/\D/g, '');
-    if (doc.length !== 11 && doc.length !== 14) throw new UnauthorizedException('Credenciais inválidas');
-    const contas = await comoMaster(this.db, (tx) =>
-      tx.select().from(usuario).where(and(eq(usuario.documento, doc), eq(usuario.perfil, 'PRESTADOR'), eq(usuario.ativo, true))));
-    for (const u of contas) if (await verificarSenha(senha, u.senhaHash)) return u;
-    throw new UnauthorizedException('Credenciais inválidas');
+  /** Confere e-mail e senha (o e-mail é comparado sem diferenciar maiúsculas). */
+  private async autenticar(email: string, senha: string) {
+    const e = email.trim();
+    const u = (await comoMaster(this.db, (tx) =>
+      tx.select().from(usuario).where(sql`lower(${usuario.email}) = ${e.toLowerCase()}`).limit(1)))[0];
+    if (!u || !u.ativo || !(await verificarSenha(senha, u.senhaHash))) throw new UnauthorizedException('Credenciais inválidas');
+    return u;
   }
 
   /** Abre a sessão de um usuário já autenticado (login ou aceite de convite). */
@@ -203,7 +191,7 @@ export class AuthService {
    */
   async solicitarRecuperacao(email: string) {
     const rows = await comoMaster(this.db, (tx) =>
-      tx.select().from(usuario).where(eq(usuario.email, email)).limit(1));
+      tx.select().from(usuario).where(sql`lower(${usuario.email}) = ${email.trim().toLowerCase()}`).limit(1));
     const u = rows[0];
 
     if (u && u.ativo) {

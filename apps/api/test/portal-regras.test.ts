@@ -106,9 +106,9 @@ describe('convite', () => {
     expect(c).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{2}$/);
   });
   it('mensagem e WhatsApp', () => {
-    const m = mensagemConvite('Diego Rocha', 'Auto Norte', 'https://x/c/ABCD-EF', 'CPF');
+    const m = mensagemConvite('Diego Rocha', 'Auto Norte', 'https://x/c/ABCD-EF', 'diego@gmail.com');
     expect(m).toContain('Oi, Diego!');
-    expect(m).toContain('Seu usuário é o seu CPF.');
+    expect(m).toContain('Seu usuário é o seu e-mail: diego@gmail.com');
     expect(linkWhatsapp('(82) 99999-1234', 'oi')).toBe('https://wa.me/5582999991234?text=oi');
     expect(linkWhatsapp('123', 'oi')).toBeNull();
   });
