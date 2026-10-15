@@ -677,9 +677,19 @@ export class PortalService {
       const temPush = conta ? (await tx.select({ id: pushSubscription.id }).from(pushSubscription).where(eq(pushSubscription.usuarioId, conta.id)).limit(1)).length > 0 : false;
       const agora = new Date();
       const status = conta?.ativo ? 'ATIVO' : conv && conv.expiraEm > agora ? 'CONVIDADO' : conta ? 'BLOQUEADO' : conv ? 'CONVITE_VENCIDO' : 'SEM';
+      // Convite pendente: o RH pode reenviar o mesmo link a qualquer momento.
+      let convite = null;
+      if (status === 'CONVIDADO') {
+        const emp = await this.empresaDo(tenantId);
+        const nomeEmpresa = emp.razao.replace(/\s+(LTDA|S\/?A|EIRELI|ME|EPP)\.?$/i, '').trim() || emp.razao;
+        const link = `${urlWeb()}/c/${conv!.codigo}`;
+        const mensagem = mensagemConvite(p.nome, nomeEmpresa, link, (p.documento ?? '').length === 14 ? 'CNPJ' : 'CPF');
+        convite = { prestadorId: p.id, nome: p.nome, telefone: p.telefone, email: p.email, codigo: conv!.codigo, link, mensagem,
+          whatsapp: linkWhatsapp(p.telefone, mensagem), emailEnviado: false, expiraEm: conv!.expiraEm.toISOString() };
+      }
       return {
         status, temPush, conviteExpiraEm: status === 'CONVIDADO' ? conv!.expiraEm.toISOString() : null,
-        documento: p.documento, telefone: p.telefone, email: p.email,
+        documento: p.documento, telefone: p.telefone, email: p.email, convite,
       };
     });
   }

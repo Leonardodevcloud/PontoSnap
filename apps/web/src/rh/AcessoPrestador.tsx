@@ -3,7 +3,7 @@ import { api } from '../lib/api';
 import { dataIsoBr, fmtTel, type ConviteGerado, type StatusAcesso } from '../lib/prestador';
 import css from './AcessoPrestador.module.css';
 
-interface Acesso { status: StatusAcesso; temPush: boolean; conviteExpiraEm: string | null; documento: string | null; telefone: string | null; email: string | null }
+interface Acesso { status: StatusAcesso; temPush: boolean; conviteExpiraEm: string | null; documento: string | null; telefone: string | null; email: string | null; convite: ConviteGerado | null }
 
 const ROTULO: Record<StatusAcesso, [string, string]> = {
   ATIVO: ['tem acesso', 'ok'], CONVIDADO: ['convite enviado', 'av'], SEM: ['sem acesso', 'cz'], BLOQUEADO: ['acesso cortado', 'er'], CONVITE_VENCIDO: ['convite venceu', 'cz'],
@@ -112,7 +112,15 @@ export function AcessoPrestador({ prestadorId, nome }: { prestadorId: string; no
           <label className={css.chk}><input type="checkbox" checked={porEmail} onChange={(e) => setPorEmail(e.target.checked)} /> mandar também por e-mail</label>
         )}
       </div>
-      {convite && <BlocoConvite c={convite} />}
+      {(convite ?? a.convite) && (
+        <>
+          {!convite && <p className={css.hint}><b>Convite pendente.</b> Ele ainda não criou o acesso. Reenvie o mesmo link:</p>}
+          <BlocoConvite c={(convite ?? a.convite)!} />
+        </>
+      )}
+      {a.status !== 'ATIVO' && (
+        <p className={css.nota}>Como ele entra: abre o link, digita o {(a.documento ?? '').length === 14 ? 'CNPJ' : 'CPF'}, cria a senha e já cai no app. Sem o link? Na tela de login, "Recebi um convite" e cola o código.</p>
+      )}
     </section>
   );
 }

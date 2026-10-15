@@ -39,6 +39,9 @@ export function Login() {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  const [convite, setConvite] = useState<string | null>(null);
+  /** Aceita o link inteiro (…/c/ABCD-EF) ou só o código. */
+  const codigoConvite = (v: string) => (v.match(/\/c\/([A-Za-z0-9-]+)/)?.[1] ?? v).replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   const dispararParticulas = useRef<((x: number, y: number) => void) | null>(null);
   const botaoRef = useRef<HTMLButtonElement | null>(null);
   const telaRef = useRef<HTMLDivElement | null>(null);
@@ -148,6 +151,23 @@ export function Login() {
               Recuperar por e-mail
             </button>
           </p>
+
+          <p className={css.ajuda}>
+            Prestador e recebeu um convite?{' '}
+            <button type="button" className={css.link} onClick={() => setConvite((c) => (c === null ? '' : null))} aria-expanded={convite !== null}>
+              Criar meu acesso
+            </button>
+          </p>
+          {convite !== null && (
+            <form className={css.campo} onSubmit={(e) => { e.preventDefault(); const c = codigoConvite(convite); if (c.length === 6) navegar(`/c/${c.slice(0, 4)}-${c.slice(4)}`); }}>
+              <label htmlFor="convite">Código ou link do convite</label>
+              <div className={css.entrada}>
+                <input id="convite" autoCapitalize="characters" autoComplete="off" spellCheck={false} placeholder="ABCD-EF ou o link que chegou no WhatsApp"
+                  value={convite} onChange={(e) => setConvite(e.target.value)} autoFocus />
+              </div>
+              <button type="submit" className={css.entrar} disabled={codigoConvite(convite).length !== 6}>Continuar</button>
+            </form>
+          )}
 
           <div className={css.quiosque}>
             <p>Este aparelho é o<br />tablet do ponto?</p>
