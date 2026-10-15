@@ -39,6 +39,11 @@ export function Inicio() {
   const hoje = atencao ? new Date(`${atencao.hoje}T12:00:00-0300`) : new Date();
   const itens = atencao?.itens ?? [];
   const t = atencao?.totais;
+  const estado = !t ? null : t.bloqueia > 0 ? 'BLOQUEADO' : t.antes > 0 ? 'INCOMPLETO' : 'PRONTO';
+  // No estado "incompleto", diz o que falta (ex.: "82 notas fiscais faltando").
+  const antesResumo = estado === 'INCOMPLETO'
+    ? itens.filter((i) => i.grupo === 'ANTES').map((i) => i.titulo.charAt(0).toLowerCase() + i.titulo.slice(1)).join(' · ').replace(/^./, (c) => c.toUpperCase())
+    : null;
 
   function agir(i: ItemAtencao) {
     if (i.acao.abrir === 'BATIDAS') setBatidas(true);
@@ -56,21 +61,24 @@ export function Inicio() {
       {aviso && <div className={css.ok} role="status"><Icone nome="check" />{aviso}</div>}
 
       <section className={css.prontidao} aria-live="polite">
-        <div className={`${css.num} ${t && t.bloqueia === 0 ? css.numOk : ''}`} aria-hidden="true">
-          {!t ? '…' : t.bloqueia === 0 ? <Icone nome="check" tamanho={30} /> : t.bloqueia}
+        {/* Três estados que não se contradizem: tem bloqueio / pode fechar mas falta
+            coisa (sai incompleto) / tudo pronto. */}
+        <div className={`${css.num} ${estado === 'PRONTO' ? css.numOk : estado === 'INCOMPLETO' ? css.numAviso : ''}`} aria-hidden="true">
+          {!t ? '…' : estado === 'PRONTO' ? <Icone nome="check" tamanho={30} /> : estado === 'INCOMPLETO' ? <Icone nome="alerta" tamanho={28} /> : t.bloqueia}
         </div>
         <div className={css.prTxt}>
           {!atencao && <p className={css.prT}>Conferindo pendências…</p>}
-          {t && t.bloqueia > 0 && <p className={css.prT}>{t.bloqueia === 1 ? '1 coisa' : `${t.bloqueia} coisas`} para resolver antes de fechar {mes}</p>}
-          {t && t.bloqueia === 0 && <p className={css.prT}>Nada impede o fechamento de {mes}</p>}
+          {estado === 'BLOQUEADO' && <p className={css.prT}>{t!.bloqueia === 1 ? '1 coisa' : `${t!.bloqueia} coisas`} para resolver antes de fechar {mes}</p>}
+          {estado === 'INCOMPLETO' && <p className={css.prT}>{mes[0].toUpperCase() + mes.slice(1)} pode ser fechado, mas sai incompleto</p>}
+          {estado === 'PRONTO' && <p className={css.prT}>Tudo pronto para fechar {mes}</p>}
           {t && (
             <p className={css.prS}>
-              {t.total === 0 ? 'Sem pendências no ponto, nos pedidos e no cadastro.'
-                : [t.antes > 0 && `${t.antes} para deixar pronto antes de fechar`, t.cadastro > 0 && `${t.cadastro} de cadastro`].filter(Boolean).join(' · ') || 'O resto está em dia.'}
+              {estado === 'PRONTO' ? (t.cadastro > 0 ? `Só ${t.cadastro === 1 ? 'um ajuste' : `${t.cadastro} ajustes`} de cadastro, que não afeta o mês.` : 'Sem pendências no ponto, nos pedidos e no cadastro.')
+                : [antesResumo, estado === 'BLOQUEADO' && t.antes > 0 && `${t.antes} para deixar pronto`, t.cadastro > 0 && `${t.cadastro} de cadastro`].filter(Boolean).join(' · ')}
             </p>
           )}
         </div>
-        <Link to={`/rh/pessoal?mes=${atencao?.competencia ?? ''}`} className={t && t.bloqueia === 0 ? css.btnPri : css.btnSec}>
+        <Link to={`/rh/pessoal?mes=${atencao?.competencia ?? ''}`} className={estado === 'PRONTO' ? css.btnPri : css.btnSec}>
           Ir para o fechamento
         </Link>
       </section>

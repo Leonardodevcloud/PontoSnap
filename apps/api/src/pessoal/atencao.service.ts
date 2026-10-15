@@ -206,9 +206,16 @@ export class AtencaoService {
     let pess: Awaited<ReturnType<PessoalService['competencia']>> | null = null;
     try { pess = await this.pessoal.competencia(tenantId, comp); } catch { pess = null; }
     if (pess && !pess.fechado) {
+      // Só cobra nota de período já encerrado: a NF do MEI sai depois do fim do
+      // mês e a do motorista depois do fim da semana — antes disso não existe.
+      const mesEncerrado = hoje > ultimoDia(comp);
+      const semanaEncerrada = (inicio: string) => {
+        const d = new Date(`${inicio}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 6);
+        return d.toISOString().slice(0, 10) < hoje;
+      };
       const semNf = [
-        ...pess.mei.filter((m) => !m.lanc.nfNumero && !m.lanc.nfArquivo).map((m) => ({ nome: primeiroNome(m.nome), detalhe: 'mensal' })),
-        ...pess.motoristas.flatMap((m) => m.semanas.filter((s) => s.dias > 0 && !s.nfNumero && !s.nfArquivo)
+        ...(mesEncerrado ? pess.mei.filter((m) => !m.lanc.nfNumero && !m.lanc.nfArquivo).map((m) => ({ nome: primeiroNome(m.nome), detalhe: 'mensal' })) : []),
+        ...pess.motoristas.flatMap((m) => m.semanas.filter((s) => s.dias > 0 && semanaEncerrada(s.inicio) && !s.nfNumero && !s.nfArquivo)
           .map((s) => ({ nome: primeiroNome(m.nome), detalhe: `semana ${dataCurta(s.inicio)}` }))),
       ];
       if (semNf.length > 0) {

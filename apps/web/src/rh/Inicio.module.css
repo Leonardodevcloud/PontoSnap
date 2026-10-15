@@ -13,6 +13,7 @@
   font-family:var(--ff-display); font-weight:800; font-size:28px; background:var(--erro-bg); color:var(--erro-text);
 }
 .numOk{ background:var(--ok-bg); color:var(--ok-text); }
+.numAviso{ background:var(--aviso-bg); color:var(--aviso-text); }
 .prTxt{ min-width:0; }
 .prT{ font-family:var(--ff-display); font-weight:800; font-size:18px; margin:0; line-height:1.3; }
 .prS{ margin:4px 0 0; color:var(--ash); font-size:14px; }
