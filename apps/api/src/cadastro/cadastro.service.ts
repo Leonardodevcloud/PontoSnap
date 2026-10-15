@@ -28,7 +28,11 @@ function lerJpeg(b64: string, max: number, nome: string): Buffer {
 }
 
 export interface MeuCadastro {
+  /** CLT (funcionário) ou PRESTADOR (MEI/motorista no portal). */
+  tipo: 'CLT' | 'PRESTADOR';
   nome: string; cpf: string;
+  /** Prestador: o e-mail de login (cadastrado pelo RH, só leitura no app). */
+  emailLogin?: string | null;
   celular: string | null; emailPessoal: string | null; contatoEmergencia: string | null;
   cadastroAtualizadoEm: string | null;
   foto: { status: 'REVISAR' | 'APROVADA' | 'RECUSADA'; motivo: string | null; miniatura: string; enviadaEm: string } | null;
@@ -49,8 +53,39 @@ export class CadastroService {
     });
   }
 
+  /** Dono da conta: funcionário (CLT) ou prestador (portal). */
+  async pessoaDoUsuario(tenantId: string, usuarioId: string): Promise<{ tipo: 'CLT' | 'PRESTADOR'; id: string }> {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const us = (await tx.select({ e: usuario.empregadoId, p: usuario.prestadorId }).from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
+      if (us?.e) return { tipo: 'CLT' as const, id: us.e };
+      if (us?.p) return { tipo: 'PRESTADOR' as const, id: us.p };
+      throw new ForbiddenException('Este acesso não está vinculado a uma pessoa.');
+    });
+  }
+
   private dataUrl(cifrado: Buffer): string {
     return `data:image/jpeg;base64,${this.cripto.decifrarBytes(cifrado).toString('base64')}`;
+  }
+
+  private async fotoDe(tx: Parameters<Parameters<Db['transaction']>[0]>[0], id: string) {
+    const f = (await tx.select({ status: empregadoFoto.status, motivo: empregadoFoto.motivo, miniatura: empregadoFoto.miniatura, enviadaEm: empregadoFoto.enviadaEm })
+      .from(empregadoFoto).where(eq(empregadoFoto.empregadoId, id)).limit(1))[0];
+    return f ? { status: f.status as 'REVISAR' | 'APROVADA' | 'RECUSADA', motivo: f.motivo, miniatura: this.dataUrl(f.miniatura), enviadaEm: f.enviadaEm.toISOString() } : null;
+  }
+
+  /** Cadastro do próprio prestador: nome/documento/e-mail vêm do RH; foto, celular e emergência são dele. */
+  async meuPrestador(tenantId: string, prestadorId: string): Promise<MeuCadastro> {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const p = (await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), eq(pessoalPrestador.id, prestadorId))).limit(1))[0];
+      if (!p) throw new NotFoundException('Prestador não encontrado');
+      const foto = await this.fotoDe(tx, prestadorId);
+      return {
+        tipo: 'PRESTADOR', nome: p.nome, cpf: p.documento ?? '', emailLogin: p.email,
+        celular: p.telefone, emailPessoal: p.email, contatoEmergencia: p.contatoEmergencia,
+        cadastroAtualizadoEm: p.cadastroAtualizadoEm?.toISOString() ?? null, avatarSemente: p.avatarSemente, foto,
+        precisaAtualizar: !foto || foto.status === 'RECUSADA' || !p.cadastroAtualizadoEm,
+      };
+    });
   }
 
   async meu(tenantId: string, empregadoId: string): Promise<MeuCadastro> {
@@ -64,7 +99,7 @@ export class CadastroService {
         .from(empregadoFoto).where(eq(empregadoFoto.empregadoId, empregadoId)).limit(1))[0];
       const foto = f ? { status: f.status as 'REVISAR' | 'APROVADA' | 'RECUSADA', motivo: f.motivo, miniatura: this.dataUrl(f.miniatura), enviadaEm: f.enviadaEm.toISOString() } : null;
       return {
-        nome: e.nome, cpf: e.cpf, celular: e.celular, emailPessoal: e.emailPessoal, contatoEmergencia: e.contatoEmergencia,
+        tipo: 'CLT' as const, nome: e.nome, cpf: e.cpf, celular: e.celular, emailPessoal: e.emailPessoal, contatoEmergencia: e.contatoEmergencia,
         cadastroAtualizadoEm: e.cadastroAtualizadoEm?.toISOString() ?? null, avatarSemente: e.avatarSemente, foto,
         precisaAtualizar: !foto || foto.status === 'RECUSADA' || !e.cadastroAtualizadoEm,
       };
@@ -73,8 +108,8 @@ export class CadastroService {
 
   async salvarMeu(tenantId: string, empregadoId: string, d: {
     foto?: string; miniatura?: string; origem?: 'CAMERA' | 'GALERIA'; celular?: string; emailPessoal?: string; contatoEmergencia?: string;
-  }): Promise<MeuCadastro> {
-    const email = d.emailPessoal?.trim() || null;
+  }, tipo: 'CLT' | 'PRESTADOR' = 'CLT'): Promise<MeuCadastro> {
+    const email = tipo === 'PRESTADOR' ? null : d.emailPessoal?.trim() || null;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestException('E-mail inválido. Confira se tem @ e o domínio (ex.: nome@gmail.com).');
     const cel = d.celular?.replace(/\D/g, '') || null;
     if (cel && (cel.length < 10 || cel.length > 13)) throw new BadRequestException('Celular inválido. Use DDD + número (ex.: 71 98812-3344).');
@@ -93,6 +128,15 @@ export class CadastroService {
         if (atual) await tx.update(empregadoFoto).set(valores).where(eq(empregadoFoto.empregadoId, empregadoId));
         else await tx.insert(empregadoFoto).values({ empregadoId, tenantId, ...valores });
       }
+      if (tipo === 'PRESTADOR') {
+        // O e-mail do prestador é o login (o RH cadastra): aqui não muda.
+        await tx.update(pessoalPrestador).set({
+          telefone: d.celular !== undefined ? cel : undefined,
+          contatoEmergencia: d.contatoEmergencia !== undefined ? (d.contatoEmergencia.trim() || null) : undefined,
+          cadastroAtualizadoEm: new Date(),
+        }).where(and(eq(pessoalPrestador.tenantId, tenantId), eq(pessoalPrestador.id, empregadoId)));
+        return;
+      }
       await tx.update(empregado).set({
         celular: d.celular !== undefined ? (d.celular.trim() || null) : undefined,
         emailPessoal: d.emailPessoal !== undefined ? email : undefined,
@@ -100,7 +144,7 @@ export class CadastroService {
         cadastroAtualizadoEm: new Date(),
       }).where(and(eq(empregado.tenantId, tenantId), eq(empregado.id, empregadoId)));
     });
-    return this.meu(tenantId, empregadoId);
+    return tipo === 'PRESTADOR' ? this.meuPrestador(tenantId, empregadoId) : this.meu(tenantId, empregadoId);
   }
 
   /** Foto grande (320px) para o perfil e a revisão. */
@@ -137,8 +181,11 @@ export class CadastroService {
           semente: e.semente, temApp: comApp.has(e.id), cadastroEm: e.atualizado?.toISOString() ?? null,
         };
       }
-      const prestadores: Record<string, { semente: number | null }> = {};
-      for (const p of prest) prestadores[p.id] = { semente: p.semente };
+      const prestadores: Record<string, { semente: number | null; foto: string | null }> = {};
+      for (const p of prest) {
+        const f = porId.get(p.id);
+        prestadores[p.id] = { semente: p.semente, foto: f && f.status !== 'RECUSADA' ? this.dataUrl(f.mini) : null };
+      }
       const ativos = emps.filter((e) => e.ativo);
       const resumo = {
         ativos: ativos.length,

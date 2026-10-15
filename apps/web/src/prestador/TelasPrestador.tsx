@@ -111,7 +111,7 @@ export function NotaPrestador() {
 
 /** Menu: dados, notificações, senha, tema e sair. */
 export function MenuPrestador() {
-  const { eu } = usePrestador();
+  const { eu, foto, trocarFoto } = usePrestador();
   const { sair } = useAuth();
   const navegar = useNavigate();
   const [push, setPush] = useState<boolean | null>(null);
@@ -128,7 +128,7 @@ export function MenuPrestador() {
     <div className={css.tela}>
       {p && (
         <div className={css.perfil}>
-          <span><Caricatura semente={p.avatarSemente ?? hash(p.id)} /></span>
+          <span>{foto ? <img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Caricatura semente={p.avatarSemente ?? hash(p.id)} />}</span>
           <div><b>{p.nome}</b><small>{p.tipo === 'MEI' ? 'MEI' : 'Motorista'}{p.empresa ? ` · ${p.empresa}` : ''}</small></div>
         </div>
       )}
@@ -146,6 +146,7 @@ export function MenuPrestador() {
             <span>Notificações no celular</span><small>{push === null ? '…' : push ? 'ligadas · desligar' : 'desligadas · ligar'}</small>
           </button>
         )}
+        <button type="button" className={css.menuItem} onClick={trocarFoto}><span>Minha foto e dados</span><small>›</small></button>
         <button type="button" className={css.menuItem} onClick={() => navegar('/trocar-senha')}><span>Trocar minha senha</span><small>›</small></button>
         <div className={css.menuItem} style={{ cursor: 'default' }}><span>Tema</span><BotaoTema /></div>
         <button type="button" className={`${css.menuItem} ${css.sair}`} onClick={() => { sair(); navegar('/login', { replace: true }); }}>Sair</button>

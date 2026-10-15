@@ -17,6 +17,7 @@ import { TokenService } from '../src/auth/token';
 import { AuthService } from '../src/auth/auth.service';
 import { PortalService } from '../src/portal/portal.service';
 import { ComunicacaoService } from '../src/comunicacao/comunicacao.service';
+import { CadastroService } from '../src/cadastro/cadastro.service';
 
 /** Portal do prestador: liberar, convite, login por CPF, contestar, enviar, conferir, pagar, lembrete, ZIP e avisos. */
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 5 });
@@ -197,6 +198,17 @@ async function main() {
   const nv = await pes.criarPrestador(t.id, { tipo: 'MEI', nome: 'Novo Cadastro', documento: `6${CNPJ.slice(-13)}`, valorMensal: 1000, baseDias: 'SEG_SAB', competenciaInicio: '2026-11', telefone: '82 91234-5678', email: 'Novo@X.com' });
   const cn = (await portal.convidar(t.id, [nv!.id]))[0] as { whatsapp: string | null };
   ok(!!cn.whatsapp && (await portal.acessoDe(t.id, nv!.id)).status === 'CONVIDADO' && (await portal.acessoDe(t.id, nv!.id)).email === 'novo@x.com', 'convite logo no cadastro, sem mês fechado');
+
+  // ── foto e dados no primeiro acesso ──
+  const cad = new CadastroService(db, new CriptoService());
+  const pc = await cad.pessoaDoUsuario(t.id, uCarlos.id);
+  let mc = await cad.meuPrestador(t.id, pc.id);
+  ok(pc.tipo === 'PRESTADOR' && mc.precisaAtualizar && mc.tipo === 'PRESTADOR' && mc.emailLogin === novoEmail, 'prestador cai na atualização cadastral (foto) no primeiro acesso');
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]).toString('base64');
+  mc = await cad.salvarMeu(t.id, pc.id, { foto: jpeg, miniatura: jpeg, origem: 'CAMERA', celular: '(82) 98888-1111', emailPessoal: 'outro@x.com', contatoEmergencia: 'Maria 82 9999-0000' }, 'PRESTADOR');
+  ok(!mc.precisaAtualizar && !!mc.foto && mc.celular === '82988881111' && mc.emailLogin === novoEmail, 'foto salva, celular atualizado e o e-mail de login não muda pelo app');
+  const av = await cad.avatares(t.id);
+  ok(!!av.prestadores[carlos!.id]?.foto, 'RH vê a foto do prestador nas listas');
 
   // ── cortar acesso ──
   await portal.definirAcesso(t.id, carlos!.id, false);

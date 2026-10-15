@@ -14,7 +14,7 @@ export interface InfoAvatarClt {
 }
 export interface RespAvatares {
   empregados: Record<string, InfoAvatarClt>;
-  prestadores: Record<string, { semente: number | null }>;
+  prestadores: Record<string, { semente: number | null; foto?: string | null }>;
   resumo: { ativos: number; comFoto: number; revisar: number; recusadas: number };
 }
 
@@ -33,7 +33,7 @@ export function ProvedorAvatares({ children }: { children: ReactNode }) {
     // Otimista: troca na hora e grava em seguida.
     setDados((d) => d && (tipo === 'CLT'
       ? { ...d, empregados: { ...d.empregados, [id]: { ...(d.empregados[id] ?? vazio()), semente: nova } } }
-      : { ...d, prestadores: { ...d.prestadores, [id]: { semente: nova } } }));
+      : { ...d, prestadores: { ...d.prestadores, [id]: { ...d.prestadores[id], semente: nova } } }));
     await api.put('/cadastro/avatar', { tipo, id, semente: nova });
   }, [dados]);
   const v = useMemo(() => ({ dados, recarregar, trocarDesenho }), [dados, recarregar, trocarDesenho]);
@@ -107,7 +107,7 @@ export function Avatar({ id, nome, tipo = 'CLT', tamanho = 36, className, titulo
 }) {
   const { dados, trocarDesenho } = useAvatares();
   const info = tipo === 'CLT' ? dados?.empregados[id] : dados?.prestadores[id];
-  const foto = tipo === 'CLT' ? (info as InfoAvatarClt | undefined)?.foto ?? null : null;
+  const foto = (info as { foto?: string | null } | undefined)?.foto ?? null;
   const semente = info?.semente ?? hash(id);
   const estilo = { width: tamanho, height: tamanho, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, display: 'inline-block', verticalAlign: 'middle', background: '#E6EDFC' } as const;
   if (trocavel && !foto) {

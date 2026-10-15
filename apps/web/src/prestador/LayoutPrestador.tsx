@@ -6,9 +6,10 @@ import { Flash } from '../components/Flash';
 import { Caricatura, hash } from '../components/Avatar';
 import { PromptInstalar } from '../components/PromptInstalar';
 import { NotificacaoPrompt } from '../telas/NotificacaoPrompt';
+import { AtualizacaoCadastral, type MeuCadastro } from '../telas/AtualizacaoCadastral';
 import css from '../telas/LayoutColaborador.module.css';
 
-interface Ctx { eu: Eu | null; erro: string | null; recarregar: () => Promise<void> }
+interface Ctx { eu: Eu | null; erro: string | null; recarregar: () => Promise<void>; foto: string | null; trocarFoto: () => void }
 /** Dados do prestador para as telas filhas (carregados uma vez pelo layout). */
 export const usePrestador = () => useOutletContext<Ctx>();
 
@@ -22,6 +23,10 @@ export function LayoutPrestador() {
   const [eu, setEu] = useState<Eu | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [naoLidos, setNaoLidos] = useState(0);
+  // Atualização cadastral (foto + dados) no primeiro acesso, como o CLT.
+  const [meu, setMeu] = useState<MeuCadastro | null | 'erro'>(null);
+  const [trocandoFoto, setTrocandoFoto] = useState(false);
+  useEffect(() => { api.get<MeuCadastro>('/cadastro/meu').then(setMeu).catch(() => setMeu('erro')); }, []);
 
   const recarregar = useCallback(async () => {
     try { setEu(await api.get<Eu>('/portal/eu')); setErro(null); } catch (e) { setErro((e as Error).message); }
@@ -39,6 +44,12 @@ export function LayoutPrestador() {
     return () => window.removeEventListener('pontosnap:avisos', buscar);
   }, [pathname]);
 
+  if (meu === null) return <div className={css.casca} aria-busy="true" />;
+  if (meu !== 'erro' && (meu.precisaAtualizar || trocandoFoto)) {
+    return <AtualizacaoCadastral meu={meu} modo={meu.precisaAtualizar ? 'obrigatorio' : 'trocar'}
+      onConcluir={(m) => { setMeu(m); setTrocandoFoto(false); void recarregar(); }} onCancelar={() => setTrocandoFoto(false)} />;
+  }
+  const foto = meu !== 'erro' ? meu.foto?.miniatura ?? null : null;
   const p = eu?.prestador;
   const aba = (rota: string, rotulo: string, ativo: boolean, extra?: JSX.Element) => (
     <button className={`${ativo ? css.on : ''} ${extra ? css.comBolinha : ''}`} onClick={() => navegar(rota)} aria-current={ativo ? 'page' : undefined}>
@@ -54,7 +65,7 @@ export function LayoutPrestador() {
           <span>Ponto<b>Snap</b></span>
         </button>
         <button className={css.avatar} onClick={() => navegar('/menu')} aria-label="Menu e minha conta" style={{ background: '#E6EDFC' }}>
-          {p ? <Caricatura semente={p.avatarSemente ?? hash(p.id)} /> : null}
+          {foto ? <img src={foto} alt="" className={css.avatarFoto} /> : p ? <Caricatura semente={p.avatarSemente ?? hash(p.id)} /> : null}
         </button>
       </header>
 
@@ -65,7 +76,7 @@ export function LayoutPrestador() {
       </div>
 
       <main className={css.conteudo}>
-        <Outlet context={{ eu, erro, recarregar } satisfies Ctx} />
+        <Outlet context={{ eu, erro, recarregar, foto, trocarFoto: () => setTrocandoFoto(true) } satisfies Ctx} />
       </main>
 
       <nav className={css.abas} aria-label="Navegação">

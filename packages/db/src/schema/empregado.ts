@@ -59,7 +59,8 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () =>
  * status: REVISAR (já vale, RH não olhou) | APROVADA | RECUSADA (app pede outra).
  */
 export const empregadoFoto = pgTable('empregado_foto', {
-  empregadoId: uuid('empregado_id').primaryKey().references(() => empregado.id),
+  /** Pessoa: funcionário (empregado.id) ou prestador (pessoal_prestador.id) — migration 0058. */
+  empregadoId: uuid('empregado_id').primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
   foto: bytea('foto').notNull(),
   miniatura: bytea('miniatura').notNull(),

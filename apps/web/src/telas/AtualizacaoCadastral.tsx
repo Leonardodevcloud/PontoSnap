@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { Caricatura, hash } from '../components/Avatar';
+import { fmtTel } from '../lib/prestador';
 import css from './AtualizacaoCadastral.module.css';
 
 /** O que o app sabe do cadastro do funcionário (GET /cadastro/meu). */
 export interface MeuCadastro {
+  /** CLT (funcionário) ou PRESTADOR (MEI/motorista no portal). */
+  tipo?: 'CLT' | 'PRESTADOR';
   nome: string; cpf: string;
+  /** Prestador: e-mail de login (cadastrado pelo RH). */
+  emailLogin?: string | null;
   celular: string | null; emailPessoal: string | null; contatoEmergencia: string | null;
   cadastroAtualizadoEm: string | null;
   foto: { status: 'REVISAR' | 'APROVADA' | 'RECUSADA'; motivo: string | null; miniatura: string; enviadaEm: string } | null;
@@ -14,7 +19,9 @@ export interface MeuCadastro {
 }
 
 type Passo = 'aviso' | 'dicas' | 'camera' | 'conferir' | 'dados' | 'pronto';
-const fmtCpf = (c: string) => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+const fmtCpf = (c: string) => (c.length === 14
+  ? c.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
+  : c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'));
 
 /** Brilho médio (0–255) de uma área da imagem. */
 function brilho(fonte: CanvasImageSource, sx: number, sy: number, sw: number, sh: number): number {
@@ -56,7 +63,8 @@ export function AtualizacaoCadastral({ meu, modo = 'obrigatorio', onConcluir, on
 }) {
   const [passo, setPasso] = useState<Passo>(modo === 'trocar' ? 'dicas' : 'aviso');
   const [recorte, setRecorte] = useState<Recorte | null>(null);
-  const [celular, setCelular] = useState(meu.celular ?? '');
+  const prestador = meu.tipo === 'PRESTADOR';
+  const [celular, setCelular] = useState(prestador && meu.celular ? fmtTel(meu.celular) : meu.celular ?? '');
   const [email, setEmail] = useState(meu.emailPessoal ?? '');
   const [emergencia, setEmergencia] = useState(meu.contatoEmergencia ?? '');
   const [erro, setErro] = useState<string | null>(null);
@@ -83,7 +91,7 @@ export function AtualizacaoCadastral({ meu, modo = 'obrigatorio', onConcluir, on
     try {
       const foto = renderizar(recorte, 320).toDataURL('image/jpeg', 0.86).split(',')[1];
       const miniatura = renderizar(recorte, 96).toDataURL('image/jpeg', 0.8).split(',')[1];
-      const r = await api.put<MeuCadastro>('/cadastro/meu', { foto, miniatura, origem: recorte.origem, celular, emailPessoal: email, contatoEmergencia: emergencia });
+      const r = await api.put<MeuCadastro>('/cadastro/meu', { foto, miniatura, origem: recorte.origem, celular, ...(prestador ? {} : { emailPessoal: email }), contatoEmergencia: emergencia });
       setFinal(r); setPasso('pronto');
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
@@ -100,7 +108,7 @@ export function AtualizacaoCadastral({ meu, modo = 'obrigatorio', onConcluir, on
       {passo === 'aviso' && (
         <section className={css.sec}>
           <p className={css.eyebrow}>Atualização cadastral</p>
-          <h1>{recusada ? 'O RH pediu outra foto' : 'Antes de bater o ponto, sua foto'}</h1>
+          <h1>{recusada ? 'O RH pediu outra foto' : prestador ? 'Antes de começar, sua foto' : 'Antes de bater o ponto, sua foto'}</h1>
           <p className={css.lead}>{recusada ? `Motivo: ${meu.foto?.motivo ?? 'a foto não ficou boa'}. Leva 1 minuto.` : 'Leva 1 minuto. Só precisa fazer uma vez.'}</p>
           <div className={css.heroi} aria-hidden="true">
             <span className={css.heroiAv}><Caricatura semente={hash(`${meu.cpf}a`)} /></span>
@@ -109,7 +117,7 @@ export function AtualizacaoCadastral({ meu, modo = 'obrigatorio', onConcluir, on
           </div>
           <div className={css.porque}>
             <div><span className={css.ic}>👤</span><p><b>Seu rosto no lugar do desenho</b><span>O RH e a equipe reconhecem você mais rápido.</span></p></div>
-            <div><span className={css.ic}>✓</span><p><b>Confere seus dados</b><span>Celular e e-mail, para o RH conseguir falar com você.</span></p></div>
+            <div><span className={css.ic}>✓</span><p><b>Confere seus dados</b><span>{prestador ? 'Celular e contato, para o RH conseguir falar com você.' : 'Celular e e-mail, para o RH conseguir falar com você.'}</span></p></div>
           </div>
           <div className={css.pilha}>
             <button className={css.pri} onClick={() => setPasso('dicas')}>Começar</button>
@@ -157,15 +165,18 @@ export function AtualizacaoCadastral({ meu, modo = 'obrigatorio', onConcluir, on
         <section className={css.sec}>
           <p className={css.eyebrow}>Passo 2 de 3 · Seus dados</p>
           <h1>Confira seus dados</h1>
-          <p className={css.lead}>Nome e CPF vêm da empresa. Se estiver errado, avise o RH.</p>
+          <p className={css.lead}>{prestador ? 'Nome, documento e e-mail vêm do cadastro feito pelo RH. Se estiver errado, avise o RH.' : 'Nome e CPF vêm da empresa. Se estiver errado, avise o RH.'}</p>
           <div className={css.trava}><b>{meu.nome}</b><span>nome</span></div>
-          <div className={css.trava}><b>{fmtCpf(meu.cpf)}</b><span>CPF</span></div>
+          {meu.cpf && <div className={css.trava}><b>{fmtCpf(meu.cpf)}</b><span>{meu.cpf.length === 14 ? 'CNPJ' : 'CPF'}</span></div>}
+          {prestador && meu.emailLogin && <div className={css.trava}><b>{meu.emailLogin}</b><span>e-mail (login)</span></div>}
           <label className={css.campo}><span>Celular (WhatsApp)</span>
             <input value={celular} onChange={(e) => setCelular(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="(71) 98812-3344" />
-            <small>Para o RH falar com você sobre ponto e benefícios.</small></label>
-          <label className={css.campo}><span>E-mail pessoal</span>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" placeholder="nome@gmail.com" />
-            <small>Usado para recuperar a senha.</small></label>
+            <small>{prestador ? 'Para o RH falar com você sobre valores e notas.' : 'Para o RH falar com você sobre ponto e benefícios.'}</small></label>
+          {!prestador && (
+            <label className={css.campo}><span>E-mail pessoal</span>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" placeholder="nome@gmail.com" />
+              <small>Usado para recuperar a senha.</small></label>
+          )}
           <label className={css.campo}><span>Contato de emergência (opcional)</span>
             <input value={emergencia} onChange={(e) => setEmergencia(e.target.value)} placeholder="Nome e telefone" /></label>
           {erro && <p className={css.erro} role="alert">{erro}</p>}
@@ -181,10 +192,10 @@ export function AtualizacaoCadastral({ meu, modo = 'obrigatorio', onConcluir, on
           <div className={css.pronto}>
             <div className={css.prontoFoto}><img src={final.foto?.miniatura} alt="Sua foto" /><span>✓</span></div>
             <h1>Tudo certo, {primeiro}!</h1>
-            <p className={css.lead}>{modo === 'trocar' ? 'Foto atualizada.' : 'Cadastro atualizado. Agora é só bater o ponto.'}</p>
+            <p className={css.lead}>{modo === 'trocar' ? 'Foto atualizada.' : prestador ? 'Cadastro atualizado. Agora você já vê seus valores e manda suas notas.' : 'Cadastro atualizado. Agora é só bater o ponto.'}</p>
           </div>
           <div className={css.pilha}>
-            <button className={css.pri} onClick={() => onConcluir(final)} data-autofoco>{modo === 'trocar' ? 'Voltar' : 'Ir para o ponto'}</button>
+            <button className={css.pri} onClick={() => onConcluir(final)} data-autofoco>{modo === 'trocar' ? 'Voltar' : prestador ? 'Ir para o início' : 'Ir para o ponto'}</button>
             <p className={css.privado}>Quer trocar a foto depois? Menu › Minha foto e dados.</p>
           </div>
         </section>

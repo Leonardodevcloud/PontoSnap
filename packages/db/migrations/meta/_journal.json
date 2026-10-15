@@ -407,6 +407,13 @@
       "when": 1785035040000,
       "tag": "0057_portal_prestador",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1785121440000,
+      "tag": "0058_prestador_foto",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import {
   brl, dataBr, dataIsoBr, diaMes, fmtTel, haQuanto, ROTULO_SITUACAO, TOM_SITUACAO,
   type ConviteGerado, type LinhaRh, type PainelRh, type Situacao, type UnidadeRh,
 } from '../lib/prestador';
-import { Caricatura, hash } from '../components/Avatar';
+import { Caricatura, hash, useAvatares } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { PainelLateral } from '../components/PainelLateral';
 import css from './Prestadores.module.css';
@@ -40,8 +40,13 @@ const passaFiltro = (l: LinhaRh, f: Filtro) => {
   }
 };
 
+/** Rosto do prestador: a foto que ele mandou no app ou, sem foto, a caricatura. */
 export function Rosto({ id, semente, tamanho = 34 }: { id: string; semente: number | null; tamanho?: number }) {
-  return <span style={{ width: tamanho, height: tamanho, borderRadius: '50%', overflow: 'hidden', display: 'inline-block', flexShrink: 0 }}><Caricatura semente={semente ?? hash(id)} /></span>;
+  const { dados } = useAvatares();
+  const foto = dados?.prestadores[id]?.foto ?? null;
+  return <span style={{ width: tamanho, height: tamanho, borderRadius: '50%', overflow: 'hidden', display: 'inline-block', flexShrink: 0 }}>
+    {foto ? <img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <Caricatura semente={dados?.prestadores[id]?.semente ?? semente ?? hash(id)} />}
+  </span>;
 }
 export function TagSituacao({ s, atrasada }: { s: Situacao; atrasada?: boolean }) {
   return <span className={`${css.tag} ${css[`t-${TOM_SITUACAO[s]}`]}`}>{ROTULO_SITUACAO[s]}{atrasada ? ' · atrasada' : ''}</span>;

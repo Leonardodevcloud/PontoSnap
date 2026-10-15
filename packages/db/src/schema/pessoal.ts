@@ -65,6 +65,9 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   /** Tomador da nota. Vazio = razão social e CNPJ da empresa. */
   tomadorNome: varchar('tomador_nome', { length: 160 }),
   tomadorCnpj: varchar('tomador_cnpj', { length: 14 }),
+  /** Atualização cadastral feita pelo próprio prestador no app (foto + dados) — migration 0058. */
+  cadastroAtualizadoEm: timestamp('cadastro_atualizado_em', { withTimezone: true }),
+  contatoEmergencia: varchar('contato_emergencia', { length: 160 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
 

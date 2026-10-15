@@ -18,21 +18,23 @@ export class CadastroController {
     return u.tenantId;
   }
 
-  // ---------- funcionário ----------
-  @Get('meu') @Perfis(Perfil.COLABORADOR)
+  // ---------- funcionário e prestador (portal) ----------
+  @Get('meu') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async meu(@UsuarioAtual() u: PayloadAcesso) {
     const t = this.t(u);
-    return this.svc.meu(t, await this.svc.empregadoDoUsuario(t, u.sub));
+    const p = await this.svc.pessoaDoUsuario(t, u.sub);
+    return p.tipo === 'PRESTADOR' ? this.svc.meuPrestador(t, p.id) : this.svc.meu(t, p.id);
   }
-  @Put('meu') @Perfis(Perfil.COLABORADOR)
+  @Put('meu') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR)
   async salvar(@UsuarioAtual() u: PayloadAcesso, @Body() dto: MeuCadastroDto) {
     const t = this.t(u);
-    return this.svc.salvarMeu(t, await this.svc.empregadoDoUsuario(t, u.sub), dto);
+    const p = await this.svc.pessoaDoUsuario(t, u.sub);
+    return this.svc.salvarMeu(t, p.id, dto, p.tipo);
   }
-  @Get('meu/foto') @Perfis(Perfil.COLABORADOR) @Header('Content-Type', 'image/jpeg') @Header('Cache-Control', 'private, no-store')
+  @Get('meu/foto') @Perfis(Perfil.COLABORADOR, Perfil.PRESTADOR) @Header('Content-Type', 'image/jpeg') @Header('Cache-Control', 'private, no-store')
   async minhaFoto(@UsuarioAtual() u: PayloadAcesso) {
     const t = this.t(u);
-    return new StreamableFile(await this.svc.foto(t, await this.svc.empregadoDoUsuario(t, u.sub)));
+    return new StreamableFile(await this.svc.foto(t, (await this.svc.pessoaDoUsuario(t, u.sub)).id));
   }
 
   // ---------- RH ----------
