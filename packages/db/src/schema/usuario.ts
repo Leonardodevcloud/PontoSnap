@@ -8,6 +8,8 @@ export const usuario = pgTable('usuario', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').references(() => tenant.id),
   email: varchar('email', { length: 180 }).notNull().unique(),
+  /** Nome de quem usa a conta (migration 0062) — aparece na auditoria. Nulo = derivado do e-mail. */
+  nome: varchar('nome', { length: 120 }),
   senhaHash: varchar('senha_hash', { length: 120 }).notNull(),
   perfil: perfilEnum('perfil').notNull(),
   empregadoId: uuid('empregado_id'),
@@ -17,5 +19,7 @@ export const usuario = pgTable('usuario', {
   documento: varchar('documento', { length: 14 }),
   ativo: boolean('ativo').notNull().default(true),
   deveTrocarSenha: boolean('deve_trocar_senha').notNull().default(false),
+  /** Último login ou renovação de sessão (migration 0062). */
+  ultimoAcessoEm: timestamp('ultimo_acesso_em', { withTimezone: true }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });

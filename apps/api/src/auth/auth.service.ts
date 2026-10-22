@@ -104,6 +104,7 @@ export class AuthService {
   /** Abre a sessão de um usuário já autenticado (login ou aceite de convite). */
   async sessaoDe(u: typeof usuario.$inferSelect) {
     const acesso = await this.resolverAcesso(u);
+    await this.marcarAcesso(u.id);
     const payload = await this.montarPayload({ ...u, tenantId: acesso.tenantId, perfil: acesso.perfil });
     const empresas = u.perfil === 'ADMIN_CLIENTE' || u.perfil === 'RH'
       ? await this.empresasDoUsuario(u.id) : [];
@@ -117,6 +118,13 @@ export class AuthService {
       /** Vazio ou com 1 item = usuário de empresa única (o front nem mostra o seletor). */
       empresas,
     };
+  }
+
+  /** Último acesso (login/renovação), no máximo 1 gravação a cada 5 min. Falha aqui não derruba o login. */
+  private async marcarAcesso(usuarioId: string) {
+    await comoMaster(this.db, (tx) => tx.update(usuario).set({ ultimoAcessoEm: new Date() })
+      .where(and(eq(usuario.id, usuarioId), sql`(${usuario.ultimoAcessoEm} is null or ${usuario.ultimoAcessoEm} < now() - interval '5 minutes')`)))
+      .catch(() => undefined);
   }
 
   async refresh(refreshToken: string) {
@@ -134,6 +142,7 @@ export class AuthService {
     // Revalida o vínculo: se o acesso àquela empresa foi retirado, a renovação
     // já não devolve mais permissão nela.
     const acesso = await this.resolverAcesso(u, tenantAtivo ?? null);
+    await this.marcarAcesso(u.id);
     const payload = await this.montarPayload({ ...u, tenantId: acesso.tenantId, perfil: acesso.perfil });
     return {
       accessToken: this.tokens.assinarAcesso(payload),

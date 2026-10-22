@@ -495,6 +495,7 @@ export interface Afastamento {
 // ---- Trilha de auditoria ----
 
 export interface LinhaAuditoria {
+  usuarioId?: string | null; usuarioNome?: string | null;
   id: string;
   usuarioEmail: string | null;
   usuarioPerfil: string | null;

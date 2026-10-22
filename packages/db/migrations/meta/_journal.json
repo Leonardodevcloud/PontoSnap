@@ -435,6 +435,13 @@
       "when": 1785380640000,
       "tag": "0061_modelo_nota",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1785390000000,
+      "tag": "0062_usuarios_equipe",
+      "breakpoints": true
     }
   ]
 }

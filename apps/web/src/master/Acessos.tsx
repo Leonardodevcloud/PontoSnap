@@ -3,7 +3,7 @@ import { api } from '../lib/api';
 import css from './Acessos.module.css';
 
 interface Vinculo { id: string; tenantId: string; perfil: string; razaoSocial: string; cnpj: string; }
-interface Conta { id: string; email: string; perfil: string; tenantPadrao: string | null; empresaOrigem: string | null; ativo: boolean; empresas: Vinculo[]; }
+interface Conta { id: string; email: string; nome: string | null; perfil: string; tenantPadrao: string | null; empresaOrigem: string | null; ativo: boolean; empresas: Vinculo[]; }
 interface Cliente { id: string; razaoSocial: string; cnpj: string; }
 
 const fmtCnpj = (c: string) => c.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
@@ -103,7 +103,8 @@ export function Acessos() {
                 <tr key={c.id}>
                   <td>
                     {c.empresaOrigem && <span className={css.cli}>Cliente: {c.empresaOrigem}</span>}
-                    <strong className={css.emailConta}>{c.email}</strong>
+                    {c.nome && <strong className={css.emailConta}>{c.nome}</strong>}
+                    <strong className={css.emailConta} style={c.nome ? { fontWeight: 500, fontSize: 12.5, color: 'var(--ash)' } : undefined}>{c.email}</strong>
                     <div className={css.meta}>
                       {papelLongo(c.perfil)}{c.ativo ? '' : ' · inativo'}
                       {(c.perfil === 'RH' || c.perfil === 'ADMIN_CLIENTE') && (

@@ -63,7 +63,8 @@ const CONFIG: ItemMenu[] = [
   { to: '/rh/dispositivos', rotulo: 'Quiosques', icone: 'grade' },
   { to: '/rh/notificacoes', rotulo: 'Notificações do app', icone: 'sino' },
   { to: '/rh/integracoes', rotulo: 'Integrações', icone: 'engrenagem', soAdmin: true },
-  { to: '/rh/auditoria', rotulo: 'Auditoria', icone: 'documento' },
+  { to: '/rh/usuarios', rotulo: 'Usuários', icone: 'pessoas', soAdmin: true },
+  { to: '/rh/auditoria', rotulo: 'Auditoria', icone: 'documento', soAdmin: true },
   { to: '/rh/assinatura', rotulo: 'Plano e cobrança', icone: 'dinheiro', soAdmin: true },
 ];
 
@@ -81,7 +82,7 @@ const NOMES: Record<string, string> = {
   '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e benefícios', '/rh/prestadores': 'Notas de prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
   '/rh/relatorios': 'Relatórios', '/rh/fiscal': 'Arquivos fiscais', '/rh/funcionarios': 'Funcionários', '/rh/comunicacao': 'Comunicação interna', '/rh/comunicacao/novo': 'Novo comunicado', '/rh/escalas': 'Escalas',
   '/rh/regras': 'Regras de cálculo', '/rh/feriados': 'Feriados', '/rh/local': 'Local e cerca', '/rh/dispositivos': 'Quiosques',
-  '/rh/auditoria': 'Auditoria', '/rh/notificacoes': 'Notificações do app', '/rh/assinatura': 'Plano e cobrança',
+  '/rh/auditoria': 'Auditoria', '/rh/usuarios': 'Usuários', '/rh/notificacoes': 'Notificações do app', '/rh/assinatura': 'Plano e cobrança',
   '/rh/documentos': 'Assinaturas', '/rh/integracoes': 'Integrações',
   '/rh/ajuda': 'Central de Ajuda', '/rh/ajuda/assistente': 'Assistente de configuração',
 };

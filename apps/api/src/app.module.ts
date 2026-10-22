@@ -3,6 +3,7 @@ import { DatabaseModule } from './database/database.module';
 import { EmailModule } from './email/email.module';
 import { AuthModule } from './auth/auth.module';
 import { TenantModule } from './tenant/tenant.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 import { EmpregadoModule } from './empregado/empregado.module';
 import { CertificadoModule } from './certificado/certificado.module';
 import { MarcacaoModule } from './marcacao/marcacao.module';
@@ -29,7 +30,7 @@ import { AjudaModule } from './ajuda/ajuda.module';
 
 @Module({
   imports: [
-    DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
+    DatabaseModule, EmailModule, AuthModule, TenantModule, UsuariosModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
     BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule, ComunicacaoModule, PortalModule, AssinaturaModule, AjudaModule,
   ],

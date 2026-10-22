@@ -18,10 +18,17 @@ export class AuditoriaController {
   listar(
     @UsuarioAtual() u: PayloadAcesso,
     @Query('usuarioId') usuarioId?: string,
+    @Query('outros') outros?: string,
     @Query('inicio') inicio?: string,
     @Query('fim') fim?: string,
   ) {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
-    return this.auditoria.listar(u.tenantId, { usuarioId, inicio, fim });
+    return this.auditoria.listar(u.tenantId, { usuarioId, outros: outros === '1', inicio, fim });
+  }
+
+  @Get('pessoas')
+  pessoas(@UsuarioAtual() u: PayloadAcesso, @Query('inicio') inicio?: string, @Query('fim') fim?: string) {
+    if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
+    return this.auditoria.pessoas(u.tenantId, { inicio, fim });
   }
 }

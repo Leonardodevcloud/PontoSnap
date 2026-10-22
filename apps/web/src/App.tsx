@@ -32,6 +32,8 @@ import Perfis from './rh/Perfis';
 import AjustesPonto from './rh/AjustesPonto';
 import { BatidasFaltando } from './rh/BatidasFaltando';
 import { Auditoria } from './rh/Auditoria';
+import { Usuarios } from './rh/Usuarios';
+import { UsuariosCliente } from './master/UsuariosCliente';
 import { Dispositivos } from './rh/Dispositivos';
 import { Notificacoes } from './rh/Notificacoes';
 import { Comunicacao } from './rh/Comunicacao';
@@ -163,6 +165,7 @@ export function App() {
         <Route path="ajustes" element={<AjustesPonto />} />
         <Route path="batidas-faltando" element={<BatidasFaltando />} />
         <Route path="auditoria" element={<Auditoria />} />
+        <Route path="usuarios" element={<Usuarios />} />
         <Route path="dispositivos" element={<Dispositivos />} />
         <Route path="notificacoes" element={<Notificacoes />} />
         <Route path="comunicacao" element={<Comunicacao />} />
@@ -182,6 +185,7 @@ export function App() {
         <Route index element={<Clientes />} />
         <Route path="cobranca" element={<Cobranca />} />
         <Route path="acessos" element={<Acessos />} />
+        <Route path="clientes/:id/usuarios" element={<UsuariosCliente />} />
         <Route path="certificado" element={<CertificadoPlataforma />} />
       </Route>
 

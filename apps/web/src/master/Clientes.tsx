@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
 import type { Tenant } from '../tipos';
@@ -26,6 +27,7 @@ export function Clientes() {
   const [menu, setMenu] = useState<string | null>(null);
   const [editarFuso, setEditarFuso] = useState<Tenant | null>(null);
   const [editarDados, setEditarDados] = useState<Tenant | null>(null);
+  const navegar = useNavigate();
 
   async function carregar() {
     try { setLista(await api.get<Tenant[]>('/tenants')); }
@@ -104,6 +106,7 @@ export function Clientes() {
               {menu === t.id && (
                 <div className={css.menu} onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => { setMenu(null); setEditarDados(t); }}>Editar dados</button>
+                  <button onClick={() => { setMenu(null); navegar(`/master/clientes/${t.id}/usuarios`); }}>Usuários</button>
                   <button onClick={() => { setMenu(null); setEditarFuso(t); }}>Fuso horário</button>
                   <button onClick={() => { setMenu(null); void baixarAttr(t); }}>Baixar ATTR</button>
                   <button onClick={() => { setMenu(null); void reenviarAcesso(t); }}>Reenviar acesso</button>

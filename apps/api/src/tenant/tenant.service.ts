@@ -12,7 +12,7 @@ import { emailBoasVindasCliente } from '../email/templates';
 
 /** Senha provisória legível: sem 0/O/1/l/I para não confundir na hora de digitar. */
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-function senhaProvisoria(tam = 10): string {
+export function senhaProvisoria(tam = 10): string {
   const bytes = randomBytes(tam);
   let out = '';
   for (const b of bytes) out += ALFABETO[b % ALFABETO.length];
@@ -239,7 +239,7 @@ export class TenantService {
       // Traz o nome do cliente de origem: sem isso, a lista vira um monte de
       // e-mail solto e não dá para saber de quem é cada conta.
       const contas = await tx.select({
-        id: usuario.id, email: usuario.email, perfil: usuario.perfil,
+        id: usuario.id, email: usuario.email, nome: usuario.nome, perfil: usuario.perfil,
         tenantPadrao: usuario.tenantId, ativo: usuario.ativo,
         empresaOrigem: tenant.razaoSocial,
       }).from(usuario)
