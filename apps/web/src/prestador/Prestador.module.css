@@ -166,3 +166,9 @@
 .linkBtn{ background:none; border:0; color:var(--coral-dark); font:inherit; font-weight:800; font-size:14px; cursor:pointer; padding:8px; min-height:40px; }
 .linkBtn:disabled{ opacity:.5; cursor:default; }
 .linkBtn:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; border-radius:8px; }
+/* Dados para emitir (modelo de nota do RH) */
+.dica{ margin:0 0 4px; color:var(--ash); font-size:13px; line-height:1.45; }
+.obsPedido{ margin:6px 0 0; background:var(--aviso-bg); color:var(--aviso-text); border-radius:10px; padding:8px 10px; font-size:13px; line-height:1.45; }
+.btnTudo{ margin-top:10px; }
+.avisoI{ background:var(--aviso-bg); color:var(--aviso-text); font-weight:900; }
+.avisoTxt{ margin:10px 0 0; background:var(--aviso-bg); color:var(--aviso-text); border-radius:10px; padding:9px 11px; font-size:13px; line-height:1.45; }

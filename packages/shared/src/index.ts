@@ -3,3 +3,4 @@ export * from './types.js';
 export * from './geo';
 export * from './video';
 export * from './nfse';
+export * from './modelo-nota';

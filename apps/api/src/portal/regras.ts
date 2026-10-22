@@ -1,6 +1,7 @@
 import type { ConferenciaNota, LinhaDetalheNota } from '@ponto/db';
 import type { LinhaDebito, LinhaMei, LinhaMot, SemanaMot } from '../pessoal/pessoal.service';
 import type { LidoNfse } from '@ponto/shared';
+import { mesmaDescricao, mesmoCodigoServico } from '@ponto/shared';
 
 /**
  * Regras puras do portal do prestador: rótulos, "como chegou nesse valor",
@@ -131,6 +132,8 @@ export function conferir(e: {
   fonte?: 'XML' | 'PDF';
   documentoPrestador: string | null; cnpjTomador: string | null;
   numerosAnteriores: string[];
+  /** Pedido no modelo de nota (se houver): código do serviço e descrição. */
+  codigoServico?: string | null; descricao?: string | null;
 }): ConferenciaNota {
   const arquivo: ConferenciaNota['arquivo'] = e.mime.includes('xml') ? 'XML' : e.mime === 'application/pdf' ? 'PDF' : 'FOTO';
   const lido = e.lido;
@@ -144,10 +147,14 @@ export function conferir(e: {
   const competenciaOk = data ? data >= inicio : null;
   const tomadorOk = lido?.cnpjTomador && e.cnpjTomador ? lido.cnpjTomador === e.cnpjTomador : null;
   const prestadorOk = lido?.cnpjPrestador && e.documentoPrestador ? lido.cnpjPrestador === e.documentoPrestador : null;
-  const falhou = valorBate === false || numeroRepetido || competenciaOk === false || tomadorOk === false || prestadorOk === false;
+  // Código do serviço errado é problema; descrição diferente é só aviso (o RH decide).
+  const codigoOk = e.codigoServico ? mesmoCodigoServico(e.codigoServico, lido?.codigoServico) : null;
+  const descricaoOk = e.descricao ? mesmaDescricao(e.descricao, lido?.descricao) : null;
+  const falhou = valorBate === false || numeroRepetido || competenciaOk === false || tomadorOk === false || prestadorOk === false || codigoOk === false;
   return {
-    arquivo, origem: lido ? (e.fonte ?? 'XML') : 'INFORMADO', valorBate, numeroRepetido, competenciaOk, tomadorOk, prestadorOk,
-    lido: lido ? { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjTomador: lido.cnpjTomador, cnpjPrestador: lido.cnpjPrestador, ...(lido.chave ? { chave: lido.chave } : {}) } : undefined,
+    arquivo, origem: lido ? (e.fonte ?? 'XML') : 'INFORMADO', valorBate, numeroRepetido, competenciaOk, tomadorOk, prestadorOk, codigoOk, descricaoOk,
+    lido: lido ? { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjTomador: lido.cnpjTomador, cnpjPrestador: lido.cnpjPrestador,
+      codigoServico: lido.codigoServico ?? null, descricao: lido.descricao ?? null, ...(lido.chave ? { chave: lido.chave } : {}) } : undefined,
     bate: !falhou && arquivo !== 'FOTO' && valorBate === true,
   };
 }

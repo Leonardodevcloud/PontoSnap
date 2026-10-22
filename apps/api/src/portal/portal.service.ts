@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import JSZip from 'jszip';
 import {
   comTenant, comoMaster, pessoalLancamento, pessoalNfArquivo, pessoalNota, pessoalPrestador, prestadorConvite, pushSubscription,
-  tenant, usuario, type ConferenciaNota, type Db, type LinhaDetalheNota,
+  tenant, usuario, type ConferenciaNota, type Db, type InstrucoesNota, type LinhaDetalheNota,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { PessoalService, type CompetenciaPessoal } from '../pessoal/pessoal.service';
@@ -19,6 +19,8 @@ import {
   mensagemConvite, emailLogin, reaisBr, rotuloMes, rotuloPeriodo, situacaoDe, valorSemana, type Situacao, type StatusNota,
 } from './regras';
 import { lerNfseDoPdf } from './pdf-texto';
+import { ModeloNotaService, instrucoesDe, modeloDe } from './modelo-nota.service';
+import { textoInstrucoesNota } from '@ponto/shared';
 import type { LidoNfse } from '@ponto/shared';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -112,6 +114,30 @@ export class PortalService {
       nome: pessoalNfArquivo.arquivoNome, mime: pessoalNfArquivo.arquivoMime, bytes: pessoalNfArquivo.arquivoBytes,
     }).from(pessoalNfArquivo).where(and(eq(pessoalNfArquivo.tenantId, tenantId), inArray(pessoalNfArquivo.pessoaId, ids),
       ...(comp ? [eq(pessoalNfArquivo.competencia, comp)] : [])));
+  }
+
+  /**
+   * O que foi pedido em cada nota (tomador, código, descrição): o congelado ao
+   * liberar ou, para notas liberadas antes dos modelos e ainda não enviadas, o modelo de agora.
+   */
+  private async pedidosDe(tx: Tx, tenantId: string, notas: Nota[]): Promise<Map<string, InstrucoesNota | null>> {
+    const out = new Map<string, InstrucoesNota | null>();
+    // Sem pedido congelado: só as notas ainda não enviadas usam o modelo de agora
+    // (nota enviada antes de existir o modelo não ganha um pedido retroativo).
+    const faltam = notas.filter((n) => !n.instrucoes && (n.status === 'AGUARDANDO' || n.status === 'RECUSADA'));
+    for (const n of notas) if (n.instrucoes) out.set(n.id, n.instrucoes);
+    if (!faltam.length) return out;
+    const ids = [...new Set(faltam.map((n) => n.pessoaId))];
+    const pessoas = await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.id, ids)));
+    const modelos = await new ModeloNotaService(this.db).listarTx(tx, tenantId);
+    const lancs = await this.lancamentosDe(tx, tenantId, ids);
+    for (const n of faltam) {
+      const p = pessoas.find((x) => x.id === n.pessoaId);
+      const m = p ? modeloDe(p, modelos) : null;
+      const dias = lancs.find((l) => l.pessoaId === n.pessoaId && l.competencia === n.competencia && l.periodo === n.periodo)?.diasDatas;
+      out.set(n.id, p && m ? instrucoesDe(m, p, n, dias) : null);
+    }
+    return out;
   }
 
   /** Visão da nota (comum ao prestador e ao RH). */
@@ -209,17 +235,19 @@ export class PortalService {
   async eu(tenantId: string, usuarioId: string) {
     const p = await this.prestadorDoUsuario(tenantId, usuarioId);
     const emp = await this.empresaDo(tenantId);
-    const { notas, lancs, arqs } = await comTenant(this.db, tenantId, async (tx) => ({
-      notas: await tx.select().from(pessoalNota).where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.pessoaId, p.id)))
-        .orderBy(desc(pessoalNota.competencia), desc(pessoalNota.periodo)),
-      lancs: await this.lancamentosDe(tx, tenantId, [p.id]),
-      arqs: await this.arquivosDe(tx, tenantId, [p.id]),
-    }));
+    const { notas, lancs, arqs, pedidos, modelo } = await comTenant(this.db, tenantId, async (tx) => {
+      const notas = await tx.select().from(pessoalNota).where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.pessoaId, p.id)))
+        .orderBy(desc(pessoalNota.competencia), desc(pessoalNota.periodo));
+      return {
+        notas, lancs: await this.lancamentosDe(tx, tenantId, [p.id]), arqs: await this.arquivosDe(tx, tenantId, [p.id]),
+        pedidos: await this.pedidosDe(tx, tenantId, notas), modelo: modeloDe(p, await new ModeloNotaService(this.db).listarTx(tx, tenantId)),
+      };
+    });
     const lista = notas.map((n) => this.visao(n, {
       lanc: lancs.find((l) => l.competencia === n.competencia && l.periodo === n.periodo),
       arquivo: arqs.find((a) => a.competencia === n.competencia && a.periodo === n.periodo) ?? null,
     }));
-    const tomador = this.tomadorDe(p, emp);
+    const tomador = modelo ? { nome: modelo.tomadorRazao, cnpj: modelo.tomadorCnpj } : this.tomadorDe(p, emp);
     return {
       prestador: {
         id: p.id, nome: p.nome, tipo: p.tipo, funcao: p.funcao, empresa: p.empresa, documento: p.documento, email: p.email,
@@ -228,7 +256,10 @@ export class PortalService {
       empresa: emp.razao,
       tomador,
       emissorUrl: EMISSOR_NFSE,
-      notas: lista.map((n) => ({ ...n, descricao: this.descricao(p, n.competencia, n.periodo) })),
+      notas: lista.map((n) => {
+        const pedido = pedidos.get(n.id) ?? null;
+        return { ...n, descricao: pedido?.descricao ?? this.descricao(p, n.competencia, n.periodo), pedido, textoPedido: pedido ? textoInstrucoesNota(pedido) : null };
+      }),
     };
   }
 
@@ -319,13 +350,15 @@ export class PortalService {
     mime: string; lido: (LidoNfse & { chave?: string | null }) | null; fonte?: 'XML' | 'PDF'; informado: { numero: string; data: string; valorCent: number | null };
   }): Promise<ConferenciaNota> {
     const emp = await this.empresaDo(tenantId);
+    const pedido = await comTenant(this.db, tenantId, async (tx) => (await this.pedidosDe(tx, tenantId, [n])).get(n.id) ?? null);
     const outras = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ nf: pessoalLancamento.nfNumero, comp: pessoalLancamento.competencia, per: pessoalLancamento.periodo })
       .from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.pessoaId, p.id))))
       .filter((x) => x.nf && !(x.comp === n.competencia && x.per === n.periodo)).map((x) => x.nf!));
     return conferir({
       mime: e.mime, esperadoCent: n.valorCent, competencia: n.competencia, periodo: n.periodo,
       informado: e.informado, lido: e.lido, fonte: e.fonte,
-      documentoPrestador: p.documento, cnpjTomador: this.tomadorDe(p, emp).cnpj || null, numerosAnteriores: outras,
+      documentoPrestador: p.documento, cnpjTomador: pedido?.tomador.cnpj ?? (this.tomadorDe(p, emp).cnpj || null), numerosAnteriores: outras,
+      codigoServico: pedido?.codigoServico ?? null, descricao: pedido?.descricao ?? null,
     });
   }
 
@@ -343,7 +376,8 @@ export class PortalService {
     const conferencia = await this.conferirNota(tenantId, p, n, {
       mime, lido, fonte, informado: { numero: lido.numero ?? '', data: lido.data ?? '', valorCent: lido.valorCent },
     });
-    return { lido: { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjPrestador: lido.cnpjPrestador, cnpjTomador: lido.cnpjTomador }, conferencia };
+    return { lido: { numero: lido.numero, data: lido.data, valorCent: lido.valorCent, cnpjPrestador: lido.cnpjPrestador, cnpjTomador: lido.cnpjTomador,
+      codigoServico: lido.codigoServico ?? null, descricao: lido.descricao ?? null }, conferencia };
   }
 
   /** O próprio arquivo enviado (o prestador só abre os dele). */
@@ -407,6 +441,15 @@ export class PortalService {
       const existentes = await tx.select().from(pessoalNota).where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.competencia, d.competencia),
         inArray(pessoalNota.pessoaId, [...new Set(itens.map((i) => i.pessoaId))])));
       const contas = await this.contasDe(tx, tenantId, [...new Set(itens.map((i) => i.pessoaId))]);
+      // Pedido da nota (modelo + dias marcados), congelado junto com o valor.
+      const idsP = [...new Set(itens.map((i) => i.pessoaId))];
+      const pessoasP = await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.id, idsP)));
+      const modelosP = await new ModeloNotaService(this.db).listarTx(tx, tenantId);
+      const lancsP = await this.lancamentosDe(tx, tenantId, idsP, d.competencia);
+      const pedidoDe = (i: Item): InstrucoesNota | null => {
+        const p = pessoasP.find((x) => x.id === i.pessoaId); const m = p ? modeloDe(p, modelosP) : null;
+        return p && m ? instrucoesDe(m, p, { competencia: d.competencia, periodo: i.periodo, valorCent: i.valorCent }, lancsP.find((l) => l.pessoaId === i.pessoaId && l.periodo === i.periodo)?.diasDatas) : null;
+      };
       const avisos: { usuarioId?: string; titulo: string; corpo: string; tag: string }[] = [];
       let novas = 0, alteradas = 0, iguais = 0;
       for (const i of itens) {
@@ -416,7 +459,7 @@ export class PortalService {
         if (!atual) {
           const [r] = await tx.insert(pessoalNota).values({
             tenantId, pessoaTipo: i.pessoaTipo, pessoaId: i.pessoaId, competencia: d.competencia, periodo: i.periodo,
-            valorCent: i.valorCent, detalhe: i.detalhe, prazo, pedirConfirmacao: !!d.pedirConfirmacao,
+            valorCent: i.valorCent, detalhe: i.detalhe, prazo, pedirConfirmacao: !!d.pedirConfirmacao, instrucoes: pedidoDe(i),
           }).returning();
           novas++;
           avisos.push({ usuarioId: contas.get(i.pessoaId), titulo: `${i.periodo === 'MES' ? `${rotulo} fechado` : `${rotulo} fechada`}: R$ ${reaisBr(i.valorCent)}`,
@@ -424,7 +467,7 @@ export class PortalService {
         } else if (atual.valorCent !== i.valorCent) {
           const jaEnviada = atual.status === 'ENVIADA' || atual.status === 'APROVADA';
           await tx.update(pessoalNota).set({
-            valorCent: i.valorCent, detalhe: i.detalhe, versao: atual.versao + 1, prazo, pedirConfirmacao: !!d.pedirConfirmacao,
+            valorCent: i.valorCent, detalhe: i.detalhe, versao: atual.versao + 1, prazo, pedirConfirmacao: !!d.pedirConfirmacao, instrucoes: pedidoDe(i),
             liberadoEm: new Date(), confirmacao: null, confirmadoEm: null, contestacao: null, resposta: null, respondidoEm: null,
             ...(jaEnviada ? { status: 'RECUSADA', motivoRecusa: `O valor foi corrigido de R$ ${reaisBr(atual.valorCent)} para R$ ${reaisBr(i.valorCent)}. Envie uma nota com o novo valor.`, conferidaEm: new Date(), conferidaPor: 'RH' } : {}),
           }).where(eq(pessoalNota.id, atual.id));
@@ -432,7 +475,9 @@ export class PortalService {
           avisos.push({ usuarioId: contas.get(i.pessoaId), titulo: `${rotulo}: o valor mudou`,
             corpo: `Novo valor: R$ ${reaisBr(i.valorCent)}. ${jaEnviada ? 'Envie uma nota com o novo valor.' : corpoPrazo}`, tag: `nota-liberada-${atual.id}-v${atual.versao + 1}` });
         } else {
-          await tx.update(pessoalNota).set({ prazo, pedirConfirmacao: !!d.pedirConfirmacao }).where(eq(pessoalNota.id, atual.id));
+          // Mesmo valor: o pedido acompanha o modelo de agora enquanto a nota não foi enviada.
+          const aindaNaoEnviou = atual.status === 'AGUARDANDO' || atual.status === 'RECUSADA';
+          await tx.update(pessoalNota).set({ prazo, pedirConfirmacao: !!d.pedirConfirmacao, ...(aindaNaoEnviou ? { instrucoes: pedidoDe(i) } : {}) }).where(eq(pessoalNota.id, atual.id));
           iguais++;
         }
       }
@@ -467,6 +512,7 @@ export class PortalService {
       subs: await tx.selectDistinct({ u: pushSubscription.usuarioId }).from(pushSubscription).where(eq(pushSubscription.tenantId, tenantId)),
       lancs: await this.lancamentosDe(tx, tenantId, ids, competencia),
       arqs: await this.arquivosDe(tx, tenantId, ids, competencia),
+      modelos: await new ModeloNotaService(this.db).listarTx(tx, tenantId),
     }));
     const comPush = new Set(dados.subs.map((s) => s.u));
     const pr = new Map(dados.prest.map((p) => [p.id, p]));
@@ -509,6 +555,8 @@ export class PortalService {
       return {
         ...l, empresa: p?.empresa ?? null, funcao: p?.funcao ?? null, documento: p?.documento ?? null, telefone: p?.telefone ?? null, email: p?.email ?? null,
         tomadorNome: p?.tomadorNome ?? null, tomadorCnpj: p?.tomadorCnpj ?? null, avatarSemente: p?.avatarSemente ?? null,
+        /** Modelo de nota: o escolhido (id) e o que vale (escolhido ou padrão do tipo). */
+        modeloNotaId: p?.modeloNotaId ?? null, modeloNota: p ? (() => { const m = modeloDe(p, dados.modelos); return m ? { id: m.id, nome: m.nome, padrao: !p.modeloNotaId } : null; })() : null,
         acesso: acessoDe(l.id), situacao: sit, atrasada: l.unidades.some((u) => u.atrasada),
         vistoEm: liberadas.map((u) => u.nota!.vistoEm).filter(Boolean).sort().pop() ?? null,
         pago: l.unidades.length > 0 && l.unidades.every((u) => u.pago),
@@ -555,7 +603,7 @@ export class PortalService {
         .from(pessoalNota).innerJoin(pessoalPrestador, eq(pessoalPrestador.id, pessoalNota.pessoaId))
         .where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.status, 'ENVIADA'))).orderBy(pessoalNota.enviadaEm);
       const ids = [...new Set(notas.map((x) => x.n.pessoaId))];
-      return { notas, lancs: await this.lancamentosDe(tx, tenantId, ids), arqs: await this.arquivosDe(tx, tenantId, ids) };
+      return { notas, lancs: await this.lancamentosDe(tx, tenantId, ids), arqs: await this.arquivosDe(tx, tenantId, ids), pedidos: await this.pedidosDe(tx, tenantId, notas.map((x) => x.n)) };
     });
     const emp = await this.empresaDo(tenantId);
     return r.notas.map(({ n, nome, documento, empresa, avatarSemente, tomadorCnpj }) => ({
@@ -565,7 +613,9 @@ export class PortalService {
       }),
       pessoaId: n.pessoaId, nome, documento, empresa, avatarSemente,
       /** CNPJ que deveria estar como tomador na nota (o do prestador ou o da empresa). */
-      tomadorEsperado: tomadorCnpj || emp.cnpj || null,
+      tomadorEsperado: r.pedidos.get(n.id)?.tomador.cnpj ?? (tomadorCnpj || emp.cnpj || null),
+      /** O que foi pedido na nota (modelo): tomador, código e descrição. */
+      pedido: r.pedidos.get(n.id) ?? null,
     }));
   }
 
@@ -576,7 +626,7 @@ export class PortalService {
       if (!n) throw new NotFoundException('Nota não encontrada.');
       const lanc = (await this.lancamentosDe(tx, tenantId, [n.pessoaId], n.competencia)).find((l) => l.periodo === n.periodo);
       const arq = (await this.arquivosDe(tx, tenantId, [n.pessoaId], n.competencia)).find((a) => a.periodo === n.periodo) ?? null;
-      return this.visao(n, { lanc, arquivo: arq });
+      return { ...this.visao(n, { lanc, arquivo: arq }), pedido: (await this.pedidosDe(tx, tenantId, [n])).get(n.id) ?? null };
     });
   }
 

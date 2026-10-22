@@ -763,6 +763,8 @@ export interface PessoalSemanaMot {
   inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: PessoalNfArquivo | null;
   /** Débito do mês descontado nesta semana e o pagamento da semana. */
   debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
+  /** Dias da semana dentro do mês e os marcados como trabalhados (vão na descrição da nota). */
+  diasPossiveis?: string[]; diasDatas?: string[] | null;
 }
 export interface PessoalLinhaMot {
   fechadoIndividual?: FechadoIndividual;

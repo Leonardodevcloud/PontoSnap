@@ -1284,12 +1284,19 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
   const fi = l.fechadoIndividual;
   const fechado = fechadoMes || !!fi;
   // Só dias, adicionais e NF são editados aqui; pagamento e débito vêm ao vivo de `l`.
-  const [ed, setEd] = useState(l.semanas.map((s) => ({ dias: s.dias, adicionalCent: s.adicionalCent, nfNumero: s.nfNumero ?? '' })));
+  const [ed, setEd] = useState(l.semanas.map((s) => ({ dias: s.dias, adicionalCent: s.adicionalCent, nfNumero: s.nfNumero ?? '', datas: s.diasDatas ?? [] })));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const diaria = l.valorCent / Math.max(1, l.diasMes);
   const up = (i: number, p: Partial<(typeof ed)[number]>) => setEd(ed.map((s, j) => (j === i ? { ...s, ...p } : s)));
-  const mudou = ed.some((e, i) => { const o = l.semanas[i]!; return e.dias !== o.dias || e.adicionalCent !== o.adicionalCent || e.nfNumero !== (o.nfNumero ?? ''); });
+  const mudouDatas = (i: number) => ed[i]!.datas.join() !== (l.semanas[i]!.diasDatas ?? []).join();
+  const mudou = ed.some((e, i) => { const o = l.semanas[i]!; return e.dias !== o.dias || e.adicionalCent !== o.adicionalCent || e.nfNumero !== (o.nfNumero ?? '') || mudouDatas(i); });
+  // Marcar o dia: a quantidade acompanha. Mudar só a quantidade: as datas saem.
+  const marcarDia = (i: number, dia: string) => {
+    const atual = ed[i]!.datas;
+    const datas = (atual.includes(dia) ? atual.filter((x) => x !== dia) : [...atual, dia]).sort();
+    up(i, datas.length ? { datas, dias: datas.length } : { datas });
+  };
   const total = Math.round(diaria * ed.reduce((a, s) => a + s.dias, 0)) + ed.reduce((a, s) => a + s.adicionalCent, 0);
   const pago = pagoMot(l);
   const comDias = l.semanas.filter((s) => s.dias > 0);
@@ -1299,12 +1306,13 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
     try {
       for (let i = 0; i < ed.length; i++) {
         const e = ed[i]!, o = l.semanas[i]!;
-        if (e.dias === o.dias && e.adicionalCent === o.adicionalCent && e.nfNumero === (o.nfNumero ?? '')) continue;
+        if (e.dias === o.dias && e.adicionalCent === o.adicionalCent && e.nfNumero === (o.nfNumero ?? '') && !mudouDatas(i)) continue;
         await api.put('/pessoal/lancamento', fechado || o.pago ? {
           pessoaTipo: 'MOTORISTA', pessoaId: l.id, competencia: mes, periodo: o.inicio, nfNumero: e.nfNumero,
         } : {
           pessoaTipo: 'MOTORISTA', pessoaId: l.id, competencia: mes, periodo: o.inicio,
-          dias: e.dias === o.diasAuto ? null : e.dias, adicional: e.adicionalCent / 100, nfNumero: e.nfNumero,
+          adicional: e.adicionalCent / 100, nfNumero: e.nfNumero,
+          ...(e.datas.length ? { diasDatas: e.datas } : { dias: e.dias === o.diasAuto ? null : e.dias }),
         });
       }
       await onSalvo();
@@ -1334,10 +1342,11 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
                 <strong className={css.semValor}>{brl(valor)}</strong>
               </div>
               <div className={css.grade3}>
-                <CampoNum id={`d-${i}`} rotulo={`Dias (previsto ${s.diasAuto})`} max={7} valor={e.dias} onChange={(n) => up(i, { dias: n })} disabled={travada} />
+                <CampoNum id={`d-${i}`} rotulo={`Dias (previsto ${s.diasAuto})`} max={7} valor={e.dias} onChange={(n) => up(i, { dias: n, datas: [] })} disabled={travada} />
                 <CampoReais id={`a-${i}`} rotulo="Adicionais" valorCent={e.adicionalCent} onChange={(c) => up(i, { adicionalCent: c })} disabled={travada} />
                 <CampoTexto id={`n-${i}`} rotulo="Nº da NF" valor={e.nfNumero} onChange={(v) => up(i, { nfNumero: v })} />
               </div>
+              {(s.diasPossiveis?.length ?? 0) > 0 && <DiasSemana s={s} datas={e.datas} disabled={travada} onMarcar={(dia) => marcarDia(i, dia)} />}
               {s.debitoAplicadoCent > 0 && <p className={css.formula}>Inclui débito descontado nesta semana: {brl(-s.debitoAplicadoCent)}.</p>}
               {e.dias > 0 && <AnexoNf pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} periodo={s.inicio} nome={`${l.nome} · semana ${fmtDia(s.inicio)}`}
                 arquivo={s.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />}
@@ -1373,6 +1382,31 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
         </div>
       </div>}
     </>
+  );
+}
+
+const SEM_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+/** Quais dias da semana o motorista trabalhou: vão na descrição da nota ("13/10 e 16/10"). */
+function DiasSemana({ s, datas, disabled, onMarcar }: { s: PessoalSemanaMot; datas: string[]; disabled: boolean; onMarcar: (dia: string) => void }) {
+  const lista = s.diasPossiveis ?? [];
+  const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  return (
+    <div className={css.diasTrab}>
+      <span className={css.diasTrabRot} id={`dt-${s.inicio}`}>Dias trabalhados{datas.length ? ` · ${datas.length}` : ''}</span>
+      <div className={css.diasTrabChips} role="group" aria-labelledby={`dt-${s.inicio}`}>
+        {lista.map((d) => {
+          const on = datas.includes(d);
+          return (
+            <button key={d} type="button" className={`${css.diaChip} ${on ? css.diaChipOn : ''}`} aria-pressed={on} disabled={disabled} onClick={() => onMarcar(d)}>
+              <b>{d.slice(8, 10)}</b><small>{SEM_CURTO[new Date(`${d}T12:00:00Z`).getUTCDay()]}</small>
+            </button>
+          );
+        })}
+      </div>
+      <small className={css.formula}>{datas.length
+        ? <>Na nota: <b>({datas.length === 1 ? dm(datas[0]!) : `${datas.slice(0, -1).map(dm).join(', ')} e ${dm(datas[datas.length - 1]!)}`})</b>. Marcar os dias já preenche a quantidade.</>
+        : <>Opcional: marque os dias para a descrição da nota sair com as datas. Sem marcar, vai o período ({dm(s.inicio)} a {dm(s.fim)}).</>}</small>
+    </div>
   );
 }
 

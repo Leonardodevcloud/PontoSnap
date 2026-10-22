@@ -68,6 +68,8 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   /** Atualização cadastral feita pelo próprio prestador no app (foto + dados) — migration 0058. */
   cadastroAtualizadoEm: timestamp('cadastro_atualizado_em', { withTimezone: true }),
   contatoEmergencia: varchar('contato_emergencia', { length: 160 }),
+  /** Modelo de nota (migration 0061). Nulo = o padrão do tipo, se houver. */
+  modeloNotaId: uuid('modelo_nota_id'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
 
@@ -94,6 +96,8 @@ export const pessoalLancamento = pgTable('pessoal_lancamento', {
   faltas: integer('faltas').notNull().default(0),
   feriadosTrab: integer('feriados_trab').notNull().default(0),
   dias: integer('dias'),
+  /** Motorista: datas trabalhadas na semana (YYYY-MM-DD) — {dias} na nota. */
+  diasDatas: jsonb('dias_datas').$type<string[]>(),
   adicional: numeric('adicional', { precision: 12, scale: 2 }).notNull().default('0'),
   meta: numeric('meta', { precision: 12, scale: 2 }).notNull().default('0'),
   metaPaga: boolean('meta_paga').notNull().default(false),
@@ -212,6 +216,13 @@ export const prestadorConvite = pgTable('prestador_convite', {
 
 /** Linha do "como chegou nesse valor" que o prestador vê. */
 export interface LinhaDetalheNota { rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS' }
+/** O que foi pedido na nota (mesmo formato de InstrucoesNota em @ponto/shared). */
+export interface InstrucoesNota {
+  modeloId: string | null; modeloNome: string | null;
+  tomador: { cnpj: string; razao: string; endereco: string | null; telefone: string | null; email: string | null };
+  codigoServico: string | null; codigoDescricao: string | null;
+  descricao: string; observacao: string | null; valorCent: number;
+}
 /** Conferência automática da nota enviada (o que deu para checar). */
 export interface ConferenciaNota {
   arquivo: 'PDF' | 'XML' | 'FOTO';
@@ -219,7 +230,9 @@ export interface ConferenciaNota {
   origem: 'XML' | 'PDF' | 'INFORMADO';
   valorBate: boolean | null; numeroRepetido: boolean; competenciaOk: boolean | null;
   tomadorOk: boolean | null; prestadorOk: boolean | null;
-  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null; chave?: string | null };
+  /** Modelo de nota (0061): código do serviço e descrição batem com o pedido? null = não deu para conferir. */
+  codigoOk?: boolean | null; descricaoOk?: boolean | null;
+  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null; chave?: string | null; codigoServico?: string | null; descricao?: string | null };
   bate: boolean;
 }
 
@@ -253,6 +266,8 @@ export const pessoalNota = pgTable('pessoal_nota', {
   enviadaEm: timestamp('enviada_em', { withTimezone: true }),
   nfValorCent: integer('nf_valor_cent'),
   conferencia: jsonb('conferencia').$type<ConferenciaNota>(),
+  /** O que foi pedido na nota (tomador, código, descrição), congelado ao liberar. */
+  instrucoes: jsonb('instrucoes').$type<InstrucoesNota>(),
   conferidaEm: timestamp('conferida_em', { withTimezone: true }),
   conferidaPor: varchar('conferida_por', { length: 160 }),
   motivoRecusa: text('motivo_recusa'),
@@ -262,3 +277,23 @@ export const pessoalNota = pgTable('pessoal_nota', {
   unique('uq_pessoal_nota').on(t.tenantId, t.pessoaTipo, t.pessoaId, t.competencia, t.periodo),
   index('idx_pessoal_nota_pessoa').on(t.tenantId, t.pessoaId),
 ]);
+
+/** Modelo de nota fiscal por operação (migration 0061). */
+export const pessoalModeloNota = pgTable('pessoal_modelo_nota', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
+  nome: varchar('nome', { length: 80 }).notNull(),
+  /** MEI | MOTORISTA: padrão do tipo. */
+  padraoTipo: varchar('padrao_tipo', { length: 10 }),
+  tomadorCnpj: varchar('tomador_cnpj', { length: 14 }).notNull(),
+  tomadorRazao: varchar('tomador_razao', { length: 160 }).notNull(),
+  tomadorEndereco: varchar('tomador_endereco', { length: 300 }),
+  tomadorTelefone: varchar('tomador_telefone', { length: 30 }),
+  tomadorEmail: varchar('tomador_email', { length: 160 }),
+  codigoServico: varchar('codigo_servico', { length: 12 }),
+  codigoDescricao: varchar('codigo_descricao', { length: 200 }),
+  descricao: text('descricao').notNull(),
+  observacao: varchar('observacao', { length: 400 }),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+  atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
+});

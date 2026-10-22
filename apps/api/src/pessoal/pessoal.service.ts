@@ -109,6 +109,8 @@ export interface LinhaMei {
 }
 export interface SemanaMot {
   inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null;
+  /** Datas da semana que caem no mês (para marcar) e as marcadas como trabalhadas (nota: {dias}). */
+  diasPossiveis?: string[]; diasDatas?: string[] | null;
   /** Débito do mês descontado nesta semana e o pagamento da semana (valor e hora). */
   debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
 }
@@ -488,7 +490,7 @@ export class PessoalService {
           const lin = cgm.linha as LinhaMot;
           const sems = lin.semanas.map((s) => {
             const l = lancDe('MOTORISTA', p.id, s.inicio);
-            return { ...s, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null,
+            return { ...s, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null, diasDatas: l?.diasDatas ?? null,
               debitoAplicadoCent: centavos(l?.debitoAplicado), ...pagamentoDe(l) };
           });
           motoristas.push({ ...lin, semanas: sems, fechadoIndividual: infoCongelado(cgm),
@@ -503,6 +505,7 @@ export class PessoalService {
           const adicionalCent = centavos(l?.adicional);
           const { totalCent } = calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias, adicionalCent });
           return { inicio: s.inicio, fim: s.fim, diasAuto, dias, adicionalCent, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, totalCent,
+            diasPossiveis: s.dias, diasDatas: l?.diasDatas ?? null,
             nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null,
             debitoAplicadoCent: centavos(l?.debitoAplicado), ...pagamentoDe(l) };
         });
@@ -740,7 +743,7 @@ export class PessoalService {
   /** Lançamento do mês (MEI, observação de qualquer um) ou da semana (motorista). */
   async salvarLancamento(tenantId: string, d: {
     pessoaTipo: PessoaTipo; pessoaId: string; competencia: string; periodo?: string;
-    heMin?: number; faltas?: number; feriadosTrab?: number; dias?: number | null; adicional?: number;
+    heMin?: number; faltas?: number; feriadosTrab?: number; dias?: number | null; diasDatas?: string[] | null; adicional?: number;
     meta?: number; metaPaga?: boolean; metaPagaEm?: string | null; nfNumero?: string | null; nfData?: string | null;
     pago?: boolean; valorPago?: number | null; debitoAplicado?: number; observacao?: string | null;
   }) {
@@ -763,6 +766,15 @@ export class PessoalService {
       if (d[k] !== undefined) set[k] = (typeof d[k] === 'string' ? (d[k] as string).trim() : d[k]) || null;
     }
     if (d.metaPaga === false) set.metaPagaEm = null;
+    // Dias marcados (motorista): a quantidade acompanha as datas. Mudou só a quantidade: as datas saem.
+    if (d.diasDatas !== undefined) {
+      if (d.pessoaTipo !== 'MOTORISTA' || periodo === 'MES') throw new BadRequestException('Dias trabalhados por data é só para a semana do motorista.');
+      const daSemana = semanasDoMes(d.competencia).find((x) => x.inicio === periodo)?.dias ?? [];
+      const datas = d.diasDatas == null ? null : [...new Set(d.diasDatas)].sort();
+      if (datas?.some((x) => !daSemana.includes(x))) throw new BadRequestException('Os dias marcados precisam ser desta semana e deste mês.');
+      set.diasDatas = datas?.length ? datas : null;
+      if (datas?.length) set.dias = datas.length;
+    } else if (d.dias !== undefined) set.diasDatas = null;
     if (d.valorPago !== undefined) set.valorPago = d.valorPago == null ? null : reais(centavos(d.valorPago));
     if (d.debitoAplicado !== undefined) {
       if (d.pessoaTipo !== 'MOTORISTA' || periodo === 'MES') throw new BadRequestException('Débito por semana é só para motorista.');

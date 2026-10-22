@@ -8,7 +8,9 @@ export interface LinhaDetalhe { rotulo: string; valorCent: number; tipo?: 'BASE'
 export interface Conferencia {
   arquivo: 'PDF' | 'XML' | 'FOTO'; origem: 'XML' | 'PDF' | 'INFORMADO';
   valorBate: boolean | null; numeroRepetido: boolean; competenciaOk: boolean | null; tomadorOk: boolean | null; prestadorOk: boolean | null;
-  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null };
+  /** Código do serviço e descrição × o pedido do modelo (null = não deu para ler / sem modelo). */
+  codigoOk?: boolean | null; descricaoOk?: boolean | null;
+  lido?: { numero?: string | null; data?: string | null; valorCent?: number | null; cnpjTomador?: string | null; cnpjPrestador?: string | null; codigoServico?: string | null; descricao?: string | null };
   bate: boolean;
 }
 export interface ArquivoNf { id: string; nome: string; mime: string; bytes: number }
@@ -22,6 +24,25 @@ export interface Nota {
   pago: boolean; pagoEm: string | null; valorPagoCent: number | null; lembretes: number; lembreteEm: string | null;
   /** Só no app: descrição pronta para colar no emissor. */
   descricao?: string;
+  /** O que foi pedido (modelo de nota congelado ao liberar). */
+  pedido?: PedidoNota | null;
+  /** Bloco para "Copiar tudo". */
+  textoPedido?: string | null;
+}
+export interface PedidoNota {
+  modeloId: string | null; modeloNome: string | null;
+  tomador: { cnpj: string; razao: string; endereco: string | null; telefone: string | null; email: string | null };
+  codigoServico: string | null; codigoDescricao: string | null; descricao: string; observacao: string | null; valorCent: number;
+}
+export interface ModeloNota {
+  id: string; nome: string; padraoTipo: 'MEI' | 'MOTORISTA' | null;
+  tomadorCnpj: string; tomadorRazao: string; tomadorEndereco: string | null; tomadorTelefone: string | null; tomadorEmail: string | null;
+  codigoServico: string | null; codigoDescricao: string | null; descricao: string; observacao: string | null;
+  usadoPor: number; escolhidoPor: number;
+}
+export interface ListaModelos {
+  modelos: ModeloNota[]; semModelo: { id: string; nome: string; tipo: 'MEI' | 'MOTORISTA' }[]; empresa: { razao: string; cnpj: string };
+  pessoas: { id: string; nome: string; tipo: 'MEI' | 'MOTORISTA'; modeloNotaId: string | null; modeloEfetivoId: string | null }[];
 }
 export interface Eu {
   prestador: { id: string; nome: string; tipo: 'MEI' | 'MOTORISTA'; funcao: string | null; empresa: string | null; documento: string | null; email: string | null; chavePix: string | null; telefone: string | null; avatarSemente: number | null };
@@ -88,6 +109,8 @@ export interface LinhaRh {
   situacao: Situacao; atrasada: boolean; vistoEm: string | null; pago: boolean; pagoCent: number;
   /** Fechado sozinho no mês (desligamento / pagar antes do fechamento). */
   fechadoIndividual: FechadoIndividual | null;
+  /** Modelo de nota que vale para a pessoa (padrão = o do tipo, sem escolha). */
+  modeloNotaId: string | null; modeloNota: { id: string; nome: string; padrao: boolean } | null;
 }
 export interface PainelRh {
   competencia: string; rotulo: string; fechado: boolean; fechadoEm: string | null; hoje: string; meiLiberado: boolean;
@@ -98,7 +121,7 @@ export interface PainelRh {
   };
   linhas: LinhaRh[];
 }
-export interface NotaFila extends Nota { pessoaId: string; nome: string; documento: string | null; empresa: string | null; avatarSemente: number | null; tomadorEsperado: string | null }
+export interface NotaFila extends Nota { pessoaId: string; nome: string; documento: string | null; empresa: string | null; avatarSemente: number | null; tomadorEsperado: string | null; pedido?: PedidoNota | null }
 export interface ConviteGerado { prestadorId: string; nome: string; erro?: string; telefone?: string | null; email?: string | null; codigo?: string; link?: string; mensagem?: string; whatsapp?: string | null; emailEnviado?: boolean; expiraEm?: string }
 
 /** "há 2 dias", "hoje", "ontem". */

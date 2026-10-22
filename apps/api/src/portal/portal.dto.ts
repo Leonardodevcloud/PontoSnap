@@ -83,3 +83,22 @@ export class ContatoDto {
   @IsOptional() @IsString() @MaxLength(160) tomadorNome?: string | null;
   @IsOptional() @IsString() @MaxLength(20) tomadorCnpj?: string | null;
 }
+
+export class ModeloNotaDto {
+  @IsString() @MaxLength(80) nome!: string;
+  @IsOptional() @IsIn(['MEI', 'MOTORISTA', null]) padraoTipo?: 'MEI' | 'MOTORISTA' | null;
+  @IsString() @MaxLength(20) tomadorCnpj!: string;
+  @IsString() @MaxLength(160) tomadorRazao!: string;
+  @IsOptional() @IsString() @MaxLength(300) tomadorEndereco?: string | null;
+  @IsOptional() @IsString() @MaxLength(30) tomadorTelefone?: string | null;
+  @IsOptional() @IsString() @MaxLength(160) tomadorEmail?: string | null;
+  @IsOptional() @IsString() @MaxLength(12) codigoServico?: string | null;
+  @IsOptional() @IsString() @MaxLength(200) codigoDescricao?: string | null;
+  @IsString() @MaxLength(2000) descricao!: string;
+  @IsOptional() @IsString() @MaxLength(400) observacao?: string | null;
+}
+
+export class AplicarModeloDto {
+  @IsOptional() @IsUUID() modeloId?: string | null;
+  @IsArray() @ArrayMaxSize(2000) @IsUUID('all', { each: true }) prestadorIds!: string[];
+}

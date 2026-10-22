@@ -58,6 +58,7 @@ import { CentralAjuda } from './rh/ajuda/CentralAjuda';
 import { ArtigoPagina } from './rh/ajuda/ArtigoPagina';
 import { Assistente } from './rh/ajuda/Assistente';
 import { ConferirNotas } from './rh/ConferirNotas';
+import { ModelosNota } from './rh/ModelosNota';
 import { Flash } from './components/Flash';
 import { BarraProgresso } from './components/BarraProgresso';
 
@@ -150,6 +151,7 @@ export function App() {
         <Route path="pessoal" element={<ComMesPadrao><GestaoPessoal /></ComMesPadrao>} />
         <Route path="prestadores" element={<ComMesPadrao><Prestadores /></ComMesPadrao>} />
         <Route path="prestadores/conferir" element={<ConferirNotas />} />
+        <Route path="prestadores/modelos" element={<ModelosNota />} />
         <Route path="relatorios" element={<Relatorios />} />
         <Route path="feriados" element={<Feriados />} />
         <Route path="fiscal" element={<Fiscal />} />

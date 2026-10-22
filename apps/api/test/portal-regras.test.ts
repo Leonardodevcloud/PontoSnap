@@ -62,16 +62,16 @@ describe('NFS-e em XML', () => {
   const nacional = `<?xml version="1.0"?><NFSe xmlns="http://www.sped.fazenda.gov.br/nfse"><infNFSe Id="x"><nNFSe>000127</nNFSe>
     <emit><CNPJ>01234567000189</CNPJ><xNome>JOAO</xNome></emit><valores><vLiq>1980.00</vLiq></valores>
     <DPS><infDPS><dhEmi>2026-11-02T10:00:00-03:00</dhEmi><prest><CNPJ>01234567000189</CNPJ></prest>
-    <toma><CNPJ>12345678000190</CNPJ><xNome>IG</xNome></toma><valores><vServPrest><vServ>1980.00</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>`;
+    <toma><CNPJ>12345678000190</CNPJ><xNome>IG</xNome></toma><serv><cServ><cTribNac>260101</cTribNac><xDescServ>Coleta e entrega  de outubro</xDescServ></cServ></serv><valores><vServPrest><vServ>1980.00</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>`;
   const abrasf = `<CompNfse><Nfse><InfNfse><Numero>44</Numero><DataEmissao>2026-10-28T08:00:00</DataEmissao>
     <ValoresNfse><ValorLiquidoNfse>552.00</ValorLiquidoNfse></ValoresNfse>
     <PrestadorServico><IdentificacaoPrestador><CpfCnpj><Cnpj>11222333000144</Cnpj></CpfCnpj></IdentificacaoPrestador></PrestadorServico>
-    <TomadorServico><IdentificacaoTomador><CpfCnpj><Cnpj>12345678000190</Cnpj></CpfCnpj></IdentificacaoTomador></TomadorServico></InfNfse></Nfse></CompNfse>`;
+    <Servico><ItemListaServico>17.02</ItemListaServico><Discriminacao>Operador de caixa</Discriminacao></Servico><TomadorServico><IdentificacaoTomador><CpfCnpj><Cnpj>12345678000190</Cnpj></CpfCnpj></IdentificacaoTomador></TomadorServico></InfNfse></Nfse></CompNfse>`;
   it('padrão nacional', () => {
-    expect(lerNfseXml(nacional)).toEqual({ numero: '127', data: '2026-11-02', valorCent: 198000, cnpjPrestador: '01234567000189', cnpjTomador: '12345678000190' });
+    expect(lerNfseXml(nacional)).toEqual({ numero: '127', data: '2026-11-02', valorCent: 198000, cnpjPrestador: '01234567000189', cnpjTomador: '12345678000190', codigoServico: '26.01.01', descricao: 'Coleta e entrega de outubro' });
   });
   it('ABRASF', () => {
-    expect(lerNfseXml(abrasf)).toEqual({ numero: '44', data: '2026-10-28', valorCent: 55200, cnpjPrestador: '11222333000144', cnpjTomador: '12345678000190' });
+    expect(lerNfseXml(abrasf)).toEqual({ numero: '44', data: '2026-10-28', valorCent: 55200, cnpjPrestador: '11222333000144', cnpjTomador: '12345678000190', codigoServico: '17.02', descricao: 'Operador de caixa' });
   });
 });
 

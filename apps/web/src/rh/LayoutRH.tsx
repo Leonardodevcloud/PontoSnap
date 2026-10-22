@@ -78,7 +78,7 @@ const SECOES: { rotas: { to: string; rotulo: string }[] }[] = [
 const NOMES: Record<string, string> = {
   '/rh': 'Início', '/rh/espelhos': 'Ponto do mês · Espelhos', '/rh/apuracao': 'Ponto do mês · Apuração CLT',
   '/rh/batidas-faltando': 'Batidas faltando', '/rh/ajustes': 'Pedidos · Ajustes de ponto', '/rh/atestados': 'Pedidos · Atestados',
-  '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e benefícios', '/rh/prestadores': 'Notas de prestadores', '/rh/prestadores/conferir': 'Conferir notas',
+  '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e benefícios', '/rh/prestadores': 'Notas de prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
   '/rh/relatorios': 'Relatórios', '/rh/fiscal': 'Arquivos fiscais', '/rh/funcionarios': 'Funcionários', '/rh/comunicacao': 'Comunicação interna', '/rh/comunicacao/novo': 'Novo comunicado', '/rh/escalas': 'Escalas',
   '/rh/regras': 'Regras de cálculo', '/rh/feriados': 'Feriados', '/rh/local': 'Local e cerca', '/rh/dispositivos': 'Quiosques',
   '/rh/auditoria': 'Auditoria', '/rh/notificacoes': 'Notificações do app', '/rh/assinatura': 'Plano e cobrança',

@@ -71,6 +71,8 @@ export class LancamentoDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(31) faltas?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(31) feriadosTrab?: number;
   @IsOptional() @ValidateIf((_, v) => v !== null) @Type(() => Number) @IsInt() @Min(0) @Max(7) dias?: number | null;
+  /** Motorista: datas trabalhadas na semana (preenche "dias" e o {dias} da nota). */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsArray() @ArrayMaxSize(7) @Matches(DATA, { each: true }) diasDatas?: string[] | null;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) adicional?: number;
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) meta?: number;
   @IsOptional() @IsBoolean() metaPaga?: boolean;

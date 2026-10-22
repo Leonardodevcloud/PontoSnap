@@ -1,6 +1,38 @@
 /** Leitura de NFS-e em XML (usada no app do prestador e na API). Sem dependência. */
 
-export interface LidoNfse { numero: string | null; data: string | null; valorCent: number | null; cnpjPrestador: string | null; cnpjTomador: string | null }
+export interface LidoNfse {
+  numero: string | null; data: string | null; valorCent: number | null; cnpjPrestador: string | null; cnpjTomador: string | null;
+  /** Código de tributação nacional (LC 116), formatado NN.NN.NN (ou NN.NN no ABRASF). */
+  codigoServico?: string | null;
+  /** Descrição / discriminação do serviço, como veio na nota. */
+  descricao?: string | null;
+}
+
+/** "260101" / "26.01.01" / "2601" → "26.01.01" / "26.01". Outros formatos: null. */
+export function formatarCodigoServico(s: string | null | undefined): string | null {
+  const d = (s ?? '').replace(/\D/g, '');
+  if (d.length === 6) return `${d.slice(0, 2)}.${d.slice(2, 4)}.${d.slice(4)}`;
+  if (d.length === 4) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  return null;
+}
+/** Mesmo código? 26.01 (ABRASF) bate com 26.01.01 (nacional) no item. */
+export function mesmoCodigoServico(a: string | null | undefined, b: string | null | undefined): boolean | null {
+  const x = (a ?? '').replace(/\D/g, ''), y = (b ?? '').replace(/\D/g, '');
+  if (!x || !y) return null;
+  if (x.length === y.length) return x === y;
+  return x.slice(0, 4) === y.slice(0, 4);
+}
+const normTexto = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9/]+/g, ' ').trim();
+/**
+ * A descrição da nota bate com a pedida? Ignora maiúsculas, acentos,
+ * pontuação e espaços. Também aceita quando um texto contém o outro (o PDF
+ * às vezes corta ou junta linhas).
+ */
+export function mesmaDescricao(pedida: string | null | undefined, lida: string | null | undefined): boolean | null {
+  if (!pedida?.trim() || !lida?.trim()) return null;
+  const a = normTexto(pedida), b = normTexto(lida);
+  return a === b || b.includes(a) || (a.includes(b) && b.length >= a.length * 0.9);
+}
 
 const tag = (xml: string, nomes: string[]): string | null => {
   for (const n of nomes) {
@@ -31,7 +63,9 @@ export function lerNfseXml(xml: string): LidoNfse {
   const valorCent = valor && /^\d+(\.\d+)?$/.test(valor) ? Math.round(Number(valor) * 100) : null;
   const prest = bloco(xml, ['prest', 'emit', 'PrestadorServico', 'Prestador', 'IdentificacaoPrestador']);
   const toma = bloco(xml, ['toma', 'TomadorServico', 'Tomador', 'IdentificacaoTomador']);
-  return { numero: numero?.replace(/^0+(?=\d)/, '') ?? null, data, valorCent, cnpjPrestador: docDe(prest), cnpjTomador: docDe(toma) };
+  const codigoServico = formatarCodigoServico(tag(xml, ['cTribNac', 'ItemListaServico', 'CodigoServico']));
+  const descricao = tag(xml, ['xDescServ', 'Discriminacao', 'DescricaoServico'])?.replace(/\s+/g, ' ').trim() ?? null;
+  return { numero: numero?.replace(/^0+(?=\d)/, '') ?? null, data, valorCent, cnpjPrestador: docDe(prest), cnpjTomador: docDe(toma), codigoServico, descricao };
 }
 
 
@@ -114,6 +148,31 @@ function docDaSecao(ordem: TextoPdf[], inicio: RegExp, fim: RegExp): string | nu
   return null;
 }
 
+/**
+ * Texto livre logo abaixo de um rótulo (ex.: "Descrição do Serviço"): junta as
+ * linhas seguintes da mesma coluna até o próximo rótulo/seção.
+ */
+function textoAbaixo(itens: TextoPdf[], rotulo: RegExp): string | null {
+  const r = itens.find((i) => rotulo.test(norm(i.str)));
+  if (!r) return null;
+  // Mesmo item: "Discriminação: texto…"
+  const dp = r.str.indexOf(':');
+  if (dp >= 0 && r.str.slice(dp + 1).trim().length > 3) return r.str.slice(dp + 1).trim();
+  const PARA = /^(tributacao|valor|informacoes|tributos|retencao|calculo|codigo|local da|pais da|municipio|intermediario|total|deducoes|desconto|outras informacoes|observac)/;
+  const abaixo = itens.filter((i) => i.pagina === r.pagina && r.y - i.y > 1 && r.y - i.y < 140 && i.x >= r.x - 30)
+    .sort((a, b) => (Math.abs(a.y - b.y) > 2 ? b.y - a.y : a.x - b.x));
+  const partes: string[] = [];
+  for (const i of abaixo) {
+    const n = norm(i.str);
+    const ehRotulo = PARA.test(n) || (i.str === i.str.toUpperCase() && /[A-Z]{4}/.test(i.str) && i.str.length > 10 && !/\d/.test(i.str));
+    if (ehRotulo) break;
+    partes.push(i.str.trim());
+    if (partes.join(' ').length > 1200) break;
+  }
+  const t = partes.join(' ').replace(/\s+/g, ' ').trim();
+  return t || null;
+}
+
 const centavos = (s: string | null) => (s ? Math.round(Number(s.replace(/[^\d,]/g, '').replace(',', '.')) * 100) : null);
 const dataIso = (s: string | null) => { const m = s ? RE_DATA.exec(s) : null; return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 
@@ -149,5 +208,9 @@ export function lerNfsePdf(itensBrutos: TextoPdf[]): LidoNfsePdf {
     ?? docDaSecao(itens, /^(emitente|prestador( do servico| de servicos)?)\b/, /^tomador/);
   const cnpjTomador = docDaSecao(itens, /^tomador/, FIM_TOMADOR);
 
-  return { numero, data, valorCent, cnpjPrestador, cnpjTomador, chave, leu: !!(numero || valorCent != null) };
+  const cod = valorDoRotulo(itens, /codigo de tributacao nacional|^item da lista de servico|^codigo do servico|^subitem/, /(?<v>\b\d{2}\.\d{2}(?:\.\d{2})?\b)/);
+  const codigoServico = formatarCodigoServico(cod);
+  const descricao = textoAbaixo(itens, /^(descricao do servico|discriminacao( dos servicos| do servico)?)\b/);
+
+  return { numero, data, valorCent, cnpjPrestador, cnpjTomador, codigoServico, descricao, chave, leu: !!(numero || valorCent != null) };
 }

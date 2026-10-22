@@ -4,15 +4,19 @@ import { api } from '../lib/api';
 import { brl, dataBr, dataIsoBr, diaMes, fmtCnpj, passoDe, reais, type Eu, type Nota } from '../lib/prestador';
 import css from './Prestador.module.css';
 
+async function paraAreaDeTransferencia(valor: string) {
+  try { await navigator.clipboard.writeText(valor); }
+  catch {
+    const t = document.createElement('textarea'); t.value = valor; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); } finally { t.remove(); }
+  }
+}
+
 /** Copia com retorno visual ("✓ Copiado"). */
 function Copiar({ rotulo, valor, mostrar }: { rotulo: string; valor: string; mostrar?: string }) {
   const [ok, setOk] = useState(false);
   async function copiar() {
-    try { await navigator.clipboard.writeText(valor); }
-    catch {
-      const t = document.createElement('textarea'); t.value = valor; document.body.appendChild(t); t.select();
-      try { document.execCommand('copy'); } finally { t.remove(); }
-    }
+    await paraAreaDeTransferencia(valor);
     setOk(true); setTimeout(() => setOk(false), 1800);
   }
   return (
@@ -137,7 +141,7 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
       </section>
 
       {nota.status !== 'APROVADA' && !nota.pago && (
-        <section className={css.card}>
+        nota.pedido ? <DadosPedido nota={nota} emissorUrl={eu.emissorUrl} /> : <section className={css.card}>
           <h3>Dados para emitir a nota</h3>
           <Copiar rotulo="Tomador" valor={eu.tomador.nome} />
           {eu.tomador.cnpj && <Copiar rotulo="CNPJ do tomador" valor={eu.tomador.cnpj} mostrar={fmtCnpj(eu.tomador.cnpj)} />}
@@ -155,5 +159,35 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
         </section>
       )}
     </>
+  );
+}
+
+/** Tudo o que vai na nota (do modelo do RH), cada campo com copiar e o "Copiar tudo". */
+function DadosPedido({ nota, emissorUrl }: { nota: Nota; emissorUrl: string }) {
+  const p = nota.pedido!;
+  const [tudo, setTudo] = useState(false);
+  async function copiarTudo() {
+    await paraAreaDeTransferencia(nota.textoPedido ?? '');
+    setTudo(true); setTimeout(() => setTudo(false), 2200);
+  }
+  return (
+    <section className={css.card}>
+      <h3>Dados para emitir a nota</h3>
+      <p className={css.dica}>Tudo já preenchido para {nota.periodo === 'MES' ? 'este mês' : 'esta semana'}. Copie cada campo para o emissor ou use "Copiar tudo".</p>
+      <Copiar rotulo="CNPJ do tomador" valor={p.tomador.cnpj} mostrar={fmtCnpj(p.tomador.cnpj)} />
+      <Copiar rotulo="Razão social" valor={p.tomador.razao} />
+      {p.tomador.endereco && <Copiar rotulo="Endereço" valor={p.tomador.endereco} />}
+      {p.tomador.telefone && <Copiar rotulo="Telefone" valor={p.tomador.telefone} />}
+      {p.tomador.email && <Copiar rotulo="E-mail" valor={p.tomador.email} />}
+      {p.codigoServico && <Copiar rotulo="Código do serviço" valor={p.codigoServico} mostrar={`${p.codigoServico}${p.codigoDescricao ? ` — ${p.codigoDescricao}` : ''}`} />}
+      <Copiar rotulo="Valor" valor={reais(nota.valorCent)} mostrar={brl(nota.valorCent)} />
+      <Copiar rotulo="Descrição" valor={p.descricao} />
+      {p.observacao && <p className={css.obsPedido}>{p.observacao}</p>}
+      {nota.textoPedido && (
+        <button type="button" className={`${css.btn} ${css.btnTudo}`} onClick={copiarTudo}>{tudo ? '✓ Copiado' : 'Copiar tudo'}</button>
+      )}
+      <span className="sr-only" aria-live="polite">{tudo ? 'Dados da nota copiados' : ''}</span>
+      <a className={css.emissor} href={emissorUrl} target="_blank" rel="noopener noreferrer">Abrir o Emissor Nacional ↗</a>
+    </section>
   );
 }

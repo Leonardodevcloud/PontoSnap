@@ -18,10 +18,10 @@ function lerTexto(f: File): Promise<string> {
 function paraBase64Texto(s: string) { return btoa(unescape(encodeURIComponent(s))); }
 
 /** Item da conferência (✓ / ✗ / ?). */
-function Cl({ ok, titulo, detalhe }: { ok: boolean | null; titulo: string; detalhe?: string }) {
+function Cl({ ok, titulo, detalhe, aviso }: { ok: boolean | null; titulo: string; detalhe?: string; aviso?: boolean }) {
   return (
     <div className={css.cl}>
-      <i className={ok === true ? css.sim : ok === false ? css.nao : css.talvez} aria-hidden="true">{ok === true ? '✓' : ok === false ? '✗' : '?'}</i>
+      <i className={ok === true ? css.sim : aviso ? css.avisoI : ok === false ? css.nao : css.talvez} aria-hidden="true">{ok === true ? '✓' : aviso ? '!' : ok === false ? '✗' : '?'}</i>
       <span>{titulo}{detalhe && <small>{detalhe}</small>}</span>
       <span className="sr-only">{ok === true ? 'ok' : ok === false ? 'não confere' : 'não verificado'}</span>
     </div>
@@ -29,9 +29,20 @@ function Cl({ ok, titulo, detalhe }: { ok: boolean | null; titulo: string; detal
 }
 
 /** O que a API leu do arquivo (prévia, antes de enviar). */
-interface Lido { numero: string | null; data: string | null; valorCent: number | null; cnpjPrestador: string | null; cnpjTomador: string | null }
+interface Lido { numero: string | null; data: string | null; valorCent: number | null; cnpjPrestador: string | null; cnpjTomador: string | null; codigoServico?: string | null; descricao?: string | null }
 interface Leitura { lido: Lido | null; conferencia: Conferencia | null }
-interface ItemConf { ok: boolean | null; titulo: string; detalhe?: string }
+interface ItemConf { ok: boolean | null; titulo: string; detalhe?: string; /** Só avisa (não é problema): o RH decide. */ aviso?: boolean }
+
+const curto = (t: string | null | undefined, n = 70) => (!t ? '—' : t.length > n ? `…${t.slice(-n)}` : t);
+const normPal = (w: string) => w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9/]/g, '');
+/** Palavras do pedido que não estão na nota (ex.: "(13/10 e 16/10)"). */
+function faltouNaNota(pedido: string, nota: string | null | undefined): string | null {
+  const resto = new Map<string, number>();
+  for (const w of (nota ?? '').split(/\s+/).map(normPal).filter(Boolean)) resto.set(w, (resto.get(w) ?? 0) + 1);
+  const faltam = pedido.split(/\s+/).filter((w) => { const k = normPal(w); if (!k) return false; const n = resto.get(k) ?? 0; if (n > 0) { resto.set(k, n - 1); return false; } return true; });
+  return faltam.length && faltam.length <= 12 ? faltam.join(' ') : null;
+}
+const nomeCurto = (r: string) => r.split(' ').filter((w, i) => i < 3 && !(i === 2 && /^(de|da|do|e)$/i.test(w))).slice(0, 3).join(' ').replace(/\s+(de|da|do|e)$/i, '');
 
 /** Itens da conferência a partir do que foi lido (só mostra o que deu para checar). */
 function itensConferencia(c: Conferencia, nota: Nota, eu: Eu): ItemConf[] {
@@ -43,9 +54,20 @@ function itensConferencia(c: Conferencia, nota: Nota, eu: Eu): ItemConf[] {
   if (l.cnpjPrestador) r.push(c.prestadorOk === false
     ? { ok: false, titulo: 'Emitida em outro CNPJ', detalhe: `na nota ${fmtCnpj(l.cnpjPrestador)}${eu.prestador.documento ? ` · o seu ${fmtCnpj(eu.prestador.documento)}` : ''}` }
     : { ok: c.prestadorOk, titulo: 'Emitida no seu CNPJ', detalhe: fmtCnpj(l.cnpjPrestador) });
+  const tom = nota.pedido ? { nome: nota.pedido.tomador.razao, cnpj: nota.pedido.tomador.cnpj } : eu.tomador;
   if (l.cnpjTomador) r.push(c.tomadorOk === false
-    ? { ok: false, titulo: 'Emitida para outra empresa', detalhe: `na nota ${fmtCnpj(l.cnpjTomador)} · certo ${fmtCnpj(eu.tomador.cnpj)}` }
-    : { ok: c.tomadorOk, titulo: 'Para a empresa certa', detalhe: `${eu.tomador.nome} · ${fmtCnpj(l.cnpjTomador)}` });
+    ? { ok: false, titulo: 'Emitida para outra empresa', detalhe: `na nota ${fmtCnpj(l.cnpjTomador)} · certo ${fmtCnpj(tom.cnpj)}` }
+    : { ok: c.tomadorOk, titulo: 'Para a empresa certa', detalhe: `${nomeCurto(tom.nome)} · ${fmtCnpj(l.cnpjTomador)}` });
+  const pedido = nota.pedido;
+  if (pedido?.codigoServico && c.codigoOk != null) r.push(c.codigoOk
+    ? { ok: true, titulo: 'Código do serviço', detalhe: pedido.codigoServico }
+    : { ok: false, titulo: 'Código do serviço diferente', detalhe: `na nota ${l.codigoServico ?? '—'} · pedido ${pedido.codigoServico}` });
+  if (pedido && c.descricaoOk != null) r.push(c.descricaoOk
+    ? { ok: true, titulo: 'Descrição igual à pedida' }
+    : { ok: false, aviso: true, titulo: 'Descrição diferente da pedida', detalhe: (() => {
+      const f = faltouNaNota(pedido.descricao, l.descricao);
+      return f ? `Faltou na nota: "${f}"` : `na nota "${curto(l.descricao)}" · pedido "${curto(pedido.descricao)}"`;
+    })() });
   if (l.data) r.push(c.competenciaOk === false
     ? { ok: false, titulo: 'Emitida antes do serviço', detalhe: `emitida em ${dataBr(l.data)}` }
     : { ok: true, titulo: 'Emitida depois do serviço', detalhe: `emitida em ${dataBr(l.data)}` });
@@ -125,7 +147,8 @@ export function EnviarNota() {
   const valorDifere = valor.trim() !== '' && valorCent !== nota.valorCent;
   const conf = leitura?.conferencia ?? null;
   const itensConf = conf ? itensConferencia(conf, nota, eu) : [];
-  const problemas = itensConf.filter((i) => i.ok === false);
+  const problemas = itensConf.filter((i) => i.ok === false && !i.aviso);
+  const avisos = itensConf.filter((i) => i.aviso);
   const fonte = arq?.mime.includes('xml') ? 'do XML' : 'do PDF';
   const valorDoArq = lido?.valorCent != null && valor.trim() !== '' && valorCent === lido.valorCent;
 
@@ -157,6 +180,8 @@ export function EnviarNota() {
             <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota já usado antes' : 'Número da nota não repetido'} />
             <Cl ok={c.competenciaOk} titulo={c.competenciaOk === false ? 'Data de emissão antes do período' : 'Data de emissão'} />
             {c.origem !== 'INFORMADO' && c.lido?.cnpjTomador && <Cl ok={c.tomadorOk} titulo={c.tomadorOk === false ? 'Tomador diferente' : 'Tomador certo'} detalhe={c.lido?.cnpjTomador ? fmtCnpj(c.lido.cnpjTomador) : undefined} />}
+            {c.codigoOk != null && <Cl ok={c.codigoOk} titulo={c.codigoOk ? 'Código do serviço certo' : 'Código do serviço diferente'} detalhe={c.lido?.codigoServico ?? undefined} />}
+            {c.descricaoOk != null && <Cl ok={c.descricaoOk} aviso={!c.descricaoOk} titulo={c.descricaoOk ? 'Descrição igual à pedida' : 'Descrição diferente da pedida (o RH decide)'} />}
             {c.arquivo === 'FOTO' && <Cl ok={null} titulo="Foto: o RH confere a olho" />}
           </div>
         </section>
@@ -221,10 +246,13 @@ export function EnviarNota() {
 
       {!lendo && conf && itensConf.length > 0 && (
         <section className={css.card} aria-label="Conferência da nota">
-          {problemas.length === 0 && <h3><span style={{ color: 'var(--ok-text)' }}>✓</span> {conf.valorBate ? 'Li sua nota e está tudo certo' : 'Li sua nota'}</h3>}
+          {problemas.length === 0 && <h3><span style={{ color: 'var(--ok-text)' }}>✓</span> {conf.valorBate && avisos.length === 0 ? 'Li sua nota e está tudo certo' : 'Li sua nota'}</h3>}
           <div className={css.chk}>
-            {itensConf.map((i) => <Cl key={i.titulo} ok={i.ok} titulo={i.titulo} detalhe={i.detalhe} />)}
+            {itensConf.map((i) => <Cl key={i.titulo} ok={i.ok} titulo={i.titulo} detalhe={i.detalhe} aviso={i.aviso} />)}
           </div>
+          {problemas.length === 0 && avisos.length > 0 && (
+            <p className={css.avisoTxt}>A descrição não bate com o pedido. Você pode enviar assim mesmo (o RH decide) ou emitir de novo com o texto de "Dados para emitir a nota".</p>
+          )}
         </section>
       )}
 

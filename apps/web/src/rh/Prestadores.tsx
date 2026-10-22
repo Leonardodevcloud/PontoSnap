@@ -5,7 +5,7 @@ import { salvarBlob } from '../lib/download';
 import { mascaraDoc } from '../lib/formato';
 import {
   brl, dataBr, dataIsoBr, diaMes, fmtTel, haQuanto, ROTULO_SITUACAO, TOM_SITUACAO,
-  type ConviteGerado, type LinhaRh, type PainelRh, type Situacao, type UnidadeRh,
+  type ConviteGerado, type LinhaRh, type ListaModelos, type PainelRh, type Situacao, type UnidadeRh,
 } from '../lib/prestador';
 import { Caricatura, hash, useAvatares } from '../components/Avatar';
 import { Modal } from '../components/Modal';
@@ -138,6 +138,7 @@ export function Prestadores() {
   }
 
   const t = d?.totais;
+  const semModelo = (d?.linhas ?? []).filter((l) => !l.modeloNota).length;
   const faltamIds = (d?.linhas ?? []).flatMap((l) => l.unidades).filter((u) => u.nota && (u.situacao === 'FALTA' || u.situacao === 'RECUSADA')).map((u) => u.nota!.id);
   const pendentesLib = d ? (!d.meiLiberado && d.fechado && d.totais.mei > 0) || d.semanas.some((s) => s.encerrada && !s.liberada && s.motoristas > 0) : false;
 
@@ -157,6 +158,7 @@ export function Prestadores() {
           <button type="button" className={css.btnSec} onClick={() => setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id))} disabled={!d || !t?.semAcesso}>
             Dar acesso em lote
           </button>
+          <Link className={css.btnSec} to="/rh/prestadores/modelos">Modelos de nota</Link>
           <Link className={css.btnSec} to="/rh/prestadores/conferir" aria-disabled={!t?.conferir}>Conferir {t?.conferir ?? 0} {t?.conferir === 1 ? 'nota' : 'notas'}</Link>
           <button type="button" className={css.btnPri} onClick={() => setLiberar(true)} disabled={!d}>Liberar valores</button>
         </div>
@@ -174,6 +176,13 @@ export function Prestadores() {
         <div className={css.faixa}>
           <div><b>Tem valor fechado e ainda não liberado</b><small>{!d.meiLiberado && d.totais.mei > 0 ? `${d.totais.mei} MEI` : ''}{!d.meiLiberado && d.semanas.some((s) => s.encerrada && !s.liberada && s.motoristas > 0) ? ' e ' : ''}{d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length ? `${d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length} semana(s) de motorista` : ''} esperando a liberação.</small></div>
           <button type="button" className={css.btnPri} onClick={() => setLiberar(true)}>Liberar agora</button>
+        </div>
+      )}
+
+      {d && d.linhas.length > 0 && semModelo > 0 && (
+        <div className={css.avisoModelo} role="status">
+          <span><b>{semModelo === d.linhas.length ? 'Nenhum prestador tem modelo de nota' : `${semModelo} ${semModelo === 1 ? 'prestador sem modelo de nota' : 'prestadores sem modelo de nota'}`}:</b> o app mostra só tomador e valor, e a conferência não confere código do serviço nem descrição.</span>
+          <Link className={css.btnTxt} to="/rh/prestadores/modelos">{semModelo === d.linhas.length ? 'Criar modelo' : 'Escolher modelo'}</Link>
         </div>
       )}
 
@@ -337,6 +346,12 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
   const [resp, setResp] = useState('');
   const [contato, setContato] = useState({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? '') });
   const [salvando, setSalvando] = useState(false);
+  const [modelos, setModelos] = useState<ListaModelos['modelos'] | null>(null);
+  useEffect(() => {
+    if (aba !== 'dados' || modelos) return;
+    api.get<ListaModelos>('/portal/rh/modelos-nota').then((r) => setModelos(r.modelos)).catch(() => setModelos([]));
+  }, [aba, modelos]);
+  const padraoTipo = modelos?.find((m) => m.padraoTipo === l.tipo) ?? null;
   useEffect(() => { setContato({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? '') }); }, [l.id]);
 
   async function chamar(f: () => Promise<unknown>, m: string) {
@@ -448,6 +463,20 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
           tomadorNome: contato.tomadorNome || null, tomadorCnpj: contato.tomadorCnpj || null,
         }), 'Dados salvos.');
       }}>
+        <h4>Modelo de nota</h4>
+        {modelos === null ? <p className={css.hint}>Carregando…</p> : modelos.length === 0 ? (
+          <p className={css.hint}>Nenhum modelo criado. <Link to="/rh/prestadores/modelos">Criar modelo de nota</Link> (tomador, código do serviço e descrição prontos no app).</p>
+        ) : (
+          <div className={css.campo}>
+            <label htmlFor="c-mod">O que vai na nota</label>
+            <select id="c-mod" value={l.modeloNotaId ?? ''} disabled={salvando}
+              onChange={(e) => void chamar(() => api.post('/portal/rh/modelos-nota/aplicar', { modeloId: e.target.value || null, prestadorIds: [l.id] }), 'Modelo de nota atualizado. Vale a partir da próxima liberação.')}>
+              <option value="">{padraoTipo ? `Padrão dos ${l.tipo === 'MEI' ? 'MEI' : 'motoristas'} (${padraoTipo.nome})` : 'Sem modelo'}</option>
+              {modelos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+            </select>
+            <small className={css.hint}>{l.modeloNota ? 'Com modelo, tomador, código e descrição vêm dele (os campos de tomador abaixo não valem).' : 'Sem modelo, o app mostra o tomador abaixo e uma descrição simples.'} <Link to="/rh/prestadores/modelos">Ver modelos</Link></small>
+          </div>
+        )}
         <h4>Contato e nota</h4>
         <div className={css.campos}>
           <div className={css.campo}><label htmlFor="c-doc">CPF/CNPJ</label><input id="c-doc" value={contato.documento} onChange={(e) => setContato({ ...contato, documento: mascaraDoc(e.target.value) })} /></div>

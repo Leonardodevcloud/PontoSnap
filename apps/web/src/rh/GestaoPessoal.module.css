@@ -414,3 +414,16 @@ label.pixItem:hover{ background:var(--cream); }
   .mCorpo2 .pCorpo{ column-count:1; }
   .mCorpo1 .pRodape, .mCorpo2 .pRodape{ margin:0 -16px -16px; padding:12px 16px; bottom:-16px; }
 }
+/* Dias trabalhados da semana do motorista (vão na descrição da nota) */
+.diasTrab{ display:flex; flex-direction:column; gap:6px; }
+.diasTrabRot{ font-family:var(--ff-mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ash); font-weight:600; }
+.diasTrabChips{ display:flex; gap:6px; flex-wrap:wrap; }
+.diaChip{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:4px 6px; border-radius:10px; border:1px solid rgba(var(--ink-rgb),.2); background:var(--white); color:var(--ink); cursor:pointer; font:inherit; line-height:1.1; }
+.diaChip b{ font-size:14px; font-weight:800; }
+.diaChip small{ font-size:10px; text-transform:uppercase; color:var(--ash); }
+.diaChip:hover:not(:disabled){ background:var(--cream); }
+.diaChip:disabled{ opacity:.5; cursor:not-allowed; }
+.diaChip:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.diaChipOn{ background:var(--coral-acao); border-color:var(--coral-acao); color:var(--on-coral); }
+.diaChipOn small{ color:inherit; opacity:.85; }
+.diaChipOn:hover:not(:disabled){ background:var(--coral-acao-hover); }

@@ -180,11 +180,21 @@ function Prestadores() {
       <Sec id="fluxo" titulo="O caminho da nota">
         <ol className={css.passos}>
           <li><b>Liberar valores</b> — em Notas de prestadores, depois de fechar a Folha.</li>
-          <li>O prestador recebe o aviso no celular e envia a NFS-e (o sistema lê o PDF/XML e confere valor, CNPJs e data).</li>
+          <li>O prestador recebe o aviso no celular, com tudo o que vai na nota (do modelo de nota), e envia a NFS-e. O sistema lê o PDF/XML e confere valor, CNPJs, data, código do serviço e descrição.</li>
           <li><b>Conferir notas</b> — aprovar ou pedir correção.</li>
           <li><b>Pagar</b> — registrar o pagamento (Pix).</li>
         </ol>
         <Ir to="/rh/prestadores">Abrir Notas de prestadores</Ir>
+      </Sec>
+      <Sec id="modelos" titulo="Modelos de nota (tomador, código e descrição)">
+        <p>Em <b>Notas de prestadores › Modelos de nota</b>, crie um modelo por operação (ex.: "Motoristas sob demanda"): tomador completo, código do serviço (ex.: 26.01.01) e o texto da descrição com campos automáticos — <b>mês</b>, <b>período</b>, <b>dias trabalhados</b>, nome, valor.</p>
+        <ul className={css.lista}>
+          <li>Marque o modelo como <b>padrão dos motoristas</b> (ou dos MEI): todo mundo do tipo já usa, inclusive quem entrar depois. Para uma operação diferente, use "Aplicar a pessoas".</li>
+          <li><b>Dias trabalhados</b>: na Folha e benefícios, na semana do motorista, toque nos dias em que ele trabalhou. A nota sai com "(13/10 e 16/10)". Sem marcar, vai o período da semana.</li>
+          <li>O texto é montado na hora de liberar e fica guardado com a nota. Mudou o modelo? Libere de novo: as notas ainda não enviadas pegam o texto novo.</li>
+          <li>Na conferência, código do serviço errado é problema; descrição diferente só avisa (você decide).</li>
+        </ul>
+        <Ir to="/rh/prestadores/modelos">Abrir Modelos de nota</Ir>
       </Sec>
       <Sec id="uma-pessoa" titulo="Fechar uma pessoa sozinha (desligamento)">
         <p>No detalhe do prestador, "Fechar só esta pessoa": desligamento (último pagamento, com contrato proporcional) ou pagar antes do fechamento. O valor fica congelado e a nota é liberada na hora. Dá para reabrir se foi engano.</p>
@@ -276,8 +286,8 @@ export const ARTIGOS_ROTINA: Artigo[] = [
     busca: 'fechar mês fechamento folha benefícios vr vt cesta débitos reabrir competência', rotas: ['/rh/pessoal'], Corpo: FecharMes,
     secoes: [{ id: 'ordem', titulo: 'Ordem do fechamento' }, { id: 'folha', titulo: 'Folha e benefícios' }] },
   { slug: 'prestadores', titulo: 'Notas de prestadores (MEI e motoristas)', cat: 'MES', minutos: 2, resumo: 'Liberar valores, conferir notas, pagar e fechar uma pessoa sozinha.',
-    busca: 'prestador mei motorista nota fiscal nfs-e liberar pagar pix desligamento fechar pessoa', rotas: ['/rh/prestadores', '/rh/prestadores/conferir'], Corpo: Prestadores,
-    secoes: [{ id: 'fluxo', titulo: 'O caminho da nota' }, { id: 'uma-pessoa', titulo: 'Fechar uma pessoa' }, { id: 'acesso', titulo: 'Acesso do prestador' }] },
+    busca: 'prestador mei motorista nota fiscal nfs-e liberar pagar pix desligamento fechar pessoa modelo de nota tomador cnae código do serviço descrição dias trabalhados', rotas: ['/rh/prestadores', '/rh/prestadores/conferir', '/rh/prestadores/modelos'], Corpo: Prestadores,
+    secoes: [{ id: 'fluxo', titulo: 'O caminho da nota' }, { id: 'modelos', titulo: 'Modelos de nota' }, { id: 'uma-pessoa', titulo: 'Fechar uma pessoa' }, { id: 'acesso', titulo: 'Acesso do prestador' }] },
   { slug: 'assinaturas', titulo: 'Assinaturas: espelho e contracheque', cat: 'MES', minutos: 2, resumo: 'Subir contracheques, enviar pela Autentique e acompanhar.',
     busca: 'assinatura autentique contracheque holerite espelho assinar documento', rotas: ['/rh/documentos'], Corpo: Assinaturas, secoes: [{ id: 'passos', titulo: 'Passo a passo' }] },
   { slug: 'relatorios', titulo: 'Relatórios e arquivos fiscais', cat: 'MES', minutos: 1, resumo: 'Consolidado do mês, AFD e AEJ.',

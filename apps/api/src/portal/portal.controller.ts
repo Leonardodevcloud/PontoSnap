@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Patch, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Patch, Post, Put, Query, StreamableFile, UseGuards } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -6,7 +6,9 @@ import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
 import { PortalService } from './portal.service';
+import { ModeloNotaService } from './modelo-nota.service';
 import {
+  AplicarModeloDto, ModeloNotaDto,
   AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, ConvidarDto, EnviarNotaDto, LerNotaDto, FecharPessoaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
 } from './portal.dto';
 
@@ -54,7 +56,14 @@ export class PortalPrestadorController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
 export class PortalRhController {
-  constructor(private readonly svc: PortalService) {}
+  constructor(private readonly svc: PortalService, private readonly modelos: ModeloNotaService) {}
+
+  // Modelos de nota fiscal (por operação).
+  @Get('modelos-nota') listarModelos(@UsuarioAtual() u: PayloadAcesso) { return this.modelos.listar(t(u)); }
+  @Post('modelos-nota') criarModelo(@UsuarioAtual() u: PayloadAcesso, @Body() dto: ModeloNotaDto) { return this.modelos.salvar(t(u), null, dto); }
+  @Put('modelos-nota/:id') salvarModelo(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ModeloNotaDto) { return this.modelos.salvar(t(u), id, dto); }
+  @Delete('modelos-nota/:id') excluirModelo(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.modelos.excluir(t(u), id); }
+  @Post('modelos-nota/aplicar') aplicarModelo(@UsuarioAtual() u: PayloadAcesso, @Body() dto: AplicarModeloDto) { return this.modelos.aplicar(t(u), dto.modeloId ?? null, dto.prestadorIds); }
 
   @Get('painel') painel(@UsuarioAtual() u: PayloadAcesso, @Query('comp') comp: string) { return this.svc.painel(t(u), comp); }
   @Get('conferir') conferir(@UsuarioAtual() u: PayloadAcesso) { return this.svc.filaConferir(t(u)); }
