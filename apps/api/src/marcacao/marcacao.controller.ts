@@ -92,8 +92,8 @@ export class MarcacaoController {
         const feriados = await this.banco['tratamento'].listarFeriados(u.tenantId, inicio, fim);
         const ap = await this.banco['tratamento'].apurarPeriodoCLT(
           u.tenantId, empregadoId, inicio, fim, feriados.map((f: { data: string }) => f.data));
-        const saldoMesMin = ap.resultado.dias.reduce((s: number, d: { saldoMin: number }) => s + d.saldoMin, 0);
-        return { ...resp, saldoEstimadoMesMin: saldoMesMin, competenciaEstimada: comp };
+        // Mesma conta do RH: só o que entra no banco (falta descontada na folha fica fora).
+        return { ...resp, saldoEstimadoMesMin: ap.conta.destino.paraBancoMin, competenciaEstimada: comp, conta: ap.conta };
       } catch { /* ignora erro, retorna sem estimativa */ }
     }
     return resp;

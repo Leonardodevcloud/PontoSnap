@@ -80,9 +80,11 @@ export function MeuBanco() {
           </div>
         )}
         {mesCorrente && !intraMes && (
-          <div className={css.estAviso}>
-            {rotuloMes} até agora: <b>{comSinal(mesCorrente.estimadoMin)}</b>
-            {' · '}previsão ao fechar o mês: <b>{comSinal(projetado)}</b>. O mês entra no saldo no dia 1.
+          <div className={css.soma}>
+            <div><span>Saldo do banco (meses fechados)</span><b>{comSinal(s.saldoMin)}</b></div>
+            <div><span>+ {rotuloMes} até agora</span><b>{comSinal(mesCorrente.estimadoMin)}</b></div>
+            <div className={css.somaTot}><span>= se o mês fechasse hoje</span><b>{comSinal(projetado)}</b></div>
+            <small>{rotuloMes} entra no saldo no dia 1º. Até lá, cada batida atualiza a previsão. A conta completa está em Meu espelho.</small>
           </div>
         )}
         <div className={css.mini}>
@@ -102,6 +104,15 @@ export function MeuBanco() {
           )}
         </div>
       </div>
+
+      {dados.conta && dados.conta.falta.min > 0 && dados.conta.falta.destino === 'DESCONTA' && (
+        <div className={css.faltaBox}>
+          <b>Faltou um dia?</b>
+          Falta de dia inteiro não é tirada do banco: ela é descontada no salário, junto com o descanso da semana
+          {dados.conta.falta.dias.length ? ` (este mês: ${dados.conta.falta.dias.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`).join(', ')})` : ''}.
+          {dados.conta.destino.destinoAtraso === 'BANCO' ? ' Atrasos e saídas cedo, sim, abatem do banco.' : ''}
+        </div>
+      )}
 
       {/* O prazo é a informação que mais importa: saldo sem data engana. */}
       {s.vencidoMin > 0 && (

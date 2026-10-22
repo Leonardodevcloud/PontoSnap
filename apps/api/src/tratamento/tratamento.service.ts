@@ -13,6 +13,7 @@ import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCom
 import { montarRegrasApuracao, jornadaFlexivel, type ItensResolvidos } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
+import { montarContaMes } from './conta-mes';
 import { resumirDestinacao, movimentosBancoDoDia } from './destinacao';
 import { acertoDoMes, ehDaApuracao, inicioJanela } from '../banco/acerto-mes';
 import { PushService } from '../notificacao/push.service';
@@ -767,6 +768,11 @@ export class TratamentoService {
         nome: emp.nome, matricula: emp.matricula, inicio: inicioStr, fim: fimStr,
         regras: regime === 'r12x36' ? 'CLT_12x36' : 'CLT_PADRAO', resultado, valores,
         afastamentos, destinacao, batidas, banco,
+        /** A conta do mês por extenso (previsto, faltas, sobrou, faltou, abatido, para onde vai). */
+        conta: montarContaMes(resultado.dias, {
+          destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA', destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
+          bancoAtivo, formaCalculo: banco?.formaCalculo ?? null,
+        }, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10)),
         /** Acerto do banco que compensa no mês, em R$ (já somado em valores.liquidoProventosCentavos). */
         acertoBanco,
         /** Histórico de salário usado na valorização (vigência por data). */

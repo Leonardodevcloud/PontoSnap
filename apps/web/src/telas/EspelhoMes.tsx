@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm } from '../lib/formato';
 import type { ApuracaoResp, TipoAfastamento } from '../tipos';
+import { ContaMes } from '../components/ContaMes';
 import css from './EspelhoMes.module.css';
 
 /** Primeiro e último dia da competência YYYY-MM, no calendário de Brasília. */
@@ -84,16 +85,23 @@ export function EspelhoMes() {
       {r && (
         <>
           <div className={css.resumo}>
-            <div className={css.rL}>Saldo do mês</div>
-            <div className={css.rV}>{comSinal(r.saldoPeriodoMin)}</div>
+            {(() => {
+              // Mesmo número do RH: o que entra no banco (ou o saldo líquido, sem banco). Falta fica à parte.
+              const c = dados?.conta;
+              const mesNome = rotuloMes(comp).split(' de ')[0];
+              if (!c) return <><div className={css.rL}>Saldo do mês</div><div className={css.rV}>{comSinal(r.saldoPeriodoMin)}</div></>;
+              const v = c.destino.tipo === 'BANCO' ? c.destino.paraBancoMin : c.resultadoMin;
+              return <><div className={css.rL}>{c.destino.tipo === 'BANCO' ? (c.destino.formaCalculo === 'INTRA_MES' ? `Saldo de ${mesNome}` : `Vai para o seu banco em ${mesNome}`) : `Saldo de ${mesNome}`}{ehMesAtual ? ' · atualizado agora' : ''}</div>
+                <div className={css.rV}>{comSinal(v)}</div></>;
+            })()}
             <div className={css.mini}>
               <div>
                 <div className={css.mL}>Trabalhado</div>
-                <div className={css.mV}>{minutosParaHhMm(r.totalTrabalhadoMin)}</div>
+                <div className={css.mV}>{minutosParaHhMm(dados?.conta ? dados.conta.trabalhadoMin : r.totalTrabalhadoMin)}</div>
               </div>
               <div>
-                <div className={css.mL}>Previsto no mês</div>
-                <div className={css.mV}>{minutosParaHhMm(r.totalContratadoMesMin ?? r.totalContratadoMin)}</div>
+                <div className={css.mL}>{dados?.conta ? `Combinado até ${dados.conta.ate.slice(8, 10)}/${dados.conta.ate.slice(5, 7)}` : 'Previsto no mês'}</div>
+                <div className={css.mV}>{minutosParaHhMm(dados?.conta ? dados.conta.previstoMin : r.totalContratadoMesMin ?? r.totalContratadoMin)}</div>
               </div>
               <div>
                 <div className={css.mL}>Faltas</div>
@@ -101,6 +109,8 @@ export function EspelhoMes() {
               </div>
             </div>
           </div>
+
+          {dados?.conta && <div style={{ marginBottom: 14 }}><ContaMes conta={dados.conta} mes={rotuloMes(comp).split(" de ")[0]!} quem="eu" atual={ehMesAtual} /></div>}
 
           {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
 
@@ -125,7 +135,7 @@ export function EspelhoMes() {
                     ? d.marcacoes.map((m) => fmtHora(String(m))).join(' · ')
                     : motivo ?? (folga ? 'Descanso' : 'Sem batidas')}
                   {d.paresIncompletos && <span className={`${css.tag} ${css.tagF}`}>Em aberto</span>}
-                  {d.faltaInjustificada && <span className={`${css.tag} ${css.tagF}`}>Falta</span>}
+                  {d.faltaInjustificada && <span className={`${css.tag} ${css.tagF}`}>{dados?.conta?.falta.destino === 'DESCONTA' ? 'Falta · descontada no salário' : dados?.conta?.falta.destino === 'BANCO' ? 'Falta · sai do banco' : 'Falta'}</span>}
                   {d.semana?.compensado && d.marcacoes.length === 0 && !d.faltaInjustificada && <span className={css.tag}>{d.semana.estado === 'FECHADA' ? 'Compensado na semana' : 'Semana em aberto'}</span>}
                 </span>
                 <span className={`${css.dS} ${d.saldoMin > 0 ? css.pos : d.saldoMin < 0 ? css.neg : ''}`}>

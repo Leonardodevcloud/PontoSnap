@@ -8,6 +8,8 @@ import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, Result
 import { TabelaCompetencia } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
+import { ContaMes } from '../components/ContaMes';
+import { RaioX } from './RaioX';
 import vt from './VisaoTodos.module.css';
 import css from './Espelhos.module.css';
 
@@ -232,6 +234,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
   const [ap, setAp] = useState<ApuracaoResp | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [baixando, setBaixando] = useState(false);
+  const [raio, setRaio] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -269,6 +272,10 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
     return a ? ROTULO_AFAST[a.tipo] : null;
   };
   const dias = useMemo(() => (r?.dias ?? []).filter((d) => d.data <= hoje).reverse(), [r, hoje]);
+  // Caixinhas e conta com os MESMOS números (a conta deixa de fora o dia em aberto).
+  const k = ap?.conta
+    ? { trabalhado: ap.conta.trabalhadoMin, previsto: ap.conta.previstoMin, extras: ap.conta.sobrouMin, atrasos: ap.conta.faltouMin }
+    : { trabalhado: r?.totalTrabalhadoMin ?? 0, previsto: r?.totalContratadoMin ?? 0, extras: r?.totalExtrasMin ?? 0, atrasos: r?.totalAtrasoMin ?? 0 };
   const horasDoDia = (d: ResultadoDiaCLT) => {
     if (d.marcacoes.length === 0) return null;
     return d.marcacoes.map((m) => fmtHora(m)).join(' · ');
@@ -284,12 +291,17 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
         <div className={css.dois}>
           <div>
             <div className={vt.kpis} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(125px, 1fr))' }}>
-              <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(r.totalTrabalhadoMin)}</div></div>
-              <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(r.totalContratadoMin)}</div></div>
-              <div className={`${vt.kpi} ${r.totalExtrasMin > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{r.totalExtrasMin > 0 ? `+${minutosParaHhMm(r.totalExtrasMin)}` : '—'}</div></div>
-              <div className={`${vt.kpi} ${r.totalAtrasoMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{r.totalAtrasoMin > 0 ? `−${minutosParaHhMm(r.totalAtrasoMin)}` : '—'}</div></div>
-              <div className={`${vt.kpi} ${r.totalFaltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '—'}</div></div>
+              <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(k.trabalhado)}</div></div>
+              <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(k.previsto)}</div>{ap?.conta && <div className={vt.kpiS}>até {ap.conta.ate.slice(8, 10)}/{ap.conta.ate.slice(5, 7)}</div>}</div>
+              <div className={`${vt.kpi} ${k.extras > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{k.extras > 0 ? `+${minutosParaHhMm(k.extras)}` : '—'}</div>
+                {k.extras > 0 && <div className={vt.kpiS}>{ap?.banco ? 'vão para o banco' : 'pagas na folha'}</div>}</div>
+              <div className={`${vt.kpi} ${k.atrasos > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{k.atrasos > 0 ? `−${minutosParaHhMm(k.atrasos)}` : '—'}</div>
+                {k.atrasos > 0 && <div className={vt.kpiS}>{ap?.conta?.destino.destinoAtraso === 'BANCO' ? 'abatem do banco' : ap?.conta?.destino.destinoAtraso === 'TOLERA' ? 'tolerados' : 'descontados na folha'}</div>}</div>
+              <div className={`${vt.kpi} ${r.totalFaltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '—'}</div>
+                {r.totalFaltaMin > 0 && ap?.conta && <div className={vt.kpiS}>{ap.conta.falta.dias.length} {ap.conta.falta.dias.length === 1 ? 'dia' : 'dias'} · {ap.conta.falta.destino === 'DESCONTA' ? 'na folha' : ap.conta.falta.destino === 'BANCO' ? 'no banco' : 'abonadas'}</div>}</div>
             </div>
+
+            {ap?.conta && <div style={{ marginBottom: 14 }}><ContaMes conta={ap.conta} mes={rotuloMes(mes).split(' de ')[0]!} quem="rh" atual={mes === mesAtual()} aoVerRegras={() => setRaio(true)} /></div>}
 
             <div className={css.card}>
               <h3>Dias do mês <span className={css.h3sub}>· clique no dia para ver as batidas</span></h3>
@@ -350,14 +362,17 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 ) : (
                   <div className={css.bLinha}><span>Veio dos meses anteriores (fechado)</span><span className={css.bM}>{comSinal(ap.banco.saldoAnteriorMin)}</span></div>
                 )}
-                <div className={css.bLinha}><span>{rotuloMes(mes).split(' de ')[0]} {ap.banco.fechada ? '(fechado)' : 'até agora (em andamento)'}</span><span className={`${css.bM} ${ap.banco.saldoMesMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.saldoMesMin)}</span></div>
+                <div className={css.bLinha}><span>+ {rotuloMes(mes).split(' de ')[0]} {ap.banco.fechada ? '(fechado)' : 'até agora (em andamento)'}</span><span className={`${css.bM} ${ap.banco.saldoMesMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.saldoMesMin)}</span></div>
                 {ap.banco.avulsoMin !== 0 && <div className={css.bLinha}><span>Folgas, pagamentos e ajustes</span><span className={`${css.bM} ${ap.banco.avulsoMin < 0 ? css.bNeg : ''}`}>{comSinal(ap.banco.avulsoMin)}</span></div>}
-                <div className={`${css.bLinha} ${css.bTotal}`}><span>{ap.banco.acerto ? 'Saldo do mês' : ap.banco.fechada ? 'Saldo acumulado' : 'Previsão ao fechar o mês'}</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
+                <div className={`${css.bLinha} ${css.bTotal}`}><span>= {ap.banco.acerto ? 'Saldo do mês' : ap.banco.fechada ? 'Saldo acumulado' : 'Previsão ao fechar o mês'}</span><span className={css.bM}>{comSinal(ap.banco.saldoAcumuladoMin)}</span></div>
+                {ap.conta && ap.conta.falta.min > 0 && ap.conta.falta.destino !== 'BANCO' && (
+                  <div className={`${css.bLinha} ${css.bFora}`}><span>{ap.conta.falta.dias.length === 1 ? 'Falta' : 'Faltas'} de {minutosParaHhMm(ap.conta.falta.min)}: fica fora do banco</span><span className={css.bM}>{ap.conta.falta.destino === 'DESCONTA' ? 'na folha' : 'abonada'}</span></div>
+                )}
                 {ap.banco.acerto && ap.banco.acerto.acertoMin > 0 && <div className={css.bLinha}><span>{ap.banco.fechada ? 'Pago na folha' : 'Será pago na folha'}</span><span className={`${css.bM} ${css.bNeg}`}>{comSinal(-ap.banco.acerto.acertoMin)}</span></div>}
                 {ap.banco.acerto && ap.banco.acerto.acertoMin < 0 && <div className={css.bLinha}><span>{ap.banco.fechada ? 'Descontado na folha' : 'Será descontado na folha'}</span><span className={css.bM}>{comSinal(-ap.banco.acerto.acertoMin)}</span></div>}
                 {ap.banco.acerto && ap.banco.acerto.passaMin < 0 && <div className={css.bLinha}><span>Passa para o mês seguinte</span><span className={`${css.bM} ${css.bNeg}`}>{comSinal(ap.banco.acerto.passaMin)}</span></div>}
                 {ap.banco.desatualizado && <div className={css.bAviso}>Este mês estava fechado com outro valor e foi reaberto: o banco é refeito sozinho na próxima consulta.</div>}
-                <div className={css.bNota}>Os meses fecham sozinhos no dia 1º. Ajuste aprovado ou atestado abonado refazem o mês.</div>
+                <div className={css.bNota}>Os meses fecham sozinhos no dia 1º. Até lá, cada batida e cada ajuste atualizam a previsão na hora. Ajuste aprovado ou atestado abonado refazem o mês.</div>
               </div>
             ) : (
               <div className={css.card}><h3>Banco de horas</h3><p className={css.vazio}>Este funcionário não tem banco de horas: a hora extra é paga na folha.</p></div>
@@ -375,6 +390,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
           </div>
         </div>
       )}
+      {raio && <RaioX empregadoId={empregadoId} onFechar={() => setRaio(false)} />}
     </>
   );
 }

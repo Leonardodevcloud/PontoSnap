@@ -117,3 +117,5 @@
 
 /* mobile-head: título em cima, ações embaixo quebrando linha */
 @media (max-width:760px){ .head{ flex-direction:column; align-items:stretch; } .head > div{ flex-wrap:wrap; } }
+
+.bFora{ color:#ffb4aa; }

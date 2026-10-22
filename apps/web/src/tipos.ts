@@ -293,6 +293,8 @@ export interface ApuracaoResp {
   destinacao?: Destinacao;
   /** Banco de horas no contexto do período: anterior + mês = acumulado. Null = sem banco. */
   banco?: BancoPeriodo | null;
+  /** A conta do mês por extenso: previsto, faltas, sobrou/faltou/abatido e para onde vai. */
+  conta?: ContaMes;
   /** Banco que compensa no mês: o acerto em R$ (já dentro de valores.liquidoProventosCentavos). */
   acertoBanco?: AcertoBancoValores | null;
   /** Batidas de cada dia (chave = YYYY-MM-DD) com a origem de cada uma. */
@@ -425,6 +427,8 @@ export interface BancoResp {
   /** Saldo oficial + mês em andamento. */
   saldoProjetadoMin: number | null;
   fechamentos: FechamentoBanco[];
+  /** Conta do mês em andamento (mesma do espelho). */
+  conta?: ContaMes;
 }
 
 export interface ConfigBanco {
@@ -825,4 +829,18 @@ export interface RespAtencao {
   hoje: string; competencia: string; anterior: string;
   itens: ItemAtencao[];
   totais: { total: number; bloqueia: number; antes: number; cadastro: number };
+}
+
+// ---- Conta do mês por extenso (API: apuração.conta) ----
+export type DestinoDiaConta = 'BANCO' | 'PAGA' | 'FOLHA' | 'TOLERADO' | 'FALTA' | 'PENDENTE' | 'SEMANA' | 'ZERO';
+export interface DiaConta { data: string; previstoMin: number; trabalhadoMin: number; brutoMin: number; saldoMin: number; faltaMin: number; destino: DestinoDiaConta }
+export interface ContaMes {
+  ate: string; previstoMin: number;
+  falta: { min: number; dias: string[]; destino: 'DESCONTA' | 'BANCO' | 'ABONA' };
+  previstoDiasVeioMin: number; trabalhadoMin: number; diferencaMin: number;
+  sobrouMin: number; faltouMin: number; abatidoMin: number; ajusteMin: number; semanaAbertaMin: number; resultadoMin: number;
+  destino: { tipo: 'BANCO' | 'FOLHA'; paraBancoMin: number; extraPagaMin: number; atrasoFolhaMin: number; atrasoToleradoMin: number;
+    destinoAtraso: 'DESCONTA' | 'BANCO' | 'TOLERA'; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' | null };
+  pendentes: { dias: string[]; trabalhadoMin: number };
+  dias: DiaConta[];
 }
