@@ -24,3 +24,4 @@ export * from './job';
 export * from './notificacao';
 export * from './pessoal';
 export * from './comunicacao';
+export * from './assinatura-doc';

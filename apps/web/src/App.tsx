@@ -51,6 +51,9 @@ import { EnviarNota } from './prestador/EnviarNota';
 import { PrimeiroAcesso } from './prestador/PrimeiroAcesso';
 import { Prestadores } from './rh/Prestadores';
 import { ComMesPadrao } from './lib/mesPadrao';
+import { DocsAssinatura } from './rh/DocsAssinatura';
+import { Integracoes } from './rh/Integracoes';
+import { MeusDocumentos } from './telas/MeusDocumentos';
 import { ConferirNotas } from './rh/ConferirNotas';
 import { Flash } from './components/Flash';
 import { BarraProgresso } from './components/BarraProgresso';
@@ -129,6 +132,8 @@ export function App() {
         <Route path="notificacoes" element={<NotificacaoPrefs />} />
         <Route path="avisos" element={<Avisos />} />
         <Route path="avisos/:id" element={<Aviso />} />
+        <Route path="documentos" element={<MeusDocumentos />} />
+        <Route path="documentos/:id" element={<MeusDocumentos />} />
       </Route>
       )}
 
@@ -160,6 +165,8 @@ export function App() {
         <Route path="comunicacao/:id" element={<ComunicadoDetalhe />} />
         <Route path="comunicacao/:id/editar" element={<ComunicadoEditor />} />
         <Route path="assinatura" element={<Assinatura />} />
+        <Route path="documentos" element={<ComMesPadrao><DocsAssinatura /></ComMesPadrao>} />
+        <Route path="integracoes" element={<Integracoes />} />
       </Route>
 
       {/* Master (desktop) */}

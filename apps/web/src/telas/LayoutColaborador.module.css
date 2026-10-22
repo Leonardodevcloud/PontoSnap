@@ -62,3 +62,7 @@
 .instalarZona{ padding:0 20px; }
 
 .avatarFoto{ width:100%; height:100%; object-fit:cover; display:block; }
+
+/* 7 abas (documentos + banco): letra um pouco menor para caber no celular */
+.abasMuitas{ gap:2px; }
+.abasMuitas button{ font-size:11px; padding:10px 0; letter-spacing:-.02em; }

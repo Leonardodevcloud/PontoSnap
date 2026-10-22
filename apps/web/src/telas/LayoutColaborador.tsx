@@ -37,6 +37,15 @@ export function LayoutColaborador() {
     return () => { window.removeEventListener('pontosnap:avisos', buscar); document.removeEventListener('visibilitychange', vis); };
   }, [pathname]);
 
+  // Documentos para assinar (Autentique): a aba só aparece se o RH já mandou algum.
+  const [docs, setDocs] = useState<{ total: number; pendentes: number }>({ total: 0, pendentes: 0 });
+  useEffect(() => {
+    const buscar = () => { api.get<{ documentos: unknown[]; pendentes: number }>('/assinaturas/meus').then((r) => setDocs({ total: r.documentos.length, pendentes: r.pendentes })).catch(() => {}); };
+    buscar();
+    window.addEventListener('pontosnap:documentos', buscar);
+    return () => window.removeEventListener('pontosnap:documentos', buscar);
+  }, [pathname]);
+
   // A aba de banco de horas só existe pra quem tem acordo. Mostrar uma aba
   // vazia seria pior do que não ter aba nenhuma.
   useEffect(() => {
@@ -85,6 +94,7 @@ export function LayoutColaborador() {
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/atestados'); }}>Atestados</button>
+                {docs.total > 0 && <button role="menuitem" onClick={() => { setMenu(false); navegar('/documentos'); }}>Documentos{docs.pendentes ? ` (${docs.pendentes} para assinar)` : ''}</button>}
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/avisos'); }}>Avisos do RH{avisos?.naoLidos ? ` (${avisos.naoLidos})` : ''}</button>
                 {temBanco && (
                   <button role="menuitem" onClick={() => { setMenu(false); navegar('/banco'); }}>Banco de horas</button>
@@ -122,7 +132,7 @@ export function LayoutColaborador() {
         <Outlet />
       </main>
 
-      <nav className={css.abas}>
+      <nav className={`${css.abas} ${docs.total > 0 && temBanco ? css.abasMuitas : ''}`}>
         <button className={pathname === '/' ? css.on : ''} onClick={() => navegar('/')}>
           Bater
         </button>
@@ -135,6 +145,12 @@ export function LayoutColaborador() {
         <button className={pathname === '/atestados' ? css.on : ''} onClick={() => navegar('/atestados')}>
           Atestados
         </button>
+        {docs.total > 0 && (
+          <button className={`${pathname.startsWith('/documentos') ? css.on : ''} ${css.comBolinha}`} onClick={() => navegar('/documentos')}
+            aria-label={docs.pendentes ? `Documentos, ${docs.pendentes} para assinar` : 'Documentos'}>
+            Docs{docs.pendentes > 0 && <span className={css.bolinha} aria-hidden="true">{docs.pendentes > 9 ? '9+' : docs.pendentes}</span>}
+          </button>
+        )}
         <button className={`${pathname.startsWith('/avisos') ? css.on : ''} ${css.comBolinha}`} onClick={() => navegar('/avisos')}
           aria-label={avisos?.naoLidos ? `Avisos, ${avisos.naoLidos} não ${avisos.naoLidos === 1 ? 'lido' : 'lidos'}` : 'Avisos'}>
           Avisos{avisos && avisos.naoLidos > 0 && <span className={css.bolinha} aria-hidden="true">{avisos.naoLidos > 9 ? '9+' : avisos.naoLidos}</span>}

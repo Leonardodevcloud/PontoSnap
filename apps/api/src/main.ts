@@ -19,7 +19,9 @@ async function bootstrap() {
   // A foto do atestado vai como base64 no corpo JSON, e o padrão do Express é
   // só 100 KB — estourava com "request entity too large". 10 MB cobre os 5 MB
   // do arquivo + o inchaço do base64; o service ainda barra acima de 5 MB reais.
-  app.use(json({ limit: '10mb' }));
+  // rawBody: o webhook da Autentique confere a assinatura HMAC sobre os bytes originais.
+  // 16 MB: contracheque/ZIP de até 10 MB em base64 (+33%).
+  app.use(json({ limit: '16mb', verify: (req, _res, buf) => { (req as unknown as { rawBody?: Buffer }).rawBody = buf; } }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
