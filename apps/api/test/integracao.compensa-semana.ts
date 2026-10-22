@@ -38,7 +38,7 @@ async function main() {
   for (const d of ['2026-10-07', '2026-10-08', '2026-10-09']) await bate(d, ['08:00', '12:00', '13:00', '17:00']);
   await bate('2026-10-10', ['08:00', '13:12']);
 
-  const out = await trat.apurarPeriodoCLT(t.id, emp.id, '2026-10-01', '2026-10-31', []);
+  const out = await trat.apurarPeriodoCLT(t.id, emp.id, '2026-10-01', '2026-10-11', []);
   const r = out.resultado;
   const sab = r.dias.find((d) => d.data === '2026-10-03')!;
   ok(r.dias[0]!.data === '2026-10-01', `outubro começa em 01/10 (dias de setembro só fecham a semana) (${r.dias[0]!.data})`);

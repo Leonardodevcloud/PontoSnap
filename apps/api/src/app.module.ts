@@ -25,12 +25,13 @@ import { CadastroModule } from './cadastro/cadastro.module';
 import { ComunicacaoModule } from './comunicacao/comunicacao.module';
 import { PortalModule } from './portal/portal.module';
 import { AssinaturaModule } from './assinatura/assinatura.module';
+import { AjudaModule } from './ajuda/ajuda.module';
 
 @Module({
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule, ComunicacaoModule, PortalModule, AssinaturaModule,
+    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule, ComunicacaoModule, PortalModule, AssinaturaModule, AjudaModule,
   ],
 })
 export class AppModule {}

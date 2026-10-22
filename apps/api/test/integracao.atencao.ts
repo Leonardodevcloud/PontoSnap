@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { schema, comoMaster, tenant, empregado, pontoRep, pontoMarcacao, pontoPerfilRegra, pontoAjuste } from '@ponto/db';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
 import { PessoalService } from '../src/pessoal/pessoal.service';
+import { AjudaService } from '../src/ajuda/ajuda.service';
 import { AtencaoService } from '../src/pessoal/atencao.service';
 import { CriptoService } from '../src/common/cripto.service';
 
@@ -15,7 +16,7 @@ const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', use
 const db = drizzle(client, { schema });
 const trat = new TratamentoService(db);
 const pes = new PessoalService(db, trat, new CriptoService());
-const at = new AtencaoService(db, trat, pes);
+const at = new AtencaoService(db, trat, pes, new AjudaService(db));
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };
 

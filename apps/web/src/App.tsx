@@ -54,6 +54,9 @@ import { ComMesPadrao } from './lib/mesPadrao';
 import { DocsAssinatura } from './rh/DocsAssinatura';
 import { Integracoes } from './rh/Integracoes';
 import { MeusDocumentos } from './telas/MeusDocumentos';
+import { CentralAjuda } from './rh/ajuda/CentralAjuda';
+import { ArtigoPagina } from './rh/ajuda/ArtigoPagina';
+import { Assistente } from './rh/ajuda/Assistente';
 import { ConferirNotas } from './rh/ConferirNotas';
 import { Flash } from './components/Flash';
 import { BarraProgresso } from './components/BarraProgresso';
@@ -167,6 +170,9 @@ export function App() {
         <Route path="assinatura" element={<Assinatura />} />
         <Route path="documentos" element={<ComMesPadrao><DocsAssinatura /></ComMesPadrao>} />
         <Route path="integracoes" element={<Integracoes />} />
+        <Route path="ajuda" element={<CentralAjuda />} />
+        <Route path="ajuda/assistente" element={<Assistente />} />
+        <Route path="ajuda/:slug" element={<ArtigoPagina />} />
       </Route>
 
       {/* Master (desktop) */}

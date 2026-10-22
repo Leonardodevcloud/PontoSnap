@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { BotaoAjuda } from './ajuda/PainelAjuda';
 import css from './Perfis.module.css';
 
 interface Config {
@@ -74,19 +75,19 @@ export default function Perfis() {
 }
 
 function resumo(c: Config): { lb: string; valor: string }[] {
-  const h = (min: number) => Math.round(min / 60);
   return [
     ...(c.contrato?.tipoJornada === 'CONTRATO_HORAS' ? [{ lb: 'jornada do dia', valor: 'contrato de horas (forma antiga)' }] : []),
     { lb: 'hora extra', valor: c.extra ? `${c.extra.extraDiaUtilPct}% / ${c.extra.extraDomingoFeriadoPct}%` : 'CLT' },
     { lb: 'tolerância', valor: c.tolerancia ? `${c.tolerancia.toleranciaDiariaMin} min/dia` : 'CLT' },
     { lb: 'noturno', valor: c.noturno ? `${c.noturno.noturnoAdicionalPct}%` : 'CLT' },
-    { lb: 'jornada', valor: c.jornada ? `${h(c.jornada.jornadaSemanalMin)}h/semana` : 'CLT' },
+
     { lb: 'banco de horas', valor: bancoTxt(c.banco) },
     { lb: 'faltas', valor: c.destinacao ? faltaTxt(c.destinacao.destinacaoFaltas) : 'descontam' },
+    { lb: 'atrasos', valor: c.destinacao ? atrasoTxt(c.destinacao.destinacaoAtrasos) : 'abatem do banco (se houver)' },
   ];
 }
-const bancoTxt = (b: Config['banco']) => !b || b.bancoModo === 'HERDA' ? 'como a empresa'
-  : b.bancoModo === 'INATIVO' ? 'não usa'
+const bancoTxt = (b: Config['banco']) => !b || b.bancoModo === 'HERDA' ? 'igual à empresa'
+  : b.bancoModo === 'INATIVO' ? 'não compensa'
   : b.formaCalculo === 'INTRA_MES' ? `paga a diferença no mês · devendo ${b.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}`
   : `acumula · ${b.bancoTipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'} · ${b.bancoPrazoMeses}m`;
 
@@ -94,11 +95,15 @@ type ModoBanco = 'ACUMULA' | 'MES' | 'NAO';
 const modoDe = (b: NonNullable<Config['banco']>): ModoBanco =>
   b.bancoModo === 'INATIVO' ? 'NAO' : b.formaCalculo === 'INTRA_MES' ? 'MES' : 'ACUMULA';
 const OPCOES_BANCO: { k: ModoBanco; t: string; d: string; ex?: string }[] = [
-  { k: 'ACUMULA', t: 'Acumula no banco, para folgar depois', d: 'O saldo passa de um mês para o outro até ser compensado com folga. O que passar do prazo vence e é pago.', ex: 'fez +10h em set → começa out com +10h' },
+  { k: 'NAO', t: 'Não compensa: toda hora extra é paga', d: 'Hora extra paga cheia; atraso e falta são descontados. Um dia não cobre o outro (só dentro do mesmo dia, ou na semana se a escala compensar na semana).' },
   { k: 'MES', t: 'Compensa no mês e paga a diferença', d: 'Extra e atraso do mês se compensam. Se o mês fechar positivo, a diferença é paga como hora extra na folha e o banco zera.', ex: '+8h extra −3h atraso → paga 5h' },
-  { k: 'NAO', t: 'Não usa banco: toda hora extra é paga', d: 'Hora extra paga cheia; atraso e falta seguem a regra de desconto. Nada se compensa.' },
+  { k: 'ACUMULA', t: 'Acumula no banco, para folgar depois', d: 'O saldo passa de um mês para o outro até ser compensado com folga. O que passar do prazo vence e é pago.', ex: 'fez +10h em set → começa out com +10h' },
 ];
 const faltaTxt = (f: string) => f === 'DESCONTA' ? 'descontam' : f === 'BANCO' ? 'abatem do banco' : 'abonadas';
+const atrasoTxt = (f: string) => f === 'DESCONTA' ? 'descontam' : f === 'BANCO' ? 'abatem do banco' : 'tolerados';
+interface AcordoEmpresa { tipoAcordo: string; prazoMeses: number | null; ativo: boolean }
+const acordoTxt = (a: AcordoEmpresa | null) => !a ? '…' : !a.ativo ? 'sem banco (a empresa não tem acordo de banco)'
+  : `acumula · acordo ${a.tipoAcordo === 'COLETIVO' ? 'coletivo' : 'individual'}${a.prazoMeses ? ` · ${a.prazoMeses} meses` : ''}`;
 
 // ---------------------------------------------------------------------------
 
@@ -111,6 +116,8 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
   const [pdf, setPdf] = useState<{ nome: string; base64: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [empresa, setEmpresa] = useState<AcordoEmpresa | null>(null);
+  useEffect(() => { api.get<AcordoEmpresa>('/banco/config').then(setEmpresa).catch(() => {}); }, []);
 
   // helpers pra ligar/desligar cada bloco e editar campos
   const setBloco = <K extends keyof Config>(k: K, v: Config[K]) => setCfg((c) => ({ ...c, [k]: v }));
@@ -207,98 +214,123 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
         )}
       </Secao>
 
-      <Secao titulo="Jornada semanal"
-        ligado={!!cfg.jornada}
-        aoLigar={(on) => setBloco('jornada', on ? { jornadaSemanalMin: 2640, interjornadaMinimaMin: 660, intervaloMaior6hMin: 60 } : null)}
-        explicacao="Quantas horas por semana compõem a jornada normal. Acima disso vira hora extra. O padrão CLT é 44 horas semanais.">
-        {cfg.jornada && (
-          <div className={css.dupla}>
-            <Num rot="Horas por semana" v={Math.round(cfg.jornada.jornadaSemanalMin / 60 * 10) / 10}
-              on={(n) => setBloco('jornada', { ...cfg.jornada!, jornadaSemanalMin: Math.round(n * 60) })} />
+      <div className={css.card}>
+        <div className={css.secaoTop}>
+          <div>
+            <p className={css.secaoTit}>Banco de horas: a hora a mais compensa a hora a menos? <BotaoAjuda artigo="regras" secao="banco" /></p>
+            <p className={css.exp}>Decide se um dia cobre o outro no mês ou se o saldo acumula para folga. Compensar só dentro da semana, sem banco, fica na <strong>escala</strong> ("Compensa na semana").</p>
           </div>
-        )}
-      </Secao>
-
-      <Secao titulo="Banco de horas"
-        ligado={!!cfg.banco && cfg.banco.bancoModo !== 'HERDA'}
-        aoLigar={(on) => setBloco('banco', on ? { bancoModo: 'ATIVO', bancoTipoAcordo: 'INDIVIDUAL', bancoPrazoMeses: 6, formaCalculo: 'BANCO_HORAS' } : null)}
-        explicacao="Em vez de pagar a hora extra, ela fica guardada para o funcionário folgar depois. Precisa de acordo — individual (com o funcionário) ou coletivo (com o sindicato).">
-        {cfg.banco && cfg.banco.bancoModo !== 'HERDA' && (
-          <>
-            <div className={css.lb} id="lb-modo-banco">O que acontece com a hora a mais (e a hora a menos)</div>
-            <div className={css.opBanco} role="radiogroup" aria-labelledby="lb-modo-banco">
-              {OPCOES_BANCO.map((o) => {
-                const on = modoDe(cfg.banco!) === o.k;
-                return (
-                  <div key={o.k}>
-                    <button type="button" role="radio" aria-checked={on}
-                      className={`${css.opB} ${on ? css.opBOn : ''}`}
-                      onClick={() => setBloco('banco', {
-                        ...cfg.banco!,
-                        bancoModo: o.k === 'NAO' ? 'INATIVO' : 'ATIVO',
-                        formaCalculo: o.k === 'MES' ? 'INTRA_MES' : 'BANCO_HORAS',
-                        negativoMes: o.k === 'MES' ? (cfg.banco!.negativoMes ?? 'DESCONTA') : cfg.banco!.negativoMes,
-                      })}>
-                      <i className={css.opRd} aria-hidden />
-                      <span><b>{o.t}</b><span>{o.d}</span>{o.ex && <em className={css.opEx}>{o.ex}</em>}</span>
-                    </button>
-                    {o.k === 'MES' && on && (
-                      <div className={css.opSub}>
-                        <div className={css.opSubLb} id="lb-negativo">E se o mês fechar devendo horas?</div>
-                        <div className={css.pills} role="radiogroup" aria-labelledby="lb-negativo">
-                          {([['DESCONTA', 'Desconta na folha'], ['CARREGA', 'Passa para o mês seguinte']] as const).map(([k, t]) => (
-                            <button key={k} type="button" role="radio" aria-checked={(cfg.banco!.negativoMes ?? 'DESCONTA') === k}
-                              className={`${css.pill} ${(cfg.banco!.negativoMes ?? 'DESCONTA') === k ? css.pillOn : ''}`}
-                              onClick={() => setBloco('banco', { ...cfg.banco!, negativoMes: k })}>{t}</button>
-                          ))}
-                        </div>
-                        <p className={css.exp} style={{ marginTop: 8 }}>
-                          {(cfg.banco!.negativoMes ?? 'DESCONTA') === 'DESCONTA'
-                            ? 'Fechou com −3h → desconta 3h na folha e o banco zera.'
-                            : 'Fechou com −3h → começa o mês seguinte devendo 3h. Se fechar positivo depois, abate antes de pagar.'}
-                        </p>
-                      </div>
-                    )}
+        </div>
+        <div className={css.lb} id="lb-modo-banco">O que acontece com a hora a mais (e a hora a menos)</div>
+        <div className={css.opBanco} role="radiogroup" aria-labelledby="lb-modo-banco">
+          <button type="button" role="radio" aria-checked={!cfg.banco || cfg.banco.bancoModo === 'HERDA'}
+            className={`${css.opB} ${!cfg.banco || cfg.banco.bancoModo === 'HERDA' ? css.opBOn : ''}`}
+            onClick={() => setBloco('banco', null)}>
+            <i className={css.opRd} aria-hidden />
+            <span><b>Igual à empresa</b><span>Segue o acordo de banco cadastrado para a empresa em Banco de horas. Hoje: <strong className={empresa && !empresa.ativo ? css.txtAlerta : undefined}>{acordoTxt(empresa)}</strong>.</span></span>
+          </button>
+          {OPCOES_BANCO.map((o) => {
+            const on = !!cfg.banco && cfg.banco.bancoModo !== 'HERDA' && modoDe(cfg.banco) === o.k;
+            const base = cfg.banco && cfg.banco.bancoModo !== 'HERDA' ? cfg.banco : { bancoModo: 'ATIVO' as const, bancoTipoAcordo: 'INDIVIDUAL' as const, bancoPrazoMeses: 6, formaCalculo: 'BANCO_HORAS' as const };
+            return (
+              <div key={o.k}>
+                <button type="button" role="radio" aria-checked={on}
+                  className={`${css.opB} ${on ? css.opBOn : ''}`}
+                  onClick={() => setBloco('banco', {
+                    ...base,
+                    bancoModo: o.k === 'NAO' ? 'INATIVO' : 'ATIVO',
+                    formaCalculo: o.k === 'MES' ? 'INTRA_MES' : 'BANCO_HORAS',
+                    negativoMes: o.k === 'MES' ? (base.negativoMes ?? 'DESCONTA') : base.negativoMes,
+                  })}>
+                  <i className={css.opRd} aria-hidden />
+                  <span><b>{o.t}</b><span>{o.d}</span>{o.ex && <em className={css.opEx}>{o.ex}</em>}</span>
+                </button>
+                {o.k === 'MES' && on && (
+                  <div className={css.opSub}>
+                    <div className={css.opSubLb} id="lb-negativo">E se o mês fechar devendo horas?</div>
+                    <div className={css.pills} role="radiogroup" aria-labelledby="lb-negativo">
+                      {([['DESCONTA', 'Desconta na folha'], ['CARREGA', 'Passa para o mês seguinte']] as const).map(([k, t]) => (
+                        <button key={k} type="button" role="radio" aria-checked={(cfg.banco!.negativoMes ?? 'DESCONTA') === k}
+                          className={`${css.pill} ${(cfg.banco!.negativoMes ?? 'DESCONTA') === k ? css.pillOn : ''}`}
+                          onClick={() => setBloco('banco', { ...cfg.banco!, negativoMes: k })}>{t}</button>
+                      ))}
+                    </div>
+                    <p className={css.exp} style={{ marginTop: 8 }}>
+                      {(cfg.banco!.negativoMes ?? 'DESCONTA') === 'DESCONTA'
+                        ? 'Fechou com −3h → desconta 3h na folha e o banco zera.'
+                        : 'Fechou com −3h → começa o mês seguinte devendo 3h. Se fechar positivo depois, abate antes de pagar.'}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-            {cfg.banco.bancoModo === 'ATIVO' && (
-              <div className={css.dupla}>
-                <label className={css.campo}>
-                  <span className={css.lb}>Tipo de acordo</span>
-                  <select className={css.inp} value={cfg.banco.bancoTipoAcordo ?? 'INDIVIDUAL'}
-                    onChange={(e) => setBloco('banco', { ...cfg.banco!, bancoTipoAcordo: e.target.value as 'INDIVIDUAL' | 'COLETIVO' })}>
-                    <option value="INDIVIDUAL">Individual (com o funcionário)</option>
-                    <option value="COLETIVO">Coletivo (com o sindicato)</option>
-                  </select>
-                </label>
-                {cfg.banco.formaCalculo !== 'INTRA_MES' && (
-                  <Num rot="Prazo para compensar (meses)" v={cfg.banco.bancoPrazoMeses ?? 6}
-                    on={(n) => setBloco('banco', { ...cfg.banco!, bancoPrazoMeses: n })} />
                 )}
               </div>
+            );
+          })}
+        </div>
+        {cfg.banco && cfg.banco.bancoModo === 'ATIVO' && (
+          <div className={css.dupla} style={{ marginTop: 12 }}>
+            <label className={css.campo}>
+              <span className={css.lb}>Tipo de acordo</span>
+              <select className={css.inp} value={cfg.banco.bancoTipoAcordo ?? 'INDIVIDUAL'}
+                onChange={(e) => setBloco('banco', { ...cfg.banco!, bancoTipoAcordo: e.target.value as 'INDIVIDUAL' | 'COLETIVO' })}>
+                <option value="INDIVIDUAL">Individual (com o funcionário)</option>
+                <option value="COLETIVO">Coletivo (com o sindicato)</option>
+              </select>
+            </label>
+            {cfg.banco.formaCalculo !== 'INTRA_MES' && (
+              <Num rot="Prazo para compensar (meses)" v={cfg.banco.bancoPrazoMeses ?? 6}
+                on={(n) => setBloco('banco', { ...cfg.banco!, bancoPrazoMeses: n })} />
             )}
-          </>
+          </div>
         )}
-      </Secao>
+        {(() => {
+          const ativo = cfg.banco && cfg.banco.bancoModo !== 'HERDA' ? cfg.banco.bancoModo === 'ATIVO' : !!empresa?.ativo;
+          const forma = cfg.banco && cfg.banco.bancoModo === 'ATIVO' ? cfg.banco.formaCalculo : 'BANCO_HORAS';
+          const atrasoBanco = (cfg.destinacao?.destinacaoAtrasos ?? 'BANCO') === 'BANCO';
+          return (
+            <p className={`${css.simula} ${ativo && atrasoBanco ? css.simulaOk : ''}`}>
+              Semana de exemplo, carga de 8h: 9h · 7h · 8h30 · 7h30 · 8h →{' '}
+              {!ativo ? <>paga 1h30 de extra e desconta 1h30 de atraso (a não ser que a escala compense na semana).</>
+                : !atrasoBanco ? <>a hora a mais vai para o banco e o atraso é descontado: <strong>não se compensam</strong>.</>
+                : forma === 'INTRA_MES' ? <><strong>nada pago, nada descontado</strong>; no fim do mês, o saldo que sobrar é pago.</>
+                : <><strong>nada pago, nada descontado</strong>; o saldo fica no banco para folga.</>}
+            </p>
+          );
+        })()}
+      </div>
 
-      <Secao titulo="Faltas não justificadas"
-        ligado={!!cfg.destinacao}
-        aoLigar={(on) => setBloco('destinacao', on ? { destinacaoFaltas: 'DESCONTA', destinacaoAtrasos: 'BANCO' } : null)}
-        explicacao="O que fazer quando o funcionário falta sem justificativa. O padrão é descontar da folha (incluindo o reflexo no descanso semanal).">
-        {cfg.destinacao && (
+      <div className={css.card}>
+        <div className={css.secaoTop}>
+          <div>
+            <p className={css.secaoTit}>Faltas e atrasos <BotaoAjuda artigo="regras" secao="faltas" /></p>
+            <p className={css.exp}>Com banco, atraso abate das horas a mais. Falta de dia inteiro, por padrão, é descontada da folha com o DSR — mesmo com banco.</p>
+          </div>
+        </div>
+        <div className={css.dupla}>
           <label className={css.campo}>
-            <span className={css.lb}>Quando falta sem justificar…</span>
-            <select className={css.inp} value={cfg.destinacao.destinacaoFaltas}
-              onChange={(e) => setBloco('destinacao', { ...cfg.destinacao!, destinacaoFaltas: e.target.value as 'DESCONTA' | 'BANCO' | 'ABONA' })}>
-              <option value="DESCONTA">Descontar da folha</option>
+            <span className={css.lb}>Quando falta o dia inteiro sem justificar…</span>
+            <select className={css.inp} value={cfg.destinacao?.destinacaoFaltas ?? 'DESCONTA'}
+              onChange={(e) => setBloco('destinacao', { destinacaoAtrasos: cfg.destinacao?.destinacaoAtrasos ?? 'BANCO', destinacaoFaltas: e.target.value as 'DESCONTA' | 'BANCO' | 'ABONA' })}>
+              <option value="DESCONTA">Descontar da folha (com DSR)</option>
               <option value="BANCO">Abater do banco de horas</option>
               <option value="ABONA">Abonar (não descontar)</option>
             </select>
           </label>
-        )}
-      </Secao>
+          <label className={css.campo}>
+            <span className={css.lb}>Quando chega atrasado ou sai cedo…</span>
+            <select className={css.inp} value={cfg.destinacao?.destinacaoAtrasos ?? 'BANCO'}
+              onChange={(e) => setBloco('destinacao', { destinacaoFaltas: cfg.destinacao?.destinacaoFaltas ?? 'DESCONTA', destinacaoAtrasos: e.target.value as 'DESCONTA' | 'BANCO' | 'TOLERA' })}>
+              <option value="BANCO">Abater do banco de horas</option>
+              <option value="DESCONTA">Descontar da folha</option>
+              <option value="TOLERA">Tolerar (não descontar)</option>
+            </select>
+          </label>
+        </div>
+        {(() => {
+          const ativo = cfg.banco && cfg.banco.bancoModo !== 'HERDA' ? cfg.banco.bancoModo === 'ATIVO' : !!empresa?.ativo;
+          const usaBanco = (cfg.destinacao?.destinacaoFaltas === 'BANCO') || ((cfg.destinacao?.destinacaoAtrasos ?? 'BANCO') === 'BANCO');
+          return !ativo && usaBanco ? <p className={css.exp} style={{ marginTop: 8 }}>Sem banco, "abater do banco" vira desconto na folha.</p> : null;
+        })()}
+      </div>
 
       <div className={css.card}>
         <p className={css.secaoTit}>Convenção coletiva <span className={css.opcional}>opcional</span></p>

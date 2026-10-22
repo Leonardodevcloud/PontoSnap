@@ -167,3 +167,8 @@
 .foot .who{ grid-column:2 / -1; }
 .foot .tema{ grid-column:3; grid-row:2; }
 .foot .sair{ grid-column:4; grid-row:2; }
+
+/* Ajuda desta tela: fixo no canto, longe das ações da página */
+.ajudaTela{ position:fixed; right:22px; bottom:20px; z-index:40; }
+@media (max-width:760px){ .ajudaTela{ right:12px; bottom:calc(76px + env(safe-area-inset-bottom, 0px)); } }
+@media print{ .ajudaTela{ display:none; } }

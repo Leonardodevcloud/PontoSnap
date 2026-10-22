@@ -128,7 +128,7 @@ async function main() {
   const w = await svc.webhook(tokenWebhook, corpo);
   p = await svc.painel(t.id, COMP);
   const ccAna2 = p.linhas.find((l) => l.empregadoId === ana.id)!.contracheque!;
-  ok(w.ok && ccAna2.status === 'ASSINADO' && ccAna2.temAssinado && ccAna2.assinadoEm?.startsWith('2026-11-05'), 'webhook: contracheque da Ana ASSINADO, com o arquivo assinado guardado');
+  ok(w.ok && ccAna2.status === 'ASSINADO' && ccAna2.temAssinado && !!ccAna2.assinadoEm?.startsWith('2026-11-05'), 'webhook: contracheque da Ana ASSINADO, com o arquivo assinado guardado');
   ok((await svc.arquivo(t.id, ccAna2.id, true)).buffer.toString().includes('ASSINADO'), 'baixa o PDF assinado');
 
   // ── HMAC ──

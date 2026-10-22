@@ -5,6 +5,7 @@ import { minutosParaHhMm } from '../lib/formato';
 import type { Horario, ParEntradaSaida } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
+import { BotaoAjuda } from './ajuda/PainelAjuda';
 import css from './Escalas.module.css';
 
 const DIAS = [
@@ -188,13 +189,13 @@ export function Escalas() {
 
         {regime === 'normal' && (
           <div className={css.bloco}>
-            <span className={css.lb}>Tipo de jornada</span>
+            <span className={css.lb}>Tipo de jornada <BotaoAjuda artigo="escalas" secao="tipos" /></span>
             <div className={css.tipoJ} role="radiogroup" aria-label="Tipo de jornada">
               <button type="button" role="radio" aria-checked={!flexivel} className={!flexivel ? css.tipoJOn : ''} onClick={() => setFlexivel(false)}>
                 <b>Horário fixo</b><span>Tem hora para entrar e sair. Chegar depois é atraso, sair depois é extra.</span>
               </button>
               <button type="button" role="radio" aria-checked={flexivel} className={flexivel ? css.tipoJOn : ''} onClick={() => { setFlexivel(true); if (!flexivel) setCargaFlex(minParaHhmm(durPares || 480)); }}>
-                <b>Contrato de horas</b><span>Entra e sai na hora que quiser. Vale só a carga do dia: extra acima dela, atraso abaixo.</span>
+                <b>Contrato de horas</b><span>Entra e sai na hora que quiser. Vale só a carga do dia: extra acima dela, atraso abaixo. Sozinho, um dia não compensa o outro: marque "Compensa na semana" abaixo ou use banco de horas na regra.</span>
               </button>
             </div>
             {flexivel && (
@@ -258,7 +259,7 @@ export function Escalas() {
             <label className={css.porDiaToggle}>
               <input type="checkbox" checked={compensa} onChange={(e) => setCompensa(e.target.checked)} />
               <span>
-                <strong>Compensa na semana</strong>: a pessoa pode trabalhar mais em alguns dias para não vir em outros
+                <strong>Compensa na semana</strong> <BotaoAjuda artigo="escalas" secao="semana" />: a pessoa pode trabalhar mais em alguns dias para não vir em outros
                 (estica a semana e folga o sábado, ou vem no sábado e sai mais cedo). Conta o <strong>total da semana</strong>.
               </span>
             </label>

@@ -6,9 +6,10 @@ import { PessoalController } from './pessoal.controller';
 import { CriptoService } from '../common/cripto.service';
 import { AtencaoService } from './atencao.service';
 import { AtencaoController } from './atencao.controller';
+import { AjudaModule } from '../ajuda/ajuda.module';
 
 @Module({
-  imports: [AuthModule, TratamentoModule],
+  imports: [AuthModule, TratamentoModule, AjudaModule],
   controllers: [PessoalController, AtencaoController],
   providers: [PessoalService, CriptoService, AtencaoService],
   exports: [PessoalService],

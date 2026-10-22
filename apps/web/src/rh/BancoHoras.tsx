@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import { BotaoAjuda } from './ajuda/PainelAjuda';
 import { hojeSP, minutosParaHhMm } from '../lib/formato';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
@@ -297,9 +299,7 @@ export function BancoHoras() {
                   <span className={css.big}>Sem banco de horas</span>
                   <span className={css.muted}>hora extra é paga na folha</span>
                 </>}
-            <button className={css.btnEditar} onClick={() => setEditandoAcordo(true)}>
-              {cfg.ativo ? 'Editar acordo' : 'Configurar acordo'}
-            </button>
+            <BotaoAcordo ativo={cfg.ativo} onClick={() => setEditandoAcordo(true)} />
           </div>
 
           {cob && cob.total > 0 && (
@@ -993,4 +993,11 @@ function BaixaAberturas({ onFeito }: { onFeito: () => void }) {
       )}
     </div>
   );
+}
+
+/** O acordo é decisão contratual: só o administrador altera (a API recusa o RH). */
+function BotaoAcordo({ ativo, onClick }: { ativo: boolean; onClick: () => void }) {
+  const { sessao } = useAuth();
+  if (sessao?.perfil !== 'ADMIN_CLIENTE') return <span className={css.muted}>Só o administrador altera o acordo. <BotaoAjuda artigo="banco-de-horas" secao="acordo" /></span>;
+  return <button className={css.btnEditar} onClick={onClick}>{ativo ? 'Editar acordo' : 'Configurar acordo'}</button>;
 }

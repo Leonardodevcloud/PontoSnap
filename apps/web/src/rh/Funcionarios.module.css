@@ -166,3 +166,21 @@
 .tagRevisar{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); font-weight:700; cursor:pointer; min-height:28px; }
 .tagRecusada{ background:var(--erro-bg); color:var(--erro-text); }
 @media (max-width:760px){ .tagFoto{ display:none; } }
+
+/* compensação de horas (raio-x) */
+.faixaComp{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; background:var(--erro-bg); color:var(--erro-text); border-radius:14px; padding:12px 16px; margin:0 0 12px; }
+.faixaComp > div{ flex:1; min-width:240px; }
+.faixaComp b{ display:block; font-size:15px; }
+.faixaComp span{ font-size:13.5px; }
+.faixaBtn{ background:var(--erro-text); color:#fff; border:0; border-radius:999px; padding:8px 15px; font:inherit; font-weight:800; font-size:13.5px; cursor:pointer; }
+.faixaLk{ color:var(--erro-text); font-weight:800; font-size:13.5px; }
+.faixaBtn:focus-visible, .faixaLk:focus-visible, .compTag:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.chipAlerta{ border-color:var(--erro-text) !important; color:var(--erro-text); }
+.compTag{ border:0; cursor:pointer; font:inherit; font-family:var(--ff-mono); font-size:11px; font-weight:600; padding:3px 9px; border-radius:6px; text-align:left; }
+.compTag:hover{ filter:brightness(.96); text-decoration:underline; }
+.compRes{ font-family:var(--ff-body, inherit); font-weight:500; }
+.comp-ok{ background:var(--ok-bg); color:var(--ok-text); }
+.comp-in{ background:var(--peach); color:var(--coral-dark); }
+.comp-er{ background:var(--erro-bg); color:var(--erro-text); }
+.comp-av{ background:var(--aviso-bg); color:var(--aviso-text); }
+.comp-cz{ background:var(--thead-bg); color:var(--ash); }

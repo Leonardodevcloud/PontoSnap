@@ -813,7 +813,7 @@ export interface ItemAtencao {
   id: string;
   grupo: GrupoAtencao;
   tipo: 'BATIDAS' | 'SEMANA' | 'ATESTADO' | 'AJUSTE' | 'MES_ANTERIOR' | 'NF' | 'ASSINATURA'
-    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME' | 'FOTO_REVISAR';
+    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME' | 'FOTO_REVISAR' | 'NAO_COMPENSA';
   qtd: number;
   titulo: string;
   texto: string;

@@ -1,7 +1,7 @@
 /** Ícones de traço do menu e da central (24×24, herdam a cor do texto). */
 export type NomeIcone =
   | 'inicio' | 'calendario' | 'caixa' | 'sol' | 'relogio' | 'dinheiro' | 'documento' | 'pessoas'
-  | 'grade' | 'ajustes' | 'engrenagem' | 'sino' | 'megafone' | 'busca' | 'mais' | 'alerta' | 'check' | 'lapis' | 'sair' | 'x' | 'seta';
+  | 'grade' | 'ajustes' | 'engrenagem' | 'sino' | 'megafone' | 'busca' | 'mais' | 'alerta' | 'check' | 'lapis' | 'sair' | 'x' | 'seta' | 'ajuda';
 
 const P: Record<NomeIcone, JSX.Element> = {
   inicio: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></>,
@@ -25,6 +25,7 @@ const P: Record<NomeIcone, JSX.Element> = {
   sair: <><path d="M15 4h4v16h-4" /><path d="M10 8l-4 4 4 4M6 12h10" /></>,
   x: <path d="M6 6l12 12M18 6L6 18" />,
   seta: <path d="M9 6l6 6-6 6" />,
+  ajuda: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 014.9.7c0 1.7-2.4 2.2-2.4 3.8M12 17.2v.01" /></>,
 };
 
 export function Icone({ nome, tamanho = 18, className }: { nome: NomeIcone; tamanho?: number; className?: string }) {

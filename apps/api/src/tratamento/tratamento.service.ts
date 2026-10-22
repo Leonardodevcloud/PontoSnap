@@ -127,6 +127,15 @@ export class TratamentoService {
 
       // Encerra qualquer vigência aberta no dia anterior a dataInicio.
       const diaAnterior = TratamentoService.somarDias(dataInicio, -1);
+      // Sem histórico antes da data: guarda a escala atual como vigência do
+      // passado. Senão, numa mudança agendada para o futuro, os dias até lá
+      // caíam no horário do cadastro (que já seria o novo).
+      const atual = (await tx.select({ h: empregado.horarioContratualId }).from(empregado)
+        .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0]?.h ?? null;
+      const restantes = todas.filter((v) => !(v.dataFim != null && v.dataFim < v.dataInicio));
+      if (atual && atual !== horarioContratualId && dataInicio > '2000-01-01' && !restantes.some((v) => v.dataInicio < dataInicio)) {
+        await tx.insert(empregadoEscalaVigencia).values({ tenantId, empregadoId, horarioContratualId: atual, dataInicio: '2000-01-01', dataFim: diaAnterior });
+      }
       await tx.update(empregadoEscalaVigencia)
         .set({ dataFim: diaAnterior })
         .where(and(

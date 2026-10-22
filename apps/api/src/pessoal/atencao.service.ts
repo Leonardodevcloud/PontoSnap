@@ -8,6 +8,7 @@ import { DB } from '../database/database.module';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { mesPadrao } from './mes-padrao';
 import { PessoalService } from './pessoal.service';
+import { AjudaService } from '../ajuda/ajuda.service';
 
 /**
  * Central "Precisa de atenção": junta, numa lista só, tudo que está pendente
@@ -25,7 +26,7 @@ export interface ItemAtencao {
   id: string;
   grupo: GrupoAtencao;
   tipo: 'BATIDAS' | 'SEMANA' | 'ATESTADO' | 'AJUSTE' | 'MES_ANTERIOR' | 'NF' | 'ASSINATURA'
-    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME' | 'FOTO_REVISAR';
+    | 'PADRAO_BENEFICIO' | 'SEM_SALARIO' | 'SEM_ESCALA' | 'SEM_BENEFICIO' | 'REGRA_NOME' | 'FOTO_REVISAR' | 'NAO_COMPENSA';
   /** Quantas ocorrências o item resume (dias, pessoas, notas…). */
   qtd: number;
   titulo: string;
@@ -75,6 +76,7 @@ export class AtencaoService {
     @Inject(DB) private readonly db: Db,
     private readonly trat: TratamentoService,
     private readonly pessoal: PessoalService,
+    private readonly ajuda: AjudaService,
   ) {}
 
   async listar(tenantId: string): Promise<RespAtencao> {
@@ -291,6 +293,23 @@ export class AtencaoService {
         acao2: { rotulo: 'Trocar escala', rota: '/rh/funcionarios' },
       });
     }
+
+    // Contrato de horas sem banco nem compensa na semana: cada dia fecha sozinho
+    // (a configuração que mais engana: parece que compensa e não compensa).
+    try {
+      const comp = await this.ajuda.compensacao(tenantId);
+      const quem = comp.linhas.filter((l) => l.alertas.some((a) => a.codigo === 'CONTRATO_SEM_COMPENSACAO'));
+      if (quem.length > 0) {
+        itens.push({
+          id: 'nao-compensa', grupo: 'CADASTRO', tipo: 'NAO_COMPENSA', qtd: quem.length,
+          titulo: quem.length === 1 ? `As horas de ${primeiroNome(quem[0]!.nome)} não compensam entre dias` : `${quem.length} funcionários com horas que não compensam entre dias`,
+          texto: 'Contrato de horas sem banco e sem "compensa na semana": hora a mais é paga e hora a menos é descontada, dia a dia. Se foi combinado compensar, ajuste a regra.',
+          pessoas: quem.map((l) => ({ nome: primeiroNome(l.nome), detalhe: l.escala?.codigo, empregadoId: l.empregadoId })),
+          acao: { rotulo: 'Ver quem é', rota: '/rh/funcionarios?comp=NAO_COMPENSA' },
+          acao2: { rotulo: 'Como resolver', rota: '/rh/ajuda/compensar-horas' },
+        });
+      }
+    } catch { /* o cartão de atenção não pode quebrar o Início */ }
 
     const fotos = base.fotosRevisar.filter((f) => empPorId.has(f.empregadoId));
     if (fotos.length > 0) {

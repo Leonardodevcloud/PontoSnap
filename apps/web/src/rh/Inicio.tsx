@@ -19,7 +19,7 @@ const GRUPOS: { id: GrupoAtencao; titulo: (mes: string) => string; sub: string }
 
 const ICONE: Record<ItemAtencao['tipo'], NomeIcone> = {
   BATIDAS: 'relogio', SEMANA: 'calendario', ATESTADO: 'caixa', AJUSTE: 'lapis', MES_ANTERIOR: 'calendario', NF: 'documento',
-  ASSINATURA: 'lapis', PADRAO_BENEFICIO: 'dinheiro', SEM_SALARIO: 'dinheiro', SEM_ESCALA: 'grade', SEM_BENEFICIO: 'dinheiro', REGRA_NOME: 'alerta', FOTO_REVISAR: 'pessoas',
+  ASSINATURA: 'lapis', PADRAO_BENEFICIO: 'dinheiro', SEM_SALARIO: 'dinheiro', SEM_ESCALA: 'grade', SEM_BENEFICIO: 'dinheiro', REGRA_NOME: 'alerta', FOTO_REVISAR: 'pessoas', NAO_COMPENSA: 'relogio',
 };
 
 function saudacao() {

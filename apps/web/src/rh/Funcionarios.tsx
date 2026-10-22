@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { RaioX } from './RaioX';
+import { acordoEmpresaTxt, NIVEL, temAtencao, type EmpresaBanco, type RespCompensacao } from '../lib/compensacao';
 import { Avatar, useAvatares } from '../components/Avatar';
 import { RevisarFotos } from './RevisarFotos';
 import { api } from '../lib/api';
@@ -25,8 +27,8 @@ interface ConfigRegra {
 interface PerfilResumo { id: string; nome: string; padrao: boolean; config?: ConfigRegra; usadoPor?: number; }
 
 /** Resumo curto da regra de banco de um perfil (lista e troca de perfil). */
-function resumoBanco(b: ConfigRegra['banco']): string {
-  if (!b || b.bancoModo === 'HERDA') return 'banco como a empresa';
+function resumoBanco(b: ConfigRegra['banco'], empresa?: EmpresaBanco | null): string {
+  if (!b || b.bancoModo === 'HERDA') return empresa ? `igual à empresa (${acordoEmpresaTxt(empresa)})` : 'igual à empresa';
   if (b.bancoModo === 'INATIVO') return 'hora extra sempre paga';
   if (b.formaCalculo === 'INTRA_MES') return `paga a diferença no mês · devendo ${b.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}`;
   return `acumula no banco · ${b.bancoPrazoMeses ?? 6}m`;
@@ -49,7 +51,10 @@ export function Funcionarios() {
   const [regrasDe, setRegrasDe] = useState<PerfilResumo | null | undefined>(undefined);
   const [perfis, setPerfis] = useState<PerfilResumo[]>([]);
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS'>('TODOS');
+  const [params0] = useSearchParams();
+  const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS' | 'NAO_COMPENSA'>(params0.get('comp') === 'NAO_COMPENSA' ? 'NAO_COMPENSA' : 'TODOS');
+  const [comp, setComp] = useState<RespCompensacao | null>(null);
+  const [raioDe, setRaioDe] = useState<string | null>(null);
   const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
   const [dataInicioPara, setDataInicioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
@@ -58,7 +63,10 @@ export function Funcionarios() {
   async function carregar() {
     try { setLista(await api.get<Empregado[]>('/empregados')); }
     catch (e) { setErro((e as Error).message); }
+    // Raio-x da compensação (o que vale de verdade: escala + perfil + acordo da empresa).
+    api.get<RespCompensacao>('/ajuda/compensacao').then(setComp).catch(() => {});
   }
+  const compDe = (id: string) => comp?.linhas.find((l) => l.empregadoId === id);
   useEffect(() => { void carregar(); }, []);
   const { dados: avs, trocarDesenho } = useAvatares();
   const [params, setParams] = useSearchParams();
@@ -86,6 +94,7 @@ export function Funcionarios() {
     if (!e.ativo) return false;
     if (filtro === 'MONTADAS') return temPerfil(e);
     if (filtro === 'PADRAO') return !temPerfil(e);
+    if (filtro === 'NAO_COMPENSA') { const c = compDe(e.id); return !!c && temAtencao(c); }
     return true;
   });
 
@@ -120,11 +129,23 @@ export function Funcionarios() {
         );
       })()}
 
+      {comp && comp.totais.atencao > 0 && filtro !== 'NAO_COMPENSA' && (
+        <div className={css.faixaComp} role="status">
+          <div><b>{comp.totais.atencao === 1 ? '1 funcionário precisa de atenção na compensação de horas' : `${comp.totais.atencao} funcionários precisam de atenção na compensação de horas`}</b>
+            <span>Contrato de horas sem banco nem "compensa na semana" (cada dia fecha sozinho) ou sem escala. Se foi combinado compensar, ajuste.</span></div>
+          <button type="button" className={css.faixaBtn} onClick={() => setFiltro('NAO_COMPENSA')}>Ver quem é</button>
+          <Link className={css.faixaLk} to="/rh/ajuda/compensar-horas">Como resolver</Link>
+        </div>
+      )}
+
       <div className={css.filtros}>
         <input className={css.busca} aria-label="Buscar funcionário" placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
         {([['TODOS', 'Todos'], ['MONTADAS', 'Com perfil'], ['PADRAO', 'Sem perfil (CLT)'], ['INATIVOS', 'Inativos']] as const).map(([k, rot]) => (
           <button key={k} className={`${css.chipF} ${filtro === k ? css.chipFOn : ''}`} onClick={() => setFiltro(k)}>{rot}</button>
         ))}
+        {comp && comp.totais.atencao > 0 && (
+          <button className={`${css.chipF} ${css.chipAlerta} ${filtro === 'NAO_COMPENSA' ? css.chipFOn : ''}`} onClick={() => setFiltro('NAO_COMPENSA')}>Atenção na compensação · {comp.totais.atencao}</button>
+        )}
       </div>
 
 
@@ -156,6 +177,7 @@ export function Funcionarios() {
                     <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
                     <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
                     <button onClick={() => { setPerfilPara(e); setMenu(null); }}>Perfil de regra</button>
+                    <button onClick={() => { setRaioDe(e.id); setMenu(null); }}>Como as horas contam</button>
                     <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
                     <button onClick={() => { setDataInicioPara(e); setMenu(null); }}>Início do ponto</button>
                     <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
@@ -175,10 +197,23 @@ export function Funcionarios() {
                     {p && <button type="button" className={css.perfilBadge} onClick={() => setRegrasDe(p)} title="Ver as regras deste perfil">⚙ {p.nome}</button>}
                     {!p && padrao && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(padrao)} title="Ver as regras deste perfil">⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></button>}
                     {!efetivo && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(null)} title="Ver as regras aplicadas">CLT padrão</button>}
-                    {ehContratoHoras(efetivo?.config, e.escalaFlexivel)
-                      ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
-                      : <span className={css.bancoResumo}>horário fixo</span>}
-                    <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco)}</span>
+                    {(() => {
+                      const c = e.ativo ? compDe(e.id) : undefined;
+                      if (!c) return <>
+                        {ehContratoHoras(efetivo?.config, e.escalaFlexivel)
+                          ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
+                          : <span className={css.bancoResumo}>horário fixo</span>}
+                        <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco, comp?.empresa)}</span>
+                      </>;
+                      const at = temAtencao(c);
+                      return <>
+                        {c.jornada === 'CONTRATO_HORAS' ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
+                          : c.jornada === '12X36' ? <span className={css.bancoResumo}>12x36</span> : c.jornada ? <span className={css.bancoResumo}>horário fixo</span> : null}
+                        <button type="button" className={`${css.compTag} ${css[`comp-${at ? 'er' : NIVEL[c.nivel].tom}`]}`} onClick={() => setRaioDe(e.id)} title="Ver como as horas são contadas">
+                          {at && <span aria-hidden="true">⚠ </span>}{NIVEL[c.nivel].rot}<span className={css.compRes}> · {c.resumo}</span>
+                        </button>
+                      </>;
+                    })()}
                   </>
                 );
               })()}
@@ -192,7 +227,10 @@ export function Funcionarios() {
       {importarAberto && <ModalImportar onFechar={() => setImportarAberto(false)} onImportado={() => void carregar()} />}
       {pinPara && <ModalPin empregado={pinPara} onFechar={() => setPinPara(null)} onSalvo={() => { setPinPara(null); void carregar(); }} />}
       {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
-      {perfilPara && <ModalPerfil empregado={perfilPara} perfis={perfis} onFechar={() => setPerfilPara(null)} onSalvo={() => { setPerfilPara(null); void carregar(); }} />}
+      {raioDe && <RaioX empregadoId={raioDe} onFechar={() => setRaioDe(null)}
+        onEscala={() => { const e = lista?.find((x) => x.id === raioDe); setRaioDe(null); if (e) setEscalaPara(e); }}
+        onPerfil={() => { const e = lista?.find((x) => x.id === raioDe); setRaioDe(null); if (e) setPerfilPara(e); }} />}
+      {perfilPara && <ModalPerfil empresa={comp?.empresa ?? null} empregado={perfilPara} perfis={perfis} onFechar={() => setPerfilPara(null)} onSalvo={() => { setPerfilPara(null); void carregar(); }} />}
       {regrasDe !== undefined && <ModalRegras perfil={regrasDe} onFechar={() => setRegrasDe(undefined)} />}
       {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
       {dataInicioPara && <ModalDataInicio empregado={dataInicioPara} onFechar={() => setDataInicioPara(null)} onSalvo={() => { setDataInicioPara(null); void carregar(); }} />}
@@ -452,8 +490,8 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
   );
 }
 
-function ModalPerfil({ empregado, perfis, onFechar, onSalvo }: {
-  empregado: Empregado; perfis: PerfilResumo[]; onFechar: () => void; onSalvo: () => void;
+function ModalPerfil({ empregado, perfis, empresa, onFechar, onSalvo }: {
+  empregado: Empregado; perfis: PerfilResumo[]; empresa: EmpresaBanco | null; onFechar: () => void; onSalvo: () => void;
 }) {
   const [sel, setSel] = useState<string>(empregado.perfilRegraId ?? '');
   const [erro, setErro] = useState<string | null>(null);
@@ -492,7 +530,7 @@ function ModalPerfil({ empregado, perfis, onFechar, onSalvo }: {
             <span className={css.bancoPrevLb}>Jornada</span>
             {ehContratoHoras(escolhido?.config, empregado.escalaFlexivel) ? 'contrato de horas' : 'horário fixo'}
             <span className={css.bancoPrevLb} style={{ marginLeft: 10 }}>Banco de horas</span>
-            {resumoBanco(escolhido?.config?.banco)}
+            {resumoBanco(escolhido?.config?.banco, empresa)}
           </p>
         );
       })()}
