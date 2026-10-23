@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, StreamableFile, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, StreamableFile, UseGuards, Put, ParseUUIDPipe } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { TratamentoService } from './tratamento.service';
 import { CriarHorarioDto, CriarAusenciaDto, CriarTratamentoDto, ApurarDto } from './dto/tratamento.dto';
@@ -103,9 +103,27 @@ export class TratamentoController {
     return this.tratamento.relatorioCompetencia(this.tenant(u), inicio, fim);
   }
 
-  @Post('feriados') criarFeriado(@UsuarioAtual() u: PayloadAcesso, @Body() dto: { data: string; nome: string; tipo?: string }) {
-    if (!dto?.data || !dto?.nome) throw new BadRequestException('Informe data (YYYY-MM-DD) e nome');
+  @Post('feriados') criarFeriado(@UsuarioAtual() u: PayloadAcesso, @Body() dto: { data: string; nome: string; tipo?: string; uf?: string | null; municipio?: number | null; municipioNome?: string | null }) {
+    if (!dto?.data || !/^\d{4}-\d{2}-\d{2}$/.test(dto.data) || !dto?.nome?.trim()) throw new BadRequestException('Informe data (YYYY-MM-DD) e nome');
     return this.tratamento.criarFeriado(this.tenant(u), dto);
+  }
+  @Patch('feriados/:id') editarFeriado(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { nome?: string; tipo?: string; uf?: string | null; municipio?: number | null; municipioNome?: string | null }) {
+    return this.tratamento.editarFeriado(this.tenant(u), id, dto ?? {});
+  }
+  /** Tela de Feriados: cidade da empresa, cidades em uso e quem cada feriado atinge. */
+  @Get('feriados/regioes') regioes(@UsuarioAtual() u: PayloadAcesso, @Query('ano') ano?: string) {
+    if (!ano || !/^\d{4}$/.test(ano)) throw new BadRequestException('Informe o ano');
+    return this.tratamento.regioesFeriados(this.tenant(u), ano);
+  }
+  @Put('feriados/local-empresa') localEmpresa(@UsuarioAtual() u: PayloadAcesso, @Body() dto: { municipio: number | null; municipioNome?: string | null }) {
+    return this.tratamento.definirLocalEmpresa(this.tenant(u), { municipio: dto?.municipio ?? null, municipioNome: dto?.municipioNome ?? null });
+  }
+  /** Cidade de trabalho de várias pessoas (funcionários e/ou prestadores). null = volta para a da empresa. */
+  @Post('feriados/local-pessoas') localPessoas(@UsuarioAtual() u: PayloadAcesso, @Body() dto: { empregadoIds?: string[]; prestadorIds?: string[]; municipio: number | null; municipioNome?: string | null }) {
+    const ids = [...(dto?.empregadoIds ?? []), ...(dto?.prestadorIds ?? [])];
+    if (!ids.length || ids.length > 2000 || ids.some((x) => typeof x !== 'string' || !/^[0-9a-f-]{36}$/i.test(x))) throw new BadRequestException('Escolha as pessoas.');
+    return this.tratamento.definirLocalPessoas(this.tenant(u), { empregadoIds: dto.empregadoIds, prestadorIds: dto.prestadorIds, municipio: dto.municipio ?? null, municipioNome: dto.municipioNome ?? null });
   }
   @Get('feriados') listarFeriados(
     @UsuarioAtual() u: PayloadAcesso,

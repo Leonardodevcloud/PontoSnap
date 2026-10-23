@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, numeric, boolean, date, text, timestamp, jsonb, unique, index, customType } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, integer, numeric, boolean, date, text, timestamp, jsonb, unique, index, customType, char } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 import { empregado } from './empregado';
 
@@ -70,6 +70,10 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   contatoEmergencia: varchar('contato_emergencia', { length: 160 }),
   /** Modelo de nota (migration 0061). Nulo = o padrão do tipo, se houver. */
   modeloNotaId: uuid('modelo_nota_id'),
+  /** Cidade de trabalho (feriados estaduais/municipais) — migration 0063. */
+  trabalhoUf: char('trabalho_uf', { length: 2 }),
+  trabalhoMunicipio: integer('trabalho_municipio'),
+  trabalhoMunicipioNome: varchar('trabalho_municipio_nome', { length: 80 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
 

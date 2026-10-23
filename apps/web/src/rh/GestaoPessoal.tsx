@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AcessoPrestador, BlocoConvite } from './AcessoPrestador';
+import { CidadeTrabalho } from '../components/CidadeTrabalho';
 import type { ConviteGerado } from '../lib/prestador';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -1256,6 +1257,7 @@ function PainelMei({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
         </>}
         {aba === 'dados' && <>
         <DadosContrato p={l} mes={mes} fechado={fechadoMes} empresas={empresas} onSalvo={onContrato} />
+        <CidadeTrabalho key={`cid-${l.id}`} tipo="PRESTADOR" id={l.id} atual={l.cidade} disabled={fechadoMes} onSalvo={() => void onContrato()} />
         <AcessoPrestador key={`${l.id}-${l.documento ?? ''}`} prestadorId={l.id} nome={l.nome} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
         </>}
@@ -1365,6 +1367,7 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
         </>}
         {aba === 'dados' && <>
         <DadosContrato p={l} mes={mes} fechado={fechadoMes} empresas={empresas} onSalvo={onContrato} />
+        <CidadeTrabalho key={`cid-${l.id}`} tipo="PRESTADOR" id={l.id} atual={l.cidade} disabled={fechadoMes} onSalvo={() => void onContrato()} />
         <AcessoPrestador key={`${l.id}-${l.documento ?? ''}`} prestadorId={l.id} nome={l.nome} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
         </>}

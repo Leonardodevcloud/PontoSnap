@@ -9,6 +9,7 @@ import { DB } from '../database/database.module';
 /** Competência corrente no fuso de Brasília. */
 const mesCorrente = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
 import { salarioDoMes, salarioEm } from '@ponto/apuracao-clt';
+import { feriadoValePara, localEfetivo } from '@ponto/shared';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { CriptoService } from '../common/cripto.service';
 import { mesPadrao, compAnterior as mesAnteriorDe, type MesPadrao } from './mes-padrao';
@@ -101,6 +102,8 @@ export interface LinhaMei {
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação e primeira competência no sistema. */
   inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
+  /** Cidade de trabalho própria (feriados); null = a da empresa. */
+  cidade?: { uf: string | null; municipio: number; municipioNome: string | null } | null;
   /** Desde quando o valor deste mês vale + histórico de reajustes (mais recente primeiro). */
   valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; lanc: LancMei; debitosCent: number;
@@ -120,6 +123,8 @@ export interface LinhaMot {
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;
   /** Início real da prestação e primeira competência no sistema. */
   inicioAtividade: string | null; competenciaInicio: string; valorCent: number; chavePix: string | null;
+  /** Cidade de trabalho própria (feriados); null = a da empresa. */
+  cidade?: { uf: string | null; municipio: number; municipioNome: string | null } | null;
   valorDesde: string; historicoValores: ValorContrato[];
   baseDias: BaseDias; diasMes: number; diariaCent: number; semanas: SemanaMot[];
   totalCent: number; debitosCent: number; liquidoCent: number; observacao: string | null;
@@ -306,9 +311,17 @@ export class PessoalService {
       proporcional: c.proporcional, debitosFuturosCent: centavos(c.debitosFuturos),
     });
 
-    const feriadosLista = (await this.trat.listarFeriados(tenantId, inicio, fim)).map((f) => f.data);
-    const feriadosProx = (await this.trat.listarFeriados(tenantId, fx.inicio, fx.fim)).map((f) => f.data);
-    const feriados = new Set(feriadosLista);
+    // Feriados por região: cada pessoa tem os da cidade dela (sem cidade, a da empresa).
+    const fersMes = await this.trat.listarFeriados(tenantId, inicio, fim);
+    const localEmpresa = await this.trat.localDaEmpresa(tenantId);
+    const feriadosPara = (p: { trabalhoUf: string | null; trabalhoMunicipio: number | null }) => {
+      const local = localEfetivo(p.trabalhoMunicipio ? { uf: p.trabalhoUf, municipioIbge: p.trabalhoMunicipio } : null, localEmpresa);
+      return new Set(fersMes.filter((f) => feriadoValePara({ tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio }, local)).map((f) => f.data));
+    };
+    const cidadeDe = (p: { trabalhoUf: string | null; trabalhoMunicipio: number | null; trabalhoMunicipioNome: string | null }) =>
+      p.trabalhoMunicipio ? { uf: p.trabalhoUf, municipio: p.trabalhoMunicipio, municipioNome: p.trabalhoMunicipioNome } : null;
+    /** Lista do mês (todas as regiões) — só para exibir. */
+    const feriadosLista = fersMes.map((f) => f.data);
     const snapAnt = dados.fechAnt?.snapshot as CompetenciaPessoal | undefined;
 
     const foraDoMes: CompetenciaPessoal['foraDoMes'] = [];
@@ -357,7 +370,7 @@ export class PessoalService {
       let bancoAcertoMin = 0, bancoAcertoCent = 0, bancoPassaMin = 0;
       let faltasDias: string[] = [];
       try {
-        const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim, feriadosLista);
+        const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim);
         diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala; jornadaMes = ap.jornadaEscala;
         // Salário do mês com vigência: proporcional quando muda no meio.
         const sm = salarioDoMes(ap.salarios, comp);
@@ -379,7 +392,7 @@ export class PessoalService {
           }
         }
         bancoPassaMin = ap.banco?.acerto?.passaMin ?? 0;
-        const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim, feriadosProx);
+        const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim);
         diasProxLista = apProx.diasPrevistos;
         diasProxVrLista = diasComVr(apProx.diasPrevistos, apProx.jornadaEscala);
       } catch (err) {
@@ -411,7 +424,7 @@ export class PessoalService {
         vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, diasProxVr: diasProxVrLista.length, pagos, pagosVr: pagosVr ?? undefined,
         diasProxVt: diasProxVtLista.length, pagosVt: pagosVt ?? undefined,
-        previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados,
+        previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados: feriadosPara(e),
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
 
@@ -460,6 +473,7 @@ export class PessoalService {
       const vig = historicoValores.find((v) => v.vigenteDesde <= comp)
         ?? { vigenteDesde: p.competenciaInicio, valorCent: centavos(p.valorMensal), baseDias: p.baseDias as BaseDias };
       const base = vig.baseDias;
+      const feriados = feriadosPara(p);
       const diasMes = diasBase(comp, base, feriados).length;
       const valorCent = vig.valorCent;
       const valorDesde = vig.vigenteDesde;
@@ -483,7 +497,7 @@ export class PessoalService {
           continue;
         }
         const r = calcularMei({ valorCent, diasMes, heMin: lanc.heMin, faltas: lanc.faltas, feriadosTrab: lanc.feriadosTrab, metaCent: lanc.metaCent, metaPaga: lanc.metaPaga, debitosCent });
-        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, inicioAtividade: p.inicioAtividade ?? null, competenciaInicio: p.competenciaInicio, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, ...r });
+        mei.push({ id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, inicioAtividade: p.inicioAtividade ?? null, competenciaInicio: p.competenciaInicio, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes, lanc, debitosCent, cidade: cidadeDe(p), ...r });
       } else {
         const cgm = congeladoDe('MOTORISTA', p.id);
         if (cgm) {
@@ -513,6 +527,7 @@ export class PessoalService {
         const totalCent = Math.round((valorCent / Math.max(1, diasMes)) * sem.reduce((a, s) => a + s.dias, 0))
           + sem.reduce((a, s) => a + s.adicionalCent, 0);
         motoristas.push({
+          cidade: cidadeDe(p),
           id: p.id, nome: p.nome, documento: p.documento, funcao: p.funcao, empresa: p.empresa, inicioAtividade: p.inicioAtividade ?? null, competenciaInicio: p.competenciaInicio, valorCent, chavePix: p.chavePix, valorDesde, historicoValores, baseDias: base, diasMes,
           diariaCent: calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias: 1, adicionalCent: 0 }).diariaCent,
           semanas: sem, totalCent, debitosCent, liquidoCent: totalCent - debitosCent,
@@ -1056,7 +1071,9 @@ export class PessoalService {
     const debs = await comTenant(this.db, tenantId, (tx) => tx.select().from(pessoalDebito).where(and(eq(pessoalDebito.tenantId, tenantId),
       eq(pessoalDebito.pessoaTipo, d.pessoaTipo), eq(pessoalDebito.pessoaId, d.pessoaId))));
     const futurosCent = o.motivo === 'DESLIGAMENTO' ? debitosDepois(debs.map(debParc), d.competencia) : 0;
-    const feriados = new Set(comp.feriados);
+    // Feriados da cidade desta pessoa (não os de todas as regiões).
+    const [ai, af] = [`${d.competencia}-01`, new Date(Date.UTC(Number(d.competencia.slice(0, 4)), Number(d.competencia.slice(5, 7)), 0)).toISOString().slice(0, 10)];
+    const feriados = new Set((await this.trat.feriadosDoLocal(tenantId, await this.trat.localDoPrestador(tenantId, d.pessoaId), ai, af)).map((f) => f.data));
     const congelada = d.pessoaTipo === 'MEI'
       ? congelarMei(atual as LinhaMei, o, feriados, d.competencia, futurosCent)
       : congelarMot(atual as LinhaMot, o, feriados, d.competencia, futurosCent);

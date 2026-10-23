@@ -73,6 +73,10 @@ export const pontoFeriado = pgTable('ponto_feriado', {
   data: date('data').notNull(),
   nome: varchar('nome', { length: 120 }).notNull(),
   tipo: varchar('tipo', { length: 20 }).notNull().default('nacional'),
+  /** Região (migration 0063): estadual = UF; municipal = UF + município IBGE. Vazio = vale para todos (antigos). */
+  uf: char('uf', { length: 2 }),
+  municipio: integer('municipio'),
+  municipioNome: varchar('municipio_nome', { length: 80 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });
 

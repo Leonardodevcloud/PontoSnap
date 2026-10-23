@@ -1,4 +1,4 @@
-import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date, index, integer, customType } from 'drizzle-orm/pg-core';
+import {pgTable, uuid, varchar, boolean, timestamp, unique, numeric, date, index, integer, customType, char } from 'drizzle-orm/pg-core';
 import { tenant } from './tenant';
 
 export const empregado = pgTable('empregado', {
@@ -29,6 +29,10 @@ export const empregado = pgTable('empregado', {
   cadastroAtualizadoEm: timestamp('cadastro_atualizado_em', { withTimezone: true }),
   /** Variação da caricatura mostrada enquanto não há foto (nulo = derivada do id). */
   avatarSemente: integer('avatar_semente'),
+  /** Cidade de trabalho (feriados estaduais/municipais) — migration 0063. */
+  trabalhoUf: char('trabalho_uf', { length: 2 }),
+  trabalhoMunicipio: integer('trabalho_municipio'),
+  trabalhoMunicipioNome: varchar('trabalho_municipio_nome', { length: 80 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique('uq_empregado_cpf').on(t.tenantId, t.cpf),

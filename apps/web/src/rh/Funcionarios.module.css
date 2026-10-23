@@ -184,3 +184,24 @@
 .comp-er{ background:var(--erro-bg); color:var(--erro-text); }
 .comp-av{ background:var(--aviso-bg); color:var(--aviso-text); }
 .comp-cz{ background:var(--thead-bg); color:var(--ash); }
+
+/* Cidade de trabalho (feriados por região) */
+.okMsg{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:700; margin:0 0 12px; }
+.cidadeSel{ font:inherit; font-size:13px; padding:7px 10px; border:1px solid rgba(var(--ink-rgb),.2); border-radius:999px; background:var(--white); color:var(--ink); }
+.loteBar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 10px; font-size:13.5px; }
+.loteTodos{ display:inline-flex; gap:8px; align-items:center; color:var(--ash); cursor:pointer; }
+.loteTodos input, .marca{ width:17px; height:17px; accent-color:var(--coral); cursor:pointer; flex-shrink:0; }
+.loteBtn{ font:inherit; font-size:13px; font-weight:800; padding:6px 14px; border-radius:999px; border:0; background:var(--coral-acao); color:var(--on-coral); cursor:pointer; }
+.loteLk{ background:none; border:0; font:inherit; font-size:13px; font-weight:800; color:var(--coral-dark); cursor:pointer; }
+.loteBtn:focus-visible, .loteLk:focus-visible, .cidadeTag:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.cidadeTag{ cursor:pointer; border:0; font-family:var(--ff-mono); font-size:11px; line-height:1.4; }
+.cidadeTag .herdaTxt{ font-size:11px; }
+.cidadeForm{ display:flex; flex-direction:column; gap:10px; }
+.cidadeDica{ margin:0; color:var(--ash); font-size:13.5px; line-height:1.5; }
+.cidadeOpc{ display:flex; gap:10px; align-items:flex-start; border:1px solid rgba(var(--ink-rgb),.16); border-radius:12px; padding:10px 12px; cursor:pointer; background:var(--white); }
+.cidadeOpc input{ margin-top:3px; accent-color:var(--coral); }
+.cidadeOpc b{ display:block; font-size:14px; }
+.cidadeOpc small{ display:block; color:var(--ash); font-size:12.5px; }
+.cidadeOpcOn{ border-color:var(--coral); box-shadow:0 0 0 1px var(--coral); }
+.cidadeQuem{ margin:0; padding-left:18px; font-size:13px; color:var(--ash); }
+.cidadeRod{ display:flex; gap:8px; justify-content:flex-end; }

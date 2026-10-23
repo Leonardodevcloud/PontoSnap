@@ -555,6 +555,7 @@ export class PortalService {
       return {
         ...l, empresa: p?.empresa ?? null, funcao: p?.funcao ?? null, documento: p?.documento ?? null, telefone: p?.telefone ?? null, email: p?.email ?? null,
         tomadorNome: p?.tomadorNome ?? null, tomadorCnpj: p?.tomadorCnpj ?? null, avatarSemente: p?.avatarSemente ?? null,
+        cidade: p?.trabalhoMunicipio ? { uf: p.trabalhoUf, municipio: p.trabalhoMunicipio, municipioNome: p.trabalhoMunicipioNome } : null,
         /** Modelo de nota: o escolhido (id) e o que vale (escolhido ou padrão do tipo). */
         modeloNotaId: p?.modeloNotaId ?? null, modeloNota: p ? (() => { const m = modeloDe(p, dados.modelos); return m ? { id: m.id, nome: m.nome, padrao: !p.modeloNotaId } : null; })() : null,
         acesso: acessoDe(l.id), situacao: sit, atrasada: l.unidades.some((u) => u.atrasada),

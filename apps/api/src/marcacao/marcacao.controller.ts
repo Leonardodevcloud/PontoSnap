@@ -65,11 +65,8 @@ export class MarcacaoController {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     if (!inicio || !fim) throw new BadRequestException('Informe inicio e fim (YYYY-MM-DD)');
     const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
-    const feriados = await this.tratamento.listarFeriados(u.tenantId);
-    return this.tratamento.apurarPeriodoCLT(
-      u.tenantId, empregadoId, inicio, fim,
-      feriados.map((f) => f.data),
-    );
+    // Feriados da região do funcionário: a apuração busca sozinha.
+    return this.tratamento.apurarPeriodoCLT(u.tenantId, empregadoId, inicio, fim);
   }
 
   /** O próprio banco de horas. Vazio e inativo quando a empresa não tem acordo. */
@@ -89,9 +86,7 @@ export class MarcacaoController {
         const ultimo = new Date(Date.UTC(a2!, m2!, 0)).getUTCDate();
         const inicio = `${comp}-01`;
         const fim = `${comp}-${String(ultimo).padStart(2, '0')}`;
-        const feriados = await this.banco['tratamento'].listarFeriados(u.tenantId, inicio, fim);
-        const ap = await this.banco['tratamento'].apurarPeriodoCLT(
-          u.tenantId, empregadoId, inicio, fim, feriados.map((f: { data: string }) => f.data));
+        const ap = await this.banco['tratamento'].apurarPeriodoCLT(u.tenantId, empregadoId, inicio, fim);
         // Mesma conta do RH: só o que entra no banco (falta descontada na folha fica fora).
         return { ...resp, saldoEstimadoMesMin: ap.conta.destino.paraBancoMin, competenciaEstimada: comp, conta: ap.conta };
       } catch { /* ignora erro, retorna sem estimativa */ }
@@ -115,7 +110,7 @@ export class MarcacaoController {
     const [horario, escala, feriados] = await Promise.all([
       this.marcacao.meuHorario(u.tenantId, empregadoId),
       this.tratamento.listarEscala(u.tenantId, empregadoId, inicio, fim),
-      this.tratamento.listarFeriados(u.tenantId, inicio, fim),
+      this.tratamento.feriadosDoEmpregado(u.tenantId, empregadoId, inicio, fim),
     ]);
     return {
       horario,

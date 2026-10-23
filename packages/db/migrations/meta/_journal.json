@@ -442,6 +442,13 @@
       "when": 1785390000000,
       "tag": "0062_usuarios_equipe",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1785400000000,
+      "tag": "0063_feriado_regiao",
+      "breakpoints": true
     }
   ]
 }

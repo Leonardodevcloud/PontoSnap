@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SeletorCidade, type Cidade } from '../components/SeletorCidade';
 import { Link, useSearchParams } from 'react-router-dom';
 import { RaioX } from './RaioX';
 import { acordoEmpresaTxt, NIVEL, temAtencao, type EmpresaBanco, type RespCompensacao } from '../lib/compensacao';
@@ -59,13 +60,23 @@ export function Funcionarios() {
   const [dataInicioPara, setDataInicioPara] = useState<Empregado | null>(null);
   const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
   const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
+  // Cidade de trabalho (feriados por região): marcar vários e definir de uma vez.
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [cidadePara, setCidadePara] = useState<Empregado[] | null>(null);
+  const [cidadeFiltro, setCidadeFiltro] = useState<string>('');
+  const [regioes, setRegioes] = useState<RegioesResumo | null>(null);
+  const [msgOk, setMsgOk] = useState<string | null>(null);
 
   async function carregar() {
     try { setLista(await api.get<Empregado[]>('/empregados')); }
     catch (e) { setErro((e as Error).message); }
     // Raio-x da compensação (o que vale de verdade: escala + perfil + acordo da empresa).
     api.get<RespCompensacao>('/ajuda/compensacao').then(setComp).catch(() => {});
+    api.get<RegioesResumo>(`/tratamento/feriados/regioes?ano=${new Date().getFullYear()}`).then(setRegioes).catch(() => {});
   }
+  const empresaCidade = regioes?.empresa?.municipioIbge ? { municipioNome: regioes.empresa.municipioNome ?? '', uf: regioes.empresa.uf } : null;
+  const cidadeDe = (e: Empregado) => e.trabalhoMunicipio ? `${e.trabalhoMunicipioNome}-${e.trabalhoUf}` : empresaCidade ? `${empresaCidade.municipioNome}-${empresaCidade.uf}` : '';
+  const chaveCidade = (e: Empregado) => String(e.trabalhoMunicipio ?? regioes?.empresa?.municipioIbge ?? 'sem');
   const compDe = (id: string) => comp?.linhas.find((l) => l.empregadoId === id);
   useEffect(() => { void carregar(); }, []);
   const { dados: avs, trocarDesenho } = useAvatares();
@@ -94,9 +105,16 @@ export function Funcionarios() {
     if (!e.ativo) return false;
     if (filtro === 'MONTADAS') return temPerfil(e);
     if (filtro === 'PADRAO') return !temPerfil(e);
+    if (cidadeFiltro && chaveCidade(e) !== cidadeFiltro) return false;
     if (filtro === 'NAO_COMPENSA') { const c = compDe(e.id); return !!c && temAtencao(c); }
     return true;
   });
+  const cidadesLista = (() => {
+    const m = new Map<string, { rot: string; n: number }>();
+    for (const e of lista ?? []) if (e.ativo) { const k = chaveCidade(e); const c = m.get(k) ?? { rot: cidadeDe(e) || 'sem cidade', n: 0 }; c.n++; m.set(k, c); }
+    return [...m.entries()].sort((a, b) => b[1].n - a[1].n);
+  })();
+  const todosMarcados = !!visiveis?.length && visiveis.every((e) => marcados.has(e.id));
 
   return (
     <div onClick={() => setMenu(null)}>
@@ -146,7 +164,28 @@ export function Funcionarios() {
         {comp && comp.totais.atencao > 0 && (
           <button className={`${css.chipF} ${css.chipAlerta} ${filtro === 'NAO_COMPENSA' ? css.chipFOn : ''}`} onClick={() => setFiltro('NAO_COMPENSA')}>Atenção na compensação · {comp.totais.atencao}</button>
         )}
+        {cidadesLista.length > 1 && (
+          <select className={css.cidadeSel} aria-label="Filtrar por cidade de trabalho" value={cidadeFiltro} onChange={(ev) => setCidadeFiltro(ev.target.value)}>
+            <option value="">Todas as cidades</option>
+            {cidadesLista.map(([k, c]) => <option key={k} value={k}>{c.rot} · {c.n}</option>)}
+          </select>
+        )}
       </div>
+
+      {msgOk && <p className={css.okMsg} role="status">{msgOk}</p>}
+      {visiveis && visiveis.length > 0 && (
+        <div className={css.loteBar}>
+          <label className={css.loteTodos}>
+            <input type="checkbox" checked={todosMarcados} onChange={() => setMarcados(todosMarcados ? new Set() : new Set(visiveis.map((e) => e.id)))} />
+            {todosMarcados ? 'Desmarcar todos' : `Marcar os ${visiveis.length} da lista`}
+          </label>
+          {marcados.size > 0 && <>
+            <b>{marcados.size} {marcados.size === 1 ? 'selecionado' : 'selecionados'}</b>
+            <button type="button" className={css.loteBtn} onClick={() => setCidadePara((lista ?? []).filter((e) => marcados.has(e.id)))}>Cidade de trabalho…</button>
+            <button type="button" className={css.loteLk} onClick={() => setMarcados(new Set())}>Limpar</button>
+          </>}
+        </div>
+      )}
 
 
       <div className={css.cards}>
@@ -154,6 +193,8 @@ export function Funcionarios() {
         {visiveis?.map((e) => (
           <div key={e.id} className={css.card}>
             <div className={css.linha1}>
+              <input type="checkbox" className={css.marca} aria-label={`Selecionar ${e.nome}`} checked={marcados.has(e.id)}
+                onChange={() => setMarcados((m) => { const n = new Set(m); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })} />
               <Avatar id={e.id} nome={e.nome} tamanho={44} trocavel />
               <span className={css.quem}>
                 <span className={css.nomeC}>{e.nome}</span>
@@ -180,6 +221,7 @@ export function Funcionarios() {
                     <button onClick={() => { setRaioDe(e.id); setMenu(null); }}>Como as horas contam</button>
                     <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
                     <button onClick={() => { setDataInicioPara(e); setMenu(null); }}>Início do ponto</button>
+                    <button onClick={() => { setCidadePara([e]); setMenu(null); }}>Cidade de trabalho</button>
                     <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
                     <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
                   </div>
@@ -217,6 +259,8 @@ export function Funcionarios() {
                   </>
                 );
               })()}
+              {cidadeDe(e) && <button type="button" className={`${css.bancoResumo} ${css.cidadeTag}`} onClick={() => setCidadePara([e])} title="Cidade de trabalho: define os feriados estaduais e municipais">
+                📍 {cidadeDe(e)}{!e.trabalhoMunicipio && <span className={css.herdaTxt}> (da empresa)</span>}</button>}
               <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setPerfilPara(e); }}>trocar perfil</button>
             </div>
           </div>
@@ -236,6 +280,8 @@ export function Funcionarios() {
       {dataInicioPara && <ModalDataInicio empregado={dataInicioPara} onFechar={() => setDataInicioPara(null)} onSalvo={() => { setDataInicioPara(null); void carregar(); }} />}
       {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
       {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
+      {cidadePara && <ModalCidade pessoas={cidadePara} regioes={regioes} onFechar={() => setCidadePara(null)}
+        onSalvo={(m) => { setCidadePara(null); setMarcados(new Set()); setMsgOk(m); setTimeout(() => setMsgOk(null), 6000); void carregar(); }} />}
       <RevisarFotos aberto={revisarAberto} onFechar={() => abrirRevisar(false)} emps={lista ?? []} />
     </div>
   );
@@ -781,6 +827,55 @@ function ModalRegras({ perfil, onFechar }: { perfil: PerfilResumo | null; onFech
             <div className={rg.r.custom ? css.regraValCustom : css.regraValClt}>{rg.r.texto}</div>
           </div>
         ))}
+      </div>
+    </Modal>
+  );
+}
+
+interface RegioesResumo {
+  empresa: { uf: string | null; municipioIbge: number | null; municipioNome?: string | null } | null;
+  cidades: { municipio: number; nome: string; uf: string; funcionarios: number; prestadores: number }[];
+}
+
+/** Cidade de trabalho de uma ou várias pessoas: define os feriados estaduais e municipais delas. */
+function ModalCidade({ pessoas, regioes, onFechar, onSalvo }: {
+  pessoas: Empregado[]; regioes: RegioesResumo | null; onFechar: () => void; onSalvo: (m: string) => void;
+}) {
+  const um = pessoas.length === 1 ? pessoas[0]! : null;
+  const [usarEmpresa, setUsarEmpresa] = useState(um ? !um.trabalhoMunicipio : false);
+  const [cidade, setCidade] = useState<Cidade | null>(um?.trabalhoMunicipio ? { municipio: um.trabalhoMunicipio, municipioNome: um.trabalhoMunicipioNome ?? '', uf: um.trabalhoUf ?? '' } : null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const emp = regioes?.empresa?.municipioIbge ? `${regioes.empresa.municipioNome}-${regioes.empresa.uf}` : null;
+  const emUso = (regioes?.cidades ?? []).map((c) => ({ municipio: c.municipio, nome: c.nome, uf: c.uf, pessoas: c.funcionarios + c.prestadores }));
+  async function salvar() {
+    if (!usarEmpresa && !cidade) { setErro('Escolha a cidade.'); return; }
+    setSalvando(true); setErro(null);
+    try {
+      await api.post('/tratamento/feriados/local-pessoas', { empregadoIds: pessoas.map((p) => p.id), municipio: usarEmpresa ? null : cidade!.municipio, municipioNome: usarEmpresa ? null : cidade!.municipioNome });
+      const quem = um ? um.nome : `${pessoas.length} funcionários`;
+      onSalvo(usarEmpresa ? `${quem}: usa a cidade da empresa${emp ? ` (${emp})` : ''}.` : `${quem}: cidade de trabalho ${cidade!.municipioNome}-${cidade!.uf}. Os feriados passam a ser os de lá.`);
+    } catch (e) { setErro((e as Error).message); setSalvando(false); }
+  }
+  return (
+    <Modal titulo={um ? `Cidade de trabalho · ${um.nome}` : `Cidade de trabalho · ${pessoas.length} funcionários`} onFechar={onFechar}>
+      <div className={css.cidadeForm}>
+        <p className={css.cidadeDica}>Define os feriados <b>estaduais e municipais</b> que valem para {um ? 'esta pessoa' : 'estas pessoas'}. Use a cidade onde {um ? 'ela trabalha' : 'trabalham'}, não onde mora{um ? '' : 'm'}.</p>
+        <label className={`${css.cidadeOpc} ${usarEmpresa ? css.cidadeOpcOn : ''}`}>
+          <input type="radio" name="cid" checked={usarEmpresa} onChange={() => setUsarEmpresa(true)} />
+          <span><b>Cidade da empresa</b><small>{emp ? emp : 'ainda não definida (Configurações › Feriados)'} · muda junto se a empresa mudar</small></span>
+        </label>
+        <label className={`${css.cidadeOpc} ${!usarEmpresa ? css.cidadeOpcOn : ''}`}>
+          <input type="radio" name="cid" checked={!usarEmpresa} onChange={() => setUsarEmpresa(false)} />
+          <span><b>Outra cidade</b><small>quem trabalha fora da cidade da empresa</small></span>
+        </label>
+        {!usarEmpresa && <SeletorCidade valor={cidade} onChange={setCidade} emUso={emUso} id="cid-func" />}
+        {!um && <ul className={css.cidadeQuem}>{pessoas.slice(0, 8).map((p) => <li key={p.id}>{p.nome}</li>)}{pessoas.length > 8 && <li>… e mais {pessoas.length - 8}</li>}</ul>}
+        {erro && <p className={css.erro}>{erro}</p>}
+        <div className={css.cidadeRod}>
+          <Botao variante="ghost" onClick={onFechar}>Cancelar</Botao>
+          <Botao variante="coral" onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+        </div>
       </div>
     </Modal>
   );

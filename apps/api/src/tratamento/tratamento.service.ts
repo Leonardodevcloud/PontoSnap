@@ -1,11 +1,11 @@
-import { Inject, Injectable, NotFoundException, ConflictException, Optional } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, ConflictException, Optional } from '@nestjs/common';
 import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
-  pontoBancoMov, pontoBancoFechamento, espelhoAssinatura, empregadoSalario,
+  pontoBancoMov, pontoBancoFechamento, espelhoAssinatura, empregadoSalario, pessoalPrestador,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
-import { foraDoRaio } from '@ponto/shared';
+import { foraDoRaio, feriadoValePara, feriadoSemRegiao, localEfetivo, ufDoMunicipio, ufValida, type LocalTrabalho } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarComSalarios, valorizarAcertoBanco, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente, type AcertoBancoValores } from '@ponto/apuracao-clt';
@@ -344,12 +344,33 @@ export class TratamentoService {
     });
   }
 
-  // ---- Feriados (calendário por cliente) ----
-  criarFeriado(tenantId: string, dto: { data: string; nome: string; tipo?: string }) {
+  // ---- Feriados (calendário por cliente, por região) ----
+  /** Normaliza a região: estadual = UF; municipal = município IBGE (a UF vem do código). */
+  private regiaoFeriado(dto: { tipo?: string; uf?: string | null; municipio?: number | null; municipioNome?: string | null }) {
+    const tipo = dto.tipo === 'estadual' || dto.tipo === 'municipal' ? dto.tipo : 'nacional';
+    if (tipo === 'nacional') return { tipo, uf: null, municipio: null, municipioNome: null };
+    if (tipo === 'estadual') {
+      if (!ufValida(dto.uf)) throw new BadRequestException('Escolha o estado do feriado estadual.');
+      return { tipo, uf: dto.uf!, municipio: null, municipioNome: null };
+    }
+    const uf = ufDoMunicipio(dto.municipio ?? null);
+    if (!uf || !dto.municipioNome?.trim()) throw new BadRequestException('Escolha a cidade do feriado municipal.');
+    return { tipo, uf, municipio: dto.municipio!, municipioNome: dto.municipioNome.trim().slice(0, 80) };
+  }
+  async criarFeriado(tenantId: string, dto: { data: string; nome: string; tipo?: string; uf?: string | null; municipio?: number | null; municipioNome?: string | null }) {
+    const reg = this.regiaoFeriado(dto);
     return comTenant(this.db, tenantId, async (tx) =>
-      (await tx.insert(pontoFeriado).values({
-        tenantId, data: dto.data, nome: dto.nome, tipo: dto.tipo ?? 'nacional',
-      }).returning())[0]);
+      (await tx.insert(pontoFeriado).values({ tenantId, data: dto.data, nome: dto.nome.trim().slice(0, 120), ...reg }).returning())[0]);
+  }
+  /** Muda nome/região de um feriado (ex.: dar região a um antigo "sem região"). */
+  async editarFeriado(tenantId: string, id: string, dto: { nome?: string; tipo?: string; uf?: string | null; municipio?: number | null; municipioNome?: string | null }) {
+    const reg = this.regiaoFeriado(dto);
+    return comTenant(this.db, tenantId, async (tx) => {
+      const [r] = await tx.update(pontoFeriado).set({ ...reg, ...(dto.nome?.trim() ? { nome: dto.nome.trim().slice(0, 120) } : {}) })
+        .where(and(eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.id, id))).returning();
+      if (!r) throw new NotFoundException('Feriado não encontrado');
+      return r;
+    });
   }
   listarFeriados(tenantId: string, inicio?: string, fim?: string) {
     return comTenant(this.db, tenantId, (tx) => {
@@ -357,6 +378,96 @@ export class TratamentoService {
       if (inicio) conds.push(gte(pontoFeriado.data, inicio));
       if (fim) conds.push(lte(pontoFeriado.data, fim));
       return tx.select().from(pontoFeriado).where(and(...conds)).orderBy(asc(pontoFeriado.data));
+    });
+  }
+
+  /** Cidade da empresa (vale para quem não tem cidade própria). */
+  async localDaEmpresa(tenantId: string): Promise<LocalTrabalho | null> {
+    const t = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ uf: tenant.trabalhoUf, m: tenant.trabalhoMunicipio, n: tenant.trabalhoMunicipioNome })
+      .from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0]);
+    return t?.m ? { uf: t.uf, municipioIbge: t.m, municipioNome: t.n } : null;
+  }
+
+  /**
+   * Feriados que valem para um local (nacional, os da UF, os do município e os
+   * antigos sem região). Usado por funcionário (apuração) e prestador (folha).
+   */
+  async feriadosDoLocal(tenantId: string, local: LocalTrabalho | null, inicio?: string, fim?: string) {
+    return (await this.listarFeriados(tenantId, inicio, fim)).filter((f) => feriadoValePara({ tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio }, local));
+  }
+  async localDoEmpregado(tenantId: string, empregadoId: string): Promise<LocalTrabalho | null> {
+    const e = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ uf: empregado.trabalhoUf, m: empregado.trabalhoMunicipio, n: empregado.trabalhoMunicipioNome })
+      .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.id, empregadoId))).limit(1))[0]);
+    return localEfetivo(e?.m ? { uf: e.uf, municipioIbge: e.m, municipioNome: e.n } : null, await this.localDaEmpresa(tenantId));
+  }
+  async localDoPrestador(tenantId: string, prestadorId: string): Promise<LocalTrabalho | null> {
+    const p = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ uf: pessoalPrestador.trabalhoUf, m: pessoalPrestador.trabalhoMunicipio, n: pessoalPrestador.trabalhoMunicipioNome })
+      .from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), eq(pessoalPrestador.id, prestadorId))).limit(1))[0]);
+    return localEfetivo(p?.m ? { uf: p.uf, municipioIbge: p.m, municipioNome: p.n } : null, await this.localDaEmpresa(tenantId));
+  }
+  async feriadosDoEmpregado(tenantId: string, empregadoId: string, inicio?: string, fim?: string) {
+    return this.feriadosDoLocal(tenantId, await this.localDoEmpregado(tenantId, empregadoId), inicio, fim);
+  }
+
+  /** Cidade da empresa (Configurações › Feriados). */
+  async definirLocalEmpresa(tenantId: string, d: { municipio: number | null; municipioNome?: string | null }) {
+    const uf = d.municipio ? ufDoMunicipio(d.municipio) : null;
+    if (d.municipio && (!uf || !d.municipioNome?.trim())) throw new BadRequestException('Cidade inválida.');
+    await comTenant(this.db, tenantId, (tx) => tx.update(tenant).set({ trabalhoUf: uf, trabalhoMunicipio: d.municipio ?? null, trabalhoMunicipioNome: d.municipio ? d.municipioNome!.trim().slice(0, 80) : null }).where(eq(tenant.id, tenantId)));
+    return { uf, municipio: d.municipio ?? null, municipioNome: d.municipio ? d.municipioNome!.trim() : null };
+  }
+
+  /**
+   * Visão da tela de Feriados: a cidade da empresa, as cidades em uso (com
+   * quantas pessoas) e, por feriado, quantas pessoas ele atinge.
+   */
+  async regioesFeriados(tenantId: string, ano: string) {
+    const [emp, fers, pessoas] = await Promise.all([
+      this.localDaEmpresa(tenantId),
+      this.listarFeriados(tenantId, `${ano}-01-01`, `${ano}-12-31`),
+      comTenant(this.db, tenantId, async (tx) => ({
+        func: await tx.select({ id: empregado.id, nome: empregado.nome, uf: empregado.trabalhoUf, m: empregado.trabalhoMunicipio, n: empregado.trabalhoMunicipioNome })
+          .from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true))),
+        prest: await tx.select({ id: pessoalPrestador.id, nome: pessoalPrestador.nome, uf: pessoalPrestador.trabalhoUf, m: pessoalPrestador.trabalhoMunicipio, n: pessoalPrestador.trabalhoMunicipioNome })
+          .from(pessoalPrestador).where(eq(pessoalPrestador.tenantId, tenantId)),
+      })),
+    ]);
+    const todos = [
+      ...pessoas.func.map((p) => ({ tipo: 'FUNCIONARIO' as const, id: p.id, nome: p.nome, proprio: !!p.m, local: localEfetivo(p.m ? { uf: p.uf, municipioIbge: p.m, municipioNome: p.n } : null, emp) })),
+      ...pessoas.prest.map((p) => ({ tipo: 'PRESTADOR' as const, id: p.id, nome: p.nome, proprio: !!p.m, local: localEfetivo(p.m ? { uf: p.uf, municipioIbge: p.m, municipioNome: p.n } : null, emp) })),
+    ];
+    const cidades = new Map<number, { municipio: number; nome: string; uf: string; funcionarios: number; prestadores: number }>();
+    for (const p of todos) {
+      if (!p.local?.municipioIbge) continue;
+      const c = cidades.get(p.local.municipioIbge) ?? { municipio: p.local.municipioIbge, nome: p.local.municipioNome ?? '', uf: p.local.uf ?? ufDoMunicipio(p.local.municipioIbge) ?? '', funcionarios: 0, prestadores: 0 };
+      if (p.tipo === 'FUNCIONARIO') c.funcionarios++; else c.prestadores++;
+      cidades.set(p.local.municipioIbge, c);
+    }
+    return {
+      empresa: emp,
+      semCidadePropria: { funcionarios: todos.filter((p) => p.tipo === 'FUNCIONARIO' && !p.proprio).length, prestadores: todos.filter((p) => p.tipo === 'PRESTADOR' && !p.proprio).length },
+      semLocal: todos.filter((p) => !p.local).length,
+      total: todos.length,
+      cidades: [...cidades.values()].sort((a, b) => b.funcionarios + b.prestadores - (a.funcionarios + a.prestadores)),
+      feriados: fers.map((f) => {
+        const reg = { tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio };
+        const atinge = todos.filter((p) => feriadoValePara(reg, p.local));
+        return { ...f, semRegiao: feriadoSemRegiao(reg), atinge: atinge.length, atingeFuncionarios: atinge.filter((p) => p.tipo === 'FUNCIONARIO').length };
+      }),
+      pessoas: todos.map((p) => ({ tipo: p.tipo, id: p.id, nome: p.nome, proprio: p.proprio, uf: p.local?.uf ?? null, municipio: p.local?.municipioIbge ?? null, municipioNome: p.local?.municipioNome ?? null })),
+    };
+  }
+
+  /** Cidade de trabalho de várias pessoas de uma vez (null = volta para a da empresa). */
+  async definirLocalPessoas(tenantId: string, d: { empregadoIds?: string[]; prestadorIds?: string[]; municipio: number | null; municipioNome?: string | null }) {
+    const uf = d.municipio ? ufDoMunicipio(d.municipio) : null;
+    if (d.municipio && (!uf || !d.municipioNome?.trim())) throw new BadRequestException('Cidade inválida.');
+    const set = { trabalhoUf: uf, trabalhoMunicipio: d.municipio ?? null, trabalhoMunicipioNome: d.municipio ? d.municipioNome!.trim().slice(0, 80) : null };
+    return comTenant(this.db, tenantId, async (tx) => {
+      let n = 0;
+      if (d.empregadoIds?.length) n += (await tx.update(empregado).set(set).where(and(eq(empregado.tenantId, tenantId), inArray(empregado.id, d.empregadoIds))).returning({ id: empregado.id })).length;
+      if (d.prestadorIds?.length) n += (await tx.update(pessoalPrestador).set(set).where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.id, d.prestadorIds))).returning({ id: pessoalPrestador.id })).length;
+      return { atualizados: n };
     });
   }
   removerFeriado(tenantId: string, id: string) {
@@ -545,10 +656,16 @@ export class TratamentoService {
         }
       }
 
-      // feriados do banco (calendário do cliente) + os passados por parâmetro
-      const feriadosBanco = await tx.select({ data: pontoFeriado.data }).from(pontoFeriado).where(and(
+      // Feriados do calendário que valem para ONDE a pessoa trabalha (nacional,
+      // os da UF, os do município; sem cidade própria, a da empresa) + os
+      // passados por parâmetro.
+      const feriadosBanco = await tx.select({ data: pontoFeriado.data, tipo: pontoFeriado.tipo, uf: pontoFeriado.uf, municipio: pontoFeriado.municipio }).from(pontoFeriado).where(and(
         eq(pontoFeriado.tenantId, tenantId), gte(pontoFeriado.data, inicioQStr), lte(pontoFeriado.data, fimStr)));
-      const feriadoSet = new Set<string>([...feriados, ...feriadosBanco.map((f) => f.data)]);
+      const locEmp = (await tx.select({ uf: tenant.trabalhoUf, m: tenant.trabalhoMunicipio }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
+      const localPessoa = localEfetivo(emp.trabalhoMunicipio ? { uf: emp.trabalhoUf, municipioIbge: emp.trabalhoMunicipio } : null,
+        locEmp?.m ? { uf: locEmp.uf, municipioIbge: locEmp.m } : null);
+      const feriadoSet = new Set<string>([...feriados, ...feriadosBanco
+        .filter((f) => feriadoValePara({ tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio }, localPessoa)).map((f) => f.data)]);
 
       // agrupa as batidas EFETIVAS (com ajustes aprovados) por dia local
       const porDia = new Map<string, Date[]>();

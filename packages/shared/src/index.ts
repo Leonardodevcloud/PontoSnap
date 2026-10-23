@@ -4,3 +4,4 @@ export * from './geo';
 export * from './video';
 export * from './nfse';
 export * from './modelo-nota';
+export * from './feriado-regiao';

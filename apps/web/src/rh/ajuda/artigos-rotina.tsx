@@ -64,11 +64,24 @@ function Local() {
 function Feriados() {
   return (
     <>
-      <p className={css.lead}>O calendário de feriados evita que o dia conte como falta e faz o trabalho no feriado valer como extra de feriado (100% pela CLT).</p>
+      <p className={css.lead}>O calendário de feriados evita que o dia conte como falta e faz o trabalho no feriado valer como extra de feriado (100% pela CLT). Cada feriado vale só para quem trabalha na região dele.</p>
+      <Sec id="regiao" titulo="Quem cada feriado atinge">
+        <ul className={css.lista}>
+          <li><b>Nacional</b> — todo mundo.</li>
+          <li><b>Estadual</b> — só quem trabalha naquele estado (ex.: 2 de Julho, só na Bahia).</li>
+          <li><b>Municipal</b> — só quem trabalha naquela cidade. Quem é de Lauro de Freitas trabalha normal no feriado de Salvador.</li>
+        </ul>
+        <p>A região de cada pessoa é a <b>cidade de trabalho</b> do cadastro. Quem não tem cidade própria usa a <b>cidade da empresa</b> (no topo da tela de Feriados). Vale para funcionários e também para MEI e motoristas (dias do mês na Folha e benefícios).</p>
+      </Sec>
       <Sec id="cadastrar" titulo="Cadastrar">
-        <p>Em <b>Feriados</b>: data, nome e tipo (Nacional, Estadual ou Municipal) → "+ Adicionar". Cadastre os municipais da sua cidade — eles não vêm prontos. A lista mostra um ano por vez.</p>
-        <Aviso tipo="aviso">"remover" apaga na hora, sem pedir confirmação.</Aviso>
+        <p>Em <b>Feriados</b> › "+ Novo feriado": data, nome e abrangência; estadual pede o estado, municipal pede a cidade (lista do IBGE). A tela mostra na hora quantas pessoas o feriado atinge. Cadastre os estaduais e municipais: eles não vêm prontos.</p>
+        <p>Feriado antigo marcado como "sem região" vale para todo mundo, como era antes. Use "Definir região" para corrigir.</p>
         <Ir to="/rh/feriados">Abrir Feriados</Ir>
+      </Sec>
+      <Sec id="cidade" titulo="Cidade de trabalho de cada pessoa">
+        <p>Em <b>Funcionários</b>: marque várias pessoas (ou filtre pela cidade) e use "Cidade de trabalho…" para definir de uma vez; ou "⋯ › Cidade de trabalho" numa pessoa. Para MEI e motoristas, na aba Dados da Folha e benefícios ou em Notas de prestadores › Dados e contato.</p>
+        <Aviso tipo="aviso">Use a cidade onde a pessoa trabalha, não onde mora. Feriado num mês já fechado só vale depois de reabrir o mês.</Aviso>
+        <Ir to="/rh/funcionarios">Abrir Funcionários</Ir>
       </Sec>
     </>
   );
@@ -272,8 +285,9 @@ export const ARTIGOS_ROTINA: Artigo[] = [
     secoes: [{ id: 'app', titulo: 'App no celular' }, { id: 'quiosque', titulo: 'Quiosque' }, { id: 'local', titulo: 'Batida fora do local' }] },
   { slug: 'local', titulo: 'Local e cerca', cat: 'CONFIGURAR', minutos: 2, resumo: 'Endereço e raio: quando o app pede observação (nunca bloqueia).',
     busca: 'local cerca raio gps endereço mapa localização distância', rotas: ['/rh/local'], Corpo: Local, secoes: [{ id: 'definir', titulo: 'Definir o local' }] },
-  { slug: 'feriados', titulo: 'Feriados', cat: 'CONFIGURAR', minutos: 1, resumo: 'Calendário que evita falta e paga o feriado trabalhado.',
-    busca: 'feriado municipal estadual nacional calendário', rotas: ['/rh/feriados'], Corpo: Feriados, secoes: [{ id: 'cadastrar', titulo: 'Cadastrar' }] },
+  { slug: 'feriados', titulo: 'Feriados por região', cat: 'CONFIGURAR', minutos: 2, resumo: 'Nacional para todos; estadual e municipal só para quem trabalha lá.',
+    busca: 'feriado municipal estadual nacional calendário cidade região município uf cidade de trabalho', rotas: ['/rh/feriados'], Corpo: Feriados,
+    secoes: [{ id: 'regiao', titulo: 'Quem cada feriado atinge' }, { id: 'cadastrar', titulo: 'Cadastrar' }, { id: 'cidade', titulo: 'Cidade de cada pessoa' }] },
   { slug: 'pedidos', titulo: 'Pedidos: ajustes, atestados e batidas faltando', cat: 'MES', minutos: 3, resumo: 'Aprovar ou recusar ajustes, abonar atestados e resolver dias pendentes.',
     busca: 'ajuste batida esqueceu atestado abonar recusar pendente ímpar faltando', rotas: ['/rh/ajustes', '/rh/atestados', '/rh/batidas-faltando'], Corpo: Pedidos,
     secoes: [{ id: 'ajustes', titulo: 'Ajustes de ponto' }, { id: 'atestados', titulo: 'Atestados' }, { id: 'faltando', titulo: 'Batidas faltando' }] },

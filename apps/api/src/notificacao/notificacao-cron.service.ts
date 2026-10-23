@@ -4,6 +4,7 @@ import {
   empregado, usuario, pontoHorarioContratual, pontoMarcacao, notificacaoPreferencia, pushSubscription,
   pontoFeriado, pontoAfastamento, pontoAusencia, pontoEscala, tenant, comoMaster, type Db,
 } from '@ponto/db';
+import { feriadoValePara, localEfetivo } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { PushService } from './push.service';
 import { agendaDoMomento } from './agenda';
@@ -58,14 +59,17 @@ export class NotificacaoCronService implements OnModuleInit {
       // Só quem tem aparelho com notificação ativa.
       const comPush = await tx.selectDistinct({ usuarioId: pushSubscription.usuarioId }).from(pushSubscription).where(eq(pushSubscription.tenantId, tenantId));
       if (comPush.length === 0) return null;
-      const feriado = (await tx.select({ id: pontoFeriado.id }).from(pontoFeriado)
-        .where(and(eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.data, hoje))).limit(1)).length > 0;
+      // Feriados de hoje (com região): cada pessoa só folga no da cidade dela.
+      const feriadosHoje = await tx.select({ tipo: pontoFeriado.tipo, uf: pontoFeriado.uf, municipio: pontoFeriado.municipio }).from(pontoFeriado)
+        .where(and(eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.data, hoje)));
+      const locEmp = (await tx.select({ uf: tenant.trabalhoUf, m: tenant.trabalhoMunicipio }).from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];
       const us = await tx.select({ id: usuario.id, empregadoId: usuario.empregadoId }).from(usuario)
         .where(and(eq(usuario.tenantId, tenantId), eq(usuario.ativo, true), inArray(usuario.id, comPush.map((c) => c.usuarioId))));
       const empIds = us.map((u) => u.empregadoId).filter((x): x is string => !!x);
       if (empIds.length === 0) return null;
       const emps = await tx.select({
         id: empregado.id, cpf: empregado.cpf, horarioId: empregado.horarioContratualId, inicio: empregado.dataInicioPonto,
+        uf: empregado.trabalhoUf, municipio: empregado.trabalhoMunicipio,
       }).from(empregado).where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true), inArray(empregado.id, empIds)));
       const horIds = [...new Set(emps.map((e) => e.horarioId).filter((x): x is string => !!x))];
       const hors = horIds.length ? await tx.select().from(pontoHorarioContratual).where(inArray(pontoHorarioContratual.id, horIds)) : [];
@@ -81,9 +85,14 @@ export class NotificacaoCronService implements OnModuleInit {
       const fim = new Date(ini.getTime() + 86_400_000);
       const marcs = await tx.select({ cpf: pontoMarcacao.cpf }).from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.tenantId, tenantId), gte(pontoMarcacao.dtMarcacao, ini), lt(pontoMarcacao.dtMarcacao, fim)));
-      return { feriado, us, emps, hors, afast, aus, escala, prefs, marcs };
+      return { feriadosHoje, locEmp, us, emps, hors, afast, aus, escala, prefs, marcs };
     });
-    if (!dados || dados.feriado) return { enviados: 0 };
+    if (!dados) return { enviados: 0 };
+    const localEmpresa = dados.locEmp?.m ? { uf: dados.locEmp.uf, municipioIbge: dados.locEmp.m } : null;
+    const folgaFeriado = (e: { uf: string | null; municipio: number | null }) => {
+      const local = localEfetivo(e.municipio ? { uf: e.uf, municipioIbge: e.municipio } : null, localEmpresa);
+      return dados.feriadosHoje.some((f) => feriadoValePara({ tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio }, local));
+    };
 
     const horPorId = new Map(dados.hors.map((h) => [h.id, h]));
     const usuarioDe = new Map(dados.us.filter((u) => u.empregadoId).map((u) => [u.empregadoId!, u.id]));
@@ -95,7 +104,7 @@ export class NotificacaoCronService implements OnModuleInit {
 
     let enviados = 0;
     for (const e of dados.emps) {
-      if (fora.has(e.id) || (e.inicio && e.inicio > hoje) || !e.horarioId) continue;
+      if (fora.has(e.id) || (e.inicio && e.inicio > hoje) || !e.horarioId || folgaFeriado(e)) continue;
       const h = horPorId.get(e.horarioId);
       if (!h) continue;
       const trabalhaHoje = h.regime === 'r12x36' ? temEscalaHoje.has(e.id) : h.diasSemana.includes(dow);

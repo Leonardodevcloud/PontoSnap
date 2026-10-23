@@ -69,6 +69,8 @@ export interface Empregado {
   cctId?: string | null;
   perfilRegraId?: string | null;
   dataInicioPonto?: string | null;
+  /** Cidade de trabalho (feriados estaduais/municipais). Vazio = a da empresa. */
+  trabalhoUf?: string | null; trabalhoMunicipio?: number | null; trabalhoMunicipioNome?: string | null;
 }
 
 export interface InfoCertificado {
@@ -748,6 +750,8 @@ export interface FechadoIndividual {
   id: string; em: string; por: string | null; motivo: 'DESLIGAMENTO' | 'ANTECIPADO'; ultimoDia: string | null; proporcional: boolean; debitosFuturosCent: number;
 }
 export interface PessoalLinhaMei {
+  /** Cidade de trabalho própria (feriados); null = a da empresa. */
+  cidade?: { uf: string | null; municipio: number; municipioNome: string | null } | null;
   fechadoIndividual?: FechadoIndividual;
   proporcional?: { dias: number; diasMes: number; contratoCent: number };
   debitosFuturosCent?: number;
@@ -768,6 +772,8 @@ export interface PessoalSemanaMot {
   diasPossiveis?: string[]; diasDatas?: string[] | null;
 }
 export interface PessoalLinhaMot {
+  /** Cidade de trabalho própria (feriados); null = a da empresa. */
+  cidade?: { uf: string | null; municipio: number; municipioNome: string | null } | null;
   fechadoIndividual?: FechadoIndividual;
   debitosFuturosCent?: number;
   id: string; nome: string; documento: string | null; funcao: string | null; empresa: string | null;

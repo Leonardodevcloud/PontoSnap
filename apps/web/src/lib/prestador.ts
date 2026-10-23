@@ -105,6 +105,7 @@ export interface LinhaRh {
   id: string; tipo: 'MEI' | 'MOTORISTA'; nome: string; valorCent: number; unidades: UnidadeRh[];
   empresa: string | null; funcao: string | null; documento: string | null; telefone: string | null; email: string | null;
   tomadorNome: string | null; tomadorCnpj: string | null; avatarSemente: number | null;
+  cidade?: { uf: string | null; municipio: number; municipioNome: string | null } | null;
   acesso: { status: StatusAcesso; temPush: boolean; conviteExpiraEm: string | null };
   situacao: Situacao; atrasada: boolean; vistoEm: string | null; pago: boolean; pagoCent: number;
   /** Fechado sozinho no mês (desligamento / pagar antes do fechamento). */

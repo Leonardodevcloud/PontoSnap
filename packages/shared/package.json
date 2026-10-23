@@ -5,7 +5,8 @@
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./municipios": "./src/municipios-br.ts"
   },
   "devDependencies": {
     "vitest": "2.1.9"

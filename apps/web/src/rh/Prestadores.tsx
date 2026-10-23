@@ -12,6 +12,7 @@ import { Modal } from '../components/Modal';
 import { ModalPessoa } from '../components/ModalPessoa';
 import { Icone } from '../components/Icone';
 import { FecharPessoa } from './FecharPessoa';
+import { CidadeTrabalho } from '../components/CidadeTrabalho';
 import css from './Prestadores.module.css';
 
 const mesHoje = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
@@ -463,6 +464,8 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
           tomadorNome: contato.tomadorNome || null, tomadorCnpj: contato.tomadorCnpj || null,
         }), 'Dados salvos.');
       }}>
+        <h4>Feriados</h4>
+        <CidadeTrabalho key={`cid-${l.id}`} tipo="PRESTADOR" id={l.id} atual={l.cidade} onSalvo={(m) => void onMudou(m)} />
         <h4>Modelo de nota</h4>
         {modelos === null ? <p className={css.hint}>Carregando…</p> : modelos.length === 0 ? (
           <p className={css.hint}>Nenhum modelo criado. <Link to="/rh/prestadores/modelos">Criar modelo de nota</Link> (tomador, código do serviço e descrição prontos no app).</p>

@@ -12,7 +12,7 @@ export default defineConfig({
         // Injeta o handler de push dentro do SW gerado pelo workbox
         importScripts: ['sw-push.js'],
         // pdf.js (visor da conferência de notas) só baixa quando o RH abre um PDF.
-        globIgnores: ['**/pdfjs-*.js', '**/index-*unpdf*.js'],
+        globIgnores: ['**/pdfjs-*.js', '**/index-*unpdf*.js', '**/municipios-br-*.js'],
       },
       manifest: {
         name: 'PontoSnap',

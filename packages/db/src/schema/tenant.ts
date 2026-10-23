@@ -1,4 +1,4 @@
-import { boolean, integer, numeric, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, integer, numeric, pgTable, timestamp, uuid, varchar, char } from 'drizzle-orm/pg-core';
 
 /** Cliente = empregador. É a raiz do tenant. Gerenciado pelo MASTER. */
 export const tenant = pgTable('tenant', {
@@ -22,5 +22,9 @@ export const tenant = pgTable('tenant', {
   bancoTipoAcordo: varchar('banco_tipo_acordo', { length: 12 }).notNull().default('NENHUM'),
   bancoPrazoMeses: integer('banco_prazo_meses'),
   ativo: boolean('ativo').notNull().default(true),
+  /** Cidade de trabalho (feriados estaduais/municipais) — migration 0063. */
+  trabalhoUf: char('trabalho_uf', { length: 2 }),
+  trabalhoMunicipio: integer('trabalho_municipio'),
+  trabalhoMunicipioNome: varchar('trabalho_municipio_nome', { length: 80 }),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 });

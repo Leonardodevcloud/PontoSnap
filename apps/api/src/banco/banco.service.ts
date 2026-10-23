@@ -411,9 +411,8 @@ export class BancoService {
   ) {
     const inicio = `${competencia}-01`;
     const fim = ultimoDiaDe(competencia);
-    const feriados = await this.tratamento.listarFeriados(tenantId, inicio, fim);
-    const ap = await this.tratamento.apurarPeriodoCLT(
-      tenantId, empregadoId, inicio, fim, feriados.map((f) => f.data));
+    // Os feriados (da região do funcionário) a apuração já busca sozinha.
+    const ap = await this.tratamento.apurarPeriodoCLT(tenantId, empregadoId, inicio, fim);
     const opc = { destinacaoFaltas: cfg.destinacaoFaltas, destinacaoAtrasos: cfg.destinacaoAtrasos, bancoAtivo: true };
     return ap.resultado.dias.flatMap((d) =>
       movimentosBancoDoDia(d, opc).map((mv) => ({

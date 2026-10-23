@@ -1,0 +1,5 @@
+.seletor{ display:grid; grid-template-columns:96px minmax(0,1fr); gap:8px; min-width:0; }
+.so{ grid-template-columns:minmax(0,1fr); }
+.seletor select{ font:inherit; font-size:14px; padding:9px 10px; border:1px solid rgba(var(--ink-rgb),.24); border-radius:10px; background:var(--white); color:var(--ink); min-width:0; }
+.seletor select:disabled{ background:var(--thead-bg); color:var(--ash); }
+.seletor select:focus-visible{ outline:3px solid var(--ink); outline-offset:1px; }
