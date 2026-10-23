@@ -301,8 +301,6 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 {r.totalFaltaMin > 0 && ap?.conta && <div className={vt.kpiS}>{ap.conta.falta.dias.length} {ap.conta.falta.dias.length === 1 ? 'dia' : 'dias'} · {ap.conta.falta.destino === 'DESCONTA' ? 'na folha' : ap.conta.falta.destino === 'BANCO' ? 'no banco' : 'abonadas'}</div>}</div>
             </div>
 
-            {ap?.conta && <div style={{ marginBottom: 14 }}><ContaMes conta={ap.conta} mes={rotuloMes(mes).split(' de ')[0]!} quem="rh" atual={mes === mesAtual()} aoVerRegras={() => setRaio(true)} /></div>}
-
             <div className={css.card}>
               <h3>Dias do mês <span className={css.h3sub}>· clique no dia para ver as batidas</span></h3>
               {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
@@ -343,6 +341,8 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 })}
               </div>
             </div>
+            {/* A conta do mês vem depois dos dias: primeiro o que aconteceu, depois a soma. */}
+            {ap?.conta && <div style={{ marginTop: 14 }}><ContaMes conta={ap.conta} mes={rotuloMes(mes).split(' de ')[0]!} quem="rh" atual={mes === mesAtual()} aoVerRegras={() => setRaio(true)} /></div>}
           </div>
 
           <div>

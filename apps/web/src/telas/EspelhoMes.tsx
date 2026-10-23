@@ -110,8 +110,6 @@ export function EspelhoMes() {
             </div>
           </div>
 
-          {dados?.conta && <div style={{ marginBottom: 14 }}><ContaMes conta={dados.conta} mes={rotuloMes(comp).split(" de ")[0]!} quem="eu" atual={ehMesAtual} /></div>}
-
           {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
 
           <BlocoAssinatura competencia={comp} podeAssinar={!ehMesAtual} />
@@ -144,6 +142,9 @@ export function EspelhoMes() {
               </button>
             );
           })}
+
+          {/* A conta do mês vem depois dos dias: primeiro as batidas, depois a soma. */}
+          {dados?.conta && <div style={{ marginTop: 14 }}><ContaMes conta={dados.conta} mes={rotuloMes(comp).split(" de ")[0]!} quem="eu" atual={ehMesAtual} /></div>}
         </>
       )}
     </div>
