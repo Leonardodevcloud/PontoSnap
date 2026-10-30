@@ -10,6 +10,7 @@ import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
 import { ContaMes } from '../components/ContaMes';
 import { RaioX } from './RaioX';
+import { Explica } from '../components/Explica';
 import vt from './VisaoTodos.module.css';
 import css from './Espelhos.module.css';
 
@@ -67,7 +68,7 @@ export function Espelhos() {
   return (
     <div>
       <div className={css.head}>
-        <div><h2>Espelhos</h2><p>Jornada e banco de horas de todo mundo no mês — ou de um funcionário, dia a dia.</p></div>
+        <div className={css.tituloLinha}><h2>Espelhos</h2><Explica>Jornada e banco de horas de todo mundo no mês, ou de um funcionário dia a dia. Clique numa pessoa para ver o mês dela; clique num dia para ver as batidas.</Explica></div>
       </div>
 
       <div className={css.controles}>
@@ -168,7 +169,7 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
         <input className={vt.busca} placeholder="Buscar por nome ou matrícula" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar funcionário" />
         <div className={vt.acoes}>
           <Botao variante="ghost" className={vt.btn} onClick={baixarZip} disabled={baixando !== null || emps.length === 0}>{baixando === 'zip' ? 'Gerando…' : 'Espelhos em lote (ZIP)'}</Botao>
-          <Botao variante="lime" className={vt.btn} onClick={baixarXlsx} disabled={baixando !== null}>{baixando === 'xlsx' ? 'Gerando…' : 'Exportar XLSX'}</Botao>
+          <Botao variante="ghost" className={vt.btn} onClick={baixarXlsx} disabled={baixando !== null}>{baixando === 'xlsx' ? 'Gerando…' : 'Exportar XLSX'}</Botao>
         </div>
       </div>
 
@@ -177,20 +178,9 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
       {rel && t && (
         <>
           {nPend > 0 && (
-            <div className={vt.callout}>
-              <div className={vt.calloutTopo}>
-                <b>{nPend} {nPend === 1 ? 'pessoa com pendência' : 'pessoas com pendência'}</b> em {rotuloMes(mes)}
-                <Link to="/rh" className={vt.calloutLink}>resolver no Início →</Link>
-              </div>
-              <ul className={vt.calloutLista}>
-                {pendentes.abertos.map((n) => <li key={`a${n}`}><b>{n}</b> · batida em aberto hoje</li>)}
-                {pendentes.faltas.map((f) => (
-                  <li key={`f${f.nome}`} title={f.dias.map(fmtDia).join(', ')}>
-                    <b>{f.nome}</b> · {f.dias.length === 1 ? `sem batida em ${fmtDia(f.dias[0]!)}` : `${f.dias.length} dias sem batida (${f.dias.slice(0, 3).map(fmtDia).join(', ')}${f.dias.length > 3 ? '…' : ''})`}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <p className={css.avisoLinha} role="note">
+              {nPend} {nPend === 1 ? 'pessoa com pendência' : 'pessoas com pendência'} em {rotuloMes(mes)}. <Link to="/rh">Resolver no Início</Link>
+            </p>
           )}
 
           <div className={vt.kpis}>
@@ -215,10 +205,6 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
               carregar={() => api.baixar(`/espelho-assinatura/rh/pdf?empregadoId=${espelho.id}&competencia=${mes}`)}
               onFechar={() => setEspelho(null)} />
           )}
-          <div className={vt.legenda}>
-            <span>Clique na linha pra ver o mês do funcionário · número sublinhado mostra de onde ele veio · "PDF" abre a prévia do espelho.</span>
-            <span>Banco anterior = saldo fechado até o mês passado · Acumulado = anterior + este mês + folgas/pagamentos.</span>
-          </div>
         </>
       )}
     </>
@@ -283,14 +269,22 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
 
   return (
     <>
-      <div className={vt.crumb}><button onClick={onVoltar}>← Todos os funcionários</button><span>/</span><span>{nome || ap?.nome}</span><span>/</span><span>{rotuloMes(mes)}</span></div>
+      <div className={css.pessoaTopo}>
+        <button className={css.voltar} onClick={onVoltar} aria-label="Voltar para todos os funcionários">‹</button>
+        <h3>{nome || ap?.nome}</h3>
+        <span className={css.esp} />
+        <Link to={`/rh/apuracao?emp=${empregadoId}&mes=${mes}`} className={css.lk}>Apuração CLT</Link>
+        {ap?.banco && <Link to="/rh/banco" className={css.lk}>Extrato do banco</Link>}
+        <Link to="/rh/ajustes" className={css.lk}>Ajustes</Link>
+        <Botao variante="coral" className={vt.btn} onClick={baixarEspelho} disabled={baixando}>{baixando ? 'Gerando…' : 'Espelho (PDF)'}</Botao>
+      </div>
 
       {carregando && !ap && <p className={css.carregando}>Apurando…</p>}
 
       {r && (
-        <div className={css.dois}>
+        <div className={ap?.banco ? css.dois : css.um}>
           <div>
-            <div className={vt.kpis} style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(125px, 1fr))' }}>
+            <div className={`${vt.kpis} ${css.kpis5}`}>
               <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(k.trabalhado)}</div></div>
               <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(k.previsto)}</div>{ap?.conta && <div className={vt.kpiS}>até {ap.conta.ate.slice(8, 10)}/{ap.conta.ate.slice(5, 7)}</div>}</div>
               <div className={`${vt.kpi} ${k.extras > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{k.extras > 0 ? `+${minutosParaHhMm(k.extras)}` : '—'}</div>
@@ -302,7 +296,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
             </div>
 
             <div className={css.card}>
-              <h3>Dias do mês <span className={css.h3sub}>· clique no dia para ver as batidas</span></h3>
+              <h3>Dias do mês</h3>
               {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
               <div className={css.dias}>
                 {dias.map((d, i) => {
@@ -323,15 +317,23 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                       <span className={css.dM}>
                         {motivo ?? (horas ? <>{horas}{d.paresIncompletos && <span className={css.neg}> · em aberto</span>}</> : folga ? 'Folga' : faltou || compensado ? 'Sem batida' : '—')}
                       </span>
-                      <span className={css.dTags}>
-                        {faltou && <span className={`${vt.pill} ${vt.pillErr}`}>falta</span>}
-                        {compensado && <span className={`${vt.pill} ${vt.pillMute}`} title="Dia sem batida coberto pelas horas da semana">{sem!.estado === 'FECHADA' ? 'compensado na semana' : 'semana em aberto'}</span>}
-                        {sem?.estado === 'PROXIMO_MES' && !compensado && d.marcacoes.length > 0 && <span className={`${vt.pill} ${vt.pillMute}`}>fecha no mês seguinte</span>}
-                        {d.paresIncompletos && <span className={`${vt.pill} ${vt.pillErr}`}>faltou bater</span>}
-                        {d.atrasoMin > 0 && <span className={`${vt.pill} ${vt.pillErr}`}>atraso {minutosParaHhMm(d.atrasoMin)}</span>}
-                        {d.penalidadeIntervaloMin > 0 && <span className={`${vt.pill} ${vt.pillWarn}`}>intervalo curto</span>}
-                        {d.violacaoInterjornada && <span className={`${vt.pill} ${vt.pillWarn}`}>descanso &lt; 11h</span>}
-                      </span>
+                      {(() => {
+                        // No máximo uma etiqueta por dia, a mais grave; o resto vai no title.
+                        const tags: [string, string, string?][] = [];
+                        if (faltou) tags.push(['falta', vt.pillErr]);
+                        if (d.paresIncompletos) tags.push(['faltou bater', vt.pillErr]);
+                        if (d.atrasoMin > 0) tags.push([`atraso ${minutosParaHhMm(d.atrasoMin)}`, vt.pillErr]);
+                        if (d.penalidadeIntervaloMin > 0) tags.push(['intervalo curto', vt.pillWarn]);
+                        if (d.violacaoInterjornada) tags.push(['descanso < 11h', vt.pillWarn]);
+                        if (compensado) tags.push([sem!.estado === 'FECHADA' ? 'compensado na semana' : 'semana em aberto', vt.pillMute, 'Dia sem batida coberto pelas horas da semana']);
+                        if (sem?.estado === 'PROXIMO_MES' && !compensado && d.marcacoes.length > 0) tags.push(['fecha no mês seguinte', vt.pillMute]);
+                        const [t0, ...resto] = tags;
+                        return (
+                          <span className={css.dTags}>
+                            {t0 && <span className={`${vt.pill} ${t0[1]}`} title={[t0[2], ...resto.map((x) => x[0])].filter(Boolean).join(' · ') || undefined}>{t0[0]}{resto.length > 0 && ` +${resto.length}`}</span>}
+                          </span>
+                        );
+                      })()}
                       <span className={`${css.dS} ${d.saldoMin > 0 ? vt.pos : d.saldoMin < 0 ? vt.neg : ''}`}>
                         {d.paresIncompletos || d.marcacoes.length === 0 ? '' : sem ? minutosParaHhMm(d.minutosTrabalhados) : comSinal(d.saldoMin)}
                       </span>
@@ -348,7 +350,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
           <div>
             {ap?.banco ? (
               <div className={css.banco}>
-                <div className={css.bK}>Banco de horas · {ap.banco.fechada ? 'saldo ao fim do mês' : 'saldo (meses fechados)'}</div>
+                <div className={css.bK}>Banco de horas · {ap.banco.fechada ? 'saldo ao fim do mês' : 'saldo (meses fechados)'} <Explica lado="dir">Os meses fecham sozinhos no dia 1º. Até lá, cada batida e cada ajuste atualizam a previsão na hora. Ajuste aprovado ou atestado abonado refazem o mês.</Explica></div>
                 {(() => {
                   // Compensa no mês: depois do acerto, só fica o devendo que passa.
                   const v = ap.banco.fechada ? (ap.banco.acerto ? ap.banco.acerto.passaMin : ap.banco.saldoAcumuladoMin) : ap.banco.saldoAnteriorMin;
@@ -372,21 +374,8 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 {ap.banco.acerto && ap.banco.acerto.acertoMin < 0 && <div className={css.bLinha}><span>{ap.banco.fechada ? 'Descontado na folha' : 'Será descontado na folha'}</span><span className={css.bM}>{comSinal(-ap.banco.acerto.acertoMin)}</span></div>}
                 {ap.banco.acerto && ap.banco.acerto.passaMin < 0 && <div className={css.bLinha}><span>Passa para o mês seguinte</span><span className={`${css.bM} ${css.bNeg}`}>{comSinal(ap.banco.acerto.passaMin)}</span></div>}
                 {ap.banco.desatualizado && <div className={css.bAviso}>Este mês estava fechado com outro valor e foi reaberto: o banco é refeito sozinho na próxima consulta.</div>}
-                <div className={css.bNota}>Os meses fecham sozinhos no dia 1º. Até lá, cada batida e cada ajuste atualizam a previsão na hora. Ajuste aprovado ou atestado abonado refazem o mês.</div>
               </div>
-            ) : (
-              <div className={css.card}><h3>Banco de horas</h3><p className={css.vazio}>Este funcionário não tem banco de horas: a hora extra é paga na folha.</p></div>
-            )}
-
-            <div className={css.card}>
-              <h3>Ações</h3>
-              <div className={vt.acoes}>
-                <Botao variante="coral" className={vt.btn} onClick={baixarEspelho} disabled={baixando}>{baixando ? 'Gerando…' : 'Espelho de ponto (PDF)'}</Botao>
-                <Link to={`/rh/apuracao?emp=${empregadoId}&mes=${mes}`} className={css.linkBtn}>Apuração CLT</Link>
-                <Link to="/rh/banco" className={css.linkBtn}>Extrato do banco</Link>
-                <Link to="/rh/ajustes" className={css.linkBtn}>Ajustes de ponto</Link>
-              </div>
-            </div>
+            ) : null}
           </div>
         </div>
       )}

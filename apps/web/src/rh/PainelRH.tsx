@@ -82,6 +82,43 @@ export function PainelRH({ embutido = false }: { embutido?: boolean } = {}) {
         </div>
       )}
 
+      {embutido && (
+        <div className={css.compacto}>
+          <p className={css.resumo}>
+            {!p ? 'Carregando…' : <><b>{p.presentes}</b> de {p.ativos} presentes{p.ausentes > 0 && <> · <b className={css.resAus}>{p.ausentes}</b> {p.ausentes === 1 ? 'ausente' : 'ausentes'}</>} · {p.marcacoesHoje} {p.marcacoesHoje === 1 ? 'marcação' : 'marcações'}</>}
+          </p>
+          <div className={css.duas}>
+            <div className={css.bloco}>
+              <div className={css.blocoHead}><h3>Ausentes</h3><Link to="/rh/funcionarios" className={css.verLink}>Funcionários</Link></div>
+              {p && p.listaAusentes.length === 0 && <p className={css.vazio}>Todo mundo bateu ponto.</p>}
+              <div className={css.lista}>
+                {p?.listaAusentes.slice(0, 6).map((a, i) => (
+                  <div key={i} className={css.item}>
+                    {a.empregadoId && <Avatar id={a.empregadoId} nome={a.nome} tamanho={26} />}
+                    <span className={css.itemNome}>{a.nome}</span>
+                  </div>
+                ))}
+                {p && p.listaAusentes.length > 6 && <p className={css.vazio}>e mais {p.listaAusentes.length - 6}</p>}
+              </div>
+            </div>
+            <div className={css.bloco}>
+              <div className={css.blocoHead}><h3>Últimas batidas</h3><Link to="/rh/espelhos" className={css.verLink}>Ponto do mês</Link></div>
+              {p && p.ultimas.length === 0 && <p className={css.vazio}>Nenhuma batida hoje ainda.</p>}
+              <div className={css.lista}>
+                {p?.ultimas.slice(0, 6).map((m, i) => (
+                  <div key={i} className={css.item}>
+                    {m.empregadoId && <Avatar id={m.empregadoId} nome={m.nome} tamanho={26} />}
+                    <span className={css.itemNome}>{m.nome}</span>
+                    <span className={css.itemHora}>{fmtHora(m.dt)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!embutido && <>
       <div className={css.stats}>
         <Stat k="Funcionários ativos" v={p?.ativos ?? '—'} />
         <Stat k="Presentes hoje" v={p?.presentes ?? '—'} destaque />
@@ -145,6 +182,7 @@ export function PainelRH({ embutido = false }: { embutido?: boolean } = {}) {
           </div>
         </div>
       </div>
+      </>}
     </div>
   );
 }

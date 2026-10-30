@@ -259,7 +259,7 @@ export function GestaoPessoal() {
 
   const visao: 'fech' | 'hist' = aba === 'historico' ? 'hist' : 'fech';
   const comoTexto: Record<Exclude<Aba, 'historico'>, ReactNode> = {
-    folha: <>Valor do dia = salário ÷ dias de trabalho de {mesCurto(mes)}. Extras, faltas e atrasos vêm do ponto. Hora extra de quem tem banco de horas vai pro banco e não entra em R$. Indenização de intervalo é paga sempre (não vai pro banco).</>,
+    folha: <><b>Prévia, não é holerite:</b> simulação a partir do ponto, sem INSS, IRRF, FGTS e encargos. O valor real é o que a contabilidade informar. Valor do dia = salário ÷ dias de trabalho de {mesCurto(mes)}. Extras, faltas e atrasos vêm do ponto. Hora extra de quem tem banco de horas vai pro banco e não entra em R$. Indenização de intervalo é paga sempre (não vai pro banco).</>,
     beneficios: d ? <>Hoje você carrega <b>{mesCurto(d.proxima)}</b>. O que foi pago para <b>{mesCurto(mes)}</b> e não foi usado (feriado, falta, férias, atestado) volta
       como <b>acerto</b> e é abatido aqui. Não precisa lançar "VT a mais" em Débitos. Sábado de meio turno recebe VT, mas não VR/VA. Dia em home office (marcado no painel da pessoa) não recebe VT. A cesta só é paga sem falta no mês e depois da carência.
       {d.clt.some((c) => c.beneficios.pagosEstimado) && <> Como {mesCurto(mes)} ainda não foi fechado no sistema, os dias pagos foram estimados pela escala.</>}</> : null,
@@ -270,6 +270,7 @@ export function GestaoPessoal() {
   };
   const acaoAba = aba === 'beneficios' && !fechado && d
     ? <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'padrao' }, e.currentTarget)}>{d.padrao ? 'Alterar padrão da empresa' : 'Definir padrão da empresa'}</Botao>
+    : aba === 'prestadores' && !fechado ? <Botao variante="ghost" className={css.btnSec} onClick={() => ir({ novo: filtroTipo === 'MOTORISTA' ? 'MOTORISTA' : 'MEI' })}>Adicionar prestador</Botao>
     : aba === 'debitos' && !fechado ? <Botao variante="ghost" className={css.btnSec} onClick={(e) => abrir({ tipo: 'debito' }, e.currentTarget)}>Adicionar débito</Botao>
     : null;
 
@@ -300,7 +301,6 @@ export function GestaoPessoal() {
             ? <span className={`${css.chip} ${css.chipOk}`} title={`Fechado em ${new Date(d.fechadoEm!).toLocaleDateString('pt-BR')}`}>fechado em {new Date(d.fechadoEm!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
             : <span className={`${css.chip} ${css.chipAberto}`}>em aberto</span>)}
           <span className={css.esp} />
-          {!fechado && <Botao variante="ghost" className={css.btnSec} onClick={() => ir({ novo: filtroTipo === 'MOTORISTA' ? 'MOTORISTA' : 'MEI' })}>Adicionar prestador</Botao>}
           {fechado && d && (d.mei.length > 0 || d.motoristas.length > 0) && (
             <Botao variante="ghost" className={css.btnSec} onClick={() => navegarRota(`/rh/prestadores?mes=${mes}&liberar=1`)}>Liberar para os prestadores</Botao>
           )}
@@ -310,31 +310,27 @@ export function GestaoPessoal() {
         </div>
         {fechado && <p className={css.fechadoLinha}>Os números de {mesCurto(mes)} são o retrato do fechamento e não mudam mais. Nota fiscal e pagamento ainda podem ser registrados.</p>}
 
-        <nav className={css.trilha} aria-label="Passos do fechamento">
-          {passos.map((p, i) => (
-            <button key={p.titulo} className={`${css.passo} ${p.aba === aba ? css.passoAtual : ''}`}
-              aria-current={p.aba === aba ? 'step' : undefined}
-              onClick={() => (p.aba ? ir({ aba: p.aba }) : !fechado && d && setDialogo({ tipo: 'fechar' }))}>
-              <span className={`${css.bola} ${p.status === 'ok' ? css.bolaOk : p.status === 'aviso' ? css.bolaAviso : ''}`}>{p.status === 'ok' ? '✓' : p.status === 'aviso' ? '!' : i + 1}</span>
-              <span style={{ minWidth: 0 }}><b>{p.titulo}</b><span className={css.passoTxt}>{p.texto}</span></span>
-            </button>
-          ))}
-        </nav>
-
         <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
           {([
             ['folha', 'Folha CLT', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length],
             ['prestadores', 'Prestadores', d ? d.mei.length + d.motoristas.length : undefined], ['debitos', 'Débitos', d?.debitos.length],
-          ] as [Aba, string, number | undefined][]).map(([k, t, n]) => (
-            <button key={k} role="tab" aria-selected={aba === k} className={`${css.aba} ${aba === k ? css.abaOn : ''}`} onClick={() => ir({ aba: k })}>
-              {t} {n != null && <span className={css.cont}>{n}</span>}
-              {k === 'prestadores' && nfPend > 0 && <span className={css.contAlerta} title={`${nfPend} nota${nfPend > 1 ? 's' : ''} fiscal pendente`}>NF</span>}
-            </button>
-          ))}
+          ] as [Aba, string, number | undefined][]).map(([k, t, n]) => {
+            const pendente = passos.find((p) => p.aba === k)?.status === 'aviso';
+            return (
+              <button key={k} role="tab" aria-selected={aba === k} className={`${css.aba} ${aba === k ? css.abaOn : ''}`} onClick={() => ir({ aba: k })}>
+                {t} {n != null && <span className={css.cont}>{n}</span>}
+                {pendente && <span className={css.abaPonto} title={passos.find((p) => p.aba === k)!.texto}><span className={css.sr}>tem pendência</span></span>}
+              </button>
+            );
+          })}
         </div>
+        {(() => {
+          // Um aviso por vez: só o da aba aberta.
+          const p = passos.find((x) => x.aba === aba);
+          return p?.status === 'aviso' && d ? <p className={css.avisoAba} role="note">{p.texto}</p> : null;
+        })()}
 
         {d && aba !== 'historico' && <ResumoAba aba={aba} d={d} />}
-        {d && aba === 'folha' && <AvisoPrevia />}
 
         <div className={css.barra}>
           <input className={vt.busca} type="search" placeholder={aba === 'prestadores' ? 'Buscar pessoa ou empresa' : 'Buscar pessoa'} aria-label="Buscar pessoa" value={busca} onChange={(e) => setBusca(e.target.value)} />
@@ -479,35 +475,39 @@ const Vazio = ({ cols, children }: { cols: number; children: ReactNode }) => <tr
 
 function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void }) {
   const t = linhas.reduce((a, l) => ({ sal: a.sal + (l.salarioCent ?? 0), pr: a.pr + l.proventosCent, de: a.de + l.descontosCent, db: a.db + l.debitosCent, li: a.li + l.liquidoSalarioCent, br: a.br + l.custoBrutoCent }), { sal: 0, pr: 0, de: 0, db: 0, li: 0, br: 0 });
+  // Coluna Cliente só aparece se alguém tem cliente.
+  const comCliente = linhas.some((l) => l.cliente);
+  const cols = comCliente ? 9 : 8;
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Colaborador</th><th>Cliente</th><th className={vt.n}>Salário</th><th className={vt.n} title={`Salário ÷ dias de trabalho de ${mesCurto(mes)}`}>Valor do dia</th>
-        <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras e intervalo</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n} title="Simulação a partir do ponto, sem INSS, IRRF e encargos. O valor real vem da contabilidade.">Líquido (prévia)</th>
+      <thead><tr><th>Colaborador</th>{comCliente && <th>Cliente</th>}<th className={vt.n}>Salário</th>
+        <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n} title="Simulação a partir do ponto, sem INSS, IRRF e encargos. O valor real vem da contabilidade.">Líquido (prévia)</th>
         <th className={vt.n} title="Salário − descontos + extras + benefícios, sem tirar débitos">Custo bruto</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={10}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
-        {linhas.map((l) => (
-          <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-            <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}<BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span><small>{l.config.cargo ?? (l.matricula ? `#${l.matricula}` : 'CLT')}</small>
-              {l.erro && <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro}>sem escala</span>}
-              {l.salarioCent == null && <span className={`${vt.pill} ${vt.pillWarn}`}>sem salário</span>}</td>
-            <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
-            <td className={vt.n}>{l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub} title={l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ')}>proporcional · mudou {fmtDia(l.salarioPartes[1]!.desde)}</small>}</td>
-            <td className={vt.n}>{l.diasMes ? brl(l.valorDiaMesCent) : '—'}<small className={css.sub}>÷ {l.diasMes} dias</small></td>
-            <td className={vt.n}>{(() => {
-              const x = textoExtras(l);
-              if (x.valor) return <><span className={vt.pos}>{x.valor}</span><small className={css.sub}>{x.detalhe}</small></>;
-              if (x.soBanco) return <span className={`${vt.pill} ${vt.pillMute}`} title="Foram pro banco de horas: não são pagas nesta folha">{minutosParaHhMm(l.heNoBancoMin)} no banco</span>;
-              return '—';
-            })()}</td>
-            <td className={vt.n}>{l.descontosCent > 0 ? <><span className={vt.neg}>{brl(-l.descontosCent)}</span><small className={css.sub}>{l.faltasDias.length ? `${l.faltasDias.length} falta${l.faltasDias.length > 1 ? 's' : ''} · ponto` : 'atrasos · ponto'}</small></> : '—'}</td>
-            <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
-            <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoSalarioCent)}</td>
-            <td className={vt.n}>{brl(l.custoBrutoCent)}</td>
-          </Linha>
-        ))}
+        {linhas.length === 0 && <Vazio cols={cols}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
+        {linhas.map((l) => {
+          // No máximo um alerta por linha.
+          const alerta = l.salarioCent == null ? 'sem salário' : l.erro ? 'sem escala' : null;
+          const x = textoExtras(l);
+          return (
+            <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeLinha}><span className={css.nomeTxt} title={l.nome}>{l.nome}</span><BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span>
+                {alerta ? <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro ?? undefined}>{alerta}</span> : <small>{l.config.cargo ?? 'CLT'}</small>}</td>
+              {comCliente && <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>}
+              <td className={vt.n} title={l.diasMes ? `${brl(l.valorDiaMesCent)} por dia (÷ ${l.diasMes} dias de ${mesCurto(mes)})${l.salarioPartes.length > 1 ? ' · proporcional: ' + l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ') : ''}` : undefined}>
+                {l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub}>proporcional</small>}</td>
+              <td className={vt.n} title={x.valor ? x.detalhe : undefined}>{x.valor ? <span className={vt.pos}>{x.valor}</span>
+                : x.soBanco ? <span className={css.mute} title="Foram pro banco de horas: não são pagas nesta folha">{minutosParaHhMm(l.heNoBancoMin)} no banco</span> : '—'}</td>
+              <td className={vt.n} title={l.descontosCent > 0 ? (l.faltasDias.length ? `${l.faltasDias.length} falta${l.faltasDias.length > 1 ? 's' : ''} no ponto` : 'atrasos no ponto') : undefined}>
+                {l.descontosCent > 0 ? <span className={vt.neg}>{brl(-l.descontosCent)}</span> : '—'}</td>
+              <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
+              <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoSalarioCent)}</td>
+              <td className={vt.n}>{brl(l.custoBrutoCent)}</td>
+            </Linha>
+          );
+        })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.sal)}</td><td /><td className={vt.n}>{brl(t.pr)}</td>
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td>{comCliente && <td />}<td className={vt.n}>{brl(t.sal)}</td><td className={vt.n}>{brl(t.pr)}</td>
         <td className={vt.n}>{brl(-t.de)}</td><td className={vt.n}>{brl(-t.db)}</td><td className={vt.n}>{brl(t.li)}</td><td className={vt.n}>{brl(t.br)}</td><td /></tr></tfoot>}
     </table></div></div>
   );
@@ -524,37 +524,38 @@ function StatusCesta({ l }: { l: PessoalLinhaClt }) {
 
 function TabelaBeneficios({ linhas, d, onAbrir }: { linhas: PessoalLinhaClt[]; d: PessoalCompetencia; onAbrir: (id: string, el: HTMLElement) => void }) {
   const t = linhas.reduce((a, l) => ({ vr: a.vr + l.beneficios.vrProxCent, ce: a.ce + l.beneficios.cestaCent, vt: a.vt + l.beneficios.vtProxCent, ac: a.ac + l.beneficios.acertoCent, ca: a.ca + l.beneficios.cargaCent }), { vr: 0, ce: 0, vt: 0, ac: 0, ca: 0 });
+  const comCliente = linhas.some((l) => l.cliente);
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Colaborador</th><th>Cliente</th><th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th>
+      <thead><tr><th>Colaborador</th>{comCliente && <th>Cliente</th>}<th className={vt.n}>Dias de {mesCurto(d.proxima)}</th><th className={vt.n}>VR / VA</th>
         <th className={vt.n} title={`Cesta de ${mesCurto(d.competencia)}: só pra quem não faltou no mês e já passou da carência`}>Cesta</th><th className={vt.n}>VT / combustível</th>
         <th className={vt.n}>Acerto de {mesCurto(d.competencia)}</th><th className={vt.n}>A carregar</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={9}>Nenhum funcionário ativo no ponto.</Vazio>}
+        {linhas.length === 0 && <Vazio cols={comCliente ? 9 : 8}>Nenhum funcionário ativo no ponto.</Vazio>}
         {linhas.map((l) => {
           const b = l.beneficios, c = l.config;
           const semCfg = c.origem === 'NENHUM' || (c.vrDiaCent === 0 && c.vtTipo === 'NENHUM');
           return (
             <Linha key={l.empregadoId} rotulo={`Abrir benefícios de ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} trocavel />{l.nome}<small>{semCfg ? 'sem benefício' : resumoBen(c)}</small>
-                {semCfg ? <span className={`${vt.pill} ${vt.pillWarn}`}>configurar</span>
-                  : <span className={`${vt.pill} ${c.origem === 'PROPRIO' ? vt.pillLime : vt.pillMute}`} title={c.vigenteDesde ? `Vale desde ${mesLongo(c.vigenteDesde)}` : undefined}>{c.origem === 'PROPRIO' ? 'valor próprio' : 'padrão'}</span>}</td>
-              <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>
-              <td className={vt.n}>{b.diasProx}{b.diasProxVr != null && b.diasProxVr !== b.diasProx
-                && <small className={css.sub} title="Sábado de meio turno recebe VT, mas não VR/VA">VR em {b.diasProxVr} · sáb. ½ turno</small>}
-                {c.vtTipo === 'DIA' && b.diasProxVt != null && b.diasProxVt !== b.diasProx
-                && <small className={css.sub} title="Dia em home office não recebe VT">VT em {b.diasProxVt} · {nomesDias(c.vtSemDias ?? [])} home</small>}</td>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeTxt} title={l.nome}>{l.nome}</span>
+                {semCfg ? <span className={`${vt.pill} ${vt.pillWarn}`}>sem benefício</span>
+                  : <small title={`${c.origem === 'PROPRIO' ? 'Valor próprio' : 'Padrão da empresa'}${c.vigenteDesde ? ` · vale desde ${mesLongo(c.vigenteDesde)}` : ''}`}>{resumoBen(c)}{c.origem === 'PROPRIO' ? ' · próprio' : ''}</small>}</td>
+              {comCliente && <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>}
+              <td className={vt.n} title={[
+                b.diasProxVr != null && b.diasProxVr !== b.diasProx ? `VR em ${b.diasProxVr} dias (sábado de meio turno recebe VT, mas não VR/VA)` : '',
+                c.vtTipo === 'DIA' && b.diasProxVt != null && b.diasProxVt !== b.diasProx ? `VT em ${b.diasProxVt} dias (${nomesDias(c.vtSemDias ?? [])} em home office)` : '',
+              ].filter(Boolean).join(' · ') || undefined}>{b.diasProx}{((b.diasProxVr != null && b.diasProxVr !== b.diasProx) || (c.vtTipo === 'DIA' && b.diasProxVt != null && b.diasProxVt !== b.diasProx)) && <small className={css.sub}>parcial</small>}</td>
               <td className={vt.n}>{b.vrProxCent ? brl(b.vrProxCent) : '—'}</td>
               <td className={vt.n}><StatusCesta l={l} /></td>
-              <td className={vt.n}>{c.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)}<small className={css.sub}>{c.vtTipo === 'FIXO' ? 'combustível · fixo' : c.vtTipo === 'DIA' ? `VT ${brl(c.vtValorCent)}/dia` : ''}</small></td>
-              <td className={vt.n}>{b.acertoCent ? <><span className={vt.neg}>{brl(-b.acertoCent)}</span>
-                <small className={`${css.sub} ${css.subCorta}`} title={b.naoUsados.map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}>{b.naoUsados.length} dia{b.naoUsados.length > 1 ? 's' : ''}: {b.naoUsados.slice(0, 2).map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}{b.naoUsados.length > 2 ? '…' : ''}</small></> : '—'}</td>
+              <td className={vt.n} title={c.vtTipo === 'FIXO' ? 'Combustível · valor fixo' : c.vtTipo === 'DIA' ? `VT ${brl(c.vtValorCent)}/dia` : undefined}>{c.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)}</td>
+              <td className={vt.n} title={b.acertoCent ? `${b.naoUsados.length} dia${b.naoUsados.length > 1 ? 's' : ''} não usado${b.naoUsados.length > 1 ? 's' : ''}: ${b.naoUsados.map((x) => `${ROT_MOTIVO[x.motivo]} ${fmtDia(x.data)}`).join(', ')}` : undefined}>
+                {b.acertoCent ? <><span className={vt.neg}>{brl(-b.acertoCent)}</span><small className={css.sub}>{b.naoUsados.length} dia{b.naoUsados.length > 1 ? 's' : ''}</small></> : '—'}</td>
               <td className={`${vt.n} ${css.forte}`}>{brl(b.cargaCent)}</td>
             </Linha>
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td /><td className={vt.n}>{brl(t.vr)}</td><td className={vt.n}>{brl(t.ce)}</td><td className={vt.n}>{brl(t.vt)}</td>
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td>{comCliente && <td />}<td /><td className={vt.n}>{brl(t.vr)}</td><td className={vt.n}>{brl(t.ce)}</td><td className={vt.n}>{brl(t.vt)}</td>
         <td className={vt.n}>{brl(-t.ac)}</td><td className={vt.n}>{brl(t.ca)}</td><td /></tr></tfoot>}
     </table></div></div>
   );
@@ -577,26 +578,31 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
     const quitado = x.tipo === 'MEI' ? x.l.lanc.pago : x.l.semanas.some((s) => s.dias > 0) && x.l.semanas.filter((s) => s.dias > 0).every((s) => s.pago);
     return { c: a.c + x.l.valorCent, b: a.b + bruto, li: a.li + x.l.liquidoCent, pg: a.pg + pago, np: a.np + (quitado ? 1 : 0) };
   }, { c: 0, b: 0, li: 0, pg: 0, np: 0 });
-  const tag = (tipo: 'MEI' | 'MOTORISTA') => <span className={`${css.tagTipo} ${tipo === 'MEI' ? css.tagMei : css.tagMot}`}>{tipo === 'MEI' ? 'MEI' : 'Motorista'}</span>;
+  // Valor líquido dos ajustes do mês (extras/feriados − faltas + meta), com o detalhe no title.
+  const ajusteMei = (l: PessoalLinhaMei) => {
+    const v = l.heCent + l.feriadosCent - l.faltasCent + (l.lanc.metaCent ?? 0);
+    const det = [
+      l.heCent ? `extras ${brl(l.heCent)}${l.lanc.heMin ? ` (${minutosParaHhMm(l.lanc.heMin)})` : ''}` : '',
+      l.feriadosCent ? `${l.lanc.feriadosTrab} feriado${l.lanc.feriadosTrab > 1 ? 's' : ''} ${brl(l.feriadosCent)}` : '',
+      l.faltasCent ? `${l.lanc.faltas} falta${l.lanc.faltas > 1 ? 's' : ''} ${brl(-l.faltasCent)}` : '',
+      l.lanc.metaCent ? `meta ${brl(l.lanc.metaCent)} (${l.lanc.metaPaga ? 'já paga' : 'a pagar'})` : '',
+    ].filter(Boolean).join(' · ');
+    return { v, det };
+  };
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Prestador</th><th>Empresa</th><th className={vt.n}>Contrato</th><th className={vt.n}>Extras</th><th className={vt.n}>Faltas</th>
-        <th className={vt.n}>Meta</th><th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={vt.n}>Pagamento</th><th aria-label="Abrir" /></tr></thead>
+      <thead><tr><th>Prestador</th><th>Empresa</th><th className={vt.n}>Contrato</th><th className={vt.n} title="Extras e feriados trabalhados − faltas + meta (MEI) ou adicionais (motorista)">Ajustes</th><th className={vt.n}>Bruto (NF)</th><th className={vt.n}>Débitos</th><th className={vt.n}>Líquido</th><th className={vt.n}>Pagamento</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
-        {linhas.length === 0 && <Vazio cols={11}>{filtrado ? 'Ninguém com esse filtro neste mês.' : 'Nenhum prestador neste mês.'} {!filtrado && onNovo && <button className={css.link} onClick={onNovo}>Adicionar prestador</button>}</Vazio>}
+        {linhas.length === 0 && <Vazio cols={9}>{filtrado ? 'Ninguém com esse filtro neste mês.' : 'Nenhum prestador neste mês.'} {!filtrado && onNovo && <button className={css.link} onClick={onNovo}>Adicionar prestador</button>}</Vazio>}
         {linhas.map((x) => {
           if (x.tipo === 'MEI') {
             const l = x.l;
             return (
               <Linha key={l.id} rotulo={`Abrir lançamento de ${l.nome}`} onAbrir={(el) => onAbrir('MEI', l.id, el)}>
-                <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MEI')}{l.fechadoIndividual && <SeloFechado fi={l.fechadoIndividual} />}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span><small>{fmtDoc(l.documento) ?? l.funcao ?? 'MEI'}</small></td>
+                <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeLinha}><span className={css.nomeTxt} title={l.nome}>{l.nome}</span><BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onPix(pixMei(l, debitos))} /></span>{l.fechadoIndividual ? <SeloFechado fi={l.fechadoIndividual} /> : <small title={fmtDoc(l.documento) ?? undefined}>MEI{l.funcao ? ` · ${l.funcao}` : ''}</small>}</td>
                 <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
-                <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${l.diasMes} dias no mês`}>{brl(l.valorDiaCent)}/dia</small></td>
-                <td className={vt.n}>{l.heCent + l.feriadosCent ? <><span className={vt.pos}>{brl(l.heCent + l.feriadosCent)}</span>
-                  <small className={css.sub}>{[l.lanc.heMin ? minutosParaHhMm(l.lanc.heMin) : '', l.lanc.feriadosTrab ? `${l.lanc.feriadosTrab} feriado${l.lanc.feriadosTrab > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</small></> : '—'}</td>
-                <td className={vt.n}>{l.faltasCent ? <><span className={vt.neg}>{brl(-l.faltasCent)}</span><small className={css.sub}>{l.lanc.faltas} falta{l.lanc.faltas > 1 ? 's' : ''}</small></> : '—'}</td>
-                <td className={vt.n}>{!l.lanc.metaCent ? '—' : <>{brl(l.lanc.metaCent)}
-                  <small className={`${css.sub} ${l.lanc.metaPaga ? css.subOk : css.subWarn}`}>{l.lanc.metaPaga ? 'já paga' : 'a pagar'}</small></>}</td>
+                <td className={vt.n} title={`${brl(l.valorDiaCent)}/dia · ${l.diasMes} dias no mês`}>{brl(l.valorCent)}</td>
+                {(() => { const aj = ajusteMei(l); return <td className={vt.n} title={aj.det || undefined}>{aj.v ? <span className={aj.v > 0 ? vt.pos : vt.neg}>{brl(aj.v)}</span> : '—'}</td>; })()}
                 <td className={`${vt.n} ${css.forte}`}>{brl(l.brutoCent)}<CelulaNf numero={l.lanc.nfNumero} arquivo={l.lanc.nfArquivo} onVer={(a) => onVerNf(a, `Nota de ${l.nome}`)} /></td>
                 <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
                 <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoCent)}</td>
@@ -612,13 +618,11 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
           const adic = l.semanas.reduce((a, s) => a + s.adicionalCent, 0);
           return (
             <Linha key={l.id} rotulo={`Abrir semanas de ${l.nome}`} onAbrir={(el) => onAbrir('MOTORISTA', l.id, el)}>
-              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={34} className={vt.avTd} trocavel /><span className={css.nomeLinha}>{l.nome}{tag('MOTORISTA')}{l.fechadoIndividual && <SeloFechado fi={l.fechadoIndividual} />}<BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onAbrir('MOTORISTA', l.id, document.activeElement as HTMLElement)} /></span>
-                <small>{[fmtDoc(l.documento), l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'].filter(Boolean).join(' · ')}</small></td>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.id} tipo="PRESTADOR" nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeLinha}><span className={css.nomeTxt} title={l.nome}>{l.nome}</span><BotaoPix chave={l.chavePix} nome={l.nome} onPix={() => onAbrir('MOTORISTA', l.id, document.activeElement as HTMLElement)} /></span>
+                {l.fechadoIndividual ? <SeloFechado fi={l.fechadoIndividual} /> : <small title={fmtDoc(l.documento) ?? undefined}>Motorista · {l.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex'}</small>}</td>
               <td className={css.empresa}>{l.empresa ?? <span className={css.mute}>—</span>}</td>
-              <td className={vt.n}>{brl(l.valorCent)}<small className={css.sub} title={`${dias} dia${dias === 1 ? '' : 's'} trabalhados no mês`}>{brl(l.diariaCent)}/dia · {dias}d</small></td>
-              <td className={vt.n}>{adic ? <><span className={vt.pos}>{brl(adic)}</span><small className={css.sub}>adicionais</small></> : '—'}</td>
-              <td className={vt.n}>—</td>
-              <td className={vt.n}>—</td>
+              <td className={vt.n} title={`${brl(l.diariaCent)}/dia · ${dias} dia${dias === 1 ? '' : 's'} trabalhados no mês`}>{brl(l.valorCent)}</td>
+              <td className={vt.n} title={adic ? 'Adicionais das semanas' : undefined}>{adic ? <span className={vt.pos}>{brl(adic)}</span> : '—'}</td>
               <td className={`${vt.n} ${css.forte}`}>{brl(l.totalCent)}
                 {comDias.length > 0 && <small className={`${css.sub} ${comNf < comDias.length ? css.subErr : ''}`}>{comNf === comDias.length ? `${comNf}/${comDias.length} NFs semanais` : `NF ${comNf}/${comDias.length} semanas`}</small>}</td>
               <td className={vt.n}>{l.debitosCent ? <><span className={vt.neg}>{brl(-l.debitosCent)}</span>
@@ -636,7 +640,7 @@ function TabelaPrestadores({ mei, mot, debitos, filtrado, onAbrir, onNovo, onPix
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.c)}</td><td /><td /><td />
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td><td /><td className={vt.n}>{brl(t.c)}</td><td />
         <td className={vt.n}>{brl(t.b)}</td><td /><td className={vt.n}>{brl(t.li)}</td>
         <td className={vt.n}>{brl(t.pg)}<small className={css.sub}>{t.np} de {linhas.length} pagos</small></td><td /></tr></tfoot>}
     </table></div></div>
@@ -1913,15 +1917,6 @@ function CelulaNf({ numero, arquivo, onVer }: { numero: string | null; arquivo: 
   );
 }
 
-function AvisoPrevia() {
-  return (
-    <div className={css.previa} role="note">
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M12 7v6M12 16.5v.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /></svg>
-      <span><b>Prévia, não é holerite.</b> Os valores da folha CLT são uma simulação a partir do ponto, sem INSS, IRRF, FGTS e demais encargos. O valor real de pagamento de cada funcionário é o que a contabilidade informar.</span>
-    </div>
-  );
-}
-
 /** Interruptor "pago" na linha da tabela — não abre o painel. */
 function TogglePago({ nome, pago, parcial, onMudar, children }: { nome: string; pago: boolean; parcial?: string; onMudar: (v: boolean) => Promise<void>; children?: ReactNode }) {
   const [enviando, setEnviando] = useState(false);
@@ -2330,7 +2325,7 @@ function HistoricoPessoa({ h, pessoa, onAbrirMes, onVerNf }: {
         <div><span className={`${css.histTag} ${perfil.tipo === 'Motorista' ? css.tagMot : ''}`}>{perfil.tipo}</span><h3>{perfil.nome}</h3></div>
         <dl>{perfil.info.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       </div>
-      {h.pessoaTipo === 'CLT' && <AvisoPrevia />}
+      {h.pessoaTipo === 'CLT' && <p className={css.hint}>Valores CLT são prévia: simulação a partir do ponto, sem INSS, IRRF e encargos.</p>}
       <Resumo itens={kpis.map((x) => ({ k: x.k, v: x.v, s: x.s, tom: x.dark ? 'ok' as const : undefined }))} />
       <div className={vt.tab}><div className={vt.scroll}>{tabela}</div></div>
       <p className={css.hint}>Mês fechado mostra o retrato do fechamento; o mês em aberto (em amarelo) mostra os números de agora. Nota e pagamento são sempre os atuais. "Abrir mês" leva ao fechamento daquela competência com a pessoa aberta.</p>

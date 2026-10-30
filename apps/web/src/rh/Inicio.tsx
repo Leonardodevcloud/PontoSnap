@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { Icone, type NomeIcone } from '../components/Icone';
 import { PainelRH } from './PainelRH';
-import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 import { CompletarBatidas } from './CompletarBatidas';
 import type { ContextoRH } from './LayoutRH';
 import type { GrupoAtencao, ItemAtencao } from '../tipos';
@@ -31,7 +31,6 @@ function saudacao() {
 export function Inicio() {
   const { atencao, recarregarAtencao } = useOutletContext<ContextoRH>();
   const navegar = useNavigate();
-  const [filtro, setFiltro] = useState<GrupoAtencao | 'TODOS'>('TODOS');
   const [batidas, setBatidas] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -83,51 +82,60 @@ export function Inicio() {
         </Link>
       </section>
 
-      {itens.length > 0 && (
-        <div className={css.filtros} role="group" aria-label="Filtrar pendências">
-          {([['TODOS', 'Todos', t?.total], ['BLOQUEIA', 'Resolver antes de fechar', t?.bloqueia], ['ANTES', 'Antes de fechar', t?.antes], ['CADASTRO', 'Cadastro', t?.cadastro]] as const)
-            .filter(([id, , n]) => id === 'TODOS' || (n ?? 0) > 0)
-            .map(([id, rot, n]) => (
-              <button key={id} className={`${css.fl} ${filtro === id ? css.flOn : ''}`} aria-pressed={filtro === id} onClick={() => setFiltro(id)}>
-                {rot}<span>{n ?? 0}</span>
-              </button>
-            ))}
-        </div>
-      )}
-
-      {GRUPOS.filter((g) => filtro === 'TODOS' || filtro === g.id).map((g) => {
+      {GRUPOS.map((g) => {
         const lista = itens.filter((i) => i.grupo === g.id);
         if (lista.length === 0) return null;
-        return (
-          <section key={g.id} className={css.grupo} aria-labelledby={`g-${g.id}`}>
-            <div className={css.gH}><h3 id={`g-${g.id}`}>{g.titulo(mes)}</h3><span>{g.sub}</span></div>
-            <ul className={css.lista}>
-              {lista.map((i) => (
+        const corpo = (
+          <ul className={css.lista}>
+            {lista.map((i) => {
+              // O texto do ajuste é o motivo que a pessoa escreveu: fica à vista. Os demais são explicação → "?".
+              const textoVisivel = i.tipo === 'AJUSTE';
+              const extra = i.pessoas.length - 3;
+              return (
                 <li key={i.id} className={css.item}>
-                  <span className={`${css.ic} ${css[`ic${g.id}`]}`} aria-hidden="true"><Icone nome={ICONE[i.tipo]} /></span>
+                  <span className={css.ic} aria-hidden="true"><Icone nome={ICONE[i.tipo]} /></span>
                   <div className={css.itemTxt}>
-                    <p className={css.itemT}>{i.titulo}</p>
-                    <p className={css.itemS}>{i.texto}</p>
+                    <p className={css.itemT}>
+                      {i.titulo}
+                      {!textoVisivel && i.texto && <> <Explica rotulo={`Por que "${i.titulo}" importa`}>{i.texto}</Explica></>}
+                    </p>
+                    {textoVisivel && i.texto && <p className={css.itemS}>{i.texto}</p>}
                     {i.pessoas.length > 0 && (
-                      <ul className={css.pessoas} aria-label="Quem">
-                        {i.pessoas.slice(0, 8).map((p, k) => (
-                          <li key={k}>
+                      <p className={css.quem}>
+                        {i.pessoas.slice(0, 3).map((p, k) => (
+                          <span key={k}>
+                            {k > 0 && ', '}
                             {p.empregadoId
-                              ? <Link to={`/rh/espelhos?emp=${p.empregadoId}`} className={css.comAv}><Avatar id={p.empregadoId} nome={p.nome} tamanho={22} />{p.nome}{p.detalhe ? ` · ${p.detalhe}` : ''}</Link>
-                              : <span>{p.nome}{p.detalhe ? ` · ${p.detalhe}` : ''}</span>}
-                          </li>
+                              ? <Link to={`/rh/espelhos?emp=${p.empregadoId}`}>{p.nome}{p.detalhe ? ` (${p.detalhe})` : ''}</Link>
+                              : <>{p.nome}{p.detalhe ? ` (${p.detalhe})` : ''}</>}
+                          </span>
                         ))}
-                        {i.pessoas.length > 8 && <li><span>+{i.pessoas.length - 8}</span></li>}
-                      </ul>
+                        {extra > 0 && <span> e mais {extra}</span>}
+                      </p>
                     )}
                   </div>
                   <div className={css.acoes}>
-                    {i.acao2 && <Link to={i.acao2.rota} className={css.btnSec}>{i.acao2.rotulo}</Link>}
-                    <button className={g.id === 'CADASTRO' ? css.btnSec : css.btnPri} onClick={() => agir(i)}>{i.acao.rotulo}</button>
+                    {i.acao2 && <Link to={i.acao2.rota} className={css.lk}>{i.acao2.rotulo}</Link>}
+                    <button className={g.id === 'BLOQUEIA' ? css.btnPri : css.btnSec} onClick={() => agir(i)}>{i.acao.rotulo}</button>
                   </div>
                 </li>
-              ))}
-            </ul>
+              );
+            })}
+          </ul>
+        );
+        // Cadastro não trava o mês: começa fechado para não competir com o que importa.
+        if (g.id === 'CADASTRO') {
+          return (
+            <details key={g.id} className={css.grupo}>
+              <summary className={css.gH}><span className={`${css.ponto} ${css.pCADASTRO}`} aria-hidden="true" /><h3>{g.titulo(mes)}</h3><span className={css.cont}>{lista.length}</span><Explica>{g.sub}</Explica></summary>
+              {corpo}
+            </details>
+          );
+        }
+        return (
+          <section key={g.id} className={css.grupo} aria-labelledby={`g-${g.id}`}>
+            <div className={css.gH}><span className={`${css.ponto} ${css[`p${g.id}`]}`} aria-hidden="true" /><h3 id={`g-${g.id}`}>{g.titulo(mes)}</h3><span className={css.cont}>{lista.length}</span><Explica>{g.sub}</Explica></div>
+            {corpo}
           </section>
         );
       })}
@@ -143,7 +151,7 @@ export function Inicio() {
       )}
 
       <section className={css.hoje} aria-labelledby="hoje-t">
-        <div className={css.gH}><h3 id="hoje-t">Hoje</h3><span>quem bateu ponto e quem falta bater</span></div>
+        <div className={css.gH}><h3 id="hoje-t">Hoje</h3><Explica>Quem já bateu ponto hoje e quem ainda falta bater.</Explica></div>
         <PainelRH embutido />
       </section>
 

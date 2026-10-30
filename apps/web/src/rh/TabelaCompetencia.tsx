@@ -53,8 +53,9 @@ export function Situacao({ l, hoje, modo }: { l: LinhaCompetencia; hoje: string;
     pills.push(<span key={`af${a.dataInicio}`} className={`${vt.pill} ${vt.pillMute}`}>{ROTULO_AFAST[a.tipo] ?? 'afastado'} {fmtDia(a.dataInicio)}–{fmtDia(a.dataFim)}</span>);
   }
   if (l.assinada) pills.push(<span key="as" className={`${vt.pill} ${vt.pillLime}`}>assinado</span>);
-  if (pills.length === 0) pills.push(<span key="ok" className={`${vt.pill} ${vt.pillOk}`}>em dia</span>);
-  return <>{pills}</>;
+  // Sem problema não tem etiqueta. Com problema, só a mais grave (a ordem acima já é por gravidade) e "+N".
+  if (pills.length === 0) return <span className={vt.mute}>—</span>;
+  return <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap' }}>{pills[0]}{pills.length > 1 && <span style={{ fontSize: 12.5, color: 'var(--ash)' }} title={`Mais ${pills.length - 1}: abra a pessoa para ver todos`}>+{pills.length - 1}</span>}</span>;
 }
 
 /** Colunas que abrem o "Por que deu esse número?". */

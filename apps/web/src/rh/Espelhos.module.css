@@ -73,7 +73,7 @@
 }
 .dia:hover{ border-color:var(--coral); }
 .dia:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
-.diaAlerta{ border-color:var(--erro-border); background:var(--erro-bg); }
+.diaAlerta{ box-shadow:inset 3px 0 0 var(--erro-text); }
 .diaFolga{ opacity:.6; }
 .dN{ font-family:var(--ff-display); font-size:18px; font-weight:600; text-align:center; line-height:1; }
 .dN small{ display:block; font-size:12px; color:var(--ash); font-weight:400; margin-top:2px; }
@@ -112,3 +112,21 @@
 @media (max-width:760px){ .head{ flex-direction:column; align-items:stretch; } .head > div{ flex-wrap:wrap; } }
 
 .bFora{ color:#ffb4aa; }
+
+/* Enxuto */
+.tituloLinha{ display:flex; align-items:center; gap:8px; }
+.tituloLinha h2{ margin:0; }
+.avisoLinha{ margin:0 0 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:14px; color:var(--aviso-text); }
+.avisoLinha::before{ content:''; width:7px; height:7px; border-radius:50%; background:currentColor; }
+.avisoLinha a{ color:var(--coral-dark); font-weight:500; }
+.pessoaTopo{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.pessoaTopo h3{ margin:0; font-size:20px; }
+.voltar{ width:34px; height:34px; border-radius:50%; border:1px solid rgba(var(--ink-rgb),.18); background:var(--white); color:var(--ink); font-size:20px; line-height:1; cursor:pointer; }
+.voltar:hover{ background:var(--cream); }
+.voltar:focus-visible, .lk:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.esp{ flex:1; }
+.lk{ font-size:14px; font-weight:500; color:var(--coral-dark); text-decoration:none; padding:6px 4px; }
+.lk:hover{ text-decoration:underline; }
+.um{ max-width:880px; }
+.kpis5{ grid-template-columns:repeat(5, minmax(0,1fr)) !important; }
+@media (max-width:640px){ .kpis5{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; } }

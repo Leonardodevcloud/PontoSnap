@@ -1,0 +1,6 @@
+.raiz{ position:relative; display:inline-flex; vertical-align:middle; }
+.btn{ width:20px; height:20px; border-radius:50%; border:1px solid rgba(var(--ink-rgb),.28); background:var(--white); color:var(--ash); font:inherit; font-size:12px; font-weight:500; line-height:1; cursor:pointer; display:grid; place-items:center; padding:0; }
+.btn:hover, .btn[aria-expanded="true"]{ color:var(--ink); border-color:rgba(var(--ink-rgb),.5); }
+.btn:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.balao{ position:absolute; top:calc(100% + 6px); left:-8px; z-index:30; width:max-content; max-width:min(320px, 80vw); background:var(--ink); color:var(--cream); border-radius:10px; padding:9px 12px; font-size:13px; font-weight:400; line-height:1.5; box-shadow:0 6px 20px rgba(0,0,0,.18); white-space:normal; text-align:left; }
+.dir{ left:auto; right:-8px; }

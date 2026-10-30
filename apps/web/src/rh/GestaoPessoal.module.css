@@ -426,3 +426,14 @@ label.pixItem:hover{ background:var(--cream); }
 .diaChipOn{ background:var(--coral-acao); border-color:var(--coral-acao); color:var(--on-coral); }
 .diaChipOn small{ color:inherit; opacity:.85; }
 .diaChipOn:hover:not(:disabled){ background:var(--coral-acao-hover); }
+
+/* Abas com ponto de pendência + um aviso por vez */
+.abaPonto{ width:7px; height:7px; border-radius:50%; background:var(--aviso-text); display:inline-block; }
+.avisoAba{ margin:0; display:flex; gap:8px; align-items:center; font-size:14px; color:var(--aviso-text); }
+.avisoAba::before{ content:''; width:7px; height:7px; border-radius:50%; background:currentColor; flex:none; }
+.sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+/* Nome longo não empurra a tabela: corta com reticências (nome completo no painel) */
+.compacta td:first-child:not([colspan]){ max-width:280px; }
+.compacta .nomeLinha{ display:flex; max-width:100%; min-width:0; }
+.nomeTxt{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
