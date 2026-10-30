@@ -92,6 +92,10 @@ export function Prestadores() {
   const [msg, setMsg] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('TODOS');
   const [busca, setBusca] = useState('');
+  // Todos / MEI / Motorista, como na Folha e benefícios. Fica na URL para voltar no mesmo filtro.
+  const tipo = (params.get('tipo') === 'MEI' || params.get('tipo') === 'MOTORISTA' ? params.get('tipo') : '') as '' | 'MEI' | 'MOTORISTA';
+  const setTipo = (t: '' | 'MEI' | 'MOTORISTA') => { const p = new URLSearchParams(params); if (t) p.set('tipo', t); else p.delete('tipo'); setParams(p, { replace: true }); };
+  const doTipo = (l: LinhaRh) => !tipo || l.tipo === tipo;
   const [ordem, setOrdemSt] = useState<Ordem>(lerOrdem);
   const setOrdem = (o: Ordem) => { setOrdemSt(o); try { localStorage.setItem('pontosnap.prestadores.ordem', o); } catch { /* sem storage */ } };
   const [fechar, setFechar] = useState<{ id: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO' } | null>(null);
@@ -121,9 +125,9 @@ export function Prestadores() {
       SITUACAO: (a, x) => PESO_SIT[a.situacao] - PESO_SIT[x.situacao] || nome(a, x),
       EMPRESA: (a, x) => (a.empresa ?? '~').localeCompare(x.empresa ?? '~', 'pt-BR') || nome(a, x),
     };
-    return (d?.linhas ?? []).filter((l) => passaFiltro(l, filtro) && achou(l)).sort(cmp[ordem]);
-  }, [d, filtro, busca, ordem]);
-  const contagem = (f: Filtro) => (d?.linhas ?? []).filter((l) => passaFiltro(l, f)).length;
+    return (d?.linhas ?? []).filter((l) => doTipo(l) && passaFiltro(l, filtro) && achou(l)).sort(cmp[ordem]);
+  }, [d, filtro, busca, ordem, tipo]);
+  const contagem = (f: Filtro) => (d?.linhas ?? []).filter((l) => doTipo(l) && passaFiltro(l, f)).length;
   const selecionadas = (d?.linhas ?? []).filter((l) => sel.has(l.id));
   const unidadesSel = selecionadas.flatMap((l) => l.unidades);
   const todasMarcadas = linhas.length > 0 && linhas.every((l) => sel.has(l.id));
@@ -148,7 +152,7 @@ export function Prestadores() {
 
   const t = d?.totais;
   const semModelo = (d?.linhas ?? []).filter((l) => !l.modeloNota).length;
-  const faltamIds = (d?.linhas ?? []).flatMap((l) => l.unidades).filter((u) => u.nota && (u.situacao === 'FALTA' || u.situacao === 'RECUSADA')).map((u) => u.nota!.id);
+  const faltamIds = (d?.linhas ?? []).filter(doTipo).flatMap((l) => l.unidades).filter((u) => u.nota && (u.situacao === 'FALTA' || u.situacao === 'RECUSADA')).map((u) => u.nota!.id);
   const semanasPend = d ? d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length : 0;
   const meiPend = d ? !d.meiLiberado && d.fechado && d.totais.mei > 0 : false;
   const pendentesLib = meiPend || semanasPend > 0;
@@ -225,6 +229,19 @@ export function Prestadores() {
           <input type="search" placeholder="Nome, empresa ou CPF/CNPJ" aria-label="Buscar prestador" value={busca} onChange={(e) => setBusca(e.target.value)} />
           {busca && <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca">✕</button>}
         </label>
+        <div className={`${css.seg} ${css.segTipo}`} role="group" aria-label="Tipo de prestador">
+          {([['', 'Todos'], ['MEI', 'MEI'], ['MOTORISTA', 'Motorista']] as const).map(([v, t]) => (
+            <button key={t} type="button" aria-pressed={tipo === v} onClick={() => setTipo(v)}>{t}</button>
+          ))}
+        </div>
+        <span className={css.esp} />
+        <label className={css.ordem}>
+          <span>Ordem:</span>
+          <select value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)} aria-label="Ordenar por">
+            {ORDENS.map((o) => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
+          </select>
+        </label>
+        <span className={css.quebra} aria-hidden="true" />
         <div className={css.filtros} role="group" aria-label="Filtrar">
           {FILTROS.filter((f) => f.id === 'TODOS' || filtro === f.id || !d || contagem(f.id) > 0).map((f) => (
             <button key={f.id} type="button" className={`${css.fl} ${filtro === f.id ? css.flOn : ''}`} aria-pressed={filtro === f.id} onClick={() => setFiltro(f.id)}>
@@ -233,15 +250,9 @@ export function Prestadores() {
           ))}
         </div>
         <span className={css.esp} />
-        {busca && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.length}</span>}
+        {(busca || tipo) && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.length}</span>}
         {faltamIds.length > 0 && <button type="button" className={css.lk} disabled={ocupado} onClick={() => lembrar(faltamIds)}
           title="Envia lembrete agora para quem ainda não mandou ou teve a nota recusada">Lembrar os {faltamIds.length}</button>}
-        <label className={css.ordem}>
-          <span>Ordem:</span>
-          <select value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)} aria-label="Ordenar por">
-            {ORDENS.map((o) => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
-          </select>
-        </label>
       </div>
 
       {sel.size > 0 && (
@@ -260,7 +271,7 @@ export function Prestadores() {
       {d && d.linhas.length === 0 && <div className={css.vazio}><b>Nenhum prestador em {d.rotulo}</b><p>Cadastre MEI e motoristas na Folha e benefícios.</p></div>}
       {d && d.linhas.length > 0 && linhas.length === 0 && (
         <div className={css.vazio}><b>Ninguém encontrado</b><p>{busca ? `Nada com "${busca}" neste filtro.` : 'Nenhum prestador neste filtro.'}</p>
-          <button type="button" className={css.btnSec} onClick={() => { setBusca(''); setFiltro('TODOS'); }}>Limpar busca e filtro</button></div>
+          <button type="button" className={css.btnSec} onClick={() => { setBusca(''); setFiltro('TODOS'); setTipo(''); }}>Limpar busca e filtro</button></div>
       )}
       {d && linhas.length > 0 && (
         <div className={css.tabela}>
