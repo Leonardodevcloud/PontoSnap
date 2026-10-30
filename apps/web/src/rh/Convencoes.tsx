@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import type { Cct } from '../tipos';
+import { Explica } from '../components/Explica';
 import css from './Convencoes.module.css';
 
 const VAZIA: Omit<Cct, 'id' | 'funcionarios'> = {
@@ -62,9 +63,9 @@ export default function Convencoes() {
   return (
     <div className={css.tela}>
       <div className={css.top}>
-        <div>
-          <h1 className={css.h}>Regras de jornada</h1>
-          <p className={css.sub}>Cada regra define o cálculo (extra, tolerância, noturno, banco, destinação). Você atribui a regra ao funcionário no cadastro dele.</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 className={css.h} style={{ margin: 0 }}>Regras de jornada</h1>
+          <Explica>Cada regra define o cálculo (extra, tolerância, noturno, banco, destinação). Você atribui a regra ao funcionário no cadastro dele.</Explica>
         </div>
         {!e && <button className={css.novo} onClick={novo}>+ Nova regra</button>}
       </div>
@@ -80,12 +81,10 @@ export default function Convencoes() {
               <thead><tr><th>Convenção</th><th>UF</th><th>Extra útil</th><th>Dom/fer</th><th>Noturno</th><th>Banco</th><th>Func.</th><th></th></tr></thead>
               <tbody>
                 {lista.map((c) => (
-                  <tr key={c.id} style={{ opacity: c.ativa ? 1 : 0.5 }}>
-                    <td>
+                  <tr key={c.id} style={{ opacity: c.ativa ? 1 : 0.5 }} title={!c.ativa ? 'Regra arquivada' : undefined}>
+                    <td title={c.vigencia ? `${c.nome} · ${c.vigencia}` : c.nome}>
                       <strong>{c.nome}</strong>
-                      {c.padrao && <span className={css.badge}>padrão</span>}
-                      {!c.ativa && <span className={css.badgeArq}>arquivada</span>}
-                      {c.vigencia && <div className={css.esc}>{c.vigencia}</div>}
+                      {(c.padrao || !c.ativa) && <div className={css.esc}>{[c.padrao ? 'padrão' : '', !c.ativa ? 'arquivada' : ''].filter(Boolean).join(' · ')}</div>}
                     </td>
                     <td className={css.mono}>{c.uf ?? '—'}</td>
                     <td className={css.mono}>{c.extraDiaUtilPct}%</td>
@@ -95,7 +94,7 @@ export default function Convencoes() {
                       {c.bancoModo === 'ATIVO' ? `${c.bancoPrazoMeses ?? (c.bancoTipoAcordo === 'COLETIVO' ? 12 : 6)}m`
                         : c.bancoModo === 'INATIVO' ? 'não' : 'empresa'}
                     </td>
-                    <td><span className={css.pill}>{c.funcionarios ?? 0}</span></td>
+                    <td className={css.mono}>{c.funcionarios ?? 0}</td>
                     <td className={css.acoesCell}>
                       <button className={css.link} onClick={() => editar(c)}>editar</button>
                       <button className={css.linkNo} onClick={() => remover(c)}>remover</button>
@@ -110,8 +109,7 @@ export default function Convencoes() {
 
       {e && (
         <div className={css.card}>
-          <h2 className={css.h2}>{e.id ? 'Editar regra' : 'Nova regra'}</h2>
-          <p className={css.sub}>Defina o cálculo. Dica: dá pra gerar uma regra automaticamente a partir do PDF na aba <strong>Convenções</strong>.</p>
+          <h2 className={css.h2}>{e.id ? 'Editar regra' : 'Nova regra'} <Explica>Defina o cálculo. Dica: dá pra gerar uma regra automaticamente a partir do PDF na aba <strong>Convenções</strong>.</Explica></h2>
 
           <div className={css.row}>
             <div><span className={css.lb}>Nome</span><input className={css.inp} value={e.nome} onChange={(x) => set({ nome: x.target.value })} placeholder="Ex.: Motoristas Carga RS 2025" /></div>
@@ -187,13 +185,12 @@ export default function Convencoes() {
             </div>
           )}
 
-          <span className={css.grupoLb}>Esta regra</span>
+          <span className={css.grupoLb}>Esta regra <Explica>Se o banco <strong>herda</strong>, vale a config da empresa (aba Banco de horas). <strong>Ativado/Desativado</strong> mandam por esta regra — assim motorista pode ter banco e administrativo não, na mesma empresa. O intervalo (&gt;6h) segue {e.intervaloMaior6hMin}min.</Explica></span>
           <label className={css.chkLinha}><input type="checkbox" checked={e.padrao} onChange={(x) => set({ padrao: x.target.checked })} /> <span>É a <strong>regra padrão</strong> da empresa (vale pra quem não tem regra escolhida)</span></label>
           <label className={css.chkLinha}><input type="checkbox" checked={e.ativa} onChange={(x) => set({ ativa: x.target.checked })} /> <span>Ativa (desmarque para arquivar)</span></label>
 
-          <div className={css.nota}>Se o banco <strong>herda</strong>, vale a config da empresa (aba Banco de horas). <strong>Ativado/Desativado</strong> mandam por esta regra — assim motorista pode ter banco e administrativo não, na mesma empresa. O intervalo (&gt;6h) segue {e.intervaloMaior6hMin}min.</div>
 
-          <span className={css.grupoLb}>Destinação de faltas e atrasos</span>
+          <span className={css.grupoLb}>Destinação de faltas e atrasos <Explica>O sistema <strong>calcula e sinaliza</strong> — o desconto real (e o reflexo do DSR) é aplicado pela sua folha. Se o banco estiver desligado, "abater do banco" vira desconto sinalizado.</Explica></span>
           <div className={css.row}>
             <div>
               <span className={css.lb}>Falta injustificada (dia inteiro)</span>
@@ -212,7 +209,6 @@ export default function Convencoes() {
               </select>
             </div>
           </div>
-          <div className={css.nota}>O sistema <strong>calcula e sinaliza</strong> — o desconto real (e o reflexo do DSR) é aplicado pela sua folha. Se o banco estiver desligado, "abater do banco" vira desconto sinalizado.</div>
 
           <div className={css.acoes}>
             <button className={css.salvar} onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar regra'}</button>

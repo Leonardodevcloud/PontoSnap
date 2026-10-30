@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { brl, dataBr, dataIsoBr, diaMes, fmtCnpj, passoDe, reais, type Eu, type Nota } from '../lib/prestador';
+import { Explica } from '../components/Explica';
 import css from './Prestador.module.css';
 
 async function paraAreaDeTransferencia(valor: string) {
@@ -96,8 +97,7 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
 
       {precisaConfirmar && !contestar && (
         <div className={css.confirma}>
-          <b>O valor confere?</b>
-          <p>O RH pediu para você confirmar antes de emitir a nota.</p>
+          <b className={css.linhaTit}>O valor confere? <Explica>O RH pediu para você confirmar o valor antes de emitir a nota. Se não conferir, conta o motivo e o RH responde aqui e no celular.</Explica></b>
           {erro && <div className={css.erro}>{erro}</div>}
           <div className={css.duoBtn}>
             <button type="button" className={css.btn} disabled={salvando} onClick={() => confirmar(true)}>Confere</button>
@@ -124,7 +124,7 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
         {verDetalhe && nota.detalhe.map((l, i) => (
           <div key={i} className={css.lin}>
             <span>{l.rotulo}</span>
-            <span className={`${css.mono} ${l.tipo === 'MENOS' ? css.neg : l.tipo === 'MAIS' ? css.pos : ''}`}>
+            <span className={`${css.mono} ${l.tipo === 'MENOS' ? css.neg : ''}`}>
               {l.tipo === 'MENOS' ? '− ' : l.tipo === 'MAIS' ? '+ ' : ''}{brl(l.valorCent)}
             </span>
           </div>
@@ -172,8 +172,7 @@ function DadosPedido({ nota, emissorUrl }: { nota: Nota; emissorUrl: string }) {
   }
   return (
     <section className={css.card}>
-      <h3>Dados para emitir a nota</h3>
-      <p className={css.dica}>Tudo já preenchido para {nota.periodo === 'MES' ? 'este mês' : 'esta semana'}. Copie cada campo para o emissor ou use "Copiar tudo".</p>
+      <h3 className={css.linhaTit}>Dados para emitir a nota <Explica>Tudo já preenchido para {nota.periodo === 'MES' ? 'este mês' : 'esta semana'}. Copie cada campo para o emissor ou use "Copiar tudo".</Explica></h3>
       <Copiar rotulo="CNPJ do tomador" valor={p.tomador.cnpj} mostrar={fmtCnpj(p.tomador.cnpj)} />
       <Copiar rotulo="Razão social" valor={p.tomador.razao} />
       {p.tomador.endereco && <Copiar rotulo="Endereço" valor={p.tomador.endereco} />}
@@ -184,7 +183,7 @@ function DadosPedido({ nota, emissorUrl }: { nota: Nota; emissorUrl: string }) {
       <Copiar rotulo="Descrição" valor={p.descricao} />
       {p.observacao && <p className={css.obsPedido}>{p.observacao}</p>}
       {nota.textoPedido && (
-        <button type="button" className={`${css.btn} ${css.btnTudo}`} onClick={copiarTudo}>{tudo ? '✓ Copiado' : 'Copiar tudo'}</button>
+        <button type="button" className={`${css.btn2} ${css.btnTudo}`} onClick={copiarTudo}>{tudo ? '✓ Copiado' : 'Copiar tudo'}</button>
       )}
       <span className="sr-only" aria-live="polite">{tudo ? 'Dados da nota copiados' : ''}</span>
       <a className={css.emissor} href={emissorUrl} target="_blank" rel="noopener noreferrer">Abrir o Emissor Nacional ↗</a>

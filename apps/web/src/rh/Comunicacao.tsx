@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { miniaturaVideo, quando, useMidia, type Publico, type StatusComunicado, rotuloPublico } from '../lib/comunicacao';
+import { Explica } from '../components/Explica';
 import css from './Comunicacao.module.css';
 
 interface Item {
@@ -65,9 +66,9 @@ export function Comunicacao() {
   return (
     <div className={css.pagina}>
       <div className={css.cab}>
-        <div>
+        <div className={css.titulo}>
           <h2>Comunicação interna</h2>
-          <p>Avisos com texto, áudio, fotos e vídeo que chegam no app de todo mundo.</p>
+          <Explica>Avisos com texto, áudio, fotos e vídeo que chegam no app de todo mundo. Você acompanha quem leu e, quando pede ciência, quem confirmou.</Explica>
         </div>
         <button className={css.btnPri} onClick={() => navegar('/rh/comunicacao/novo')}>＋ Novo comunicado</button>
       </div>
@@ -75,17 +76,21 @@ export function Comunicacao() {
 
       {r && d!.itens.length > 0 && (
         <div className={css.kpis}>
-          <div className={css.kpi}><small>Enviados no mês</small><b>{r.enviadosMes}</b><span>{r.comCienciaMes ? `${r.comCienciaMes} com ciência obrigatória` : 'nenhum pediu ciência'}</span></div>
-          <div className={css.kpi}><small>Leitura média</small><b>{r.leituraMedia != null ? `${r.leituraMedia}%` : '—'}</b><span>{r.leitura24h != null ? `em até 24h: ${r.leitura24h}%` : 'ainda sem publicações'}</span></div>
-          <div className={css.kpi}><small>Ciência pendente</small><b>{r.pessoasPendentes} {r.pessoasPendentes === 1 ? 'pessoa' : 'pessoas'}</b><span>{r.comunicadosPendentes ? `em ${r.comunicadosPendentes} ${r.comunicadosPendentes === 1 ? 'comunicado' : 'comunicados'}` : 'tudo em dia'}</span></div>
-          <div className={css.kpi}><small>Agendados</small><b>{r.agendados}</b><span>{r.proximoAgendado ? `próximo: ${quando(r.proximoAgendado)}` : 'nenhum na fila'}</span></div>
+          {/* Detalhe de cada número no title; agendados ficam no filtro "Agendados". */}
+          <div className={css.kpi} title={r.comCienciaMes ? `${r.comCienciaMes} com ciência obrigatória` : 'nenhum pediu ciência'}><small>Enviados no mês</small><b>{r.enviadosMes}</b></div>
+          <div className={css.kpi} title={r.leitura24h != null ? `em até 24h: ${r.leitura24h}%` : 'ainda sem publicações'}><small>Leitura média</small><b>{r.leituraMedia != null ? `${r.leituraMedia}%` : '—'}</b></div>
+          <div className={css.kpi} title={r.comunicadosPendentes ? `em ${r.comunicadosPendentes} ${r.comunicadosPendentes === 1 ? 'comunicado' : 'comunicados'}` : 'tudo em dia'}>
+            <small>Ciência pendente</small><b className={r.pessoasPendentes ? css.kpiNeg : ''}>{r.pessoasPendentes} {r.pessoasPendentes === 1 ? 'pessoa' : 'pessoas'}</b>
+          </div>
         </div>
       )}
 
       {d && d.itens.length > 0 && (
         <div className={css.filtros} role="group" aria-label="Filtrar comunicados">
-          {([['TODOS', 'Todos'], ['PENDENCIA', 'Com pendência'], ['AGENDADOS', 'Agendados'], ['RASCUNHOS', 'Rascunhos'], ['ARQUIVADOS', 'Arquivados']] as const).map(([k, rot]) => (
-            <button key={k} className={`${css.fl} ${filtro === k ? css.flOn : ''}`} aria-pressed={filtro === k} onClick={() => setFiltro(k)}>{rot}<span>{contagem[k]}</span></button>
+          {([['TODOS', 'Todos'], ['PENDENCIA', 'Com pendência'], ['AGENDADOS', 'Agendados'], ['RASCUNHOS', 'Rascunhos'], ['ARQUIVADOS', 'Arquivados']] as const)
+            .filter(([k]) => k === 'TODOS' || k === filtro || contagem[k] > 0).map(([k, rot]) => (
+            <button key={k} className={`${css.fl} ${filtro === k ? css.flOn : ''}`} aria-pressed={filtro === k} onClick={() => setFiltro(k)}
+              title={k === 'AGENDADOS' && r?.proximoAgendado ? `próximo: ${quando(r.proximoAgendado)}` : undefined}>{rot}<span>{contagem[k]}</span></button>
           ))}
         </div>
       )}
@@ -104,17 +109,21 @@ export function Comunicacao() {
           const porVoto = i.votos != null && !i.pedirCiencia;
           const base = i.pedirCiencia ? i.cientes : porVoto ? i.votos! : i.abertos;
           const pct = i.destinatarios ? Math.round((base / i.destinatarios) * 100) : 0;
+          // Uma etiqueta só (a do estado); as outras vão no title, com "+N".
+          const tags = [
+            i.status === 'AGENDADO' && `agendado · ${quando(i.agendadoPara)}`,
+            i.status === 'RASCUNHO' && 'rascunho',
+            i.status === 'ARQUIVADO' && 'arquivado',
+            i.pedirCiencia && i.status !== 'RASCUNHO' && 'ciência obrigatória',
+            i.fixado && 'fixado',
+          ].filter((x): x is string => !!x);
           return (
             <button key={i.id} className={css.card} onClick={() => abrir(i)}>
               <Miniatura i={i} />
               <div style={{ minWidth: 0 }}>
                 <h3>
-                  {i.titulo}
-                  {i.fixado && <span className={`${css.tag} ${css.tagFix}`}>fixado</span>}
-                  {i.pedirCiencia && i.status !== 'RASCUNHO' && <span className={`${css.tag} ${css.tagObr}`}>ciência obrigatória</span>}
-                  {i.status === 'AGENDADO' && <span className={`${css.tag} ${css.tagAg}`}>agendado · {quando(i.agendadoPara)}</span>}
-                  {i.status === 'RASCUNHO' && <span className={`${css.tag} ${css.tagRasc}`}>rascunho</span>}
-                  {i.status === 'ARQUIVADO' && <span className={`${css.tag} ${css.tagRasc}`}>arquivado</span>}
+                  <span className={css.tit} title={i.titulo}>{i.titulo}</span>
+                  {tags.length > 0 && <span className={css.tag} title={tags.join(' · ')}>{tags[0]}{tags.length > 1 ? ` +${tags.length - 1}` : ''}</span>}
                 </h3>
                 <div className={css.meta}>
                   <span>{i.midias ? i.midias.charAt(0).toUpperCase() + i.midias.slice(1) : 'Texto'}</span><span aria-hidden="true">·</span>

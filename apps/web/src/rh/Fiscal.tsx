@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { salvarBlob } from '../lib/download';
+import { Explica } from '../components/Explica';
 import css from './Fiscal.module.css';
 
 function mesAtual(): string {
@@ -34,7 +35,10 @@ export function Fiscal() {
 
   return (
     <div>
-      <div className={css.head}><h2>Arquivos fiscais</h2><p>Exportar e assinar AFD e AEJ da competência</p></div>
+      <div className={css.head}>
+        <h2>Arquivos fiscais</h2>
+        <Explica>Exportar e assinar o AFD e o AEJ da competência (Portaria 671). Os arquivos assinados (.p7s) usam o certificado ICP-Brasil cadastrado em Certificado.</Explica>
+      </div>
 
       <div className={css.filtro}>
         <label className={css.selpill}>
@@ -44,37 +48,40 @@ export function Fiscal() {
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
-      {ok && <p className={css.ok}>● {ok}</p>}
+      {ok && <p className={css.ok} role="status">{ok}</p>}
 
       <div className={css.duo}>
         <div className={css.card}>
-          <span className={css.kicker}>AFD · Portaria 671</span>
-          <h3>Arquivo Fonte de Dados</h3>
-          <p>Todas as marcações do período, com hash SHA-256 encadeado e trailer conferido. É o que a fiscalização pede primeiro.</p>
+          <span className={css.kicker}>AFD</span>
+          <div className={css.h3Linha}>
+            <h3>Arquivo Fonte de Dados</h3>
+            <Explica>Todas as marcações do período, com hash SHA-256 encadeado e trailer conferido. É o que a fiscalização pede primeiro.</Explica>
+          </div>
           <div className={css.acts}>
             <button className={`${css.btn} ${css.coral}`} disabled={!!baixando} onClick={() => baixar('afd', false)}>
               {baixando === 'afd' ? 'Gerando…' : 'Baixar AFD (.txt)'}
             </button>
-            <button className={`${css.btn} ${css.ghost}`} disabled={!!baixando} onClick={() => baixar('afd', true)}>
+            <button className={css.link} disabled={!!baixando} onClick={() => baixar('afd', true)}>
               {baixando === 'afd-p7s' ? 'Assinando…' : 'Assinado (.p7s)'}
             </button>
           </div>
         </div>
         <div className={css.card}>
-          <span className={css.kicker}>AEJ · Portaria 671</span>
-          <h3>Arquivo Eletrônico de Jornada</h3>
-          <p>As jornadas já tratadas — entradas, saídas, horários contratuais e ausências, prontas para auditoria.</p>
+          <span className={css.kicker}>AEJ</span>
+          <div className={css.h3Linha}>
+            <h3>Arquivo Eletrônico de Jornada</h3>
+            <Explica lado="dir">As jornadas já tratadas — entradas, saídas, horários contratuais e ausências, prontas para auditoria.</Explica>
+          </div>
           <div className={css.acts}>
-            <button className={`${css.btn} ${css.coral}`} disabled={!!baixando} onClick={() => baixar('aej', false)}>
+            <button className={`${css.btn} ${css.ghost}`} disabled={!!baixando} onClick={() => baixar('aej', false)}>
               {baixando === 'aej' ? 'Gerando…' : 'Baixar AEJ (.txt)'}
             </button>
-            <button className={`${css.btn} ${css.ghost}`} disabled={!!baixando} onClick={() => baixar('aej', true)}>
+            <button className={css.link} disabled={!!baixando} onClick={() => baixar('aej', true)}>
               {baixando === 'aej-p7s' ? 'Assinando…' : 'Assinado (.p7s)'}
             </button>
           </div>
         </div>
       </div>
-      <p className={css.nota}>Os arquivos assinados usam o certificado ICP-Brasil cadastrado em <strong>Certificado</strong>.</p>
     </div>
   );
 }

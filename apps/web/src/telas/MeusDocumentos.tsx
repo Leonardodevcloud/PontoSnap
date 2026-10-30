@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { salvarBlob } from '../lib/download';
+import { Explica } from '../components/Explica';
 import css from './MeusDocumentos.module.css';
 
 type Status = 'ENVIADO' | 'VISUALIZADO' | 'ASSINADO' | 'RECUSADO';
@@ -87,7 +88,10 @@ export function MeusDocumentos() {
         {erro && <p className={css.erro} role="alert">{erro}</p>}
         {pendente(atual) && (
           <>
-            <p className={css.info}>A assinatura é feita pela Autentique, com validade jurídica.{atual.canal === 'EMAIL' ? ' Você também recebeu o link no seu e-mail.' : atual.canal === 'WHATSAPP' ? ' Você também recebeu o link no WhatsApp.' : ''} Se algo estiver errado, dá para recusar lá e dizer o motivo.</p>
+            <p className={css.infoLinha}>
+              Assinatura pela Autentique
+              <Explica>A assinatura é feita pela Autentique, com validade jurídica.{atual.canal === 'EMAIL' ? ' Você também recebeu o link no seu e-mail.' : atual.canal === 'WHATSAPP' ? ' Você também recebeu o link no WhatsApp.' : ''} Se algo estiver errado, dá para recusar lá e dizer o motivo.</Explica>
+            </p>
             <button type="button" className={css.btn1} onClick={() => assinar(atual)} disabled={abrindo === atual.id}>{abrindo === atual.id ? 'Abrindo…' : 'Assinar documento'}</button>
           </>
         )}
@@ -105,8 +109,7 @@ export function MeusDocumentos() {
 
   return (
     <div className={`appshell ${css.pagina}`}>
-      <h1 className={css.h}>Documentos</h1>
-      <p className={css.s}>Espelho de ponto e contracheque de cada mês.</p>
+      <h1 className={css.h}>Documentos <Explica lado="dir">Espelho de ponto e contracheque de cada mês que o RH mandou para você assinar. Toque num documento para ver os detalhes.</Explica></h1>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {!r && !erro && <div className={css.sk} aria-busy="true"><i /><i /><i /></div>}
       {r && docs.length === 0 && <p className={css.vazio}>Nenhum documento ainda. Quando o RH mandar seu espelho de ponto ou contracheque, eles aparecem aqui.</p>}
@@ -132,7 +135,7 @@ export function MeusDocumentos() {
           {m.itens.map((d) => (
             <div key={d.id} className={css.dcard}>
               <button type="button" className={css.dcorpo} onClick={() => navegar(`/documentos/${d.id}`)}>
-                <span className={`${css.ic} ${d.status === 'ASSINADO' ? css.icOk : css.icEr}`} aria-hidden="true">{d.status === 'ASSINADO' ? '✓' : '!'}</span>
+                <span className={`${css.ic} ${d.status === 'ASSINADO' ? '' : css.icEr}`} aria-hidden="true">{d.status === 'ASSINADO' ? 'PDF' : '!'}</span>
                 <span><b>{NOME[d.tipo]} · {mesCurto(d.competencia)}</b><small>{d.status === 'ASSINADO' ? `assinado ${dia(d.assinadoEm)}` : `recusado ${dia(d.recusadoEm)}`}</small></span>
               </button>
               <button type="button" className={css.lk} onClick={() => baixar(d)} disabled={abrindo === `b${d.id}`}>{abrindo === `b${d.id}` ? '…' : 'Baixar'}</button>

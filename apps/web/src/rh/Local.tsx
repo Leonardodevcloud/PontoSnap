@@ -6,6 +6,7 @@ import { Botao } from '../components/Botao';
 import { Flash } from '../components/Flash';
 import { MapaLocal } from './MapaLocal';
 import { temMapa } from '../lib/googleMaps';
+import { Explica } from '../components/Explica';
 import css from './Local.module.css';
 
 interface Local {
@@ -104,11 +105,13 @@ export function Local() {
 
   return (
     <div className={css.tela}>
-      <h2 className={css.h}>Local do estabelecimento</h2>
-      <p className={css.sub}>
-        Serve só para o app saber quando pedir uma observação ao funcionário.
-        <strong> A batida nunca é bloqueada</strong> — a lei não permite restringir marcação.
-      </p>
+      <div className={css.titulo}>
+        <h2 className={css.h}>Local do estabelecimento</h2>
+        <Explica>
+          Serve só para o app saber quando pedir uma observação ao funcionário.
+          <strong> A batida nunca é bloqueada</strong> — a lei não permite restringir marcação.
+        </Explica>
+      </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
 
@@ -120,7 +123,7 @@ export function Local() {
           </div>
 
           <div className={css.savedInfo}>
-            <span className={css.pillOk}><span className={css.dot} />Localização ativa</span>
+            <span className={css.estado}>Localização ativa</span>
             {salvo.localPrestacao && <div className={css.endereco}>{salvo.localPrestacao}</div>}
             <div className={css.facts}>
               <div className={css.fact}>
@@ -128,15 +131,12 @@ export function Local() {
                 <div className={css.fv}>{salvo.latitude}, {salvo.longitude}</div>
               </div>
               <div className={css.fact}>
-                <div className={css.fl}>Raio</div>
+                <div className={`${css.fl} ${css.flQ}`}>Raio <Explica>{salvo.raioMetros != null
+                  ? `Fora de ${salvo.raioMetros} m, o app pede uma observação ao funcionário. Dentro do raio, bate direto. Nunca bloqueia.`
+                  : 'Sem raio definido, o app não pede observação por distância. Nunca bloqueia a batida.'}</Explica></div>
                 <div className={css.fv}>{salvo.raioMetros != null ? `${salvo.raioMetros} m` : 'sem raio'}</div>
               </div>
             </div>
-            <p className={css.hint}>
-              {salvo.raioMetros != null
-                ? <>Fora de <b>{salvo.raioMetros} m</b>, o app pede uma observação ao funcionário. Dentro do raio, bate direto. <b>Nunca bloqueia.</b></>
-                : <>Sem raio definido, o app não pede observação por distância. <b>Nunca bloqueia a batida.</b></>}
-            </p>
             <div className={css.acoesLivres}>
               <Botao variante="ghost" onClick={abrirEdicao}>Editar local</Botao>
               <button className={css.remover} onClick={remover} disabled={enviando}>Remover localização</button>
@@ -150,7 +150,7 @@ export function Local() {
         <div className={css.bloco}>
           <div className={css.saved}>
             <div className={css.info}>
-              <span className={css.pillOk}><span className={css.dot} />Localização ativa</span>
+              <span className={css.estado}>Localização ativa</span>
               {salvo.localPrestacao && <div className={css.endereco}>{salvo.localPrestacao}</div>}
               <div className={css.facts}>
                 {salvo.latitude != null && salvo.longitude != null && (
@@ -160,15 +160,12 @@ export function Local() {
                   </div>
                 )}
                 <div className={css.fact}>
-                  <div className={css.fl}>Raio</div>
+                  <div className={`${css.fl} ${css.flQ}`}>Raio <Explica>{salvo.raioMetros != null
+                  ? `Fora de ${salvo.raioMetros} m, o app pede uma observação ao funcionário. Dentro do raio, bate direto. Nunca bloqueia.`
+                  : 'Sem raio definido, o app não pede observação por distância. Nunca bloqueia a batida.'}</Explica></div>
                   <div className={css.fv}>{salvo.raioMetros != null ? `${salvo.raioMetros} m` : 'sem raio'}</div>
                 </div>
               </div>
-              <p className={css.hint}>
-                {salvo.raioMetros != null
-                  ? <>Fora de <b>{salvo.raioMetros} m</b>, o app pede uma observação ao funcionário. Dentro do raio, bate direto. <b>Nunca bloqueia.</b></>
-                  : <>Sem raio definido, o app não pede observação por distância. <b>Nunca bloqueia a batida.</b></>}
-              </p>
               <div className={css.acoesLivres}>
                 <Botao variante="ghost" onClick={abrirEdicao}>Editar local</Botao>
                 <button className={css.remover} onClick={remover} disabled={enviando}>Remover localização</button>
@@ -221,20 +218,25 @@ export function Local() {
               onChange={(e) => setLon(e.target.value)} placeholder="-38.5016000" />
           </div>
 
-          <button className={css.aqui} onClick={usarAqui} disabled={buscando}>
-            {buscando ? 'Buscando…' : 'Usar a localização deste aparelho'}
-          </button>
-          <p className={css.dica}>
-            {temMapa()
-              ? <>Abra esta tela no escritório e toque no botão acima — pega o GPS do aparelho. Ou busque o endereço no mapa e ajuste o pino.</>
-              : <>Abra esta tela no escritório e toque no botão acima — é o jeito mais fácil. Ou copie as coordenadas do Google Maps (clique com o botão direito no ponto → a primeira linha).</>}
-          </p>
+          <div className={css.aquiLinha}>
+            <button className={css.aqui} onClick={usarAqui} disabled={buscando}>
+              {buscando ? 'Buscando…' : 'Usar a localização deste aparelho'}
+            </button>
+            <Explica lado="dir" rotulo="Como pegar as coordenadas">
+              {temMapa()
+                ? <>Abra esta tela no escritório e toque neste botão — pega o GPS do aparelho. Ou busque o endereço no mapa e ajuste o pino.</>
+                : <>Abra esta tela no escritório e toque neste botão — é o jeito mais fácil. Ou copie as coordenadas do Google Maps (clique com o botão direito no ponto → a primeira linha).</>}
+            </Explica>
+          </div>
 
           <Campo rotulo="Raio em metros" inputMode="numeric" value={raio}
             onChange={(e) => setRaio(e.target.value)} placeholder="1000" />
           <p className={css.dica}>
-            Fora desse raio, o app pede uma observação (home office, visita a cliente…).
-            Recomendamos <strong>1000 m</strong>. Entre 20 e 50000 metros. <strong>Deixe em branco se a empresa é remota</strong> — aí ninguém nunca vê o campo.
+            Recomendado: 1000 m. Em branco se a empresa é remota.
+            <Explica rotulo="Sobre o raio">
+              Fora desse raio, o app pede uma observação (home office, visita a cliente…). Entre 20 e 50000 metros.
+              Deixe em branco se a empresa é remota — aí ninguém nunca vê o campo.
+            </Explica>
           </p>
 
           <div className={css.acoes}>

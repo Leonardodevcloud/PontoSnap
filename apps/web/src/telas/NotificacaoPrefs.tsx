@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { pushSuportado, estadoPermissao, temSubscriptionAtiva, ativarNotificacoes, desativarNotificacoes } from '../lib/push';
+import { Explica } from '../components/Explica';
 import css from './NotificacaoPrefs.module.css';
 
 interface Prefs {
@@ -71,17 +72,15 @@ export function NotificacaoPrefs() {
 
   return (
     <div className="appshell">
-      <div className={css.h}>Notificações</div>
-      <div className={css.sub}>Escolha o que você quer receber. Tudo fica salvo no seu perfil.</div>
+      <div className={css.h}>Notificações <Explica lado="dir">Escolha o que você quer receber. Tudo fica salvo no seu perfil.</Explica></div>
 
-      {!suportado && (
-        <div className={css.aviso}>Este navegador não suporta notificações push.</div>
-      )}
-      {negado && (
-        <div className={css.aviso}>Notificações bloqueadas nas configurações do navegador. Ative nas permissões do site.</div>
-      )}
-      {erroMsg && (
-        <div className={css.aviso}>{erroMsg}</div>
+      {/* Um aviso por vez: o mais importante primeiro. */}
+      {(erroMsg || negado || !suportado) && (
+        <div className={css.aviso} role={erroMsg ? 'alert' : undefined}>
+          {erroMsg
+            ?? (negado ? 'Notificações bloqueadas nas configurações do navegador. Ative nas permissões do site.'
+              : 'Este navegador não suporta notificações push.')}
+        </div>
       )}
 
       {/* Master toggle */}
@@ -90,13 +89,13 @@ export function NotificacaoPrefs() {
           <div className={css.masterTit}>Receber notificações</div>
           <div className={css.masterDesc}>{pushAtivo ? 'Ativo neste dispositivo' : 'Desativado'}</div>
         </div>
-        <Toggle value={pushAtivo} onChange={togglePush} disabled={!suportado || negado} />
+        <Toggle value={pushAtivo} onChange={togglePush} disabled={!suportado || negado} rotulo="Receber notificações" />
       </div>
 
       {/* Categorias */}
       <div className={css.cat}>
         <div className={css.catTit}>Lembretes de marcação</div>
-        <Row ico="⏰" icoCor="lembrete" titulo="Lembrete antes do ponto"
+        <Row titulo="Lembrete antes do ponto"
           desc="Avisa antes de cada marcação pra você não esquecer."
           valor={prefs.lembreteAntes} onChange={(v) => salvar('lembreteAntes', v)}>
           <div className={css.extra}>
@@ -113,36 +112,36 @@ export function NotificacaoPrefs() {
 
       <div className={css.cat}>
         <div className={css.catTit}>Esquecimentos</div>
-        <Row ico="📍" icoCor="esqueceu" titulo="Não bateu a entrada"
+        <Row titulo="Não bateu a entrada"
           desc="Se a jornada começou e você ainda não bateu ponto."
           valor={prefs.esqueceuEntrada} onChange={(v) => salvar('esqueceuEntrada', v)} />
-        <Row ico="🍽️" icoCor="esqueceu" titulo="Não bateu volta do almoço"
+        <Row titulo="Não bateu volta do almoço"
           desc="Se a batida de retorno do intervalo não apareceu."
           valor={prefs.esqueceuAlmoco} onChange={(v) => salvar('esqueceuAlmoco', v)} />
-        <Row ico="🚪" icoCor="esqueceu" titulo="Não bateu a saída"
+        <Row titulo="Não bateu a saída"
           desc="Se o horário de saída passou e falta a marcação."
           valor={prefs.esqueceuSaida} onChange={(v) => salvar('esqueceuSaida', v)} />
       </div>
 
       <div className={css.cat}>
         <div className={css.catTit}>RH e solicitações</div>
-        <Row ico="✅" icoCor="rh" titulo="Ajuste aprovado ou recusado"
+        <Row titulo="Ajuste aprovado ou recusado"
           desc="Quando o RH responder sua solicitação de ajuste."
           valor={prefs.ajusteRespondido} onChange={(v) => salvar('ajusteRespondido', v)} />
-        <Row ico="📋" icoCor="rh" titulo="Atestado analisado"
+        <Row titulo="Atestado analisado"
           desc="Quando o RH aprovar ou recusar seu atestado."
           valor={prefs.atestadoAnalisado} onChange={(v) => salvar('atestadoAnalisado', v)} />
-        <Row ico="📄" icoCor="rh" titulo="Espelho disponível"
+        <Row titulo="Espelho disponível"
           desc="Quando a competência fechar e o espelho estiver pronto pra assinar."
           valor={prefs.espelhoDisponivel} onChange={(v) => salvar('espelhoDisponivel', v)} />
       </div>
 
       <div className={css.cat}>
         <div className={css.catTit}>Resumos</div>
-        <Row ico="📊" icoCor="resumo" titulo="Resumo semanal"
+        <Row titulo="Resumo semanal"
           desc="Toda sexta, um resumo das suas horas e saldo da semana."
           valor={prefs.resumoSemanal} onChange={(v) => salvar('resumoSemanal', v)} />
-        <Row ico="⚠️" icoCor="resumo" titulo="Banco de horas vencendo"
+        <Row titulo="Banco de horas vencendo"
           desc="Avisa 30 dias antes de vencer horas no banco."
           valor={prefs.bancoVencendo} onChange={(v) => salvar('bancoVencendo', v)} />
       </div>
@@ -154,27 +153,26 @@ export function NotificacaoPrefs() {
 
 // ── Componentes auxiliares ──
 
-function Row({ ico, icoCor, titulo, desc, valor, onChange, children }: {
-  ico: string; icoCor: string; titulo: string; desc: string;
+function Row({ titulo, desc, valor, onChange, children }: {
+  titulo: string; desc: string;
   valor: boolean; onChange: (v: boolean) => void; children?: React.ReactNode;
 }) {
   return (
     <div className={css.row}>
-      <div className={`${css.rowIco} ${css[icoCor] ?? ''}`}>{ico}</div>
       <div className={css.rowBody}>
         <div className={css.rowTit}>{titulo}</div>
         <div className={css.rowDesc}>{desc}</div>
         {valor && children}
       </div>
-      <Toggle value={valor} onChange={onChange} />
+      <Toggle value={valor} onChange={onChange} rotulo={titulo} />
     </div>
   );
 }
 
-function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function Toggle({ value, onChange, disabled, rotulo }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean; rotulo: string }) {
   return (
     <label className={css.toggle}>
-      <input type="checkbox" checked={value} onChange={() => onChange(!value)} disabled={disabled} />
+      <input type="checkbox" role="switch" aria-label={rotulo} checked={value} onChange={() => onChange(!value)} disabled={disabled} />
       <span className={css.track} />
     </label>
   );

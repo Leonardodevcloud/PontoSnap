@@ -1,6 +1,6 @@
 .mudo{ color:var(--ash); font-size:14px; }
 .erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:10px; padding:10px 12px; font-size:14px; font-weight:600; }
-.resumo{ margin:0 0 6px; background:var(--cream); border-radius:12px; padding:12px 14px; font-size:14px; line-height:1.6; }
+.resumo{ margin:0 0 6px; font-size:14px; line-height:1.6; }
 .secT{ font-weight:500; font-size:12px; color:var(--ash); margin:18px 0 8px; }
 .conta{ list-style:none; margin:0; padding:0; border:1px solid rgba(var(--ink-rgb),.12); border-radius:14px; overflow:hidden; }
 .cl{ display:grid; grid-template-columns:20px minmax(0,1fr) auto; gap:10px; align-items:baseline; padding:11px 14px; border-top:1px solid rgba(var(--ink-rgb),.08); }
@@ -12,14 +12,15 @@
 .v{ font-weight:600; font-size:14px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .zero .v{ color:var(--ash); text-decoration:line-through; }
 .zero b{ color:var(--ash); }
-.tot{ background:var(--info-bg); border-top:2px solid var(--ink); }
+.tot{ border-top:2px solid var(--ink); }
 .tot b{ font-family:var(--ff-display); font-weight:600; font-size:16px; }
 .tot .v{ font-size:16px; }
-.nota{ margin:10px 0 0; font-size:14px; color:var(--ash); line-height:1.5; }
-.regras{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
-.regras li{ display:flex; gap:10px; align-items:center; border:1px solid rgba(var(--ink-rgb),.12); border-radius:12px; padding:10px 12px; }
+.nota{ margin:10px 0 0; font-size:12.5px; color:var(--ash); line-height:1.5; }
+.regras{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.regras li{ display:flex; gap:10px; align-items:center; padding:8px 0; border-top:1px solid rgba(var(--ink-rgb),.08); }
+.regras li:first-child{ border-top:none; }
 .regras li div{ flex:1; min-width:0; font-size:14px; }
-.regras li span{ display:block; color:var(--ash); font-size:12.5px; margin-top:2px; }
+.regras li span{ display:block; color:var(--ash); font-size:12.5px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .regras a{ color:var(--coral-dark); font-weight:500; font-size:14px; padding:8px 4px; }
 .pri, .sec{ min-height:40px; padding:8px 16px; border-radius:999px; font:inherit; font-weight:600; font-size:14px; cursor:pointer; }
 .pri{ background:var(--ink); color:var(--cream); border:none; }

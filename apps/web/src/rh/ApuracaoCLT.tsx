@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { minutosParaHhMm, reaisDeCentavos, rotuloMarcacao } from '../lib/formato';
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
+import { Explica } from '../components/Explica';
 import type { ApuracaoResp, Empregado, ResultadoDiaCLT, BatidaDia, RelatorioCompetencia } from '../tipos';
 import { TabelaCompetencia, type FiltroApuracao } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
@@ -27,7 +28,6 @@ const ROTULO_DESTINO: Record<string, string> = {
   DESCONTA: 'desconto sinalizado', BANCO: 'abatido do banco', ABONA: 'abonado',
   TOLERA: 'tolerado', PAGA: 'pago como extra',
 };
-const ehBanco = (d: string) => d === 'BANCO';
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
 
 export function ApuracaoCLT() {
@@ -151,18 +151,28 @@ export function ApuracaoCLT() {
   return (
     <div>
       <div className={css.head}>
-        <div><h2>Apuração CLT</h2><p>Fechamento da competência pelo motor de regras: extras, noturno, faltas, atrasos, banco e valores.</p></div>
+        <div className={css.tituloLinha}>
+          <h2>Apuração CLT</h2>
+          <Explica>
+            Fechamento da competência pelo motor de regras: extras, noturno, faltas, atrasos, banco e valores.
+            {visao === 'todos' && <>
+              {' '}Clique na linha pra abrir a apuração completa; clique num número sublinhado pra ver de onde ele veio.
+              {' '}Com banco de horas, extra vai pro <strong>saldo</strong> e não entra em R$; faltas e atrasos com destinação banco também não viram desconto.
+              {' '}Dia com batida em aberto fica <strong>pendente</strong> (sem falta/atraso) até o ajuste. O desconto real é aplicado pela folha.
+            </>}
+          </Explica>
+        </div>
         <div className={css.acoesPdf}>
-          <Botao variante="ghost" className={css.pdfBtn} onClick={() => setLoteAberto(true)}>Apuração em lote (ZIP)</Botao>
+          <button type="button" className={css.linkAcao} onClick={() => setLoteAberto(true)}>Apuração em lote (ZIP)</button>
           {visao === 'todos' && (
             <>
-              <Botao variante="ghost" className={css.pdfBtn} onClick={() => baixarRel('xlsx')} disabled={baixandoRel !== null}>{baixandoRel === 'xlsx' ? 'Gerando…' : 'Planilha (XLSX)'}</Botao>
+              <button type="button" className={css.linkAcao} onClick={() => baixarRel('xlsx')} disabled={baixandoRel !== null}>{baixandoRel === 'xlsx' ? 'Gerando…' : 'Planilha (XLSX)'}</button>
               <Botao variante="coral" className={css.pdfBtn} onClick={() => baixarRel('pdf')} disabled={baixandoRel !== null}>{baixandoRel === 'pdf' ? 'Gerando…' : 'Relatório da competência (PDF)'}</Botao>
             </>
           )}
           {visao === 'um' && ap && (
             <>
-              <Botao variante="ghost" className={css.pdfBtn} onClick={baixarEspelho} disabled={baixandoEspelho}>{baixandoEspelho ? 'Gerando…' : 'Espelho de ponto'}</Botao>
+              <button type="button" className={css.linkAcao} onClick={baixarEspelho} disabled={baixandoEspelho}>{baixandoEspelho ? 'Gerando…' : 'Espelho de ponto (PDF)'}</button>
               <Botao variante="coral" className={css.pdfBtn} onClick={baixarPdf} disabled={baixando}>{baixando ? 'Gerando…' : 'Apuração (PDF)'}</Botao>
             </>
           )}
@@ -210,31 +220,24 @@ export function ApuracaoCLT() {
           {rel && (
             <>
               <div className={vt.kpis}>
-                <div className={vt.kpi}><div className={vt.kpiK}>Apurados</div><div className={vt.kpiV}>{rel.linhas.length}</div><div className={vt.kpiS}>de {emps.length} ativos</div></div>
-                <div className={`${vt.kpi} ${rel.totais.extra50Min > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extra 50%</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.extra50Min)}</div></div>
-                <div className={vt.kpi}><div className={vt.kpiK}>Extra 100%</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.extra100Min)}</div><div className={vt.kpiS}>domingo/feriado</div></div>
+                <div className={vt.kpi} title={`${rel.linhas.length} de ${emps.length} funcionários ativos`}><div className={vt.kpiK}>Apurados</div><div className={vt.kpiV}>{rel.linhas.length}<span className={css.kpiDe}> de {emps.length}</span></div></div>
+                <div className={vt.kpi}><div className={vt.kpiK}>Extra 50%</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.extra50Min)}</div></div>
+                <div className={vt.kpi} title="Domingo e feriado"><div className={vt.kpiK}>Extra 100%</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.extra100Min)}</div></div>
                 <div className={vt.kpi}><div className={vt.kpiK}>Noturno (legal)</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.noturnoMin)}</div></div>
-                <div className={`${vt.kpi} ${rel.totais.faltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.faltaMin)}</div><div className={vt.kpiS}>{rel.linhas.filter((l) => l.faltaMin > 0).length} funcionário{rel.linhas.filter((l) => l.faltaMin > 0).length === 1 ? '' : 's'}</div></div>
-                <div className={`${vt.kpi} ${rel.totais.atrasoMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.atrasoMin)}</div><div className={vt.kpiS}>{rel.linhas.filter((l) => l.atrasoMin > 0).length} funcionário{rel.linhas.filter((l) => l.atrasoMin > 0).length === 1 ? '' : 's'}</div></div>
-                {rel.totais.comBanco > 0 && <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Banco · acumulado</div><div className={vt.kpiV}>{comSinal(rel.totais.bancoAcumuladoMin)}</div><div className={vt.kpiS}>anterior {comSinal(rel.totais.bancoAnteriorMin)} · mês {comSinal(rel.totais.saldoMesMin)}</div></div>}
-                <div className={vt.kpi}><div className={vt.kpiK}>Extras em R$</div><div className={vt.kpiV}>{reaisDeCentavos(rel.totais.extrasCentavos + rel.totais.adicionalNoturnoCentavos)}</div><div className={vt.kpiS}>(−) descontos {reaisDeCentavos(rel.totais.descontosCentavos)}</div></div>
+                <div className={`${vt.kpi} ${rel.totais.faltaMin > 0 ? vt.kpiAlerta : ''}`} title={plural(rel.linhas.filter((l) => l.faltaMin > 0).length, 'funcionário')}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.faltaMin)}</div></div>
+                <div className={`${vt.kpi} ${rel.totais.atrasoMin > 0 ? vt.kpiAlerta : ''}`} title={plural(rel.linhas.filter((l) => l.atrasoMin > 0).length, 'funcionário')}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{minutosParaHhMm(rel.totais.atrasoMin)}</div></div>
+                {rel.totais.comBanco > 0 && <div className={`${vt.kpi} ${rel.totais.bancoAcumuladoMin < 0 ? vt.kpiAlerta : ''}`} title={`Anterior ${comSinal(rel.totais.bancoAnteriorMin)} · mês ${comSinal(rel.totais.saldoMesMin)}`}><div className={vt.kpiK}>Banco acumulado</div><div className={vt.kpiV}>{comSinal(rel.totais.bancoAcumuladoMin)}</div></div>}
+                <div className={vt.kpi} title={`(−) descontos ${reaisDeCentavos(rel.totais.descontosCentavos)}`}><div className={vt.kpiK}>Extras em R$</div><div className={vt.kpiV}>{reaisDeCentavos(rel.totais.extrasCentavos + rel.totais.adicionalNoturnoCentavos)}</div></div>
               </div>
               <TabelaCompetencia rel={rel} modo="apuracao" filtro={filtro} onAbrir={(id) => ir({ emp: id })}
                 onExplicar={(l, campo) => setPorque({ empregadoId: l.empregadoId, nome: l.nome, campo })} />
               <PorQue pedido={porque} inicio={faixaDoMes(mes).inicio} fim={faixaDoMes(mes).fim} onFechar={() => setPorque(null)} onVerDias={(id) => ir({ emp: id })} />
-              <div className={vt.legenda}>
-                <span>Clique na linha pra abrir a apuração completa · clique num número sublinhado pra ver de onde ele veio.</span>
-                <span>Com banco de horas, extra vai pro <strong>saldo</strong> e não entra em R$; faltas e atrasos com destinação banco também não viram desconto. Dia com batida em aberto fica <strong>pendente</strong> (sem falta/atraso) até o ajuste. O desconto real é aplicado pela folha.</span>
-              </div>
             </>
           )}
         </>
       )}
 
       {visao === 'um' && carregando && <p className={css.carregando}>Apurando…</p>}
-      {visao === 'um' && ap && (
-        <div className={vt.crumb}><button onClick={() => ir({ emp: null })}>← Todos os funcionários</button><span>/</span><span>{ap.nome}</span><span>/</span><span>{new Date(`${mes}-01T12:00:00-0300`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span></div>
-      )}
 
       {visao === 'um' && r && !carregando && (
         <>
@@ -242,49 +245,51 @@ export function ApuracaoCLT() {
             <Card k="Trabalhado" v={minutosParaHhMm(r.totalTrabalhadoMin)} />
             <Card
               k="Contratado no mês" v={minutosParaHhMm(r.totalContratadoMesMin ?? r.totalContratadoMin)}
-              nota={(r.totalContratadoMesMin ?? r.totalContratadoMin) !== r.totalContratadoMin ? `até hoje ${minutosParaHhMm(r.totalContratadoMin)}` : undefined}
-              dica="Jornada esperada no mês inteiro, pela escala (feriados, folgas e afastamentos já descontados). 'Até hoje' é o que já foi apurado."
+              dica={`Jornada esperada no mês inteiro, pela escala (feriados, folgas e afastamentos já descontados).${(r.totalContratadoMesMin ?? r.totalContratadoMin) !== r.totalContratadoMin ? ` Até hoje: ${minutosParaHhMm(r.totalContratadoMin)}.` : ''}`}
             />
-            {ap!.horarioFlexivel && r.saldoPeriodoMin > 0 && <Card k="Crédito de jornada" v={`+${minutosParaHhMm(r.saldoPeriodoMin)}`} destaque dica="Contrato de horas: horas acima da carga compensam os dias curtos pelo banco. Não são extras." />}
-            <Card k="Extra 50%" v={minutosParaHhMm(extra50)} destaque={extra50 > 0} />
-            <Card k="Extra 100%" v={minutosParaHhMm(extra100)} destaque={extra100 > 0} />
+            {ap!.horarioFlexivel && r.saldoPeriodoMin > 0 && <Card k="Crédito de jornada" v={`+${minutosParaHhMm(r.saldoPeriodoMin)}`} dica="Contrato de horas: horas acima da carga compensam os dias curtos pelo banco. Não são extras." />}
+            <Card k="Extra 50%" v={minutosParaHhMm(extra50)} />
+            <Card k="Extra 100%" v={minutosParaHhMm(extra100)} dica="Domingo e feriado" />
             <Card k="Noturno (legal)" v={minutosParaHhMm(r.totalNoturnoLegalMin)} />
             <Card k="Faltas" v={minutosParaHhMm(r.totalFaltaMin)} alerta={r.totalFaltaMin > 0} />
             <Card k="Atrasos" v={minutosParaHhMm(r.totalAtrasoMin)} alerta={r.totalAtrasoMin > 0} />
-            <Card k={r.saldoPeriodoMin >= 0 ? 'Saldo credor' : 'Saldo devedor'} v={minutosParaHhMm(r.saldoPeriodoMin)} />
+            <Card k={r.saldoPeriodoMin >= 0 ? 'Saldo credor' : 'Saldo devedor'} v={minutosParaHhMm(r.saldoPeriodoMin)} alerta={r.saldoPeriodoMin < 0} />
             {r.bancoDeHorasMin !== 0 && <Card k="Banco de horas" v={minutosParaHhMm(r.bancoDeHorasMin)} />}
-            {r.reflexoDsrMin > 0 && <Card k="Reflexo do DSR" v={minutosParaHhMm(r.reflexoDsrMin)} nota="estimativa" dica="Reflexo do descanso semanal remunerado sobre as horas extras da semana. É uma estimativa — a folha de pagamento faz o cálculo exato." />}
+            {r.reflexoDsrMin > 0 && <Card k="Reflexo do DSR" v={minutosParaHhMm(r.reflexoDsrMin)} dica="Estimativa do reflexo do descanso semanal remunerado sobre as horas extras da semana — a folha de pagamento faz o cálculo exato." />}
             {r.dsrPerdidoSemanas > 0 && <Card k="DSR perdido" v={`${r.dsrPerdidoSemanas} sem`} alerta dica="Semanas em que o funcionário perdeu o descanso semanal remunerado por falta ou atraso." />}
           </div>
 
           {ap!.destinacao && (ap!.destinacao.falta.min > 0 || ap!.destinacao.atraso.min > 0) && (
             <div className={css.destinacao}>
-              <h3>Destinação — o que foi feito com falta e atraso</h3>
+              <div className={css.secH}><h3>O que foi feito com falta e atraso</h3><Explica>O sistema calcula e sinaliza — o desconto real é aplicado pela folha.</Explica></div>
               {ap!.destinacao.falta.min > 0 && (
                 <div className={css.destLinha}>
                   <span>Faltas injustificadas</span>
-                  <span><span className={css.mono}>{minutosParaHhMm(ap!.destinacao.falta.min)}</span> <span className={`${css.destBadge} ${ehBanco(ap!.destinacao.falta.destino) ? css.destBanco : css.destDesc}`}>{ROTULO_DESTINO[ap!.destinacao.falta.destino]}</span></span>
+                  <span><Destino d={ap!.destinacao.falta.destino} /> <span className={css.mono}>{minutosParaHhMm(ap!.destinacao.falta.min)}</span></span>
                 </div>
               )}
               {ap!.destinacao.atraso.min > 0 && (
                 <div className={css.destLinha}>
                   <span>Atrasos e saídas antecipadas</span>
-                  <span><span className={css.mono}>{minutosParaHhMm(ap!.destinacao.atraso.min)}</span> <span className={`${css.destBadge} ${ehBanco(ap!.destinacao.atraso.destino) ? css.destBanco : css.destDesc}`}>{ROTULO_DESTINO[ap!.destinacao.atraso.destino]}</span></span>
+                  <span><Destino d={ap!.destinacao.atraso.destino} /> <span className={css.mono}>{minutosParaHhMm(ap!.destinacao.atraso.min)}</span></span>
                 </div>
               )}
-              <p className={css.destNota}>O sistema calcula e sinaliza — o desconto real é aplicado pela folha.</p>
             </div>
           )}
 
           {ap!.banco && (
             <div className={css.destinacao}>
-              <h3>Banco de horas — de onde vem o saldo</h3>
+              <div className={css.secH}>
+                <h3>Banco de horas</h3>
+                <Explica>
+                  {ap!.banco.formaCalculo === 'INTRA_MES' && <>Regra <strong>compensa no mês e paga a diferença</strong>: sobra positiva é paga na folha; devendo
+                    {ap!.banco.acerto?.negativoMes === 'CARREGA' ? ' passa para o mês seguinte.' : ' é descontado na folha.'}{' '}</>}
+                  Os meses fecham automaticamente no dia 1º.
+                </Explica>
+                <Link to="/rh/banco" className={css.secLink}>Ver extrato</Link>
+              </div>
               {ap!.banco.formaCalculo === 'INTRA_MES' ? (
                 <>
-                  <p className={css.destNota} style={{ marginTop: 0 }}>
-                    Regra <strong>compensa no mês e paga a diferença</strong>: sobra positiva é paga na folha; devendo
-                    {ap!.banco.acerto?.negativoMes === 'CARREGA' ? ' passa para o mês seguinte.' : ' é descontado na folha.'}
-                  </p>
                   {ap!.banco.saldoAnteriorMin !== 0 && (
                     <div className={css.destLinha}>
                       <span>Veio devendo do mês anterior</span>
@@ -300,9 +305,7 @@ export function ApuracaoCLT() {
               )}
               <div className={css.destLinha}>
                 <span>
-                  Este mês {ap!.banco.fechada
-                    ? <span className={`${css.destBadge} ${css.destBanco}`}>fechado no banco</span>
-                    : <span className={`${css.destBadge} ${css.destDesc}`}>em andamento — fecha sozinho no dia 1</span>}
+                  Este mês <span className={css.destMudo}>{ap!.banco.fechada ? '· fechado no banco' : '· em andamento, fecha sozinho no dia 1º'}</span>
                 </span>
                 <span className={`${css.mono} ${ap!.banco.saldoMesMin < 0 ? css.neg : ''}`}>{comSinal(ap!.banco.saldoMesMin)}</span>
               </div>
@@ -318,19 +321,19 @@ export function ApuracaoCLT() {
               </div>
               {ap!.banco.acerto && ap!.banco.acerto.acertoMin > 0 && (
                 <div className={css.destLinha}>
-                  <span>{ap!.banco.fechada ? 'Pago na folha como hora extra' : 'Vai ser pago na folha (prévia)'} <span className={`${css.destBadge} ${css.destBanco}`}>hora extra</span></span>
+                  <span>{ap!.banco.fechada ? 'Pago na folha como hora extra' : 'Vai ser pago na folha como hora extra (prévia)'}</span>
                   <span className={`${css.mono} ${css.neg}`}>{comSinal(-ap!.banco.acerto.acertoMin)}</span>
                 </div>
               )}
               {ap!.banco.acerto && ap!.banco.acerto.acertoMin < 0 && (
                 <div className={css.destLinha}>
-                  <span>{ap!.banco.fechada ? 'Descontado na folha' : 'Vai ser descontado na folha (prévia)'} <span className={`${css.destBadge} ${css.destDesc}`}>desconto</span></span>
+                  <span>{ap!.banco.fechada ? 'Descontado na folha' : 'Vai ser descontado na folha (prévia)'}</span>
                   <span className={css.mono}>{comSinal(-ap!.banco.acerto.acertoMin)}</span>
                 </div>
               )}
               {ap!.banco.acerto && ap!.banco.acerto.passaMin < 0 && (
                 <div className={css.destLinha}>
-                  <span>Passa para o mês seguinte <span className={`${css.destBadge} ${css.destDesc}`}>a compensar</span></span>
+                  <span>Passa para o mês seguinte, a compensar</span>
                   <span className={`${css.mono} ${css.neg}`}>{comSinal(ap!.banco.acerto.passaMin)}</span>
                 </div>
               )}
@@ -341,14 +344,11 @@ export function ApuracaoCLT() {
                 </div>
               )}
               {ap!.banco.desatualizado && (
-                <div className={css.destAviso}>
-                  <span>Este mês estava fechado com outro valor (algo mudou depois). Foi reaberto e será refeito sozinho — ou refaça agora.</span>
-                  <Botao variante="ghost" onClick={refazerMes} disabled={refazendo}>{refazendo ? 'Refazendo…' : 'Refazer agora'}</Botao>
-                </div>
+                <p className={css.destAviso} role="note">
+                  <span>Este mês estava fechado com outro valor e foi reaberto — será refeito sozinho.</span>
+                  <button type="button" className={css.linkAcao} onClick={refazerMes} disabled={refazendo}>{refazendo ? 'Refazendo…' : 'Refazer agora'}</button>
+                </p>
               )}
-              <p className={css.destNota}>
-                Os meses fecham automaticamente. Extrato completo em <Link to="/rh/banco">Banco de horas</Link>.
-              </p>
             </div>
           )}
 
@@ -379,13 +379,7 @@ export function ApuracaoCLT() {
                   </span>
                   <span className={css.mono}>{d.minutosNoturnosLegais ? minutosParaHhMm(d.minutosNoturnosLegais) : '—'}</span>
                   <span className={`${css.mono} ${d.faltaMin ? css.faltaTxt : ''}`}>{d.faltaMin ? minutosParaHhMm(d.faltaMin) : '—'}</span>
-                  <span className={css.sinais}>
-                    {d.atrasoMin > 0 && <span className={`${css.tag} ${css.tagAtraso}`} title="Atraso na entrada ou saída antecipada">atraso {minutosParaHhMm(d.atrasoMin)}</span>}
-                    {d.paresIncompletos && <span className={css.tag} title="Número ímpar de batidas — esqueceu de registrar a entrada ou a saída. O dia fica pendente (sem falta, atraso ou extra) até o ajuste de ponto.">faltou bater · pendente</span>}
-                    {d.pendente && !d.paresIncompletos && <span className={css.tag} title="Dia de hoje ainda em andamento — apura quando as batidas do dia estiverem completas.">em andamento</span>}
-                    {d.penalidadeIntervaloMin > 0 && <span className={css.tag} title="Intervalo (almoço) abaixo do mínimo legal — Art. 71 §4º">intervalo curto</span>}
-                    {d.violacaoInterjornada && <span className={css.tag} title="Menos de 11h de descanso entre duas jornadas — Art. 66">descanso &lt; 11h</span>}
-                  </span>
+                  <Sinais dia={d} />
                 </div>
               );
             })}
@@ -395,25 +389,26 @@ export function ApuracaoCLT() {
             <div className={css.valores}>
               <h3>Valores (R$)</h3>
               <div className={css.vLinhas}>
-                <VLinha k={`Valor-hora (salário / 220h)`} v={reaisDeCentavos(ap!.valores.valorHoraCentavos)} />
+                <VLinha k="Valor-hora" dica="Salário ÷ 220h" v={reaisDeCentavos(ap!.valores.valorHoraCentavos)} />
                 <VLinha
-                  k={ap!.valores.extrasNoBancoMin ? `Horas extras pagas — ${minutosParaHhMm(ap!.valores.extrasNoBancoMin)} foram pro banco, não entram aqui` : 'Horas extras (base + adicional)'}
+                  k={ap!.valores.extrasNoBancoMin ? 'Horas extras pagas' : 'Horas extras'}
+                  dica={ap!.valores.extrasNoBancoMin ? `${minutosParaHhMm(ap!.valores.extrasNoBancoMin)} foram pro banco e não entram aqui` : 'Base + adicional'}
                   v={reaisDeCentavos(ap!.valores.extrasCentavos - (ap!.valores.indenizacaoCentavos ?? 0))}
                 />
                 {(ap!.valores.indenizacaoCentavos ?? 0) > 0 && (
-                  <VLinha k={`Indenização de intervalo (Art. 71) — ${minutosParaHhMm(ap!.valores.indenizacaoMin ?? 0)}, não vai pro banco`} v={reaisDeCentavos(ap!.valores.indenizacaoCentavos!)} />
+                  <VLinha k="Indenização de intervalo" dica={`Art. 71 — ${minutosParaHhMm(ap!.valores.indenizacaoMin ?? 0)}, não vai pro banco`} v={reaisDeCentavos(ap!.valores.indenizacaoCentavos!)} />
                 )}
                 <VLinha k="Adicional noturno" v={reaisDeCentavos(ap!.valores.adicionalNoturnoCentavos)} />
-                <VLinha k="Reflexo de DSR (estimativa)" v={reaisDeCentavos(ap!.valores.reflexoDsrCentavos)} />
+                <VLinha k="Reflexo de DSR" dica="Estimativa — a folha faz o cálculo exato" v={reaisDeCentavos(ap!.valores.reflexoDsrCentavos)} />
                 {ap!.valores.descontoFaltasCentavos > 0 && <VLinha k="(–) Faltas" v={`- ${reaisDeCentavos(ap!.valores.descontoFaltasCentavos)}`} desc />}
                 {ap!.valores.descontoAtrasosCentavos > 0 && <VLinha k="(–) Atrasos" v={`- ${reaisDeCentavos(ap!.valores.descontoAtrasosCentavos)}`} desc />}
                 {ap!.valores.descontoDsrPerdidoCentavos > 0 && <VLinha k="(–) DSR perdido" v={`- ${reaisDeCentavos(ap!.valores.descontoDsrPerdidoCentavos)}`} desc />}
                 {ap!.acertoBanco && ap!.acertoBanco.acertoMin > 0 && (
-                  <VLinha k={`Sobra do banco paga como extra — ${minutosParaHhMm(ap!.acertoBanco.acertoMin)} (com adicional e reflexo no DSR)`}
+                  <VLinha k="Sobra do banco paga como extra" dica={`${minutosParaHhMm(ap!.acertoBanco.acertoMin)}, com adicional e reflexo no DSR`}
                     v={reaisDeCentavos(ap!.acertoBanco.extrasCentavos + ap!.acertoBanco.reflexoDsrCentavos)} />
                 )}
                 {ap!.acertoBanco && ap!.acertoBanco.acertoMin < 0 && (
-                  <VLinha k={`(–) Banco fechou devendo — ${minutosParaHhMm(-ap!.acertoBanco.acertoMin)}`} v={`- ${reaisDeCentavos(ap!.acertoBanco.descontoCentavos)}`} desc />
+                  <VLinha k="(–) Banco fechou devendo" dica={minutosParaHhMm(-ap!.acertoBanco.acertoMin)} v={`- ${reaisDeCentavos(ap!.acertoBanco.descontoCentavos)}`} desc />
                 )}
                 <VLinha k="Resultado parcial da jornada" v={reaisDeCentavos(ap!.valores.liquidoProventosCentavos)} forte />
               </div>
@@ -441,9 +436,12 @@ export function ApuracaoCLT() {
           })()}
 
           <p className={css.disclaimer}>
-            Regras aplicadas: <strong>{ap!.regras}</strong>. Escala considerada seg–sex quando não há configuração específica;
-            feriados vêm do calendário do cliente. O <strong>reflexo de DSR é estimativa</strong> e os percentuais seguem a base
-            CLT — o acordo/convenção coletiva do cliente prevalece. Não substitui validação contábil.
+            Regras aplicadas: {ap!.regras}
+            <Explica>
+              Escala considerada seg–sex quando não há configuração específica; feriados vêm do calendário do cliente.
+              O <strong>reflexo de DSR é estimativa</strong> e os percentuais seguem a base CLT — o acordo/convenção coletiva
+              do cliente prevalece. Não substitui validação contábil.
+            </Explica>
           </p>
         </>
       )}
@@ -452,18 +450,46 @@ export function ApuracaoCLT() {
   );
 }
 
-function Card({ k, v, destaque, alerta, nota, dica }: { k: string; v: string; destaque?: boolean; alerta?: boolean; nota?: string; dica?: string }) {
+function Card({ k, v, alerta, dica }: { k: string; v: string; alerta?: boolean; dica?: string }) {
   return (
-    <div className={`${css.card} ${destaque ? css.cardDestaque : ''} ${alerta ? css.cardAlerta : ''}`} title={dica}>
-      <div className={css.cardK}>{k}{nota && <em> {nota}</em>}</div>
+    <div className={`${css.card} ${alerta ? css.cardAlerta : ''}`} title={dica}>
+      <div className={css.cardK}>{k}</div>
       <div className={css.cardV}>{v}</div>
     </div>
   );
 }
 
-function VLinha({ k, v, forte, desc }: { k: string; v: string; forte?: boolean; desc?: boolean }) {
+const plural = (n: number, s: string) => `${n} ${s}${n === 1 ? '' : 's'}`;
+
+/** Destino de falta/atraso: só vira tag quando é desconto; o resto é texto discreto. */
+function Destino({ d }: { d: string }) {
+  return d === 'DESCONTA'
+    ? <span className={css.tagProb}>{ROTULO_DESTINO[d]}</span>
+    : <span className={css.destMudo}>{ROTULO_DESTINO[d] ?? d}</span>;
+}
+
+/** Coluna "Sinais": só o sinal mais grave aparece; os demais vão no title e num "+N". */
+function Sinais({ dia: d }: { dia: ResultadoDiaCLT }) {
+  const lista: { txt: string; dica: string; grave?: boolean }[] = [];
+  if (d.paresIncompletos) lista.push({ txt: 'faltou bater', dica: 'Faltou bater · pendente: número ímpar de batidas — esqueceu de registrar a entrada ou a saída. O dia fica pendente (sem falta, atraso ou extra) até o ajuste de ponto.', grave: true });
+  if (d.atrasoMin > 0) lista.push({ txt: `atraso ${minutosParaHhMm(d.atrasoMin)}`, dica: `Atraso ${minutosParaHhMm(d.atrasoMin)}: atraso na entrada ou saída antecipada.`, grave: true });
+  if (d.penalidadeIntervaloMin > 0) lista.push({ txt: 'intervalo curto', dica: 'Intervalo curto: almoço abaixo do mínimo legal — Art. 71 §4º.', grave: true });
+  if (d.violacaoInterjornada) lista.push({ txt: 'descanso < 11h', dica: 'Descanso < 11h: menos de 11h de descanso entre duas jornadas — Art. 66.', grave: true });
+  if (d.pendente && !d.paresIncompletos) lista.push({ txt: 'em andamento', dica: 'Em andamento: dia de hoje ainda aberto — apura quando as batidas do dia estiverem completas.' });
+  if (lista.length === 0) return <span className={css.sinais} />;
+  const [p, ...resto] = lista;
+  const dica = lista.map((x) => x.dica).join('\n');
   return (
-    <div className={`${css.vLinha} ${forte ? css.vForte : ''}`}>
+    <span className={css.sinais} title={dica}>
+      {p!.grave ? <span className={`${css.tag} ${p!.txt.startsWith('atraso') ? css.tagAtraso : ''}`}>{p!.txt}</span> : <span className={css.destMudo}>{p!.txt}</span>}
+      {resto.length > 0 && <span className={css.mais}>+{resto.length}</span>}
+    </span>
+  );
+}
+
+function VLinha({ k, v, forte, desc, dica }: { k: string; v: string; forte?: boolean; desc?: boolean; dica?: string }) {
+  return (
+    <div className={`${css.vLinha} ${forte ? css.vForte : ''}`} title={dica}>
       <span className={desc ? css.vDesc : ''}>{k}</span>
       <strong className={desc ? css.vDesc : ''}>{v}</strong>
     </div>

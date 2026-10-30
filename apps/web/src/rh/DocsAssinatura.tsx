@@ -7,6 +7,7 @@ import { Avatar } from '../components/Avatar';
 import { Modal } from '../components/Modal';
 import { ModalPessoa } from '../components/ModalPessoa';
 import { Icone } from '../components/Icone';
+import { Explica } from '../components/Explica';
 import cssP from './Prestadores.module.css';
 import css from './DocsAssinatura.module.css';
 
@@ -184,8 +185,16 @@ export function DocsAssinatura() {
     <div className={cssP.pagina}>
       <div className={cssP.cab}>
         <div>
-          <h2>Assinaturas</h2>
-          <p>{d ? `${d.rotulo} · espelho de ponto e contracheque · via Autentique${d.integracao.sandbox && d.integracao.conectado ? ' (modo de teste)' : ''}` : 'Carregando…'}</p>
+          <div className={css.titulo}>
+            <h2>Assinaturas</h2>
+            <Explica>
+              Espelho de ponto (gerado quando a Folha fecha) e contracheque (PDF da contabilidade) de cada funcionário, enviados para assinar pela Autentique.
+              Cada arquivo vira um documento na Autentique (até 2 por funcionário). O status atualiza sozinho quando a pessoa visualiza, assina ou recusa
+              {pend ? `; ${pend} ${pend === 1 ? 'documento aguarda' : 'documentos aguardam'} assinatura` : ''}.
+              {t ? ` ${t.semEmail ? `${t.semEmail} sem e-mail vão pelo WhatsApp ou pelo app.` : 'Todos recebem por e-mail.'}` : ''}
+            </Explica>
+          </div>
+          {d?.integracao.sandbox && d.integracao.conectado && <p>Modo de teste</p>}
         </div>
         <div className={cssP.acoes}>
           <span className={cssP.comp}>
@@ -193,7 +202,7 @@ export function DocsAssinatura() {
             <input type="month" aria-label="Competência" value={mes} onChange={(e) => e.target.value && ir(e.target.value)} />
             <button type="button" aria-label="Próximo mês" onClick={() => ir(somarMes(mes, 1))} disabled={mes >= mesHoje()}>›</button>
           </span>
-          {d?.integracao.conectado && <button type="button" className={cssP.btnSec} onClick={atualizarStatus} disabled={atualizando}>{atualizando ? 'Atualizando…' : 'Atualizar status'}</button>}
+          {d?.integracao.conectado && <button type="button" className={cssP.btnTxt} onClick={atualizarStatus} disabled={atualizando}>{atualizando ? 'Atualizando…' : 'Atualizar status'}</button>}
           <button type="button" className={cssP.btnSec} onClick={() => setLote(true)} disabled={!d}><Icone nome="documento" tamanho={16} /> Subir contracheques</button>
           <button type="button" className={cssP.btnPri} disabled={!d?.integracao.conectado || prontos.length === 0} onClick={() => setEnviar(prontos)}>
             Enviar para assinar{prontos.length ? ` (${prontos.length})` : ''}
@@ -204,36 +213,27 @@ export function DocsAssinatura() {
       {erro && <p className={cssP.erro} role="alert">{erro}</p>}
       {msg && <p className={cssP.okMsg} role="status">{msg}</p>}
 
-      {d && !d.integracao.conectado && (
-        <div className={cssP.faixa}>
-          <div><b>A Autentique ainda não está conectada</b><small>Dá para subir os contracheques agora; o envio para assinar libera depois de colar o token da API em Integrações.</small></div>
-          {admin ? <Link className={cssP.btnPri} to="/rh/integracoes">Conectar Autentique</Link> : <small>Peça ao administrador da empresa.</small>}
-        </div>
-      )}
-      {d && d.uploadsPendentes > 0 && (
-        <div className={css.pendLote}>
-          <Icone nome="alerta" tamanho={18} />
-          <span><b>{d.uploadsPendentes} {d.uploadsPendentes === 1 ? 'arquivo subido espera' : 'arquivos subidos esperam'} confirmação.</b> Confira de quem é cada um antes de salvar.</span>
-          <button type="button" className={cssP.btnSec} onClick={() => setLote(true)}>Conferir</button>
-        </div>
-      )}
-
-      {t && (
-        <div className={css.kpis}>
-          <div className={cssP.kpi}><small>Prontos para enviar</small><b>{t.prontos} <span>de {t.pessoas}</span></b><span>{d!.espelhoPronto ? 'espelho + contracheque' : 'o espelho sai quando a Folha fechar'}</span></div>
-          <div className={cssP.kpi}><small>Falta contracheque</small><b>{t.faltaContracheque}</b><span>{t.faltaContracheque ? 'suba o PDF da contabilidade' : 'todos subidos'}</span></div>
-          <div className={cssP.kpi}>
-            <small>Enviados</small><b>{t.enviados}</b>
-            {t.enviados > 0 && <div className={cssP.barra} aria-hidden="true"><i style={{ width: `${(t.assinados / t.enviados) * 100}%`, background: 'var(--ok-text)' }} /><i style={{ width: `${(t.visualizados / t.enviados) * 100}%`, background: 'var(--coral)' }} /><i style={{ width: `${(t.recusados / t.enviados) * 100}%`, background: 'var(--erro-text)' }} /></div>}
-            <span>{t.assinados} {t.assinados === 1 ? 'assinado' : 'assinados'} · {t.visualizados} {t.visualizados === 1 ? 'visualizou' : 'visualizaram'}{t.recusados ? ` · ${t.recusados} recusado${t.recusados > 1 ? 's' : ''}` : ''}</span>
-          </div>
-          <div className={cssP.kpi}><small>Sem e-mail</small><b>{t.semEmail}</b><span>{t.semEmail ? 'vão pelo WhatsApp ou pelo app' : 'todos recebem por e-mail'}</span></div>
-        </div>
+      {/* Um aviso por vez: arquivos esperando confirmação vêm antes da Autentique desconectada. */}
+      {d && d.uploadsPendentes > 0 ? (
+        <p className={css.avisoLinha}>
+          {d.uploadsPendentes} {d.uploadsPendentes === 1 ? 'arquivo subido espera' : 'arquivos subidos esperam'} confirmação de quem é cada um.
+          <button type="button" className={css.link} onClick={() => setLote(true)}>Conferir</button>
+        </p>
+      ) : d && !d.integracao.conectado && (
+        <p className={css.avisoLinha} title="O envio para assinar libera depois de colar o token da API em Integrações.">
+          A Autentique ainda não está conectada. Dá para subir os contracheques agora.
+          {admin ? <Link className={css.link} to="/rh/integracoes">Conectar Autentique</Link> : <span>Peça ao administrador da empresa.</span>}
+        </p>
       )}
 
       <div className={cssP.filtros} role="group" aria-label="Filtrar">
-        {([['TODOS', 'Todos'], ['PRONTOS', 'Prontos'], ['FALTA', 'Falta contracheque'], ['AGUARDANDO', 'Aguardando assinatura'], ['ASSINADOS', 'Assinados'], ['PROBLEMA', 'Recusados ou com erro']] as [Filtro, string][]).map(([f, r]) => (
-          <button key={f} type="button" className={`${cssP.fl} ${filtro === f ? cssP.flOn : ''}`} aria-pressed={filtro === f} onClick={() => setFiltro(f)}>{r}<span>{contagem[f]}</span></button>
+        {/* Os números do mês ficam nos próprios filtros; filtro zerado some (menos o atual). */}
+        {([['TODOS', 'Todos'], ['PRONTOS', 'Prontos'], ['FALTA', 'Falta contracheque'], ['AGUARDANDO', 'Aguardando assinatura'], ['ASSINADOS', 'Assinados'], ['PROBLEMA', 'Recusados ou com erro']] as [Filtro, string][])
+          .filter(([f]) => f === 'TODOS' || f === filtro || contagem[f] > 0).map(([f, r]) => (
+          <button key={f} type="button" className={`${cssP.fl} ${filtro === f ? cssP.flOn : ''}`} aria-pressed={filtro === f} onClick={() => setFiltro(f)}
+            title={!t ? undefined : f === 'PRONTOS' ? (d!.espelhoPronto ? 'espelho + contracheque' : 'o espelho sai quando a Folha fechar')
+              : f === 'AGUARDANDO' ? `${t.enviados} enviados · ${t.visualizados} ${t.visualizados === 1 ? 'visualizou' : 'visualizaram'} · ${t.assinados} ${t.assinados === 1 ? 'assinado' : 'assinados'}`
+              : f === 'FALTA' ? 'suba o PDF da contabilidade' : undefined}>{r}<span>{contagem[f]}</span></button>
         ))}
         <input className={cssP.busca} type="search" placeholder="Buscar funcionário" aria-label="Buscar funcionário" value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
@@ -273,16 +273,18 @@ export function DocsAssinatura() {
                     <td>
                       <button type="button" className={`${cssP.linhaBtn} ${cssP.pes}`} onClick={() => setAberto(l.empregadoId)}>
                         <Avatar id={l.empregadoId} nome={l.nome} tamanho={34} />
-                        <span><b>{l.nome}</b><small>{l.email ?? (l.telefone ? `sem e-mail · ${fmtFone(l.telefone)}` : l.temApp ? 'sem e-mail · só pelo app' : 'sem e-mail, celular nem app')}</small></span>
+                        <span className={css.pesTxt}><b title={l.nome}>{l.nome}</b><small>{l.email ?? (l.telefone ? `sem e-mail · ${fmtFone(l.telefone)}` : l.temApp ? 'sem e-mail · só pelo app' : 'sem e-mail, celular nem app')}</small></span>
                       </button>
                     </td>
                     <td><CelulaEspelho l={l} p={d} /></td>
                     <td><CelulaCc l={l} onSubir={() => subirUm(l.empregadoId)} /></td>
                     <td>
-                      <span className={css.stat}>
-                        <span className={`${cssP.tag} ${cssP[`t-${s.tom}`]}`}>{s.rot}</span>
-                        {s.sub && <small title={s.sub}>{s.sub}</small>}
-                        <Pontos l={l} />
+                      {/* Etiqueta só quando há problema; o resto vai em texto e o detalhe no title. */}
+                      <span className={css.stat} title={[s.sub, porDoc(l)].filter(Boolean).join('\n') || undefined}>
+                        {/* "falta contracheque" já aparece como "Subir PDF" na coluna ao lado. */}
+                        {s.tom === 'er'
+                          ? <span className={`${cssP.tag} ${cssP[`t-${s.tom}`]}`}>{s.rot}</span>
+                          : <span className={s.tom === 'ok' ? css.statOk : css.statTxt}>{s.rot}</span>}
                       </span>
                     </td>
                     <td className={cssP.r}>
@@ -297,7 +299,6 @@ export function DocsAssinatura() {
           </table>
         </div>
       )}
-      {d && <p className={cssP.hint}>Cada arquivo vira um documento na Autentique (até 2 por funcionário). O status atualiza sozinho quando a pessoa visualiza, assina ou recusa{pend ? `; ${pend} ${pend === 1 ? 'documento aguarda' : 'documentos aguardam'} assinatura` : ''}.</p>}
 
       <input ref={arqInd} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => void aoEscolherUm(e.target.files?.[0])} />
 
@@ -310,27 +311,26 @@ export function DocsAssinatura() {
 }
 
 function CelulaEspelho({ l, p }: { l: Linha; p: Painel }) {
-  if (ATIVO(l.espelho)) return <span className={css.doc}><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}<small>gerado {dia(l.espelho.criadoEm)}</small></span></span>;
-  if (p.espelhoPronto) return <span className={css.doc}><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}<small>Folha fechada {dia(p.fechadoEm)} · sai no envio</small></span></span>;
-  return <span className={css.doc}><span className={`${css.ic} ${css.icOff}`}>PDF</span><span className={css.apagado}>Espelho<small>aguardando o fechamento da Folha</small></span></span>;
+  if (ATIVO(l.espelho)) return <span className={css.doc} title={`gerado ${dia(l.espelho.criadoEm)}`}><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}</span></span>;
+  if (p.espelhoPronto) return <span className={css.doc} title={`Folha fechada ${dia(p.fechadoEm)} · sai no envio`}><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}</span></span>;
+  return <span className={css.doc} title="aguardando o fechamento da Folha"><span className={`${css.ic} ${css.icOff}`}>PDF</span><span className={css.apagado}>Aguardando Folha</span></span>;
 }
 
 function CelulaCc({ l, onSubir }: { l: Linha; onSubir: () => void }) {
-  if (ATIVO(l.contracheque)) return <span className={css.doc}><span className={css.ic}>PDF</span><span className={css.nomeArq} title={l.contracheque.arquivoNome}>{l.contracheque.arquivoNome}<small>subido {dia(l.contracheque.criadoEm)} · {tam(l.contracheque.arquivoBytes)}</small></span></span>;
+  if (ATIVO(l.contracheque)) return <span className={css.doc}><span className={css.ic}>PDF</span><span className={css.nomeArq} title={`${l.contracheque.arquivoNome}\nsubido ${dia(l.contracheque.criadoEm)} · ${tam(l.contracheque.arquivoBytes)}`}>{l.contracheque.arquivoNome}</span></span>;
   return <span className={css.doc}><span className={`${css.ic} ${css.icOff}`}>PDF</span><button type="button" className={css.up} onClick={onSubir}>Subir PDF</button></span>;
 }
 
-function Pontos({ l }: { l: Linha }) {
-  const docs = [l.espelho, l.contracheque].filter(ATIVO).filter((x) => x.status !== 'RASCUNHO');
-  if (!docs.length) return null;
-  const cls = (s: StatusDoc) => s === 'ASSINADO' ? css.pf : s === 'VISUALIZADO' ? css.pv : s === 'RECUSADO' || s === 'ERRO' ? css.pe : css.pa;
-  return <span className={css.pontos} aria-hidden="true">{docs.map((x) => <i key={x.id} className={cls(x.status)} />)}</span>;
+const NOME_STATUS: Record<StatusDoc, string> = { RASCUNHO: 'pronto', ENVIADO: 'enviado', VISUALIZADO: 'visualizou', ASSINADO: 'assinado', RECUSADO: 'recusado', CANCELADO: 'cancelado', ERRO: 'erro no envio' };
+/** Situação de cada documento, para o title da célula. */
+function porDoc(l: Linha) {
+  return [l.espelho, l.contracheque].filter(ATIVO).filter((x) => x.status !== 'RASCUNHO').map((x) => `${NOME_TIPO[x.tipo]}: ${NOME_STATUS[x.status]}`).join(' · ');
 }
 
 // ───────────────────────── subir em lote ─────────────────────────
 
-const COMO: Record<string, { rot: string; tom: string }> = {
-  CPF: { rot: 'CPF', tom: 't-ok' }, NOME: { rot: 'nome', tom: 't-ok' }, CPF_PDF: { rot: 'CPF no PDF', tom: 't-in' }, NOME_PDF: { rot: 'nome no PDF', tom: 't-in' },
+const COMO: Record<string, { rot: string }> = {
+  CPF: { rot: 'CPF' }, NOME: { rot: 'nome' }, CPF_PDF: { rot: 'CPF no PDF' }, NOME_PDF: { rot: 'nome no PDF' },
 };
 
 function ModalLote({ painel, onFechar, onSalvo }: { painel: Painel; onFechar: () => void; onSalvo: (msg: string) => void | Promise<void> }) {
@@ -427,7 +427,7 @@ function ModalLote({ painel, onFechar, onSalvo }: { painel: Painel; onFechar: ()
                       {painel.linhas.map((l) => <option key={l.empregadoId} value={l.empregadoId}>{l.nome}{l.matricula ? ` · ${l.matricula}` : ''}</option>)}
                     </select>
                   </span>
-                  <span>{auto ? <span className={`${cssP.tag} ${cssP[auto.tom]}`}>{auto.rot}</span> : e ? <span className={`${cssP.tag} ${cssP['t-cz']}`}>escolhido</span> : <span className={`${cssP.tag} ${cssP['t-av']}`}>não achou</span>}</span>
+                  <span>{auto ? <span className={css.comoTxt}>{auto.rot}</span> : e ? <span className={css.comoTxt}>escolhido</span> : <span className={`${cssP.tag} ${cssP['t-av']}`}>não achou</span>}</span>
                 </div>
               );
             })}
@@ -551,7 +551,7 @@ function ModalEnviar({ painel, ids, onFechar, onEnviado }: { painel: Painel; ids
           {soCc > 0 && <p className={css.nota}>{soCc === 1 ? '1 pessoa recebe' : `${soCc} pessoas recebem`} só o contracheque agora{painel.espelhoPronto ? ' (o espelho já foi)' : '; o espelho vai quando a Folha fechar'}.</p>}
           {semAviso.length > 0 && <p className={css.alerta}>{semAviso.map((x) => x.l.nome.split(' ')[0]).slice(0, 4).join(', ')}{semAviso.length > 4 ? ` e mais ${semAviso.length - 4}` : ''}: sem e-mail, celular nem acesso ao app — não {semAviso.length === 1 ? 'vai' : 'vão'} ser {semAviso.length === 1 ? 'avisado' : 'avisados'}. Cadastre um contato em Funcionários.</p>}
           {painel.integracao.sandbox
-            ? <p className={css.teste}>Modo de teste ligado em Integrações: os documentos vão com a marca "teste" e não gastam crédito.</p>
+            ? <p className={css.nota}>Modo de teste ligado em Integrações: os documentos vão com a marca "teste" e não gastam crédito.</p>
             : <p className={css.nota}>Cada documento gasta 1 do seu plano na Autentique.</p>}
         </section>
       </div>
@@ -592,12 +592,7 @@ function ModalDetalhe({ l, p, onFechar, recarregar, avisar, onEnviar }: {
     <ModalPessoa aberto onFechar={onFechar} largura={920}
       foto={<Avatar id={l.empregadoId} nome={l.nome} tamanho={104} />}
       titulo={l.nome}
-      meta={<>{l.matricula ? `Matrícula ${l.matricula} · ` : ''}{contato}</>}
-      chips={<>
-        <span className={`${cssP.tag} ${cssP['t-cz']}`}>{p.rotulo.toLowerCase()}</span>
-        {docs.length > 0 && <span className={`${cssP.tag} ${cssP[ass === docs.length ? 't-ok' : 't-in']}`}>{ass} de {docs.length} {docs.length === 1 ? 'assinado' : 'assinados'}</span>}
-        {l.temApp && <span className={`${cssP.tag} ${cssP['t-cz']}`}>usa o app</span>}
-      </>}
+      meta={<>{p.rotulo} · {l.matricula ? `Matrícula ${l.matricula} · ` : ''}{contato}{l.temApp ? ' · usa o app' : ''}{docs.length > 0 ? ` · ${ass} de ${docs.length} ${docs.length === 1 ? 'assinado' : 'assinados'}` : ''}</>}
       rodape={<>
         <span style={{ flex: 1 }} />
         {erro && <span className={css.erroRod} role="alert">{erro}</span>}
@@ -671,7 +666,7 @@ function CartaoDoc({ tipo, d, p, vazio, ocupado, onVer, onCancelar, extra }: {
       )}
       <div className={css.cardAcoes}>
         {ok && <button type="button" className={`${cssP.btnSec} ${cssP.pequeno}`} onClick={() => onVer(ok)}>Ver PDF</button>}
-        {ok?.temAssinado && <button type="button" className={`${cssP.btnPri} ${cssP.pequeno}`} onClick={() => onVer(ok, true)}>Baixar assinado</button>}
+        {ok?.temAssinado && <button type="button" className={`${cssP.btnSec} ${cssP.pequeno}`} onClick={() => onVer(ok, true)}>Baixar assinado</button>}
         {extra}
         {ok && PENDENTE(ok.status) && <button type="button" className={`${cssP.btnTxt} ${cssP.btnPerigo}`} disabled={ocupado} onClick={() => onCancelar(ok)}>Cancelar envio</button>}
       </div>

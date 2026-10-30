@@ -6,6 +6,7 @@ import type { Horario, ParEntradaSaida } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { BotaoAjuda } from './ajuda/PainelAjuda';
+import { Explica } from '../components/Explica';
 import css from './Escalas.module.css';
 
 const DIAS = [
@@ -121,7 +122,7 @@ export function Escalas() {
   return (
     <div>
       <div className={css.headLinha}>
-        <div className={css.head}><h2>Escalas</h2><p>Dias de trabalho, carga e horários que a apuração usa para cada funcionário</p></div>
+        <div className={`${css.head} ${css.tituloLinha}`}><h2>Escalas</h2><Explica>Dias de trabalho, carga e horários que a apuração usa para cada funcionário.</Explica></div>
         <Botao variante="coral" className={css.btnAuto} onClick={novaEscala}>+ Nova escala</Botao>
       </div>
 
@@ -137,18 +138,18 @@ export function Escalas() {
         {lista?.length === 0 && (
           <div className={css.vazio}>
             Nenhuma escala ainda. Crie a primeira para dizer ao sistema os dias e as horas de trabalho.
-            <div style={{ marginTop: 12 }}><Botao variante="coral" className={css.btnAuto} onClick={novaEscala}>+ Nova escala</Botao></div>
+            {' '}<button type="button" className={css.linkAcao} onClick={novaEscala}>Criar escala</button>
           </div>
         )}
         {lista?.map((h) => (
           <div key={h.id} className={css.row}>
-            <span className={css.cod}>{h.codigo}</span>
+            <span className={css.cod} title={h.codigo}>{h.codigo}</span>
             <span className={css.mono}>{minutosParaHhMm(h.durJornadaMin)}</span>
             <span className={css.diasTxt}>{DIAS.filter((d) => h.diasSemana.includes(d.n)).map((d) => d.l).join(' · ')}</span>
             <span className={css.regimeTxt}>{h.regime === 'r12x36' ? '12x36' : h.flexivel ? 'contrato de horas' : 'horário fixo'}{h.compensaSemana ? ' · compensa na semana' : ''}</span>
             <span className={css.acoes}>
-              <button type="button" className={css.btnEditar} onClick={() => editar(h)}>Editar</button>
-              <button type="button" className={css.btnExcluir} onClick={() => excluir(h)}>Excluir</button>
+              <button type="button" className={css.linkAcao} aria-label={`Editar a escala ${h.codigo}`} onClick={() => editar(h)}>Editar</button>
+              <button type="button" className={css.linkMudo} aria-label={`Excluir a escala ${h.codigo}`} onClick={() => excluir(h)}>Excluir</button>
             </span>
           </div>
         ))}
@@ -192,10 +193,10 @@ export function Escalas() {
             <span className={css.lb}>Tipo de jornada <BotaoAjuda artigo="escalas" secao="tipos" /></span>
             <div className={css.tipoJ} role="radiogroup" aria-label="Tipo de jornada">
               <button type="button" role="radio" aria-checked={!flexivel} className={!flexivel ? css.tipoJOn : ''} onClick={() => setFlexivel(false)}>
-                <b>Horário fixo</b><span>Tem hora para entrar e sair. Chegar depois é atraso, sair depois é extra.</span>
+                <b>Horário fixo</b><span>Chegar depois é atraso, sair depois é extra.</span>
               </button>
               <button type="button" role="radio" aria-checked={flexivel} className={flexivel ? css.tipoJOn : ''} onClick={() => { setFlexivel(true); if (!flexivel) setCargaFlex(minParaHhmm(durPares || 480)); }}>
-                <b>Contrato de horas</b><span>Entra e sai na hora que quiser. Vale só a carga do dia: extra acima dela, atraso abaixo. Sozinho, um dia não compensa o outro: marque "Compensa na semana" abaixo ou use banco de horas na regra.</span>
+                <b>Contrato de horas</b><span>Entra e sai quando quiser; vale só a carga do dia.</span>
               </button>
             </div>
             {flexivel && (
@@ -204,20 +205,25 @@ export function Escalas() {
                   <span className={css.porDiaNome} style={{ width: 'auto', minWidth: 72 }}>Carga/dia</span>
                   <input type="time" aria-label="Carga de trabalho por dia" className={css.porDiaInput} value={cargaFlex} onChange={(e) => setCargaFlex(e.target.value)} />
                   <span className={css.porDiaUn}>de trabalho</span>
+                  <Explica lado="dir">
+                    Extra acima da carga, atraso abaixo. Sozinho, um dia não compensa o outro: marque "Compensa na semana" abaixo ou use banco de horas na regra.
+                    {' '}Tolerância, intervalo (Art. 71), interjornada e adicional noturno continuam valendo; só a janela de horário deixa de contar.
+                    {' '}O que fazer com o saldo (acumular no banco ou pagar) segue o banco de horas da empresa ou do perfil do funcionário.
+                  </Explica>
                 </div>
-                <p className={css.hint}>Tolerância, intervalo (Art. 71), interjornada e adicional noturno continuam valendo; só a janela de horário deixa de contar. O que fazer com o saldo (acumular no banco ou pagar) segue o banco de horas da empresa ou do perfil do funcionário.</p>
               </div>
             )}
           </div>
         )}
 
         <div className={css.bloco}>
-          <span className={css.lb}>{flexivel ? 'Horário de referência (opcional)' : 'Horários de trabalho'}</span>
-          <p className={css.hint}>
-            {flexivel
-              ? 'No contrato de horas isto não gera atraso nem extra. Serve só para lembretes de batida e para o espelho. Pode deixar em branco.'
-              : 'Cada linha é um período de trabalho. Use duas para separar manhã e tarde com o almoço no meio — ex.: 08:00→12:00 e 13:00→17:00.'}
-          </p>
+          <span className={`${css.lb} ${css.lbLinha}`}>{flexivel ? 'Horário de referência (opcional)' : 'Horários de trabalho'}
+            <Explica>
+              {flexivel
+                ? 'No contrato de horas isto não gera atraso nem extra. Serve só para lembretes de batida e para o espelho. Pode deixar em branco.'
+                : 'Cada linha é um período de trabalho. Use duas para separar manhã e tarde com o almoço no meio — ex.: 08:00→12:00 e 13:00→17:00.'}
+            </Explica>
+          </span>
           {pares.map((p, i) => (
             <div key={i} className={css.par}>
               <input type="time" value={p.entrada} aria-label={`Entrada do período ${i + 1}`} onChange={(e) => setPar(i, 'entrada', e.target.value)} />
@@ -232,8 +238,9 @@ export function Escalas() {
         <div className={css.porDiaBox}>
           <label className={css.porDiaToggle}>
             <input type="checkbox" checked={porDiaLigado} onChange={(e) => setPorDiaLigado(e.target.checked)} />
-            <span><strong>Jornada diferente por dia</strong> — marque quando um dia tem carga horária diferente (ex.: sábado menor).</span>
+            <span><strong>Jornada diferente por dia</strong></span>
           </label>
+          <Explica>Marque quando um dia tem carga horária diferente (ex.: sábado menor). O horário de almoço real vem das batidas — aqui você informa só a carga de cada dia.</Explica>
           {porDiaLigado && (
             <div className={css.porDiaGrade}>
               {DIAS.filter((d) => dias.includes(d.n)).map((d) => (
@@ -249,7 +256,6 @@ export function Escalas() {
                   <span className={css.porDiaUn}>de trabalho</span>
                 </div>
               ))}
-              <p className={css.hint}>Defina quanto o funcionário deve trabalhar em cada dia. O horário de almoço real vem das batidas dele — aqui você informa só a carga horária.</p>
             </div>
           )}
         </div>
@@ -258,25 +264,24 @@ export function Escalas() {
           <div className={`${css.porDiaBox} ${compensa ? css.compOn : ''}`}>
             <label className={css.porDiaToggle}>
               <input type="checkbox" checked={compensa} onChange={(e) => setCompensa(e.target.checked)} />
-              <span>
-                <strong>Compensa na semana</strong> <BotaoAjuda artigo="escalas" secao="semana" />: a pessoa pode trabalhar mais em alguns dias para não vir em outros
-                (estica a semana e folga o sábado, ou vem no sábado e sai mais cedo). Conta o <strong>total da semana</strong>.
-              </span>
+              <span><strong>Compensa na semana</strong></span>
             </label>
+            <Explica>
+              A pessoa pode trabalhar mais em alguns dias para não vir em outros (estica a semana e folga o sábado, ou vem no sábado e sai mais cedo). Conta o <strong>total da semana</strong>, de seg a dom; acima de 10h00 num dia é extra no dia.
+              <br /><br />• Dia sem batida <b>não é falta</b> se a semana fechar a carga.
+              <br />• No fim da semana: passou da carga → <b>hora extra</b> (ou banco, pela regra do perfil). Ficou abaixo → <b>atraso</b>.
+              <br />• Só vira <b>falta</b> quando a semana fica devendo um dia inteiro (falta tira cesta e DSR).
+              <br />• Domingo e feriado trabalhados continuam extra 100%, fora da conta da semana. Feriado e atestado tiram a carga daquele dia da semana.
+              <br />• A semana que vira o mês é apurada inteira e fecha no mês em que termina.
+              <br /><BotaoAjuda artigo="escalas" secao="semana" rotulo="Ler a ajuda" />
+            </Explica>
             {compensa && (
               <div className={css.porDiaGrade}>
                 <div className={css.compKpis}>
-                  <div><small>Carga da semana</small><b>{minutosParaHhMm(cargaSemana)}</b><em>soma dos dias da escala</em></div>
-                  <div><small>Semana vai de</small><b>seg → dom</b><em>fecha no domingo</em></div>
-                  <div><small>Teto por dia</small><b>10h00</b><em>acima disso é extra no dia</em></div>
+                  <div title="Soma dos dias da escala"><small>Carga da semana</small><b>{minutosParaHhMm(cargaSemana)}</b></div>
+                  <div title="Fecha no domingo"><small>Semana vai de</small><b>seg → dom</b></div>
+                  <div title="Acima disso é extra no dia"><small>Teto por dia</small><b>10h00</b></div>
                 </div>
-                <ul className={css.compRegras}>
-                  <li>Dia sem batida <b>não é falta</b> se a semana fechar a carga.</li>
-                  <li>No fim da semana: passou da carga → <b>hora extra</b> (ou banco, pela regra do perfil). Ficou abaixo → <b>atraso</b>.</li>
-                  <li>Só vira <b>falta</b> quando a semana fica devendo um dia inteiro (falta tira cesta e DSR).</li>
-                  <li>Domingo e feriado trabalhados continuam extra 100%, fora da conta da semana. Feriado e atestado tiram a carga daquele dia da semana.</li>
-                  <li>A semana que vira o mês é apurada inteira e fecha no mês em que termina.</li>
-                </ul>
               </div>
             )}
           </div>

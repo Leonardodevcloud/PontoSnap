@@ -127,7 +127,7 @@ export function EspelhoDia() {
           <span className={`${css.dot} ${i % 2 === 0 ? css.e : css.s}`} />
           <span className={css.kk}>{rotuloMarcacaoPorHora(m.dtMarcacao, dados?.horarioPares ?? [], i, dados?.esperadas || marcs.length)}</span>
           <span className={css.tt}>{fmtHora(m.dtMarcacao)}</span>
-          {m.nsr != null ? <span className={css.pdf}>PDF</span> : <span className={css.tagInc}>ajuste</span>}
+          {m.nsr != null ? <span className={css.pdf}>PDF</span> : <span className={css.tagInc}>por ajuste</span>}
         </button>
       ))}
 
@@ -140,7 +140,7 @@ export function EspelhoDia() {
           {impar
             ? <div className={css.aviso}>Já tem uma batida em aberto — falta bater a saída.</div>
             : ultimoNsr != null
-              ? <div className={css.afd}>NSR #{String(ultimoNsr).padStart(5, '0')} · <span className={css.ok}>●</span> registro íntegro</div>
+              ? <div className={css.afd}>NSR #{String(ultimoNsr).padStart(5, '0')} · registro íntegro</div>
               : null}
         </>
       )}
@@ -218,7 +218,7 @@ export function EspelhoDia() {
       )}
 
       <div className={css.espaco} />
-      <Botao variante="ghost" onClick={() => navegar('/')}>Voltar</Botao>
+      <button type="button" className={css.voltarLk} onClick={() => navegar('/')}>Voltar ao início</button>
     </div>
   );
 }

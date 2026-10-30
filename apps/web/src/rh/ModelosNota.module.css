@@ -17,9 +17,9 @@ button.ficha{ cursor:pointer; padding:4px 9px; min-height:28px; }
 button.ficha:hover{ filter:brightness(.96); }
 button.ficha:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 
-.aviso{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--aviso-bg); color:var(--aviso-text); border-radius:12px; padding:10px 14px; font-size:13.5px; line-height:1.5; }
-.aviso > span{ flex:1; min-width:240px; }
-.aviso small{ opacity:.85; }
+
+
+
 
 .editor{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:16px; padding:18px; }
 .col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
@@ -40,8 +40,8 @@ button.ficha:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 .opc small{ display:block; color:var(--ash); font-size:12.5px; line-height:1.45; }
 .opc select{ padding:2px 6px; font-weight:600; font-size:14px; }
 .opcOn{ border-color:var(--coral); box-shadow:0 0 0 1px var(--coral); }
-.conf{ background:var(--peach); color:var(--ink); border-radius:12px; padding:10px 12px; font-size:13px; line-height:1.5; }
-.conf b{ color:var(--coral-dark); }
+
+
 .rodape{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .confirma{ display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:13px; color:var(--ash); }
 
@@ -64,3 +64,6 @@ button.ficha:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
   .codigo{ grid-template-columns:minmax(0,1fr); }
   .modal{ min-width:0; }
 }
+.secaoLinha{ margin-top:6px; gap:6px; }
+.secaoLinha .secao{ margin:0; }
+.cardTopo{ flex-direction:column; align-items:flex-start; gap:2px; }

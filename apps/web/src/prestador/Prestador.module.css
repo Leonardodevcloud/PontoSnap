@@ -14,21 +14,21 @@
 .alertaInfo{ background:var(--info-bg, var(--peach)); border-color:transparent; }
 .alertaInfo b{ color:var(--coral-dark); }
 
-/* hero do valor */
-.hero{ background:var(--fundo-escuro); color:var(--sobre-escuro); border-radius:20px; padding:16px 17px; display:flex; flex-direction:column; gap:6px; }
-.hero small{ font-size:12px; opacity:.75; }
+/* hero do valor — cartão branco, o valor fala por si */
+.hero{ background:var(--white); color:var(--ink); border:1px solid rgba(var(--ink-rgb),.1); border-radius:20px; padding:16px 17px; display:flex; flex-direction:column; gap:6px; }
+.hero small{ font-size:12px; color:var(--ash); }
 .valor{ font-family:var(--ff-display); font-size:34px; font-weight:600; line-height:1.05; letter-spacing:-.01em; }
-.heroLin{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; opacity:.85; }
+.heroLin{ display:flex; justify-content:space-between; gap:10px; font-size:12.5px; color:var(--ash); }
 .passos{ display:flex; gap:4px; margin-top:6px; }
-.passos i{ flex:1; height:5px; border-radius:9px; background:rgba(232,237,247,.2); }
-.passos i.feito{ background:var(--lime); }
-.passos i.passoErro{ background:#F08A80; }
-.passosT{ display:flex; justify-content:space-between; font-size:10.5px; opacity:.8; gap:4px; }
+.passos i{ flex:1; height:5px; border-radius:9px; background:rgba(var(--ink-rgb),.1); }
+.passos i.feito{ background:var(--coral); }
+.passos i.passoErro{ background:var(--erro-text); }
+.passosT{ display:flex; justify-content:space-between; font-size:11px; color:var(--ash); gap:4px; }
 .passosT span{ flex:1; text-align:center; }
 .passosT span:first-child{ text-align:left; } .passosT span:last-child{ text-align:right; }
-.acaoHero{ background:var(--lime); color:var(--sobre-lime); border:0; border-radius:999px; min-height:48px; font:inherit; font-weight:600; font-size:15.5px; margin-top:8px; cursor:pointer; }
-.acaoHero:focus-visible{ outline:3px solid #fff; outline-offset:2px; }
-.estadoHero{ margin-top:8px; background:rgba(255,255,255,.08); border-radius:12px; padding:9px 11px; font-size:13px; line-height:1.45; }
+.acaoHero{ background:var(--coral-acao); color:var(--on-coral); border:0; border-radius:999px; min-height:48px; font:inherit; font-weight:500; font-size:15.5px; margin-top:8px; cursor:pointer; }
+.acaoHero:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.estadoHero{ margin-top:6px; font-size:13px; color:var(--ash); line-height:1.45; }
 
 /* cartões */
 .card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:18px; padding:13px 15px; }
@@ -37,7 +37,7 @@
 .lin:first-of-type{ border-top:0; }
 .mono{ font-size:13px; white-space:nowrap; }
 .neg{ color:var(--erro-text); }
-.pos{ color:var(--ok-text); }
+.pos{ color:var(--ink); }
 .total{ display:flex; justify-content:space-between; padding-top:9px; margin-top:4px; border-top:2px solid var(--ink); font-weight:600; font-size:15.5px; }
 .linksCard{ display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .linksCard:empty{ display:none; }
@@ -52,7 +52,7 @@
 .btnCopiar.ok{ background:var(--ok-bg); border-color:transparent; color:var(--ok-text); }
 .emissor{ display:flex; justify-content:center; align-items:center; gap:6px; margin-top:8px; min-height:44px; border-radius:999px; border:1.5px solid rgba(var(--ink-rgb),.2); color:var(--ink); text-decoration:none; font-weight:600; font-size:14px; }
 
-.confirma{ background:var(--aviso-bg); border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.confirma{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); box-shadow:inset 3px 0 0 var(--aviso-border); border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
 .confirma b{ font-size:14px; }
 .confirma p{ margin:0; font-size:13px; color:var(--ink); line-height:1.45; }
 .duoBtn{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -70,6 +70,9 @@
 .item small{ color:var(--ash); font-size:12.5px; }
 .itemDir{ text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
 .itemDir b{ font-size:13.5px; }
+.itemSt{ font-size:12px; color:var(--ash); white-space:nowrap; }
+.hLinha{ display:flex; align-items:center; gap:8px; }
+.linhaTit{ display:flex; align-items:center; gap:6px; }
 .tag{ font-size:12px; padding:3px 8px; border-radius:6px; white-space:nowrap; display:inline-block; font-weight:600; }
 .t-ok{ background:var(--ok-bg); color:var(--ok-text); }
 .t-av{ background:var(--aviso-bg); color:var(--aviso-text); }
@@ -158,8 +161,8 @@
 @media (prefers-reduced-motion: reduce){ .spin{ animation-duration:2.4s; } }
 .alertaInfo{ background:var(--info-bg); border-color:transparent; }
 .alertaInfo b{ color:var(--info-text); }
-.doArq{ font-style:normal; font-weight:600; color:var(--ok-text); font-size:11.5px; margin-left:6px; }
-.campo input.auto{ background:var(--ok-bg); border-color:var(--ok-border); }
+.doArq{ font-style:normal; font-weight:400; color:var(--ash); font-size:12px; margin-left:6px; }
+.campo input.auto{ border-color:rgba(var(--ink-rgb),.22); }
 .btnArq{ display:grid; place-items:center; position:relative; }
 .btnArq input{ position:absolute; width:1px; height:1px; opacity:0; }
 .btnArq:focus-within{ outline:3px solid var(--ink); outline-offset:2px; }
@@ -168,7 +171,7 @@
 .linkBtn:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; border-radius:8px; }
 /* Dados para emitir (modelo de nota do RH) */
 .dica{ margin:0 0 4px; color:var(--ash); font-size:13px; line-height:1.45; }
-.obsPedido{ margin:6px 0 0; background:var(--aviso-bg); color:var(--aviso-text); border-radius:10px; padding:8px 10px; font-size:13px; line-height:1.45; }
+.obsPedido{ margin:6px 0 0; color:var(--ink); border-left:3px solid var(--aviso-border); padding:4px 10px; font-size:13px; line-height:1.45; }
 .btnTudo{ margin-top:10px; }
 .avisoI{ background:var(--aviso-bg); color:var(--aviso-text); font-weight:600; }
 .avisoTxt{ margin:10px 0 0; background:var(--aviso-bg); color:var(--aviso-text); border-radius:10px; padding:9px 11px; font-size:13px; line-height:1.45; }

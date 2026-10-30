@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { Explica } from '../components/Explica';
 import type { MinhaAssinatura, Cobranca } from '../tipos';
 import css from './Assinatura.module.css';
 
@@ -45,8 +46,10 @@ export function Assinatura() {
 
   return (
     <div className={css.tela}>
-      <h2 className={css.h}>Sua assinatura</h2>
-      <p className={css.sub}>Plano e situação do PontoSnap na sua empresa.</p>
+      <div className={css.cab}>
+        <h2 className={css.h}>Sua assinatura</h2>
+        <Explica>Plano e situação do PontoSnap na sua empresa. Boletos e recibos são enviados por e-mail. Dúvidas? Fale com o suporte do PontoSnap.</Explica>
+      </div>
 
       <div className={css.cartao}>
         <div className={`${css.status} ${atrasada ? css.stAtraso : css.stOk}`}>
@@ -77,11 +80,9 @@ export function Assinatura() {
             </button>
           </div>
         )}
-        <p className={css.nota}>
-          {aberto?.avisoPagamentoEm
-            ? 'Recebemos seu aviso. A confirmação pode levar até 2 dias úteis.'
-            : 'Boletos e recibos são enviados por e-mail. Dúvidas? Fale com o suporte do PontoSnap.'}
-        </p>
+        {aberto?.avisoPagamentoEm && (
+          <p className={css.nota}>Recebemos seu aviso. A confirmação pode levar até 2 dias úteis.</p>
+        )}
       </div>
 
       {dados.cobrancas.length > 0 && (
@@ -91,9 +92,9 @@ export function Assinatura() {
             <div key={c.id} className={css.linhaHist}>
               <span className={css.comp}>{fmtComp(c.competencia)}</span>
               <span className={css.valorHist}>{brl(c.valor)}</span>
-              <span className={`${css.pill} ${c.status === 'PAGA' ? css.pillPaga : c.atrasada ? css.pillAtraso : css.pillAberta}`}>
-                {c.status === 'PAGA' ? 'Pago' : c.atrasada ? 'Atrasado' : 'Em aberto'}
-              </span>
+              {c.status !== 'PAGA' && c.atrasada
+                ? <span className={`${css.pill} ${css.pillAtraso}`}>Atrasado</span>
+                : <span className={css.stHist}>{c.status === 'PAGA' ? 'Pago' : 'Em aberto'}</span>}
             </div>
           ))}
         </div>

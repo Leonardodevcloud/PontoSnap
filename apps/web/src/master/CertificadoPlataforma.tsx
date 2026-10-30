@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { Explica } from '../components/Explica';
 import css from './CertificadoPlataforma.module.css';
 
 interface Status {
@@ -35,10 +36,10 @@ export function CertificadoPlataforma() {
     <div className={css.tela}>
       <div className={css.top}>
         <h1 className={css.h}>Certificado da plataforma</h1>
-        <p className={css.sub}>
+        <Explica>
           O e-CPF que assina o AFD, o AEJ e os comprovantes de <strong>todos</strong> os clientes.
           É um só — o seu, como desenvolvedor. Não é enviado por aqui: fica em variável de ambiente.
-        </p>
+        </Explica>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -71,17 +72,23 @@ export function CertificadoPlataforma() {
 
       {status?.configurado && (
         <div className={css.card}>
-          <div className={`${css.faixa} ${vencido ? css.fVenc : vencendo ? css.fAviso : css.fOk}`}>
-            {vencido ? '⚠ Certificado vencido — os arquivos assinados serão recusados. Renove com urgência.'
-              : vencendo ? `⚠ Vence em ${dias} dia(s). Renove antes para não interromper a assinatura.`
-              : '✓ Certificado ativo e assinando os arquivos fiscais.'}
-          </div>
+          {/* Faixa só quando há problema; ativo é uma linha discreta. */}
+          {vencido || vencendo ? (
+            <div className={`${css.faixa} ${vencido ? css.fVenc : css.fAviso}`}>
+              {vencido ? 'Certificado vencido — os arquivos assinados serão recusados. Renove com urgência.'
+                : `Vence em ${dias} dia(s). Renove antes para não interromper a assinatura.`}
+            </div>
+          ) : (
+            <p className={css.ativo}>Ativo e assinando os arquivos fiscais.</p>
+          )}
           <div className={css.linha}><span className={css.lb}>Titular (CN)</span><span className={css.val}>{status.cn ?? '—'}</span></div>
-          <div className={css.linha}><span className={css.lb}>Válido até</span><span className={css.val}>{fmtData(status.validade)}</span></div>
-          <p className={css.trocar}>
-            Para trocar (renovação anual), atualize <code>PLATAFORMA_CERT_PFX_B64</code> e
-            <code> PLATAFORMA_CERT_SENHA</code> no Railway e refaça o deploy.
-          </p>
+          <div className={css.linha}>
+            <span className={css.lb}>
+              Válido até
+              <Explica>Para trocar (renovação anual), atualize <code>PLATAFORMA_CERT_PFX_B64</code> e <code>PLATAFORMA_CERT_SENHA</code> no Railway e refaça o deploy.</Explica>
+            </span>
+            <span className={`${css.val} ${vencido ? css.neg : ''}`}>{fmtData(status.validade)}</span>
+          </div>
         </div>
       )}
     </div>

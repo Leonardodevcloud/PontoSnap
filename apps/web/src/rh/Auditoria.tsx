@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { LinhaAuditoria } from '../tipos';
+import { Explica } from '../components/Explica';
 import css from './Auditoria.module.css';
 
 const fmtQuando = (iso: string) =>
@@ -79,11 +80,13 @@ export function Auditoria() {
 
   return (
     <div className={css.tela}>
-      <h2 className={css.h}>Trilha de auditoria</h2>
-      <p className={css.sub}>
-        Toda ação que muda dados fica registrada aqui — quem fez, quando, de onde.
-        A trilha é <strong>imutável</strong>: nem o administrador consegue apagar uma linha.
-      </p>
+      <div className={css.titulo}>
+        <h2 className={css.h}>Trilha de auditoria</h2>
+        <Explica>
+          Toda ação que muda dados fica registrada aqui — quem fez, quando, de onde (o IP aparece ao passar o mouse na data).
+          A trilha é <strong>imutável</strong>: nem o administrador consegue apagar uma linha.
+        </Explica>
+      </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
 
@@ -118,13 +121,12 @@ export function Auditoria() {
         <div key={l.id} className={css.linha}>
           <div className={css.linhaTop}>
             <span className={css.acao}>{legivel(l.acao)}</span>
-            <span className={css.quando}>{fmtQuando(l.em)}</span>
+            <span className={css.quando} title={l.ip ? `IP ${l.ip}` : undefined}>{fmtQuando(l.em)}</span>
           </div>
           <div className={css.meta}>
             <span className={css.quem}>{l.usuarioNome ? <><b>{l.usuarioNome}</b>{l.usuarioEmail && !l.usuarioEmail.includes('@portal.') ? ` · ${l.usuarioEmail}` : ''}</> : l.usuarioEmail ?? 'sistema'}</span>
-            {l.usuarioPerfil && <span className={css.perfil}>{l.usuarioPerfil}</span>}
+            {l.usuarioPerfil && <span className={css.perfil}>· {l.usuarioPerfil}</span>}
             {l.statusHttp && l.statusHttp[0] === '4' && <span className={css.falhou}>recusada</span>}
-            {l.ip && <span className={css.ip}>{l.ip}</span>}
           </div>
         </div>
       ))}

@@ -5,6 +5,7 @@ import { quando, type Bloco, type Publico, type StatusComunicado, rotuloPublico 
 import { Avatar } from '../components/Avatar';
 import { ComunicadoView } from '../components/comunicado/ComunicadoView';
 import { PainelLateral } from '../components/PainelLateral';
+import { Explica } from '../components/Explica';
 import css from './Comunicacao.module.css';
 
 interface Destinatario {
@@ -122,12 +123,13 @@ export function ComunicadoDetalhe() {
           <p>Publicado {quando(d.publicadoEm)}{d.autorNome ? ` por ${d.autorNome}` : ''} · {rotuloPublico(d.publico)} ({ds.length}){d.pedirCiencia ? ' · ciência obrigatória' : ''}{arquivado ? ' · arquivado' : ''}</p>
         </div>
         <div className={css.acoes}>
+          {/* Uma ação principal (lembrar); o resto vira link. */}
+          {!arquivado && <button type="button" className={css.lnk} onClick={() => navegar(`/rh/comunicacao/${d.id}/editar`)}>Editar</button>}
+          {!arquivado && <button type="button" className={css.lnk} disabled={!!ocupado} onClick={() => acao('fixar', { fixado: !d.fixado }, d.fixado ? 'Desafixado.' : 'Fixado no topo do app.')}>{d.fixado ? 'Desafixar' : 'Fixar no topo'}</button>}
+          <button type="button" className={css.lnk} disabled={!!ocupado} onClick={() => acao('arquivar', { arquivar: !arquivado }, arquivado ? 'Voltou para o app.' : 'Arquivado: saiu do app dos funcionários. O comprovante continua aqui.')}>{arquivado ? 'Desarquivar' : 'Arquivar'}</button>
+          {!arquivado && enq && !enq.encerrada && <button type="button" className={css.lnk} disabled={!!ocupado} onClick={() => acao('encerrar-enquete', {}, 'Votação encerrada. O resultado ficou congelado.')}>Encerrar votação</button>}
           <button type="button" className={css.btnSec} onClick={() => setConteudo(true)}>Ver conteúdo</button>
-          {!arquivado && <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/comunicacao/${d.id}/editar`)}>Editar</button>}
-          {!arquivado && <button type="button" className={css.btnSec} disabled={!!ocupado} onClick={() => acao('fixar', { fixado: !d.fixado }, d.fixado ? 'Desafixado.' : 'Fixado no topo do app.')}>{d.fixado ? 'Desafixar' : 'Fixar no topo'}</button>}
-          <button type="button" className={css.btnSec} disabled={!!ocupado} onClick={() => acao('arquivar', { arquivar: !arquivado }, arquivado ? 'Voltou para o app.' : 'Arquivado: saiu do app dos funcionários. O comprovante continua aqui.')}>{arquivado ? 'Desarquivar' : 'Arquivar'}</button>
-          {!arquivado && enq && !enq.encerrada && <button type="button" className={css.btnSec} disabled={!!ocupado} onClick={() => acao('encerrar-enquete', {}, 'Votação encerrada. O resultado ficou congelado.')}>Encerrar votação agora</button>}
-          {!arquivado && pendentes.length > 0 && <button type="button" className={css.btnPri} disabled={!!ocupado} onClick={() => lembrar()}>🔔 Lembrar {votando ? (pendentes.length === 1 ? 'quem não votou' : `os ${pendentes.length} que não votaram`) : pendentes.length === 1 ? 'o pendente' : `os ${pendentes.length} pendentes`}</button>}
+          {!arquivado && pendentes.length > 0 && <button type="button" className={css.btnPri} disabled={!!ocupado} onClick={() => lembrar()}>Lembrar {votando ? (pendentes.length === 1 ? 'quem não votou' : `os ${pendentes.length} que não votaram`) : pendentes.length === 1 ? 'o pendente' : `os ${pendentes.length} pendentes`}</button>}
         </div>
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
@@ -171,7 +173,7 @@ export function ComunicadoDetalhe() {
               return (
                 <li key={x.empregadoId}>
                   <Avatar id={x.empregadoId} nome={x.nome} tamanho={34} />
-                  <span className={css.nm}><b>{x.nome}</b><small>{[x.cliente, !x.temPush && pend && 'sem notificação ativa', x.midiaEm && (nVideo ? 'deu play' : 'ouviu'), x.reacao].filter(Boolean).join(' · ') || ' '}</small></span>
+                  <span className={css.nm}><b title={x.nome}>{x.nome}</b><small>{[x.cliente, !x.temPush && pend && 'sem notificação ativa', x.midiaEm && (nVideo ? 'deu play' : 'ouviu'), x.reacao].filter(Boolean).join(' · ') || ' '}</small></span>
                   <span className={`${css.st} ${s.c}`}>{s.t}{lembrados[x.empregadoId] && <><br /><small style={{ fontWeight: 400 }}>{lembrados[x.empregadoId]}</small></>}</span>
                   {pend && !arquivado && <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={!!ocupado} onClick={() => lembrar([x.empregadoId])}>Lembrar</button>}
                 </li>
@@ -194,12 +196,6 @@ export function ComunicadoDetalhe() {
               </div>
             </div>
           )}
-          {enq && enq.mudaram > 0 && (
-            <div className={css.caixa}>
-              <h4>Mudanças de voto</h4>
-              <p className={css.ajuda} style={{ margin: 0 }}>{enq.mudaram} {enq.mudaram === 1 ? 'pessoa mudou' : 'pessoas mudaram'} o voto. Vale o último, com a hora em que foi feito.</p>
-            </div>
-          )}
           {!(enq && !enq.anonima) && d.porCliente.length > 1 && (
             <div className={css.caixa}>
               <h4>Por cliente</h4>
@@ -220,14 +216,16 @@ export function ComunicadoDetalhe() {
             <h4>Envio</h4>
             <ul className={css.hist}>
               <li><b>{quando(d.publicadoEm)}</b> · publicado{d.notificar ? `, notificação chegou para ${d.notificados} ${d.notificados === 1 ? 'pessoa' : 'pessoas'}` : ' sem notificação'}</li>
+              {enq && enq.mudaram > 0 && <li title="Vale o último voto, com a hora em que foi feito.">{enq.mudaram} {enq.mudaram === 1 ? 'pessoa mudou' : 'pessoas mudaram'} o voto (vale o último)</li>}
               {d.lembrar && <li><b>{d.lembreteEm ? quando(d.lembreteEm) : quando(new Date(Date.parse(d.publicadoEm!) + 86_400_000).toISOString())}</b> · {d.lembreteEm ? 'lembrete automático enviado' : `lembrete automático para quem ${d.pedirCiencia ? 'não deu ciência' : votando ? 'não votou' : 'não leu'}`}</li>}
             </ul>
           </div>
           <div className={css.caixa}>
-            <h4>{enq ? 'Exportar' : 'Comprovante'}</h4>
-            <p className={css.ajuda} style={{ margin: '0 0 10px' }}>{enq
-              ? `PDF com a pergunta, o total de cada opção e ${enq.anonima ? 'quem votou (sem dizer em quê, é anônima)' : 'o voto de cada pessoa'}, com data e hora${d.pedirCiencia ? ' da ciência' : ''}.`
-              : `Lista com nome, CPF, data e hora ${d.pedirCiencia ? 'da ciência' : 'da leitura'} de cada pessoa. Serve de prova de que o funcionário foi comunicado.`}</p>
+            <h4 className={css.h4q}>{enq ? 'Exportar' : 'Comprovante'}
+              <Explica lado="dir">{enq
+                ? `PDF com a pergunta, o total de cada opção e ${enq.anonima ? 'quem votou (sem dizer em quê, é anônima)' : 'o voto de cada pessoa'}, com data e hora${d.pedirCiencia ? ' da ciência' : ''}.`
+                : `Lista com nome, CPF, data e hora ${d.pedirCiencia ? 'da ciência' : 'da leitura'} de cada pessoa. Serve de prova de que o funcionário foi comunicado.`}</Explica>
+            </h4>
             <button type="button" className={css.btnSec} onClick={baixarPdf} disabled={ocupado === 'pdf'}>{ocupado === 'pdf' ? 'Gerando…' : enq ? 'Baixar PDF do resultado' : `Baixar PDF de ${d.pedirCiencia ? 'ciência' : 'leitura'}`}</button>
           </div>
         </div>
@@ -247,7 +245,7 @@ function ResultadoEnqueteRH({ enq, ds }: { enq: ResultadoEnquete; ds: Destinatar
   return (
     <div className={css.enqRes}>
       <div className={css.enqCab}>
-        <div><small>ENQUETE{enq.anonima ? ' · VOTO ANÔNIMO' : ''}{enq.multipla ? ' · MAIS DE UMA OPÇÃO' : ''}</small><h3>{enq.pergunta}</h3></div>
+        <div><small>Enquete{enq.anonima ? ' · voto anônimo' : ''}{enq.multipla ? ' · mais de uma opção' : ''}</small><h3>{enq.pergunta}</h3></div>
         <div className={css.enqTot}><b>{enq.total}</b> de {ds.length} {ds.length === 1 ? 'votou' : 'votaram'}<br />
           {enq.encerrada ? 'votação encerrada' : enq.encerraEm ? `até ${quando(enq.encerraEm)}` : 'sem prazo'}</div>
       </div>

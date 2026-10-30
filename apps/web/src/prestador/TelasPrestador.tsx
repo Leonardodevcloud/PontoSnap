@@ -6,6 +6,7 @@ import { pushSuportado, temSubscriptionAtiva, ativarNotificacoes, desativarNotif
 import { brl, fmtCnpj, fmtTel, notaEmDestaque, statusParaPrestador, type Eu, type Nota } from '../lib/prestador';
 import { Caricatura, hash } from '../components/Avatar';
 import { BotaoTema } from '../components/BotaoTema';
+import { Explica } from '../components/Explica';
 import { PainelNota } from './PainelNota';
 import { usePrestador } from './LayoutPrestador';
 import css from './Prestador.module.css';
@@ -28,7 +29,10 @@ function Item({ n, onClick }: { n: Nota; onClick: () => void }) {
       </span>
       <span className={css.itemDir}>
         <b>{brl(n.valorCent)}</b>
-        <span className={`${css.tag} ${css[`t-${st.tom}`]}`}>{st.texto}</span>
+        {/* Tag só quando falta algo do prestador; o resto é texto discreto. */}
+        {st.tom === 'er' || st.tom === 'av'
+          ? <span className={`${css.tag} ${css[`t-${st.tom}`]}`}>{st.texto}</span>
+          : <span className={css.itemSt}>{st.texto}</span>}
       </span>
     </button>
   );
@@ -79,8 +83,7 @@ export function NotasPrestador() {
   const nomeGrupo = (g: string) => (g.length === 4 ? g : new Date(`${g}-15T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   return (
     <div className={css.tela}>
-      <h1 className={css.h}>Minhas notas</h1>
-      <p className={css.s}>Cada {eu.prestador.tipo === 'MEI' ? 'mês' : 'semana'} com o valor, a nota e o pagamento.</p>
+      <h1 className={`${css.h} ${css.hLinha}`}>Minhas notas <Explica lado="dir">Cada {eu.prestador.tipo === 'MEI' ? 'mês' : 'semana'} com o valor, a nota e o pagamento. Toque numa linha para ver os detalhes.</Explica></h1>
       {eu.notas.length === 0 && <div className={css.vazio}><b>Nenhuma nota ainda</b><p>O histórico aparece aqui depois do primeiro fechamento.</p></div>}
       {[...grupos.entries()].map(([g, ns]) => (
         <section key={g} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

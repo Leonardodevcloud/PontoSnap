@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { Avatar } from '../components/Avatar';
 import { ModalPessoa } from '../components/ModalPessoa';
+import { Explica } from '../components/Explica';
 import { acordoEmpresaTxt, hhmm, JORNADA, NIVEL, type RaioX as TRaioX } from '../lib/compensacao';
 import cssP from './Prestadores.module.css';
 import css from './RaioX.module.css';
@@ -51,13 +52,12 @@ export function RaioX({ empregadoId, onFechar, onEscala, onPerfil }: {
     <ModalPessoa aberto onFechar={onFechar} largura={1000}
       foto={<Avatar id={empregadoId} nome={r?.nome ?? ''} tamanho={104} />}
       titulo={r?.nome ?? 'Carregando…'}
-      meta={r ? <>Como as horas são contadas hoje{r.matricula ? ` · mat. ${r.matricula}` : ''}</> : null}
-      chips={r ? <span className={`${cssP.tag} ${cssP[`t-${NIVEL[r.nivel].tom}`]}`}>{NIVEL[r.nivel].rot}</span> : null}
+      meta={r ? <>Como as horas são contadas hoje{r.matricula ? ` · mat. ${r.matricula}` : ''}{' '}
+        <Explica rotulo="Mudou escala ou regra?">Mudou escala ou regra de quem já tem mês fechado? Os meses fechados não mudam sozinhos: abra o mês em Ponto do mês para recalcular.</Explica></> : null}
+      chips={r && (NIVEL[r.nivel].tom === 'er' || NIVEL[r.nivel].tom === 'av') ? <span className={`${cssP.tag} ${cssP[`t-${NIVEL[r.nivel].tom}`]}`}>{NIVEL[r.nivel].rot}</span> : null}
       rodape={<>
         <Link className={cssP.btnTxt} to="/rh/ajuda/compensar-horas" onClick={onFechar}>Ler: fazer as horas compensarem</Link>
         <span style={{ flex: 1 }} />
-        {onPerfil && <button type="button" className={cssP.btnSec} onClick={onPerfil}>Trocar perfil</button>}
-        {onEscala && <button type="button" className={cssP.btnSec} onClick={onEscala}>Trocar escala</button>}
         <Link className={cssP.btnPri} to={`/rh/ajuda/assistente?emp=${empregadoId}`} onClick={onFechar} data-autofoco>
           {erros.length ? 'Corrigir com o assistente' : 'Mudar com o assistente'}
         </Link>
@@ -105,15 +105,24 @@ export function RaioX({ empregadoId, onFechar, onEscala, onPerfil }: {
           <div className={css.efeitos} aria-label="Onde compensa">
             {([['dia', 'Dentro do dia', 'atraso e extra do mesmo dia se anulam'], ['semana', 'Na semana', r.niveis.semana ? 'dias da semana se compensam' : 'cada dia fecha sozinho'],
               ['mes', 'No mês', r.niveis.mes ? 'saldos do mês se anulam' : 'extra paga, atraso descontado'], ['acumula', 'Passa de mês', r.niveis.acumula ? 'vira folga depois' : 'não acumula']] as const).map(([k, t, d]) => (
-              <div key={k} className={r.niveis[k] ? css.sim : css.nao}><b>{t}</b><span>{r.niveis[k] ? '✓ compensa' : '✕ não'}</span><small>{d}</small></div>
+              <div key={k} className={r.niveis[k] ? css.sim : css.nao} title={d}><b>{t}</b><span>{r.niveis[k] ? '✓ compensa' : '✕ não'}</span></div>
             ))}
           </div>
 
-          {(erros.length > 0 || avisos.length > 0) && (
-            <ul className={css.alertas}>
-              {[...erros, ...avisos].map((a) => <li key={a.codigo} className={css[`a-${a.gravidade}`]}>{a.texto}</li>)}
-            </ul>
-          )}
+          {(erros.length > 0 || avisos.length > 0) && (() => {
+            const [prim, ...resto] = [...erros, ...avisos];
+            return (
+              <div className={css.alertas}>
+                <p className={`${css.alertaLinha} ${css[`a-${prim!.gravidade}`]}`} role="note">{prim!.texto}</p>
+                {resto.length > 0 && (
+                  <details className={css.hist}>
+                    <summary>Mais {resto.length} {resto.length === 1 ? 'aviso' : 'avisos'}</summary>
+                    <ul>{resto.map((a) => <li key={a.codigo}>{a.texto}</li>)}</ul>
+                  </details>
+                )}
+              </div>
+            );
+          })()}
 
           {r.historico.length > 1 && (
             <details className={css.hist}>
@@ -121,7 +130,6 @@ export function RaioX({ empregadoId, onFechar, onEscala, onPerfil }: {
               <ul>{r.historico.map((h, i) => <li key={i}><b>{h.codigo}</b> · {h.dataInicio <= '2000-01-01' ? 'desde o início' : `de ${dia(h.dataInicio)}`}{h.dataFim ? ` até ${dia(h.dataFim)}` : ' em diante'}</li>)}</ul>
             </details>
           )}
-          <p className={cssP.hint}>Mudou escala ou regra de quem já tem mês fechado? Os meses fechados não mudam sozinhos: abra o mês em Ponto do mês para recalcular.</p>
         </div>
       )}
     </ModalPessoa>

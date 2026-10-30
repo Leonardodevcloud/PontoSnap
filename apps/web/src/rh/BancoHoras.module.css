@@ -1,14 +1,22 @@
 .tela{ max-width:760px; }
 .telaLarga{ max-width:none; }
-.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; }
+.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; margin:0; }
+.tituloLinha{ display:flex; align-items:center; gap:8px; margin-bottom:18px; }
+.avisoLinha{ margin:0 0 14px; display:flex; gap:7px; align-items:flex-start; font-size:14px; line-height:1.5; color:var(--aviso-text); }
+.avisoLinha::before{ content:''; flex-shrink:0; width:7px; height:7px; margin-top:.5em; border-radius:50%; background:currentColor; }
+.voltar{ background:none; border:none; padding:10px 4px; color:var(--coral-dark); font:inherit; font-size:14px; font-weight:500; cursor:pointer; white-space:nowrap; }
+.voltar:hover{ text-decoration:underline; }
+.nomeCorta{ display:block; max-width:28ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mais{ font-size:12px; color:var(--ash); margin-left:2px; }
+.loteExplica{ padding-bottom:10px; }
+.voltar:focus-visible, .acaoH:focus-visible, .aba:focus-visible, .hrow:focus-visible, .linkish:focus-visible, .btnEditar:focus-visible, .extRemover:focus-visible, .abSinalBtn:focus-visible, .opcao:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
 .sub{ color:var(--ash); font-size:14px; margin:6px 0 20px; line-height:1.55; }
 
 .bloco{
   background:var(--white); border:1px solid rgba(var(--ink-rgb),.1);
   border-radius:var(--r-md); padding:20px; margin-bottom:16px;
 }
-.blocoH{ font-size:12px; color:var(--ash); margin-bottom:10px;
-}
+.blocoH{ display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ash); margin-bottom:10px; }
 
 .opcoes{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:9px; margin-bottom:14px; }
 .opcao{
@@ -32,11 +40,10 @@
 .select:focus, .mes:focus{ border-color:var(--coral); }
 
 .cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:16px; }
-.card{ background:var(--cream); border-radius:12px; padding:12px 13px; }
+.card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:12px; padding:12px 13px; }
 .cL{ font-size:12px; color:var(--ash); }
 .cV{ font-family:var(--ff-display); font-size:22px; font-weight:600; margin-top:3px; }
-.cardAlerta{ background:var(--peach); }
-.cardAlerta .cV{ color:var(--coral-dark); }
+.cardAlerta .cV{ color:var(--erro-text); }
 
 .alerta{
   display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;
@@ -118,9 +125,10 @@
 .folgaH:focus{ border-color:var(--coral); }
 
 /* Cobertura: quem segue o padrão e quem tem regra própria */
-.cobertura{ display:flex; flex-direction:column; gap:5px; background:var(--cream); border-radius:12px; padding:11px 14px; margin-top:12px; }
+.cobertura{ font-size:12.5px; color:var(--ash); margin:12px 0 0; line-height:1.6; }
+.cobertura b{ color:var(--ink); font-weight:500; }
 .cobLinha{ font-size:12.5px; color:var(--ash); }
-.cobLink{ font-size:12.5px; font-weight:600; color:var(--coral-dark); text-decoration:underline; margin-top:3px; }
+.cobLink{ font-size:12.5px; font-weight:500; color:var(--coral-dark); white-space:nowrap; }
 
 .abSinal { display: flex; gap: 8px; margin: 10px 0; }
 .abSinalBtn { flex: 1; padding: 9px 10px; border: 1.5px solid rgba(var(--ink-rgb),.14); border-radius: 10px; background:var(--white); font: inherit; font-weight:600; font-size: 12.5px; color: var(--ash, #55627A); cursor: pointer; }
@@ -151,7 +159,7 @@
 .hauto{ font-style:normal; font-size:12px; color:var(--ash); margin-left:6px; }
 .cSub{ font-size:12.5px; color:var(--ash); margin-top:4px; }
 .cSub .mono{ font-size:12.5px; }
-.extTag{ display:table; font-style:normal; font-size:12px; color:var(--ash); margin-top:2px; padding:1px 6px; border-radius:5px; background:var(--cream); }
+.extTag{ display:block; font-style:normal; font-weight:400; font-size:12px; color:var(--ash); margin-top:2px; }
 
 .extAcao{ width:22px; text-align:center; }
 .extRemover{ margin-left:0 !important; }
@@ -181,9 +189,7 @@
 .prevSeta{ color:var(--ash); font-size:18px; }
 .prevDesc{ margin-left:auto; font-size:12.5px; color:var(--ash); text-align:right; max-width:320px; }
 .prevDesc b{ color:var(--ink); }
-.extTagPago{ background:var(--ok-bg); color:var(--ok-text); }
 /* Baixa em lote */
-.loteAviso{ background:var(--aviso-bg); border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.5; margin:0 0 14px; }
 .loteTopo{ display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px; }
 .loteTopo .campoB{ width:220px; }
 .chkTodos{ display:flex; gap:8px; align-items:center; font-size:12.5px; margin-left:auto; cursor:pointer; }
@@ -195,3 +201,5 @@
 .loteRod{ display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; font-size:14px; color:var(--ash); }
 .loteRod b{ color:var(--ink); }
 .loteRod > :last-child{ margin-left:auto; }
+@media(max-width:620px){ .cards{ grid-template-columns:1fr 1fr; } }
+.linha + .avisoLinha{ margin-top:12px; }

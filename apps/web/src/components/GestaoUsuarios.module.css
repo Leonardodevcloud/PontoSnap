@@ -1,6 +1,6 @@
 .raiz{ display:flex; flex-direction:column; gap:12px; min-width:0; }
 .topo{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-.sub{ margin:0; color:var(--ash); font-size:14px; max-width:640px; line-height:1.5; }
+.sub{ margin:0; color:var(--ash); font-size:14px; max-width:640px; line-height:1.5; display:flex; align-items:center; gap:8px; }
 .btnPri, .btnSec{ display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:6px 16px; border-radius:999px; font:inherit; font-weight:500; font-size:14px; cursor:pointer; }
 .btnPri{ background:var(--coral-acao); color:var(--on-coral); border:0; }
 .btnPri:hover:not(:disabled){ background:var(--coral-acao-hover); }
@@ -24,7 +24,9 @@
 .inativo td{ color:var(--ash); }
 .inativo .av{ background:var(--thead-bg); color:var(--ash); }
 .pes{ display:flex; gap:10px; align-items:center; min-width:0; }
-.pes b{ display:block; font-weight:600; }
+.pesTxt{ min-width:0; }
+.pes b{ display:block; font-weight:600; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.emp{ display:block; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pes small{ color:var(--ash); font-size:12.5px; overflow-wrap:anywhere; }
 .voce{ font-style:normal; font-weight:600; color:var(--coral-dark); font-size:12px; }
 .av{ width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-weight:600; font-size:12.5px; background:var(--peach); color:var(--coral-dark); flex-shrink:0; }
@@ -36,7 +38,6 @@
 .acoes{ text-align:right; white-space:nowrap; }
 .acoes .lk + .lk{ margin-left:12px; }
 .vazio{ text-align:center; color:var(--ash); padding:24px !important; }
-.nota{ margin:0; background:var(--peach); border-radius:12px; padding:10px 14px; font-size:13px; line-height:1.5; color:var(--ink); }
 
 .form{ display:flex; flex-direction:column; gap:14px; }
 .duo{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }

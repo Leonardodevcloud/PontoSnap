@@ -13,6 +13,7 @@ import { ModalPessoa } from '../components/ModalPessoa';
 import { Icone } from '../components/Icone';
 import { FecharPessoa } from './FecharPessoa';
 import { CidadeTrabalho } from '../components/CidadeTrabalho';
+import { Explica } from '../components/Explica';
 import css from './Prestadores.module.css';
 
 const mesHoje = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
@@ -63,12 +64,19 @@ export function Rosto({ id, semente, tamanho = 34 }: { id: string; semente: numb
 export function TagSituacao({ s, atrasada }: { s: Situacao; atrasada?: boolean }) {
   return <span className={`${css.tag} ${css[`t-${TOM_SITUACAO[s]}`]}`}>{ROTULO_SITUACAO[s]}{atrasada ? ' · atrasada' : ''}</span>;
 }
-function TagAcesso({ l }: { l: LinhaRh }) {
+/** Situação do acesso ao app em texto (tag só quando há problema). */
+function infoAcesso(l: LinhaRh): { texto: string; tom: 'ok' | 'av' | 'er' | 'cz'; dica: string } {
   const a = l.acesso;
-  if (a.status === 'ATIVO') return <span className={`${css.tag} ${a.temPush ? css['t-ok'] : css['t-in']}`} title={a.temPush ? 'Notificações ligadas' : 'Sem notificação no celular'}>{a.temPush ? 'ativo' : 'ativo · sem push'}</span>;
-  if (a.status === 'CONVIDADO') return <span className={`${css.tag} ${css['t-av']}`}>convidado · até {dataIsoBr(a.conviteExpiraEm)}</span>;
-  if (a.status === 'BLOQUEADO') return <span className={`${css.tag} ${css['t-er']}`}>bloqueado</span>;
-  return <span className={`${css.tag} ${css['t-cz']}`}>{a.status === 'CONVITE_VENCIDO' ? 'convite venceu' : 'sem acesso'}</span>;
+  if (a.status === 'ATIVO') return { texto: a.temPush ? 'ativo' : 'ativo · sem push', tom: 'ok', dica: a.temPush ? 'Notificações ligadas' : 'Sem notificação no celular' };
+  if (a.status === 'CONVIDADO') return { texto: `convidado · até ${dataIsoBr(a.conviteExpiraEm)}`, tom: 'av', dica: 'Convite enviado, ainda não criou a senha' };
+  if (a.status === 'BLOQUEADO') return { texto: 'bloqueado', tom: 'er', dica: 'Acesso cortado pelo RH' };
+  return { texto: a.status === 'CONVITE_VENCIDO' ? 'convite venceu' : 'sem acesso', tom: 'cz', dica: 'O RH sobe a nota pela Folha e benefícios' };
+}
+/** Tag de acesso: só quando não está ativo; ativo vira texto simples. */
+function TagAcesso({ l }: { l: LinhaRh }) {
+  const i = infoAcesso(l);
+  if (i.tom === 'ok') return <span className={css.txtMudo} title={i.dica}>{i.texto}</span>;
+  return <span className={`${css.tag} ${css[`t-${i.tom}`]}`} title={i.dica}>{i.texto}</span>;
 }
 
 /**
@@ -141,25 +149,38 @@ export function Prestadores() {
   const t = d?.totais;
   const semModelo = (d?.linhas ?? []).filter((l) => !l.modeloNota).length;
   const faltamIds = (d?.linhas ?? []).flatMap((l) => l.unidades).filter((u) => u.nota && (u.situacao === 'FALTA' || u.situacao === 'RECUSADA')).map((u) => u.nota!.id);
-  const pendentesLib = d ? (!d.meiLiberado && d.fechado && d.totais.mei > 0) || d.semanas.some((s) => s.encerrada && !s.liberada && s.motoristas > 0) : false;
+  const semanasPend = d ? d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length : 0;
+  const meiPend = d ? !d.meiLiberado && d.fechado && d.totais.mei > 0 : false;
+  const pendentesLib = meiPend || semanasPend > 0;
+  // Um aviso por vez: mês aberto > valor sem liberar > prestadores sem modelo.
+  const aviso: 'ABERTO' | 'LIBERAR' | 'MODELO' | null = !d ? null
+    : !d.fechado && d.totais.mei > 0 ? 'ABERTO'
+      : pendentesLib && d.fechado ? 'LIBERAR'
+        : d.linhas.length > 0 && semModelo > 0 ? 'MODELO' : null;
 
   return (
     <div className={css.pagina}>
       <div className={css.cab}>
         <div>
-          <h2>Notas de prestadores</h2>
-          <p>{d ? `${d.rotulo} · ${d.fechado ? `fechado em ${dataIsoBr(d.fechadoEm)}` : 'em aberto'}${d.meiLiberado ? ' e liberado para os prestadores' : ''}` : 'Carregando…'}</p>
+          <div className={css.tituloLinha}>
+            <h2>Notas de prestadores</h2>
+            <Explica>O RH libera o valor do mês (MEI) ou da semana (motorista), acompanha quem mandou a nota, confere, lembra e registra o pagamento. Quem não tem acesso ao app continua como hoje: o RH sobe a nota pela Folha e benefícios. Lembrete automático todo dia às 9h para quem ainda não mandou, até 7 dias depois do prazo.</Explica>
+          </div>
+          <p>{d ? `${d.rotulo} · ${d.fechado ? `fechado em ${dataIsoBr(d.fechadoEm)}` : 'em aberto'}${d.meiLiberado ? ' e liberado' : ''}` : 'Carregando…'}</p>
         </div>
         <div className={css.acoes}>
+          <Link className={css.lk} to="/rh/prestadores/modelos" title={semModelo && aviso !== 'MODELO' ? `${semModelo} sem modelo de nota` : undefined}>
+            Modelos de nota{semModelo > 0 && aviso !== 'MODELO' ? ` · ${semModelo} sem` : ''}
+          </Link>
+          <button type="button" className={css.lk} onClick={() => setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id))} disabled={!d || !t?.semAcesso}
+            title={t?.semAcesso ? `${t.semAcesso} sem acesso ao app` : 'Todos já têm acesso'}>
+            Dar acesso em lote
+          </button>
           <span className={css.comp}>
             <button type="button" aria-label="Mês anterior" onClick={() => ir(somarMes(mes, -1))}>‹</button>
             <input type="month" aria-label="Competência" value={mes} onChange={(e) => e.target.value && ir(e.target.value)} />
             <button type="button" aria-label="Próximo mês" onClick={() => ir(somarMes(mes, 1))} disabled={mes >= mesHoje()}>›</button>
           </span>
-          <button type="button" className={css.btnSec} onClick={() => setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id))} disabled={!d || !t?.semAcesso}>
-            Dar acesso em lote
-          </button>
-          <Link className={css.btnSec} to="/rh/prestadores/modelos">Modelos de nota</Link>
           <Link className={css.btnSec} to="/rh/prestadores/conferir" aria-disabled={!t?.conferir}>Conferir {t?.conferir ?? 0} {t?.conferir === 1 ? 'nota' : 'notas'}</Link>
           <button type="button" className={css.btnPri} onClick={() => setLiberar(true)} disabled={!d}>Liberar valores</button>
         </div>
@@ -167,37 +188,33 @@ export function Prestadores() {
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {msg && <p className={css.okMsg} role="status">{msg}</p>}
 
-      {d && !d.fechado && d.totais.mei > 0 && (
-        <div className={css.faixa}>
-          <div><b>{d.rotulo} ainda está aberto</b><small>Feche o mês na Folha e benefícios para liberar o valor de cada MEI. As semanas dos motoristas já podem ser liberadas.</small></div>
-          <button type="button" className={css.btnPri} onClick={() => navegar(`/rh/pessoal?mes=${mes}`)}>Ir para o fechamento</button>
-        </div>
+      {d && aviso === 'ABERTO' && (
+        <p className={css.avisoLinha} role="status">
+          {d.rotulo} ainda está aberto: feche o mês para liberar o valor de cada MEI.
+          <button type="button" className={css.lk} onClick={() => navegar(`/rh/pessoal?mes=${mes}`)}>Ir para o fechamento</button>
+          <Explica>Feche o mês na Folha e benefícios para liberar o valor de cada MEI. As semanas dos motoristas já podem ser liberadas em "Liberar valores".</Explica>
+        </p>
       )}
-      {d && pendentesLib && d.fechado && (
-        <div className={css.faixa}>
-          <div><b>Tem valor fechado e ainda não liberado</b><small>{!d.meiLiberado && d.totais.mei > 0 ? `${d.totais.mei} MEI` : ''}{!d.meiLiberado && d.semanas.some((s) => s.encerrada && !s.liberada && s.motoristas > 0) ? ' e ' : ''}{d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length ? `${d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length} semana(s) de motorista` : ''} esperando a liberação.</small></div>
-          <button type="button" className={css.btnPri} onClick={() => setLiberar(true)}>Liberar agora</button>
-        </div>
+      {d && aviso === 'LIBERAR' && (
+        <p className={css.avisoLinha} role="status">
+          {[meiPend ? `${d.totais.mei} MEI` : '', semanasPend ? `${semanasPend} semana(s) de motorista` : ''].filter(Boolean).join(' e ')} com valor fechado esperando a liberação.
+          <button type="button" className={css.lk} onClick={() => setLiberar(true)}>Liberar agora</button>
+        </p>
       )}
-
-      {d && d.linhas.length > 0 && semModelo > 0 && (
-        <div className={css.avisoModelo} role="status">
-          <span><b>{semModelo === d.linhas.length ? 'Nenhum prestador tem modelo de nota' : `${semModelo} ${semModelo === 1 ? 'prestador sem modelo de nota' : 'prestadores sem modelo de nota'}`}:</b> o app mostra só tomador e valor, e a conferência não confere código do serviço nem descrição.</span>
-          <Link className={css.btnTxt} to="/rh/prestadores/modelos">{semModelo === d.linhas.length ? 'Criar modelo' : 'Escolher modelo'}</Link>
-        </div>
+      {d && aviso === 'MODELO' && (
+        <p className={css.avisoLinha} role="status">
+          {semModelo === d.linhas.length ? 'Nenhum prestador tem modelo de nota.' : `${semModelo} ${semModelo === 1 ? 'prestador sem modelo de nota.' : 'prestadores sem modelo de nota.'}`}
+          <Link className={css.lk} to="/rh/prestadores/modelos">{semModelo === d.linhas.length ? 'Criar modelo' : 'Escolher modelo'}</Link>
+          <Explica>Sem modelo, o app mostra só tomador e valor, e a conferência não confere código do serviço nem descrição.</Explica>
+        </p>
       )}
 
       {t && (
         <div className={css.kpis}>
-          <div className={`${css.kpi} ${css.kpiEsc}`}><small>A pagar a prestadores</small><b>{brl(t.aPagarCent)}</b><span>{t.pessoas} pessoas · {t.mei} MEI · {t.motoristas} motoristas</span></div>
-          <div className={css.kpi}><small>Com acesso ao app</small><b>{t.comAcesso} <span>de {t.pessoas}</span></b><span>{t.semAcesso ? `${t.semAcesso} sem acesso${t.convidados ? ` · ${t.convidados} convidados` : ''}` : 'todos com acesso'}</span></div>
-          <div className={css.kpi}><small>Notas recebidas</small><b>{t.recebidas} <span>de {t.notas}</span></b>
-            <div className={css.barra} aria-hidden="true">
-              <i style={{ width: `${t.notas ? (t.aprovadas / t.notas) * 100 : 0}%`, background: 'var(--ok-text)' }} />
-              <i style={{ width: `${t.notas ? (t.conferir / t.notas) * 100 : 0}%`, background: 'var(--coral)' }} />
-            </div>
-            <span>{t.conferir} para conferir</span></div>
-          <div className={css.kpi}><small>Faltam enviar</small><b>{t.faltam}</b><span>{t.recusadas ? `${t.recusadas} recusadas · ` : ''}lembrete automático 9h</span></div>
+          <div className={css.kpi} title={`${t.mei} MEI · ${t.motoristas} motoristas`}><small>A pagar a prestadores</small><b>{brl(t.aPagarCent)}</b><span>{t.pessoas} pessoas</span></div>
+          <div className={css.kpi} title={t.convidados ? `${t.convidados} convidados` : undefined}><small>Com acesso ao app</small><b>{t.comAcesso} <span>de {t.pessoas}</span></b>{t.semAcesso ? <span>{t.semAcesso} sem acesso</span> : null}</div>
+          <div className={css.kpi} title={`${t.aprovadas} aprovadas`}><small>Notas recebidas</small><b>{t.recebidas} <span>de {t.notas}</span></b><span>{t.conferir} para conferir</span></div>
+          <div className={css.kpi} title={`${t.recusadas ? `${t.recusadas} recusadas · ` : ''}Lembrete automático às 9h`}><small>Faltam enviar</small><b>{t.faltam}</b>{t.recusadas ? <span>{t.recusadas} recusadas</span> : null}</div>
           <div className={css.kpi}><small>Pagos</small><b>{t.pagos}</b><span>{brl(t.pagosCent)}</span></div>
         </div>
       )}
@@ -205,24 +222,26 @@ export function Prestadores() {
       <div className={css.ferramentas}>
         <label className={css.buscaGrande}>
           <Icone nome="busca" tamanho={18} />
-          <input type="search" placeholder="Buscar por nome, empresa ou CPF/CNPJ" aria-label="Buscar prestador" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          <input type="search" placeholder="Nome, empresa ou CPF/CNPJ" aria-label="Buscar prestador" value={busca} onChange={(e) => setBusca(e.target.value)} />
           {busca && <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca">✕</button>}
         </label>
+        <div className={css.filtros} role="group" aria-label="Filtrar">
+          {FILTROS.filter((f) => f.id === 'TODOS' || filtro === f.id || !d || contagem(f.id) > 0).map((f) => (
+            <button key={f.id} type="button" className={`${css.fl} ${filtro === f.id ? css.flOn : ''}`} aria-pressed={filtro === f.id} onClick={() => setFiltro(f.id)}>
+              {f.rotulo}<span>{d ? contagem(f.id) : ''}</span>
+            </button>
+          ))}
+        </div>
+        <span className={css.esp} />
+        {busca && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.length}</span>}
+        {faltamIds.length > 0 && <button type="button" className={css.lk} disabled={ocupado} onClick={() => lembrar(faltamIds)}
+          title="Envia lembrete agora para quem ainda não mandou ou teve a nota recusada">Lembrar os {faltamIds.length}</button>}
         <label className={css.ordem}>
           <span>Ordem:</span>
           <select value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)} aria-label="Ordenar por">
             {ORDENS.map((o) => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
           </select>
         </label>
-        {busca && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.length}</span>}
-      </div>
-      <div className={css.filtros} role="group" aria-label="Filtrar">
-        {FILTROS.map((f) => (
-          <button key={f.id} type="button" className={`${css.fl} ${filtro === f.id ? css.flOn : ''}`} aria-pressed={filtro === f.id} onClick={() => setFiltro(f.id)}>
-            {f.rotulo}<span>{d ? contagem(f.id) : ''}</span>
-          </button>
-        ))}
-        {faltamIds.length > 0 && <button type="button" className={css.btnSec + ' ' + css.pequeno} disabled={ocupado} onClick={() => lembrar(faltamIds)}>🔔 Lembrar os {faltamIds.length}</button>}
       </div>
 
       {sel.size > 0 && (
@@ -250,7 +269,7 @@ export function Prestadores() {
               <tr>
                 <th style={{ width: 36 }}><input type="checkbox" className={css.chk} aria-label="Selecionar todos" checked={todasMarcadas}
                   onChange={() => setSel(todasMarcadas ? new Set() : new Set(linhas.map((l) => l.id)))} /></th>
-                <th>Prestador</th><th>Tipo</th><th className={css.r}>Valor da nota</th><th>Nota</th><th>App</th><th>Pagamento</th><th />
+                <th>Prestador</th><th className={css.r}>Valor da nota</th><th>Nota</th><th>App</th><th>Pagamento</th><th />
               </tr>
             </thead>
             <tbody>
@@ -262,7 +281,6 @@ export function Prestadores() {
           </table>
         </div>
       )}
-      {d && <p className={css.hint}>Quem não tem acesso continua como hoje: o RH sobe a nota pela Folha e benefícios. Lembrete automático todo dia às 9h para quem ainda não mandou, até 7 dias depois do prazo.</p>}
 
       {linhaAberta && d && !fechar && (
         <DetalhePrestador key={linhaAberta.id} l={linhaAberta} d={d} mes={mes} ocupado={ocupado} onFechar={() => setAberto(null)}
@@ -292,32 +310,37 @@ function Linha({ l, marcado, ocupado, onMarcar, onAbrir, onLembrar, onConvidar, 
   const falta = liberadas.filter((u) => u.situacao === 'FALTA' || u.situacao === 'RECUSADA').map((u) => u.nota!.id);
   const mot = l.tipo === 'MOTORISTA';
   const ultimaPaga = l.unidades.filter((u) => u.pagoEm).map((u) => u.pagoEm!).sort().pop() ?? null;
+  const fi = l.fechadoIndividual;
+  const fiTexto = fi ? `${fi.motivo === 'DESLIGAMENTO' ? 'desligado' : 'fechado'} ${dataIsoBr(fi.em)}` : null;
+  const fiDica = fi ? (fi.motivo === 'DESLIGAMENTO' ? `Desligamento · último dia ${dataBr(fi.ultimoDia ?? '')}` : 'Pago antes do fechamento do mês') : '';
+  const visto = liberadas.length > 0 && l.acesso.status === 'ATIVO' && (l.situacao === 'FALTA' || l.situacao === 'RECUSADA')
+    ? (l.vistoEm ? `viu ${haQuanto(l.vistoEm)}` : 'não abriu') : null;
+  const tomSit = TOM_SITUACAO[l.situacao];
+  const acesso = infoAcesso(l);
+  const dicaNota = [ROTULO_SITUACAO[l.situacao] + (l.atrasada ? ' · atrasada' : ''), visto, fi ? fiDica : null].filter(Boolean).join(' · ');
+  const sub = [mot ? 'Motorista' : 'MEI', l.empresa, l.funcao].filter(Boolean).join(' · ');
   return (
     <tr>
       <td><input type="checkbox" className={css.chk} checked={marcado} onChange={onMarcar} aria-label={`Selecionar ${l.nome}`} /></td>
       <td>
         <button type="button" className={`${css.linhaBtn} ${css.pes}`} onClick={onAbrir}>
           <Rosto id={l.id} semente={l.avatarSemente} />
-          <span><b>{l.nome}</b><small>{[l.empresa, l.funcao].filter(Boolean).join(' · ') || '—'}</small></span>
+          <span className={css.pesTxt}><b title={l.nome}>{l.nome}</b><small title={fiTexto ? `${sub} · ${fiDica}` : sub}>{sub}{fiTexto ? ` · ${fiTexto}` : ''}</small></span>
         </button>
       </td>
-      <td>{mot ? 'Motorista' : 'MEI'}</td>
-      <td className={`${css.r} ${css.mono}`}>{brl(l.valorCent)}{mot && <span className={css.sub}>{l.unidades.length} {l.unidades.length === 1 ? 'semana' : 'semanas'}</span>}</td>
-      <td>
-        {l.fechadoIndividual && <span className={`${css.tag} ${css['t-nv']}`} title={l.fechadoIndividual.motivo === 'DESLIGAMENTO' ? `Desligamento · último dia ${dataBr(l.fechadoIndividual.ultimoDia ?? '')}` : 'Pago antes do fechamento do mês'}>
-          {l.fechadoIndividual.motivo === 'DESLIGAMENTO' ? 'desligado' : 'fechado'} {dataIsoBr(l.fechadoIndividual.em)}</span>}{' '}
-        <TagSituacao s={l.situacao} atrasada={l.atrasada} />
-        {mot && l.unidades.length > 0 && (
+      <td className={`${css.r} ${css.mono}`} title={mot ? `${l.unidades.length} ${l.unidades.length === 1 ? 'semana' : 'semanas'}` : undefined}>{brl(l.valorCent)}</td>
+      <td title={dicaNota}>
+        {tomSit === 'ok' || tomSit === 'cz'
+          ? <span className={css.txtMudo}>{ROTULO_SITUACAO[l.situacao]}</span>
+          : <TagSituacao s={l.situacao} atrasada={l.atrasada} />}
+        {mot && l.unidades.length > 1 && (
           <span className={css.semanas} aria-label={l.unidades.map((u) => `${u.rotulo}: ${ROTULO_SITUACAO[u.situacao]}`).join('; ')}>
             {l.unidades.map((u) => <i key={u.periodo} className={css[TOM_SITUACAO[u.situacao] === 'cz' ? '' : TOM_SITUACAO[u.situacao]]} title={`${u.rotulo}: ${ROTULO_SITUACAO[u.situacao]}`} />)}
           </span>
         )}
-        {liberadas.length > 0 && l.acesso.status === 'ATIVO' && (l.situacao === 'FALTA' || l.situacao === 'RECUSADA') && (
-          <span className={css.sub}>{l.vistoEm ? `viu ${haQuanto(l.vistoEm)}` : 'não abriu'}</span>
-        )}
       </td>
-      <td><TagAcesso l={l} /></td>
-      <td className={css.mono}>{l.pago ? <span className={`${css.tag} ${css['t-ok']}`}>pago {dataIsoBr(ultimaPaga)}</span> : l.pagoCent ? <span className={css.sub}>{brl(l.pagoCent)} pago</span> : '—'}</td>
+      <td><span className={acesso.tom === 'ok' ? css.txtMudo : css.txtProb} title={acesso.dica}>{acesso.texto}</span></td>
+      <td className={`${css.mono} ${css.txtMudo}`}>{l.pago ? `pago ${dataIsoBr(ultimaPaga)}` : l.pagoCent ? `${brl(l.pagoCent)} pago` : '—'}</td>
       <td className={css.r}>
         {l.situacao === 'CONFERIR' ? <button type="button" className={css.btnTxt} onClick={onConferir}>Conferir</button>
           : l.situacao === 'CONTESTOU' ? <button type="button" className={css.btnTxt} onClick={onAbrir}>Responder</button>
@@ -389,12 +412,10 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
   return (
     <ModalPessoa aberto onFechar={onFechar} foto={<Rosto id={l.id} semente={l.avatarSemente} tamanho={104} />}
       titulo={l.nome}
-      meta={[l.tipo === 'MEI' ? 'MEI' : 'Motorista', l.empresa, l.funcao, doc].filter(Boolean).join(' · ')}
-      chips={<>
-        <span className={`${css.tag} ${css['t-cz']}`}>{d.rotulo.toLowerCase()} · {d.fechado ? 'fechado' : 'em aberto'}</span>
-        {fi && <span className={`${css.tag} ${css['t-nv']}`}>{fi.motivo === 'DESLIGAMENTO' ? `desligado · último dia ${dataBr(fi.ultimoDia ?? '')}` : 'fechado antes do mês'} · {dataIsoBr(fi.em)}</span>}
-        <TagAcesso l={l} />
-      </>}
+      meta={[l.tipo === 'MEI' ? 'MEI' : 'Motorista', l.empresa, l.funcao, doc, `${d.rotulo.toLowerCase()} ${d.fechado ? 'fechado' : 'em aberto'}`].filter(Boolean).join(' · ')}
+      chips={fi
+        ? <span className={`${css.tag} ${css['t-nv']}`}>{fi.motivo === 'DESLIGAMENTO' ? `desligado · último dia ${dataBr(fi.ultimoDia ?? '')}` : 'fechado antes do mês'} · {dataIsoBr(fi.em)}</span>
+        : infoAcesso(l).tom !== 'ok' ? <TagAcesso l={l} /> : undefined}
       abas={[{ id: 'mes', rotulo: l.tipo === 'MEI' ? 'Este mês' : 'Semanas do mês' }, { id: 'acesso', rotulo: 'Acesso ao app' }, { id: 'dados', rotulo: 'Dados e contato' }]}
       aba={aba} onAba={(x) => setAba(x as typeof aba)} rodape={rodape}>
     {aba === 'mes' && (
@@ -431,7 +452,7 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
                 {u.situacao === 'CONFERIR' && <button type="button" className={`${css.btnPri} ${css.pequeno}`} onClick={() => navegar('/rh/prestadores/conferir')}>Conferir</button>}
                 {n && (u.situacao === 'FALTA' || u.situacao === 'RECUSADA') && l.acesso.status === 'ATIVO' && <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={ocupado} onClick={() => onLembrar([n.id])}>Lembrar</button>}
                 {n && !u.pago && (u.situacao === 'APROVADA' || u.situacao === 'RH') && <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={ocupado} onClick={() => onPagar([n.id])}>Marcar pago ({brl(n.valorCent)})</button>}
-                {u.pago && <span className={`${css.tag} ${css['t-ok']}`}>pago {dataIsoBr(u.pagoEm)}{u.valorPagoCent != null ? ` · ${brl(u.valorPagoCent)}` : ''}</span>}
+                {u.pago && <span className={css.txtMudo}>pago {dataIsoBr(u.pagoEm)}{u.valorPagoCent != null ? ` · ${brl(u.valorPagoCent)}` : ''}</span>}
               </div>
             </div>
           );
@@ -466,9 +487,14 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
       }}>
         <h4>Feriados</h4>
         <CidadeTrabalho key={`cid-${l.id}`} tipo="PRESTADOR" id={l.id} atual={l.cidade} onSalvo={(m) => void onMudou(m)} />
-        <h4>Modelo de nota</h4>
+        <div className={css.tituloLinha}>
+          <h4>Modelo de nota</h4>
+          <Explica>{l.modeloNota ? 'Com modelo, tomador, código e descrição vêm dele (os campos de tomador abaixo não valem).' : 'Sem modelo, o app mostra o tomador abaixo e uma descrição simples.'} A mudança vale a partir da próxima liberação.</Explica>
+          <span className={css.esp} />
+          <Link className={css.lk} to="/rh/prestadores/modelos">{modelos && modelos.length === 0 ? 'Criar modelo' : 'Ver modelos'}</Link>
+        </div>
         {modelos === null ? <p className={css.hint}>Carregando…</p> : modelos.length === 0 ? (
-          <p className={css.hint}>Nenhum modelo criado. <Link to="/rh/prestadores/modelos">Criar modelo de nota</Link> (tomador, código do serviço e descrição prontos no app).</p>
+          <p className={css.hint}>Nenhum modelo criado ainda.</p>
         ) : (
           <div className={css.campo}>
             <label htmlFor="c-mod">O que vai na nota</label>
@@ -477,7 +503,6 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
               <option value="">{padraoTipo ? `Padrão dos ${l.tipo === 'MEI' ? 'MEI' : 'motoristas'} (${padraoTipo.nome})` : 'Sem modelo'}</option>
               {modelos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
             </select>
-            <small className={css.hint}>{l.modeloNota ? 'Com modelo, tomador, código e descrição vêm dele (os campos de tomador abaixo não valem).' : 'Sem modelo, o app mostra o tomador abaixo e uma descrição simples.'} <Link to="/rh/prestadores/modelos">Ver modelos</Link></small>
           </div>
         )}
         <h4>Contato e nota</h4>
@@ -559,7 +584,8 @@ function ModalLiberar({ d, onFechar, onLiberado }: { d: PainelRh; onFechar: () =
   return (
     <Modal titulo={`Liberar ${d.rotulo.split('/')[0]!.toLowerCase()} para os prestadores`} onFechar={onFechar}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p className={css.hint}>Depois de liberado, cada prestador vê no app o resumo dele e o valor exato da nota. O valor é o retrato do fechamento: se precisar corrigir, reabra o mês, corrija e libere de novo — ele recebe aviso de que o valor mudou.</p>
+        <p className={css.hint}>Cada prestador vê no app o resumo dele e o valor exato da nota.{' '}
+          <Explica>O valor é o retrato do fechamento: se precisar corrigir, reabra o mês, corrija e libere de novo — o prestador recebe aviso de que o valor mudou.</Explica></p>
         <div className={css.seg} role="group" aria-label="O que liberar">
           <button type="button" aria-pressed={tipo === 'MEI'} onClick={() => { setTipo('MEI'); setPrazo(proxDiaUtil(d.hoje, 3)); }}>MEI · mês</button>
           <button type="button" aria-pressed={tipo === 'MOTORISTA'} onClick={() => { setTipo('MOTORISTA'); setPrazo(proxDiaUtil(d.hoje, 2)); }}>Motoristas · semana</button>

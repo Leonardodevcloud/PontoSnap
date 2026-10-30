@@ -1,5 +1,7 @@
 .tela{ max-width:720px; }
-.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; }
+.h{ font-family:var(--ff-display); font-weight:600; font-size:28px; margin:0; }
+.topo{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+.tituloLinha{ display:flex; align-items:center; gap:8px; }
 .sub{ color:var(--ash); font-size:14px; margin:6px 0 18px; line-height:1.55; }
 .sub strong{ color:var(--ink); }
 
@@ -17,8 +19,7 @@
 .revD{ font-size:12px; color:var(--ash); margin-top:2px; }
 .st{ font-size:12px; font-weight:600; padding:3px 9px; border-radius:var(--r-pill); white-space:nowrap; height:fit-content;
 }
-.stEM_ANALISE{ background:rgba(var(--ink-rgb),.08); color:var(--ash); }
-.stABONADO{ background:rgba(255,178,62,.5); color:var(--ink); }
+.stTxt{ font-size:12.5px; color:var(--ash); white-space:nowrap; }
 .stRECUSADO{ background:var(--erro-bg); color:var(--erro-text); }
 
 .arq{
@@ -27,9 +28,9 @@
   font:inherit; font-size:12.5px; cursor:pointer; color:var(--ink); text-align:left;
 }
 .arq:hover{ background:var(--peach); }
-.arq b{ flex:1; }
+.arq b{ flex:1; min-width:0; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .arqIco{ font-size:16px; }
-.arqL{ color:var(--coral-dark); font-weight:600; font-size:12.5px; }
+.arqL{ color:var(--coral-dark); font-weight:500; font-size:12.5px; }
 
 .mot{
   font-size:12.5px; color:var(--ash); font-style:italic;
@@ -63,9 +64,9 @@
 .lgpd strong{ color:var(--ink); }
 
 /* ---- Lançar atestado (RH) ---- */
-.lancar{ width:100%; background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill); padding:12px; font:inherit; font-weight:600; font-size:14px; cursor:pointer; margin-bottom:16px;
-}
-.lancar:hover{ filter:brightness(1.08); }
+.lancar{ background:var(--white); color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.16); border-radius:var(--r-pill); padding:9px 16px; font:inherit; font-weight:500; font-size:14px; cursor:pointer; }
+.lancar:hover{ background:var(--cream); }
+.lancar:focus-visible, .filtro:focus-visible, .arq:focus-visible, .acoes button:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
 
 .folha{
   position:fixed; inset:0; background:rgba(var(--ink-rgb),.5); backdrop-filter:blur(3px);
@@ -75,7 +76,8 @@
   width:100%; max-width:440px; background:var(--white); border-radius:var(--r-lg);
   padding:24px 22px; max-height:92dvh; overflow-y:auto;
 }
-.folhaH{ font-family:var(--ff-display); font-size:22px; font-weight:600; }
+.folhaH{ font-family:var(--ff-display); font-size:22px; font-weight:600; margin:0; }
+.folhaIn .tituloLinha{ margin-bottom:16px; }
 .folhaSub{ color:var(--ash); font-size:12.5px; margin:2px 0 16px; }
 .lb{ display:block; font-size:12px; color:var(--coral-dark); margin-bottom:5px;
 }
@@ -94,3 +96,5 @@
 .abonarLinha input{ margin-top:2px; }
 
 .revQuem{ display:flex; gap:12px; align-items:center; min-width:0; }
+.revTxt{ min-width:0; }
+.revN{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

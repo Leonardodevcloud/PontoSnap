@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { hojeSP, minutosParaHhMm } from '../lib/formato';
 import type { MinhaEscalaResp } from '../tipos';
+import { Explica } from '../components/Explica';
 import css from './MinhaEscala.module.css';
 
 const DIAS_CURTO = ['d', 's', 't', 'q', 'q', 's', 's'];
@@ -67,8 +68,18 @@ export function MinhaEscala() {
 
   return (
     <div className="appshell">
-      <div className={css.h}>Minha escala</div>
-      <div className={css.s}>O que está combinado no seu contrato.</div>
+      <div className={css.h}>
+        Minha escala
+        <Explica lado="dir">
+          O que está combinado no seu contrato. No calendário:
+          <span className={css.legenda}>
+            <span><i className={`${css.lp} ${css.lpT}`} />Trabalha</span>
+            <span><i className={`${css.lp} ${css.lpF}`} />Folga</span>
+            <span><i className={`${css.lp} ${css.lpH}`} />Feriado</span>
+          </span>
+          Toque e segure num dia para ver o que é.
+        </Explica>
+      </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
 
@@ -113,12 +124,6 @@ export function MinhaEscala() {
             </div>
           );
         })}
-      </div>
-
-      <div className={css.legenda}>
-        <span><i className={`${css.lp} ${css.lpT}`} />Trabalha</span>
-        <span><i className={`${css.lp} ${css.lpF}`} />Folga</span>
-        <span><i className={`${css.lp} ${css.lpH}`} />Feriado</span>
       </div>
 
       {dados && dados.feriados.length > 0 && (

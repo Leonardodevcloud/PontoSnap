@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { prepararArquivo, type ArquivoPronto } from '../lib/imagem';
 import { lerReais } from '../lib/formato';
 import { brl, dataBr, dataIsoBr, fmtCnpj, reais, type Conferencia, type Eu, type Nota } from '../lib/prestador';
+import { Explica } from '../components/Explica';
 import { usePrestador } from './LayoutPrestador';
 import css from './Prestador.module.css';
 
@@ -95,6 +96,7 @@ export function EnviarNota() {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [feito, setFeito] = useState<(Nota & { conferencia: Conferencia }) | null>(null);
+  const [verConferidos, setVerConferidos] = useState(false);
 
   useEffect(() => { if (nota && !valor) setValor(reais(nota.valorCent)); }, [nota?.id]);
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
@@ -207,13 +209,12 @@ export function EnviarNota() {
 
       {!arq ? (
         <div className={css.up}>
-          <b>Envie o PDF da sua nota</b>
-          <small>O PDF que o emissor gera é o melhor. Se só tiver impressa, pode tirar foto.</small>
+          <b className={css.linhaTit}>Envie o PDF da sua nota <Explica>O PDF que o emissor gera é o melhor. Se só tiver impressa, pode tirar foto. Com o XML da NFS-e, o app lê a nota na hora.</Explica></b>
           <div className={css.upBtns}>
             <label>📄 Escolher PDF<input type="file" accept="application/pdf,.pdf" onChange={escolher} /></label>
             <label>📷 Tirar foto<input type="file" accept="image/*" capture="environment" onChange={escolher} /></label>
           </div>
-          <span className={css.xml}>Tem o XML da NFS-e? <label>enviar XML<input type="file" accept=".xml,text/xml,application/xml" onChange={escolher} /></label> (o app lê a nota na hora)</span>
+          <span className={css.xml}>Tem o XML da NFS-e? <label>enviar XML<input type="file" accept=".xml,text/xml,application/xml" onChange={escolher} /></label></span>
         </div>
       ) : (
         <div className={css.arq}>
@@ -247,9 +248,16 @@ export function EnviarNota() {
       {!lendo && conf && itensConf.length > 0 && (
         <section className={css.card} aria-label="Conferência da nota">
           {problemas.length === 0 && <h3><span style={{ color: 'var(--ok-text)' }}>✓</span> {conf.valorBate && avisos.length === 0 ? 'Li sua nota e está tudo certo' : 'Li sua nota'}</h3>}
+          {/* Só o que precisa de atenção fica à vista; o que confere abre num toque. */}
           <div className={css.chk}>
-            {itensConf.map((i) => <Cl key={i.titulo} ok={i.ok} titulo={i.titulo} detalhe={i.detalhe} aviso={i.aviso} />)}
+            {itensConf.filter((i) => i.ok !== true).map((i) => <Cl key={i.titulo} ok={i.ok} titulo={i.titulo} detalhe={i.detalhe} aviso={i.aviso} />)}
+            {verConferidos && itensConf.filter((i) => i.ok === true).map((i) => <Cl key={i.titulo} ok={i.ok} titulo={i.titulo} detalhe={i.detalhe} aviso={i.aviso} />)}
           </div>
+          {itensConf.some((i) => i.ok === true) && (
+            <button type="button" className={css.linkTexto} aria-expanded={verConferidos} onClick={() => setVerConferidos((v) => !v)}>
+              {verConferidos ? 'Esconder o que confere' : `Ver o que confere (${itensConf.filter((i) => i.ok === true).length})`}
+            </button>
+          )}
           {problemas.length === 0 && avisos.length > 0 && (
             <p className={css.avisoTxt}>A descrição não bate com o pedido. Você pode enviar assim mesmo (o RH decide) ou emitir de novo com o texto de "Dados para emitir a nota".</p>
           )}

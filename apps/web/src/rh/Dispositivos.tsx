@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../lib/api';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
+import { Explica } from '../components/Explica';
 import css from './Dispositivos.module.css';
 
 interface RespDispositivo { token: string; dispositivoId: string; nome: string; }
@@ -31,13 +32,14 @@ export function Dispositivos() {
 
   return (
     <div>
-      <div className={css.head}><h2>Quiosques</h2><p>Tablets de chão de fábrica — matrícula + PIN, sem login pessoal</p></div>
+      <div className={css.head}><h2>Quiosques</h2><Explica>Tablets de chão de fábrica: a pessoa bate o ponto com matrícula + PIN, sem login pessoal.</Explica></div>
 
       <div className={css.grid}>
         <div className={css.card}>
-          <span className={css.kicker}>Novo dispositivo</span>
-          <h3>Registrar um tablet</h3>
-          <p>Dê um nome pro aparelho (ex.: "Portaria", "Galpão 2"). Você recebe um token pra colar no tablet uma vez.</p>
+          <div className={css.h3Linha}>
+            <h3>Registrar um tablet</h3>
+            <Explica>Dê um nome pro aparelho (ex.: "Portaria", "Galpão 2"). Você recebe um token pra colar no tablet uma vez.</Explica>
+          </div>
           <Campo rotulo="Nome do quiosque" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Portaria" />
           {erro && <p className={css.erro}>{erro}</p>}
           <Botao variante="coral" onClick={registrar} disabled={enviando || nome.trim().length < 2}>
@@ -47,7 +49,7 @@ export function Dispositivos() {
 
         {criado && (
           <div className={css.tokenCard}>
-            <span className={css.lbl}>● {criado.nome} registrado</span>
+            <span className={css.lbl}>{criado.nome} registrado</span>
             <p className={css.aviso}>Copie agora — o token aparece uma vez só.</p>
             <div className={css.token}>{criado.token}</div>
             <div className={css.acoes}>

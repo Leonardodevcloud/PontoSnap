@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { minutosParaHhMm } from '../lib/formato';
 import type { BancoResp } from '../tipos';
+import { Explica } from '../components/Explica';
 import css from './MeuBanco.module.css';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
@@ -64,37 +65,41 @@ export function MeuBanco() {
 
   return (
     <div className="appshell">
-      <div className={css.h}>Banco de horas</div>
-      <div className={css.s}>
-        {acordo} · {intraMes ? 'compensa no mês e paga a diferença' : `compensar em até ${dados.prazoMeses} meses`}
+      <div className={css.h}>
+        Banco de horas
+        <Explica lado="dir">{acordo} · {intraMes ? 'compensa no mês e paga a diferença.' : `compensar em até ${dados.prazoMeses} meses.`}</Explica>
       </div>
 
       <div className={css.resumo}>
-        <div className={css.rL}>{intraMes ? `Saldo de ${rotuloMes || 'este mês'} até agora` : 'Saldo do banco'}</div>
+        <div className={css.rL}>
+          {intraMes ? `Saldo de ${rotuloMes || 'este mês'} até agora` : 'Saldo do banco'}
+          {intraMes && (
+            <Explica>
+              {s.saldoMin < 0 && <>Veio devendo do mês anterior: <b>{comSinal(s.saldoMin)}</b> (já está na conta). </>}
+              No fim do mês, o que sobrar é <b>pago na folha</b> como hora extra; se faltar,
+              {dados.negativoMes === 'CARREGA' ? ' passa para o mês seguinte.' : ' é descontado na folha.'}
+            </Explica>
+          )}
+        </div>
         <div className={`${css.rV} ${(intraMes ? projetado : s.saldoMin) < 0 ? css.rVneg : ''}`}>{comSinal(intraMes ? projetado : s.saldoMin)}</div>
-        {intraMes && (
-          <div className={css.estAviso}>
-            {s.saldoMin < 0 && <>Veio devendo do mês anterior: <b>{comSinal(s.saldoMin)}</b> (já está na conta). </>}
-            No fim do mês, o que sobrar é <b>pago na folha</b> como hora extra; se faltar,
-            {dados.negativoMes === 'CARREGA' ? ' passa para o mês seguinte.' : ' é descontado na folha.'}
-          </div>
-        )}
         {mesCorrente && !intraMes && (
           <div className={css.soma}>
             <div><span>Saldo do banco (meses fechados)</span><b>{comSinal(s.saldoMin)}</b></div>
             <div><span>+ {rotuloMes} até agora</span><b>{comSinal(mesCorrente.estimadoMin)}</b></div>
-            <div className={css.somaTot}><span>= se o mês fechasse hoje</span><b>{comSinal(projetado)}</b></div>
-            <small>{rotuloMes} entra no saldo no dia 1º. Até lá, cada batida atualiza a previsão. A conta completa está em Meu espelho.</small>
+            <div className={css.somaTot}>
+              <span>= se o mês fechasse hoje <Explica>{rotuloMes} entra no saldo no dia 1º. Até lá, cada batida atualiza a previsão. A conta completa está em Meu espelho.</Explica></span>
+              <b className={projetado < 0 ? css.neg : ''}>{comSinal(projetado)}</b>
+            </div>
           </div>
         )}
         <div className={css.mini}>
           <div>
             <div className={css.mL}>Creditado</div>
-            <div className={`${css.mV} ${css.pos}`}>+{minutosParaHhMm(s.creditadoMin)}</div>
+            <div className={css.mV}>+{minutosParaHhMm(s.creditadoMin)}</div>
           </div>
           <div>
             <div className={css.mL}>Compensado</div>
-            <div className={`${css.mV} ${css.neg}`}>−{minutosParaHhMm(s.compensadoMin)}</div>
+            <div className={css.mV}>−{minutosParaHhMm(s.compensadoMin)}</div>
           </div>
           {s.pagoMin > 0 && (
             <div>
@@ -105,43 +110,44 @@ export function MeuBanco() {
         </div>
       </div>
 
-      {dados.conta && dados.conta.falta.min > 0 && dados.conta.falta.destino === 'DESCONTA' && (
-        <div className={css.faltaBox}>
-          <b>Faltou um dia?</b>
-          Falta de dia inteiro não é tirada do banco: ela é descontada no salário, junto com o descanso da semana
-          {dados.conta.falta.dias.length ? ` (este mês: ${dados.conta.falta.dias.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`).join(', ')})` : ''}.
-          {dados.conta.destino.destinoAtraso === 'BANCO' ? ' Atrasos e saídas cedo, sim, abatem do banco.' : ''}
-        </div>
-      )}
-
-      {/* O prazo é a informação que mais importa: saldo sem data engana. */}
-      {s.vencidoMin > 0 && (
-        <div className={`${css.prazo} ${css.prazoVencido}`}>
-          <b>{minutosParaHhMm(s.vencidoMin)}</b> passaram do prazo de compensação.
-          Pela lei, essas horas viram hora extra e a empresa paga em dinheiro,
-          com adicional. Fale com o RH.
-        </div>
-      )}
-
-      {s.vencidoMin === 0 && s.aVencerMin > 0 && s.proximoVencimento && (
-        <div className={css.prazo}>
-          ⏳ <b>{minutosParaHhMm(s.aVencerMin)}</b> vencem em <b>{fmtData(s.proximoVencimento)}</b>.
-          O que não for compensado até lá vira hora extra paga.
-        </div>
-      )}
-
-      {s.vencidoMin === 0 && s.aVencerMin === 0 && s.proximoVencimento && (
-        <div className={css.prazoOk}>
-          Próximo vencimento em <b>{fmtData(s.proximoVencimento)}</b>.
-        </div>
-      )}
-
-      {s.devedorMin > 0 && (
-        <div className={css.prazo}>
-          Você compensou <b>{minutosParaHhMm(s.devedorMin)}</b> a mais do que tinha no banco.
-          Essas horas voltam a zero conforme você faz extra.
-        </div>
-      )}
+      {/* Um aviso por vez: o mais grave vira faixa; os outros, uma linha com "?". */}
+      {(() => {
+        const avisos: { curto: React.ReactNode; longo: React.ReactNode; grave?: boolean }[] = [];
+        // O prazo é a informação que mais importa: saldo sem data engana.
+        if (s.vencidoMin > 0) avisos.push({ grave: true,
+          curto: <><b>{minutosParaHhMm(s.vencidoMin)}</b> passaram do prazo de compensação</>,
+          longo: <>Pela lei, essas horas viram hora extra e a empresa paga em dinheiro, com adicional. Fale com o RH.</> });
+        if (s.devedorMin > 0) avisos.push({
+          curto: <>Você compensou <b>{minutosParaHhMm(s.devedorMin)}</b> a mais do que tinha</>,
+          longo: <>Você compensou {minutosParaHhMm(s.devedorMin)} a mais do que tinha no banco. Essas horas voltam a zero conforme você faz extra.</> });
+        if (s.vencidoMin === 0 && s.aVencerMin > 0 && s.proximoVencimento) avisos.push({
+          curto: <><b>{minutosParaHhMm(s.aVencerMin)}</b> vencem em <b>{fmtData(s.proximoVencimento)}</b></>,
+          longo: <>O que não for compensado até lá vira hora extra paga.</> });
+        if (dados.conta && dados.conta.falta.min > 0 && dados.conta.falta.destino === 'DESCONTA') {
+          const c = dados.conta;
+          avisos.push({
+            curto: <>Falta é descontada no salário, não no banco</>,
+            longo: <>Falta de dia inteiro não é tirada do banco: ela é descontada no salário, junto com o descanso da semana
+              {c.falta.dias.length ? ` (este mês: ${c.falta.dias.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`).join(', ')})` : ''}.
+              {c.destino.destinoAtraso === 'BANCO' ? ' Atrasos e saídas cedo, sim, abatem do banco.' : ''}</> });
+        }
+        const [primeiro, ...resto] = avisos;
+        return (
+          <>
+            {primeiro && (
+              <div className={`${css.prazo} ${primeiro.grave ? css.prazoVencido : ''}`}>
+                {primeiro.curto}. {primeiro.longo}
+              </div>
+            )}
+            {resto.map((a, i) => (
+              <div key={i} className={css.nota}>{a.curto} <Explica lado="dir">{a.longo}</Explica></div>
+            ))}
+            {!primeiro && s.proximoVencimento && (
+              <div className={css.prazoOk}>Próximo vencimento em <b>{fmtData(s.proximoVencimento)}</b>.</div>
+            )}
+          </>
+        );
+      })()}
 
       <div className={css.hExtrato}>Extrato</div>
       {dados.extrato.length === 0 && <div className={css.vazio}>Nenhum movimento ainda.</div>}

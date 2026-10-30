@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm } from '../lib/formato';
 import type { ApuracaoResp, TipoAfastamento } from '../tipos';
 import { ContaMes } from '../components/ContaMes';
+import { Explica } from '../components/Explica';
 import css from './EspelhoMes.module.css';
 
 /** Primeiro e último dia da competência YYYY-MM, no calendário de Brasília. */
@@ -70,8 +71,7 @@ export function EspelhoMes() {
 
   return (
     <div className="appshell">
-      <div className={css.h}>Meu espelho</div>
-      <div className={css.s}>Toque num dia pra ver as batidas e baixar os comprovantes.</div>
+      <div className={css.h}>Meu espelho <Explica lado="dir">Toque num dia pra ver as batidas e baixar os comprovantes. A conta completa do mês fica no fim da lista.</Explica></div>
 
       <div className={css.nav}>
         <button onClick={() => setComp((c) => deslocarMes(c, -1))} aria-label="Mês anterior">‹</button>
@@ -89,10 +89,10 @@ export function EspelhoMes() {
               // Mesmo número do RH: o que entra no banco (ou o saldo líquido, sem banco). Falta fica à parte.
               const c = dados?.conta;
               const mesNome = rotuloMes(comp).split(' de ')[0];
-              if (!c) return <><div className={css.rL}>Saldo do mês</div><div className={css.rV}>{comSinal(r.saldoPeriodoMin)}</div></>;
+              if (!c) return <><div className={css.rL}>Saldo do mês</div><div className={`${css.rV} ${r.saldoPeriodoMin < 0 ? css.neg : ''}`}>{comSinal(r.saldoPeriodoMin)}</div></>;
               const v = c.destino.tipo === 'BANCO' ? c.destino.paraBancoMin : c.resultadoMin;
               return <><div className={css.rL}>{c.destino.tipo === 'BANCO' ? (c.destino.formaCalculo === 'INTRA_MES' ? `Saldo de ${mesNome}` : `Vai para o seu banco em ${mesNome}`) : `Saldo de ${mesNome}`}{ehMesAtual ? ' · atualizado agora' : ''}</div>
-                <div className={css.rV}>{comSinal(v)}</div></>;
+                <div className={`${css.rV} ${v < 0 ? css.neg : ''}`}>{comSinal(v)}</div></>;
             })()}
             <div className={css.mini}>
               <div>
@@ -105,7 +105,7 @@ export function EspelhoMes() {
               </div>
               <div>
                 <div className={css.mL}>Faltas</div>
-                <div className={css.mV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '0'}</div>
+                <div className={`${css.mV} ${r.totalFaltaMin > 0 ? css.neg : ''}`}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '0'}</div>
               </div>
             </div>
           </div>
@@ -118,6 +118,13 @@ export function EspelhoMes() {
             const dia = new Date(`${d.data}T12:00:00-0300`);
             const motivo = motivoDoDia(d.data);
             const folga = (d.ehDescansoDia || !!motivo) && d.marcacoes.length === 0;
+            // Uma tag só, a mais grave. O detalhe vai no title.
+            const destinoFalta = dados?.conta?.falta.destino === 'DESCONTA' ? 'descontada no salário' : dados?.conta?.falta.destino === 'BANCO' ? 'sai do banco' : null;
+            const tag = d.faltaInjustificada
+              ? { txt: 'Falta', title: destinoFalta ? `Falta · ${destinoFalta}` : 'Falta' }
+              : d.paresIncompletos ? { txt: 'Em aberto', title: 'Batidas em aberto neste dia' } : null;
+            const compensado = d.semana?.compensado && d.marcacoes.length === 0 && !d.faltaInjustificada
+              ? (d.semana.estado === 'FECHADA' ? 'compensado na semana' : 'semana em aberto') : null;
             return (
               <button
                 key={d.data}
@@ -132,9 +139,8 @@ export function EspelhoMes() {
                   {d.marcacoes.length > 0
                     ? d.marcacoes.map((m) => fmtHora(String(m))).join(' · ')
                     : motivo ?? (folga ? 'Descanso' : 'Sem batidas')}
-                  {d.paresIncompletos && <span className={`${css.tag} ${css.tagF}`}>Em aberto</span>}
-                  {d.faltaInjustificada && <span className={`${css.tag} ${css.tagF}`}>{dados?.conta?.falta.destino === 'DESCONTA' ? 'Falta · descontada no salário' : dados?.conta?.falta.destino === 'BANCO' ? 'Falta · sai do banco' : 'Falta'}</span>}
-                  {d.semana?.compensado && d.marcacoes.length === 0 && !d.faltaInjustificada && <span className={css.tag}>{d.semana.estado === 'FECHADA' ? 'Compensado na semana' : 'Semana em aberto'}</span>}
+                  {compensado && <> · {compensado}</>}
+                  {tag && <span className={`${css.tag} ${css.tagF}`} title={tag.title}>{tag.txt}</span>}
                 </span>
                 <span className={`${css.dS} ${d.saldoMin > 0 ? css.pos : d.saldoMin < 0 ? css.neg : ''}`}>
                   {d.paresIncompletos ? '—' : d.marcacoes.length > 0 ? comSinal(d.saldoMin) : '—'}
@@ -191,13 +197,11 @@ function BlocoAssinatura({ competencia, podeAssinar }: { competencia: string; po
   if (status.assinado && status.confere) {
     return (
       <div className={css.assinOk}>
-        <span className={css.assinEstrela}>✦</span>
-        <div>
-          <div className={css.assinTit}>Você assinou este espelho</div>
-          <div className={css.assinSub}>
-            {status.assinadoEm ? `Em ${new Date(status.assinadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''} · {status.via ?? 'PIN no app'}
-          </div>
-        </div>
+        <span className={css.assinEstrela} aria-hidden="true">✓</span>
+        Você assinou este espelho
+        <span className={css.assinData}>
+          {status.assinadoEm ? `em ${new Date(status.assinadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''} · {status.via ?? 'PIN no app'}
+        </span>
       </div>
     );
   }
@@ -214,16 +218,22 @@ function BlocoAssinatura({ competencia, podeAssinar }: { competencia: string; po
     );
   }
 
+  // Mês em curso: ainda não dá pra assinar — só uma linha.
+  if (!podeAssinar) {
+    return (
+      <div className={css.assinNota}>
+        Assinatura liberada quando o mês fechar
+        <Explica lado="dir">O mês ainda está em curso. Você poderá assinar quando a competência fechar.</Explica>
+      </div>
+    );
+  }
+
   // Ainda não assinado.
   return (
     <div className={css.assinPend}>
       <div className={css.assinTit}>Confira e assine seu espelho</div>
-      <div className={css.assinSub}>
-        {podeAssinar
-          ? 'Depois de conferir os dias abaixo, assine para registrar sua concordância com as marcações.'
-          : 'O mês ainda está em curso. Você poderá assinar quando a competência fechar.'}
-      </div>
-      {podeAssinar && <button className={css.assinBtn} onClick={() => setModal(true)}>Concordo e assino</button>}
+      <div className={css.assinSub}>Depois de conferir os dias abaixo, assine para registrar sua concordância.</div>
+      <button className={css.assinBtn} onClick={() => setModal(true)}>Concordo e assino</button>
       {modal && <ModalPin pin={pin} setPin={setPin} erro={erro} enviando={enviando} onCancelar={() => { setModal(false); setErro(null); }} onConfirmar={assinar} />}
     </div>
   );

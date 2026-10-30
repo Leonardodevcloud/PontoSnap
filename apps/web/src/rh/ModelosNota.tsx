@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { mascaraDoc } from '../lib/formato';
 import { fmtCnpj, type ListaModelos, type ModeloNota } from '../lib/prestador';
 import { Modal } from '../components/Modal';
+import { Explica } from '../components/Explica';
 import p from './Prestadores.module.css';
 import css from './ModelosNota.module.css';
 
@@ -68,8 +69,10 @@ export function ModelosNota() {
       <div className={p.cab}>
         <div>
           <Link to="/rh/prestadores" className={css.voltar}>‹ Notas de prestadores</Link>
-          <h2>Modelos de nota</h2>
-          <p>O que o prestador coloca na nota, por operação. Configure uma vez; vale para todos os fechamentos.</p>
+          <div className={p.tituloLinha}>
+            <h2>Modelos de nota</h2>
+            <Explica>O que o prestador coloca na nota, por operação (tomador, código do serviço e descrição). Configure uma vez; vale para todos os fechamentos. O texto da nota é montado na hora de liberar o valor e fica guardado com ela. Mudou o modelo? As notas que ainda não foram enviadas pegam o texto novo ao liberar de novo.</Explica>
+          </div>
         </div>
         <div className={p.acoes}><button type="button" className={p.btnPri} onClick={() => abrir('novo')}>+ Novo modelo</button></div>
       </div>
@@ -91,17 +94,17 @@ export function ModelosNota() {
             <article key={m.id} className={css.card}>
               <div className={css.cardTopo}>
                 <h3>{m.nome}</h3>
-                {m.padraoTipo && <span className={`${p.tag} ${p['t-in']}`}>padrão dos {ROT_TIPO[m.padraoTipo].muitos}</span>}
+                {m.padraoTipo && <span className={p.txtMudo}>padrão dos {ROT_TIPO[m.padraoTipo].muitos}</span>}
               </div>
               <dl className={css.dl}>
-                <dt>Tomador</dt><dd>{m.tomadorRazao.split(' ').slice(0, 2).join(' ')} · <span className={p.mono}>{fmtCnpj(m.tomadorCnpj)}</span></dd>
+                <dt>Tomador</dt><dd title={`${m.tomadorRazao} · ${fmtCnpj(m.tomadorCnpj)}`}>{m.tomadorRazao.split(' ').slice(0, 2).join(' ')}</dd>
                 <dt>Código do serviço</dt><dd className={p.mono}>{m.codigoServico ?? '—'}</dd>
                 <dt>Descrição</dt><dd className={css.desc}><Fichas texto={m.descricao} /></dd>
-                <dt>Usado por</dt><dd><b>{m.usadoPor} {m.usadoPor === 1 ? 'pessoa' : 'pessoas'}</b>{m.padraoTipo && m.escolhidoPor < m.usadoPor ? <small> · {m.usadoPor - m.escolhidoPor} pelo padrão</small> : null}</dd>
+                <dt>Usado por</dt><dd title={m.padraoTipo && m.escolhidoPor < m.usadoPor ? `${m.usadoPor - m.escolhidoPor} pelo padrão` : undefined}>{m.usadoPor} {m.usadoPor === 1 ? 'pessoa' : 'pessoas'}</dd>
               </dl>
               <div className={p.acoes}>
-                <button type="button" className={`${p.btnSec} ${p.pequeno}`} onClick={() => abrir(m.id)}>Editar</button>
-                <button type="button" className={`${p.btnSec} ${p.pequeno}`} onClick={() => setAplicar(m)}>Aplicar a pessoas</button>
+                <button type="button" className={p.lk} onClick={() => abrir(m.id)}>Editar</button>
+                <button type="button" className={p.lk} onClick={() => setAplicar(m)}>Aplicar a pessoas</button>
               </div>
             </article>
           ))}
@@ -109,13 +112,12 @@ export function ModelosNota() {
       )}
 
       {d && d.modelos.length > 0 && d.semModelo.length > 0 && (
-        <div className={css.aviso} role="status">
-          <span><b>{d.semModelo.length} {d.semModelo.length === 1 ? 'prestador sem modelo' : 'prestadores sem modelo'}:</b> o app mostra só nome, CNPJ e valor, e a conferência não confere código nem descrição.
-            {' '}<small>({d.semModelo.slice(0, 4).map((x) => x.nome.split(' ')[0]).join(', ')}{d.semModelo.length > 4 ? '…' : ''})</small></span>
-          <button type="button" className={p.btnTxt} onClick={() => setAplicar('SEM')}>Escolher modelo</button>
-        </div>
+        <p className={p.avisoLinha} role="status">
+          <span title={d.semModelo.map((x) => x.nome).join(', ')}>{d.semModelo.length} {d.semModelo.length === 1 ? 'prestador sem modelo de nota.' : 'prestadores sem modelo de nota.'}</span>
+          <button type="button" className={p.lk} onClick={() => setAplicar('SEM')}>Escolher modelo</button>
+          <Explica>Sem modelo, o app mostra só nome, CNPJ e valor, e a conferência não confere código nem descrição. Quem está sem: {d.semModelo.map((x) => x.nome).join(', ')}.</Explica>
+        </p>
       )}
-      {d && <p className={p.hint}>O texto da nota é montado na hora de liberar o valor e fica guardado com ela. Mudou o modelo? As notas que ainda não foram enviadas pegam o texto novo ao liberar de novo.</p>}
 
       {aplicar && d && <ModalAplicar d={d} modelo={aplicar === 'SEM' ? null : aplicar} onFechar={() => setAplicar(null)}
         onAplicado={async (m) => { setAplicar(null); avisar(m); await carregar(); }} />}
@@ -188,7 +190,6 @@ function Editor({ d, modelo, onVoltar, onSalvo }: { d: ListaModelos; modelo: Mod
         <div>
           <button type="button" className={css.voltar} onClick={onVoltar}>‹ Modelos de nota</button>
           <h2>{modelo ? modelo.nome : 'Novo modelo de nota'}</h2>
-          <p>Modelo de nota{f.padraoTipo ? ` · padrão dos ${ROT_TIPO[f.padraoTipo].muitos}` : ''}</p>
         </div>
       </div>
       {erro && <p className={p.erro} role="alert">{erro}</p>}
@@ -213,7 +214,10 @@ function Editor({ d, modelo, onVoltar, onSalvo }: { d: ListaModelos; modelo: Mod
               <input id="m-mail" type="email" value={f.tomadorEmail} onChange={(e) => set('tomadorEmail', e.target.value)} /></div>
           </div>
 
-          <h4 className={css.secao}>Serviço</h4>
+          <div className={`${p.tituloLinha} ${css.secaoLinha}`}>
+            <h4 className={css.secao}>Serviço</h4>
+            <Explica>CNAE / código de tributação nacional (formato 26.01.01). A conferência verifica se a nota veio com este código.</Explica>
+          </div>
           <div className={css.codigo}>
             <div className={p.campo}><label htmlFor="m-cod">Código do serviço</label>
               <input id="m-cod" className={p.mono} value={f.codigoServico} placeholder="26.01.01" aria-invalid={!codigoOk} aria-describedby="m-cod-h"
@@ -221,11 +225,17 @@ function Editor({ d, modelo, onVoltar, onSalvo }: { d: ListaModelos; modelo: Mod
             <div className={p.campo}><label htmlFor="m-codd">Descrição do código</label>
               <input id="m-codd" value={f.codigoDescricao} onChange={(e) => set('codigoDescricao', e.target.value)} placeholder="Serviços de coleta, remessa ou entrega…" /></div>
           </div>
-          <p id="m-cod-h" className={p.hint}>{codigoOk ? 'CNAE / código de tributação nacional. A conferência verifica se a nota veio com este código.' : 'Use o formato 26.01.01.'}</p>
+          <p id="m-cod-h" className={codigoOk ? css.sr : p.erroTxt}>{codigoOk ? 'Formato 26.01.01.' : 'Use o formato 26.01.01.'}</p>
         </section>
 
         <section className={css.col}>
-          <h4 className={css.secao}>Descrição da nota</h4>
+          <div className={`${p.tituloLinha} ${css.secaoLinha}`}>
+            <h4 className={css.secao}>Descrição da nota</h4>
+            <Explica lado="dir">
+              Conferência: a nota enviada precisa ter o mesmo valor, o tomador {cnpjOk ? fmtCnpj(f.tomadorCnpj.replace(/\D/g, '')) : '—'}
+              {f.codigoServico.trim() && codigoOk ? `, o código ${formatarCodigoServico(f.codigoServico)}` : ''} e uma descrição igual à pedida (descrição diferente só avisa; o RH decide).
+            </Explica>
+          </div>
           <div className={p.campo}>
             <label htmlFor="m-desc" className={css.sr}>Descrição da nota</label>
             <textarea id="m-desc" ref={ta} rows={4} required value={f.descricao} onChange={(e) => set('descricao', e.target.value)} />
@@ -260,10 +270,6 @@ function Editor({ d, modelo, onVoltar, onSalvo }: { d: ListaModelos; modelo: Mod
             </label>
           </div>
 
-          <div className={css.conf}>
-            <b>Conferência:</b> a nota enviada precisa ter o mesmo valor, o tomador {cnpjOk ? fmtCnpj(f.tomadorCnpj.replace(/\D/g, '')) : '—'}
-            {f.codigoServico.trim() && codigoOk ? `, o código ${formatarCodigoServico(f.codigoServico)}` : ''} e uma descrição igual à pedida (descrição diferente só avisa; o RH decide).
-          </div>
         </section>
       </div>
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { rotuloMarcacao } from '../lib/formato';
 import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 import css from './BatidasFaltando.module.css';
 
 interface BatFalt { hora: string; nsr: number | null; id: string }
@@ -79,52 +80,61 @@ export function BatidasFaltando() {
     finally { setEnviando(false); }
   }
 
-  if (erro) return <div className="appshell"><p style={{ color: 'var(--erro-text)', padding: 24 }}>{erro}</p></div>;
-  if (!dados) return <div className="appshell"><p style={{ padding: 24 }}>Carregando…</p></div>;
+  if (erro) return <div className={css.tela}><p style={{ color: 'var(--erro-text)', padding: 24 }}>{erro}</p></div>;
+  if (!dados) return <div className={css.tela}><p style={{ padding: 24 }}>Carregando…</p></div>;
 
   return (
-    <div className="appshell">
+    <div className={css.tela}>
       <button className={css.voltar} onClick={() => nav('/rh')}>← Voltar ao painel</button>
       <div className={css.topo}>
         <div>
-          <h1 className={css.h}>Batidas faltando</h1>
-          <p className={css.sub}>Dias com marcação em aberto. Clique pra ajustar direto.</p>
+          <div className={css.tituloLinha}>
+            <h1 className={css.h}>Batidas faltando</h1>
+            <Explica>Dias com marcação em aberto. Clique em “Ajustar” pra lançar a batida que faltou, ou notifique os funcionários pra eles mesmos pedirem o ajuste.</Explica>
+          </div>
+          {dados.total > 0 && (
+            <p className={css.sub}>
+              <b>{dados.total}</b> {dados.total === 1 ? 'dia pendente' : 'dias pendentes'} de {dados.grupos.length} funcionário{dados.grupos.length > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
         <button className={css.notifBtn} onClick={notificar} disabled={notificando || dados.total === 0}>
-          {notificando ? 'Enviando…' : '🔔 Notificar funcionários'}
+          {notificando ? 'Enviando…' : 'Notificar funcionários'}
         </button>
       </div>
 
-      {msg && <div className={css.msgOk}>✓ {msg}</div>}
+      {msg && <div className={css.msgOk}>{msg}</div>}
 
-      <div className={css.statBar}>
-        <span className={css.statNum}>{dados.total}</span>
-        <span className={css.statTxt}><b>dias pendentes</b> de {dados.grupos.length} funcionário{dados.grupos.length > 1 ? 's' : ''}</span>
-      </div>
-
-      {dados.grupos.length === 0 && <div className={css.vazio}>Nenhuma batida faltando. Tudo certo! 🎉</div>}
+      {dados.grupos.length === 0 && <div className={css.vazio}>Nenhuma batida faltando. Tudo certo.</div>}
 
       {dados.grupos.map((g) => (
         <div key={g.empregadoId} className={css.grupo}>
           <div className={css.grupoHead}>
             <Avatar id={g.empregadoId} nome={g.nome} tamanho={32} />
-            <span className={css.grupoNome}>{g.nome}</span>
-            <span className={css.grupoBadge}>{g.dias.length}</span>
+            <span className={css.grupoNome} title={g.nome}>{g.nome}</span>
+            <span className={css.grupoCont}>{g.dias.length} {g.dias.length === 1 ? 'dia' : 'dias'}</span>
           </div>
           {g.dias.map((d) => (
             <div key={d.data} className={css.diaRow}>
               <div className={css.diaData}>{fmtDia(d.data)}<small>{dow(d.data)}</small></div>
-              <div className={css.diaBatidas}>
-                {d.batidas.map((b, i) => <span key={i} className={`${css.chip} ${css.chipOk}`}>{b.hora}</span>)}
-                {d.batidas.length < d.esperadas && Array.from({ length: d.esperadas - d.batidas.length }, (_, i) => (
-                  <span key={`m${i}`} className={`${css.chip} ${css.chipMiss}`}>
-                    {rotuloMarcacao(d.batidas.length + i, d.esperadas)} ?
-                  </span>
-                ))}
-                {d.batidas.length % 2 !== 0 && d.batidas.length >= d.esperadas && (
-                  <span className={`${css.chip} ${css.chipOpen}`}>Em aberto</span>
-                )}
-              </div>
+              {(() => {
+                const faltam = d.batidas.length < d.esperadas
+                  ? Array.from({ length: d.esperadas - d.batidas.length }, (_, i) => rotuloMarcacao(d.batidas.length + i, d.esperadas))
+                  : [];
+                return (
+                  <div className={css.diaBatidas}>
+                    <span className={css.horas}>{d.batidas.length ? d.batidas.map((b) => b.hora).join(' · ') : 'sem batidas'}</span>
+                    {faltam.length > 0 && (
+                      <span className={`${css.chip} ${css.chipMiss}`} title={`Faltando: ${faltam.join(', ')}`}>
+                        falta {faltam[0]!.toLowerCase()}{faltam.length > 1 ? ` +${faltam.length - 1}` : ''}
+                      </span>
+                    )}
+                    {faltam.length === 0 && d.batidas.length % 2 !== 0 && (
+                      <span className={`${css.chip} ${css.chipOpen}`}>em aberto</span>
+                    )}
+                  </div>
+                );
+              })()}
               <button className={css.diaAcao} onClick={() => abrirAjuste(g, d)}>Ajustar</button>
             </div>
           ))}
@@ -134,10 +144,10 @@ export function BatidasFaltando() {
       {/* Modal de ajuste rápido */}
       {ajuste && (
         <div className={css.overlay} onClick={() => setAjuste(null)}>
-          <div className={css.modal} onClick={(e) => e.stopPropagation()}>
+          <div className={css.modal} role="dialog" aria-label="Ajuste rápido" onClick={(e) => e.stopPropagation()}>
             <div className={css.modalHead}>
               <h2 className={css.modalH}>Ajuste rápido</h2>
-              <button className={css.modalX} onClick={() => setAjuste(null)}>✕</button>
+              <button className={css.modalX} onClick={() => setAjuste(null)} aria-label="Fechar">✕</button>
             </div>
             <p className={css.modalNome}>{ajuste.grupo.nome}</p>
             <p className={css.modalSub}>

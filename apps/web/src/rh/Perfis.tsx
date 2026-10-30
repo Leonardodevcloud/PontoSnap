@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { BotaoAjuda } from './ajuda/PainelAjuda';
+import { Explica } from '../components/Explica';
 import css from './Perfis.module.css';
 
 interface Config {
@@ -43,9 +44,9 @@ export default function Perfis() {
   return (
     <div className={css.tela}>
       <div className={css.top}>
-        <div>
+        <div className={css.tituloLinha}>
           <h1 className={css.h}>Perfis de regra</h1>
-          <p className={css.sub}>Um perfil é um pacote de regras pronto. Você cria uma vez, com tudo dentro — e no funcionário escolhe com um clique.</p>
+          <Explica>Um perfil é um pacote de regras pronto. Você cria uma vez, com tudo dentro — e no funcionário escolhe com um clique. A lista mostra só o que muda em relação à CLT; passe o mouse para ver tudo.</Explica>
         </div>
         <button className={css.btn} onClick={() => setEditando('novo')}>+ Novo perfil</button>
       </div>
@@ -54,32 +55,43 @@ export default function Perfis() {
 
       {lista.length === 0 ? (
         <div className={css.card}><p className={css.vazio}>Nenhum perfil ainda. Crie o primeiro — pode ser o "Padrão da empresa".</p></div>
-      ) : lista.map((p) => (
-        <div key={p.id} className={css.perfil}>
-          <div className={css.perfilTop}>
-            <span className={css.perfilNome}>
-              {p.nome}
-              {p.padrao && <span className={css.tagPadrao}>padrão</span>}
-              <span className={css.tagUso}>{p.usadoPor === 0 ? 'ninguém usa' : p.usadoPor === 1 ? 'usado por 1' : `usado por ${p.usadoPor}`}</span>
-            </span>
-            <button className={css.btnG} onClick={() => setEditando(p)}>editar</button>
-          </div>
-          <div className={css.itens}>{resumo(p.config).map((r) => (
-            <span key={r.lb} className={css.item}><span className={css.itemLb}>{r.lb}</span>{r.valor}</span>
-          ))}</div>
-          {p.cctSindicato && <p className={css.cct}>📄 Convenção: {p.cctSindicato}{p.cctVigencia ? ` · ${p.cctVigencia}` : ''}</p>}
+      ) : (
+        <div className={css.lista}>
+          {lista.map((p) => {
+            const tudo = resumo(p.config);
+            const legado = p.config.contrato?.tipoJornada === 'CONTRATO_HORAS';
+            const difere = tudo.filter((r) => !r.clt && r.lb !== 'jornada do dia');
+            const cct = p.cctSindicato ? `Convenção: ${p.cctSindicato}${p.cctVigencia ? ` · ${p.cctVigencia}` : ''}` : null;
+            const dica = [...tudo.map((r) => `${r.lb}: ${r.valor}`), ...(cct ? [cct] : [])].join('\n');
+            return (
+              <div key={p.id} className={css.perfil}>
+                <div className={css.perfilTxt}>
+                  <span className={css.perfilNome}>
+                    <span className={css.nomeTxt} title={p.nome}>{p.nome}</span>
+                    {legado && <span className={css.tagProb} title="Ainda marca o tipo de jornada no perfil (forma antiga). Abra o perfil para tirar.">contrato de horas (forma antiga)</span>}
+                  </span>
+                  <span className={css.resumo} title={dica}>
+                    {difere.length ? difere.map((r) => `${r.lb} ${r.valor}`).join(' · ') : 'Tudo pela CLT'}
+                    {cct && ` · ${p.cctSindicato}`}
+                  </span>
+                </div>
+                <span className={css.uso}>{p.padrao ? 'padrão · ' : ''}{p.usadoPor === 0 ? 'ninguém usa' : p.usadoPor === 1 ? '1 pessoa' : `${p.usadoPor} pessoas`}</span>
+                <button type="button" className={css.linkAcao} aria-label={`Editar o perfil ${p.nome}`} onClick={() => setEditando(p)}>Editar</button>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
     </div>
   );
 }
 
-function resumo(c: Config): { lb: string; valor: string }[] {
+function resumo(c: Config): { lb: string; valor: string; clt?: boolean }[] {
   return [
     ...(c.contrato?.tipoJornada === 'CONTRATO_HORAS' ? [{ lb: 'jornada do dia', valor: 'contrato de horas (forma antiga)' }] : []),
-    { lb: 'hora extra', valor: c.extra ? `${c.extra.extraDiaUtilPct}% / ${c.extra.extraDomingoFeriadoPct}%` : 'CLT' },
-    { lb: 'tolerância', valor: c.tolerancia ? `${c.tolerancia.toleranciaDiariaMin} min/dia` : 'CLT' },
-    { lb: 'noturno', valor: c.noturno ? `${c.noturno.noturnoAdicionalPct}%` : 'CLT' },
+    { lb: 'hora extra', valor: c.extra ? `${c.extra.extraDiaUtilPct}% / ${c.extra.extraDomingoFeriadoPct}%` : 'CLT', clt: !c.extra },
+    { lb: 'tolerância', valor: c.tolerancia ? `${c.tolerancia.toleranciaDiariaMin} min/dia` : 'CLT', clt: !c.tolerancia },
+    { lb: 'noturno', valor: c.noturno ? `${c.noturno.noturnoAdicionalPct}%` : 'CLT', clt: !c.noturno },
 
     { lb: 'banco de horas', valor: bancoTxt(c.banco) },
     { lb: 'faltas', valor: c.destinacao ? faltaTxt(c.destinacao.destinacaoFaltas) : 'descontam' },
@@ -149,10 +161,11 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
   return (
     <div className={css.tela}>
       <div className={css.top}>
-        <div>
+        <div className={css.tituloLinha}>
           <h1 className={css.h}>{inicial ? `Editar “${inicial.nome}”` : 'Novo perfil de regra'}</h1>
-          <p className={css.sub}>Preencha só o que difere da CLT. O que deixar em branco segue a lei automaticamente.</p>
+          <Explica>Preencha só o que difere da CLT. O que deixar em branco segue a lei automaticamente.</Explica>
         </div>
+        <button type="button" className={css.linkAcao} onClick={onFechar}>Voltar aos perfis</button>
       </div>
       {erro && <p className={css.erro}>{erro}</p>}
 
@@ -170,7 +183,7 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
       {cfg.contrato && (
         <div className={css.card}>
           <p className={css.secaoTit}>Contrato de horas (forma antiga)</p>
-          <p className={css.exp}>
+          <p className={css.exp} style={{ marginBottom: 10 }}>
             Este perfil ainda marca o tipo de jornada ({cfg.contrato.tipoJornada === 'CONTRATO_HORAS' ? 'contrato de horas' : 'horário fixo'}).
             Agora isso é escolhido na <strong>escala</strong>, junto com os dias e a carga. {cfg.contrato.tipoJornada === 'CONTRATO_HORAS'
               ? 'Enquanto estiver marcado aqui, quem usa este perfil continua em contrato de horas.' : 'Esta marcação não muda mais nada.'}
@@ -217,8 +230,7 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
       <div className={css.card}>
         <div className={css.secaoTop}>
           <div>
-            <p className={css.secaoTit}>Banco de horas: a hora a mais compensa a hora a menos? <BotaoAjuda artigo="regras" secao="banco" /></p>
-            <p className={css.exp}>Decide se um dia cobre o outro no mês ou se o saldo acumula para folga. Compensar só dentro da semana, sem banco, fica na <strong>escala</strong> ("Compensa na semana").</p>
+            <p className={css.secaoTit}>Banco de horas <Explica>A hora a mais compensa a hora a menos? Decide se um dia cobre o outro no mês ou se o saldo acumula para folga. Compensar só dentro da semana, sem banco, fica na <strong>escala</strong> ("Compensa na semana"). <BotaoAjuda artigo="regras" secao="banco" rotulo="Ler a ajuda" /></Explica></p>
           </div>
         </div>
         <div className={css.lb} id="lb-modo-banco">O que acontece com a hora a mais (e a hora a menos)</div>
@@ -301,8 +313,7 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
       <div className={css.card}>
         <div className={css.secaoTop}>
           <div>
-            <p className={css.secaoTit}>Faltas e atrasos <BotaoAjuda artigo="regras" secao="faltas" /></p>
-            <p className={css.exp}>Com banco, atraso abate das horas a mais. Falta de dia inteiro, por padrão, é descontada da folha com o DSR — mesmo com banco.</p>
+            <p className={css.secaoTit}>Faltas e atrasos <Explica>Com banco, atraso abate das horas a mais. Falta de dia inteiro, por padrão, é descontada da folha com o DSR — mesmo com banco. <BotaoAjuda artigo="regras" secao="faltas" rotulo="Ler a ajuda" /></Explica></p>
           </div>
         </div>
         <div className={css.dupla}>
@@ -333,8 +344,7 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
       </div>
 
       <div className={css.card}>
-        <p className={css.secaoTit}>Convenção coletiva <span className={css.opcional}>opcional</span></p>
-        <p className={css.exp}>Se este perfil segue uma CCT/ACT, você pode anexar o documento do sindicato aqui para deixar registrado.</p>
+        <p className={css.secaoTit}>Convenção coletiva <span className={css.opcional}>(opcional)</span> <Explica>Se este perfil segue uma CCT/ACT, você pode anexar o documento do sindicato aqui para deixar registrado.</Explica></p>
         <div className={css.dupla}>
           <label className={css.campo}><span className={css.lb}>Sindicato</span><input className={css.inp} value={sindicato} onChange={(e) => setSindicato(e.target.value)} placeholder="Ex.: SINDIMOTO-BA" /></label>
           <label className={css.campo}><span className={css.lb}>Vigência</span><input className={css.inp} value={vigencia} onChange={(e) => setVigencia(e.target.value)} placeholder="Ex.: 2026/2027" /></label>
@@ -347,7 +357,7 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
 
       <div className={css.acoes}>
         <button className={css.btn} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar perfil'}</button>
-        <button className={css.btnG} onClick={onFechar}>Cancelar</button>
+        <button type="button" className={css.btnG} onClick={onFechar}>Cancelar</button>
       </div>
     </div>
   );
@@ -360,8 +370,7 @@ function Secao({ titulo, explicacao, ligado, aoLigar, children }: {
     <div className={css.card}>
       <div className={css.secaoTop}>
         <div>
-          <p className={css.secaoTit}>{titulo}</p>
-          <p className={css.exp}>{explicacao}</p>
+          <p className={css.secaoTit}>{titulo} <Explica>{explicacao}</Explica></p>
         </div>
         <div className={css.seg} role="group" aria-label={`${titulo}: seguir a CLT ou personalizar`}>
           <button

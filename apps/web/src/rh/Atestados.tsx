@@ -5,6 +5,7 @@ import { prepararArquivo, type ArquivoPronto } from '../lib/imagem';
 import type { Documento, StatusDocumento, Empregado, TipoDocumento } from '../tipos';
 import css from './Atestados.module.css';
 import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
 const fmtQuando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -104,17 +105,20 @@ export function Atestados() {
 
   return (
     <div className={css.tela}>
-      <h2 className={css.h}>Atestados</h2>
-      <p className={css.sub}>
-        Abonar aqui faz o dia deixar de contar como falta na apuração.
-        <strong> Não é aprovar marcação</strong> — marcação não se aprova; a decisão é sobre a ausência.
-      </p>
+      <div className={css.topo}>
+        <div className={css.tituloLinha}>
+          <h2 className={css.h}>Atestados</h2>
+          <Explica>
+            Abonar aqui faz o dia deixar de contar como falta na apuração. Não é aprovar marcação: marcação
+            não se aprova; a decisão é sobre a ausência.
+          </Explica>
+        </div>
+        <button className={css.lancar} onClick={() => { setAbrindo(true); setErro(null); }}>
+          Lançar atestado
+        </button>
+      </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
-
-      <button className={css.lancar} onClick={() => { setAbrindo(true); setErro(null); }}>
-        Lançar atestado no lugar do funcionário
-      </button>
 
       <div className={css.filtros}>
         {FILTROS.map((f) => (
@@ -132,20 +136,21 @@ export function Atestados() {
           <div className={css.revTop}>
             <div className={css.revQuem}>
               <Avatar id={d.empregadoId} nome={d.nome ?? ''} tamanho={40} />
-              <div>
-              <div className={css.revN}>{d.nome}</div>
-              <div className={css.revD}>
-                {ROTULO[d.tipo] ?? d.tipo} · {periodo(d)} · enviado {fmtQuando(d.enviadoEm)}
+              <div className={css.revTxt}>
+              <div className={css.revN} title={d.nome}>{d.nome}</div>
+              <div className={css.revD} title={`Enviado em ${fmtQuando(d.enviadoEm)}`}>
+                {ROTULO[d.tipo] ?? d.tipo} · {periodo(d)}
               </div>
               </div>
             </div>
-            <span className={`${css.st} ${css[`st${d.status}`]}`}>{STATUS[d.status]}</span>
+            {d.status === 'RECUSADO'
+              ? <span className={`${css.st} ${css.stRECUSADO}`}>{STATUS[d.status]}</span>
+              : filtro !== d.status && <span className={css.stTxt}>{STATUS[d.status]}</span>}
           </div>
 
           <button className={css.arq} onClick={() => ver(d.id)}>
-            <span className={css.arqIco}>📄</span>
-            <b>{d.arquivoNome}</b>
-            <span className={css.arqL}>{kb(d.arquivoBytes)} · abrir</span>
+            <b title={d.arquivoNome}>{d.arquivoNome}</b>
+            <span className={css.arqL} title={kb(d.arquivoBytes)}>Abrir</span>
           </button>
 
           {d.motivoRecusa && <div className={css.mot}>Motivo: {d.motivoRecusa}</div>}
@@ -179,8 +184,10 @@ export function Atestados() {
       {abrindo && (
         <div className={css.folha} onClick={(e) => e.target === e.currentTarget && setAbrindo(false)}>
           <div className={css.folhaIn}>
-            <h3 className={css.folhaH}>Lançar atestado</h3>
-            <p className={css.folhaSub}>Para quando o funcionário entrega no papel ou não usa o app.</p>
+            <div className={css.tituloLinha}>
+              <h3 className={css.folhaH}>Lançar atestado</h3>
+              <Explica>Para quando o funcionário entrega no papel ou não usa o app.</Explica>
+            </div>
 
             <span className={css.lb}>Funcionário</span>
             <select className={css.inp} value={empSel} onChange={(e) => setEmpSel(e.target.value)}>
@@ -226,7 +233,7 @@ export function Atestados() {
 
             <label className={css.abonarLinha}>
               <input type="checkbox" checked={abonar} onChange={(e) => setAbonar(e.target.checked)} />
-              <span>Já abonar (o dia deixa de contar como falta). Desmarque para deixar em análise.</span>
+              <span>Já abonar: o dia deixa de contar como falta (desmarque para deixar em análise)</span>
             </label>
 
             <div className={css.acoes}>

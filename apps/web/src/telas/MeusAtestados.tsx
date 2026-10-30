@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { hojeSP } from '../lib/formato';
 import { prepararArquivo, type ArquivoPronto } from '../lib/imagem';
 import type { Documento, TipoDocumento } from '../tipos';
+import { Explica } from '../components/Explica';
 import css from './MeusAtestados.module.css';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
@@ -73,8 +74,7 @@ export function MeusAtestados() {
 
   return (
     <div className="appshell">
-      <div className={css.h}>Atestados</div>
-      <div className={css.s}>Mande o documento e acompanhe o que o RH decidiu.</div>
+      <div className={css.h}>Atestados <Explica lado="dir">Mande o documento e acompanhe o que o RH decidiu. Toque no nome do documento para abrir o arquivo.</Explica></div>
 
       {erro && <p className={css.erro}>{erro}</p>}
 
@@ -89,7 +89,8 @@ export function MeusAtestados() {
               <button className={css.docT} onClick={() => ver(d.id)}>{ROTULO[d.tipo] ?? d.tipo}</button>
               <div className={css.docD}>{periodo(d)} · {kb(d.arquivoBytes)}</div>
             </div>
-            <span className={`${css.st} ${css[`st${d.status}`]}`}>{STATUS[d.status]}</span>
+            {/* Tag só quando há problema; o resto é texto discreto. */}
+            <span className={d.status === 'RECUSADO' ? `${css.st} ${css.stRECUSADO}` : css.stTxt}>{STATUS[d.status]}</span>
           </div>
           {d.motivoRecusa && <div className={css.docMot}>RH: {d.motivoRecusa}</div>}
         </div>
@@ -147,8 +148,8 @@ export function MeusAtestados() {
             )}
 
             <div className={css.lgpd}>
-              🔒 Seu atestado é dado de saúde. Fica guardado <b>cifrado</b> e só o RH da sua
-              empresa consegue abrir.
+              Guardado cifrado, só o RH abre
+              <Explica>Seu atestado é dado de saúde. Fica guardado <b>cifrado</b> e só o RH da sua empresa consegue abrir.</Explica>
             </div>
 
             <div className={css.acoes}>

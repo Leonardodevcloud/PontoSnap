@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { PainelLateral } from '../components/PainelLateral';
 import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 import css from './Inicio.module.css';
 
 interface BatFalt { hora: string; nsr: number | null; id: string }
@@ -126,7 +127,10 @@ export function CompletarBatidas({ aberto, onFechar, onSalvo }: { aberto: boolea
       ))}
       {dados && dados.grupos.length > 0 && (
         <div className={css.cbMotivo}>
-          <label htmlFor="cb-motivo">Motivo (vai para a auditoria)</label>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label htmlFor="cb-motivo">Motivo (vai para a auditoria)</label>
+            <Explica>A batida original não é apagada: o ajuste fica registrado ao lado, como manda a Portaria 671.</Explica>
+          </span>
           <select id="cb-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
             <option>Esqueceu de bater</option>
             <option>Celular sem bateria</option>
@@ -137,7 +141,6 @@ export function CompletarBatidas({ aberto, onFechar, onSalvo }: { aberto: boolea
           {motivo === 'Outro' && (
             <input aria-label="Descreva o motivo" placeholder="Ex.: confirmou por mensagem que saiu 18h" value={outro} onChange={(e) => setOutro(e.target.value)} />
           )}
-          <p>A batida original não é apagada: o ajuste fica registrado ao lado, como manda a Portaria 671.</p>
         </div>
       )}
       {erro && <p className={css.erro} role="alert">{erro}</p>}

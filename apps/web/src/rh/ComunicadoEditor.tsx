@@ -7,6 +7,7 @@ import {
 } from '../lib/comunicacao';
 import { ArquivoPdf, ComunicadoView, PlayerAudio, VideoEmbed } from '../components/comunicado/ComunicadoView';
 import { PainelLateral } from '../components/PainelLateral';
+import { Explica } from '../components/Explica';
 import css from './Comunicacao.module.css';
 
 interface Pessoa { id: string; nome: string; cliente: string | null; horarioId: string | null; temApp: boolean; temPush: boolean; grupo?: 'CLT' | 'PRESTADOR'; tipoPrestador?: 'MEI' | 'MOTORISTA' | null }
@@ -51,7 +52,7 @@ function paraInputLocal(iso: string) {
 function Interruptor({ ligado, onMudar, rotulo, ajuda, desabilitado }: { ligado: boolean; onMudar: (v: boolean) => void; rotulo: string; ajuda: string; desabilitado?: boolean }) {
   return (
     <div className={css.tg}>
-      <div><b id={`tg-${rotulo}`}>{rotulo}</b><small>{ajuda}</small></div>
+      <div className={css.tgRot}><b id={`tg-${rotulo}`}>{rotulo}</b><Explica rotulo={`Sobre: ${rotulo}`}>{ajuda}</Explica></div>
       <button type="button" role="switch" aria-checked={ligado} aria-labelledby={`tg-${rotulo}`} className={css.sw}
         disabled={desabilitado} onClick={() => onMudar(!ligado)} />
     </div>
@@ -359,12 +360,12 @@ export function ComunicadoEditor() {
           {status === 'AGENDADO' && agendadoPara && <p>Sai em {new Date(agendadoPara).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. <button type="button" className={css.btnTxt} onClick={desagendar}>Cancelar agendamento</button></p>}
         </div>
         <div className={css.acoes}>
-          <button type="button" className={css.btnSec} onClick={() => setPrevia(true)} disabled={!conteudo.length}>Ver como fica no app</button>
+          <button type="button" className={css.lnk} onClick={() => setPrevia(true)} disabled={!conteudo.length}>Ver como fica no app</button>
           {publicado ? (
             <button type="button" className={css.btnPri} onClick={salvarRascunho} disabled={salvando || enviandoAlgo}>Salvar alterações</button>
           ) : (<>
+            <button type="button" className={css.lnk} onClick={() => setConfirmar('agendar')} disabled={!pronto || salvando}>{status === 'AGENDADO' ? 'Mudar horário' : 'Agendar…'}</button>
             <button type="button" className={css.btnSec} onClick={salvarRascunho} disabled={salvando || enviandoAlgo}>{status === 'AGENDADO' ? 'Salvar' : 'Salvar rascunho'}</button>
-            <button type="button" className={css.btnSec} onClick={() => setConfirmar('agendar')} disabled={!pronto || salvando}>{status === 'AGENDADO' ? 'Mudar horário' : 'Agendar…'}</button>
             <button type="button" className={css.btnPri} onClick={() => setConfirmar('publicar')} disabled={!pronto || salvando}>Publicar para {alvo.com} {alvo.com === 1 ? 'pessoa' : 'pessoas'}</button>
           </>)}
         </div>
@@ -624,7 +625,7 @@ function EditorEnquete({ b, travada, onMudar }: { b: BlocoEnquete; travada: bool
         <Interruptor rotulo="Funcionário vê o resultado" ajuda="Depois de votar, aparece a porcentagem de cada opção." ligado={b.mostrarResultado} onMudar={(v) => set({ mostrarResultado: v })} />
         <Interruptor rotulo="Voto anônimo" ajuda="Você vê só o total de cada opção e quem já votou, sem saber quem votou em quê." ligado={b.anonima} desabilitado={travada} onMudar={(v) => set({ anonima: v })} />
         <div className={css.tg}>
-          <div><b>Encerrar votação em</b><small>Até lá, dá para mudar o voto. Vazio = sem prazo (você encerra quando quiser).</small></div>
+          <div className={css.tgRot}><b>Encerrar votação em</b><Explica rotulo="Sobre o prazo da votação">Até lá, dá para mudar o voto. Vazio = sem prazo (você encerra quando quiser).</Explica></div>
           <input type="datetime-local" className={css.inp} style={{ width: 'auto', minWidth: 200 }} aria-label="Encerrar votação em"
             value={b.encerraEm ? paraLocal(b.encerraEm) : ''} onChange={(e) => set({ encerraEm: e.target.value ? new Date(e.target.value).toISOString() : null })} />
         </div>

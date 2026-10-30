@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 import css from './Notificacoes.module.css';
 
 interface Aparelho { id: string; aparelho: string; criadoEm: string; ultimoSucessoEm: string | null; ultimoErro: string | null; ultimoErroEm: string | null }
@@ -56,9 +57,9 @@ export function Notificacoes() {
 
   return (
     <div className={css.pagina}>
-      <div>
+      <div className={css.titulo}>
         <h2 className={css.h}>Notificações do app</h2>
-        <p className={css.sub}>Quem recebe lembretes de ponto no celular, em quais aparelhos, e o que foi enviado.</p>
+        <Explica>Quem recebe lembretes de ponto no celular, em quais aparelhos, e o que foi enviado. No fim da página dá para testar o envio de e-mail.</Explica>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -69,19 +70,18 @@ export function Notificacoes() {
         </div>
       )}
 
-      <TesteEmail />
-
       {r && (
         <section className={css.resumo}>
           <div className={css.resumoTxt}>
-            <b>{r.comNotificacao} de {r.ativos} recebem notificações</b>
+            <span className={css.titulo}>
+              <b>{r.comNotificacao} de {r.ativos} recebem notificações</b>
+              <Explica rotulo="Como ativar no celular">
+                Como ativar no celular — Android: abrir o app › menu › Notificações › Ativar.
+                iPhone: instalar o app na tela de início (Compartilhar › Adicionar à Tela de Início) e ativar por lá. No Safari aberto direto não funciona.
+              </Explica>
+            </span>
             <div className={css.barra} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Com notificação ativa"><i style={{ width: `${pct}%` }} /></div>
             <small>{[nao > 0 && `${nao} ${nao === 1 ? 'tem' : 'têm'} o app mas não ativou`, semApp > 0 && `${semApp} sem acesso ao app`].filter(Boolean).join(' · ') || 'Todo mundo com notificação ativa.'}</small>
-          </div>
-          <div className={css.como}>
-            <b>Como ativar no celular</b>
-            <span>Android: abrir o app › menu › Notificações › Ativar.</span>
-            <span>iPhone: instalar o app na tela de início (Compartilhar › Adicionar à Tela de Início) e ativar por lá. No Safari aberto direto não funciona.</span>
           </div>
         </section>
       )}
@@ -105,11 +105,12 @@ export function Notificacoes() {
               const comErro = p.aparelhos.find((a) => a.ultimoErro);
               return (
                 <tr key={p.empregadoId}>
-                  <td><span className={css.pes}><Avatar id={p.empregadoId} nome={p.nome} tamanho={34} /><b>{p.nome}</b></span></td>
+                  <td><span className={css.pes}><Avatar id={p.empregadoId} nome={p.nome} tamanho={34} /><b title={p.nome}>{p.nome}</b></span></td>
                   <td>
-                    {s === 'ATIVAS' && <span className={`${css.chip} ${comErro ? css.chipAv : css.chipOk}`}>{comErro ? 'ativa · com erro' : 'recebe'}</span>}
+                    {/* Etiqueta só quando há problema. */}
+                    {s === 'ATIVAS' && (comErro ? <span className={`${css.chip} ${css.chipAv}`}>ativa · com erro</span> : <span className={css.mudoP}>recebe</span>)}
                     {s === 'NAO_ATIVOU' && <span className={`${css.chip} ${css.chipAv}`}>não ativou</span>}
-                    {s === 'SEM_APP' && <span className={css.chip}>sem acesso ao app</span>}
+                    {s === 'SEM_APP' && <span className={css.mudoP}>sem acesso ao app</span>}
                   </td>
                   <td className={css.aparelhos}>
                     {p.aparelhos.length === 0 ? <span className={css.mudo}>—</span> : p.aparelhos.map((a) => (
@@ -120,10 +121,11 @@ export function Notificacoes() {
                   </td>
                   <td className={css.mono}>{quando(ultima)}</td>
                   <td className={css.pref}>
-                    {!p.temApp ? <span className={css.mudo}>—</span> : <>
-                      <span>{p.preferencias.lembretes ? `lembra ${p.preferencias.lembreteMinutos} min antes` : 'lembrete desligado'}</span>
-                      <span>{p.preferencias.esqueceu ? 'avisa se esquecer' : '"esqueceu" desligado'}</span>
-                    </>}
+                    {!p.temApp ? <span className={css.mudo}>—</span> : (
+                      <span title={`${p.preferencias.lembretes ? `lembra ${p.preferencias.lembreteMinutos} min antes` : 'lembrete desligado'} · ${p.preferencias.esqueceu ? 'avisa se esquecer' : '"esqueceu" desligado'}`}>
+                        {p.preferencias.lembretes ? `lembra ${p.preferencias.lembreteMinutos} min antes` : 'lembrete desligado'}{!p.preferencias.esqueceu && ' · sem "esqueceu"'}
+                      </span>
+                    )}
                   </td>
                   <td className={css.acao}>
                     {p.temApp && <button className={css.btn} onClick={() => enviarTeste(p)} disabled={!d.servidor.ativo || teste[p.empregadoId] === 'Enviando…'}>Enviar teste</button>}
@@ -147,13 +149,15 @@ export function Notificacoes() {
                 {v.empregadoId ? <Avatar id={v.empregadoId} nome={v.nome} tamanho={26} /> : <span className={css.semAv} />}
                 <span className={css.envTxt}><b>{v.nome}</b> · {v.titulo} <em>{TIPOS[v.tipo] ?? v.tipo}</em></span>
                 {v.entregues > 0
-                  ? <span className={`${css.chip} ${css.chipOk}`}>entregue{v.entregues > 1 ? ` em ${v.entregues}` : ''}</span>
-                  : <span className={`${css.chip} ${css.chipAv}`} title={v.erro ?? undefined}>não chegou{v.erro ? `: ${v.erro}` : ''}</span>}
+                  ? <span className={css.mudoP}>entregue{v.entregues > 1 ? ` em ${v.entregues}` : ''}</span>
+                  : <span className={`${css.chip} ${css.chipAv}`} title={v.erro ?? undefined}>não chegou</span>}
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      <TesteEmail />
     </div>
   );
 }
@@ -175,12 +179,15 @@ function TesteEmail() {
   }
   if (!st) return null;
   return (
-    <section className={st.ativo ? css.resumo : css.alerta} style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
-      <b>E-mail {st.ativo ? `ligado · remetente ${st.remetente}` : 'desligado'}</b>
-      {!st.ativo && <span>Falta a variável <code>RESEND_API_KEY</code> no serviço da API (Railway). Sem ela, convites e recuperação de senha não chegam.</span>}
+    <section className={css.email}>
+      <h3>E-mail</h3>
+      {st.ativo
+        ? <p className={css.mudoP}>Ligado · remetente {st.remetente}</p>
+        : <p className={css.avisoLinha}>E-mail desligado: falta a variável <code>RESEND_API_KEY</code> no serviço da API (Railway). Sem ela, convites e recuperação de senha não chegam.</p>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input aria-label="Enviar o teste para" placeholder="seu e-mail (vazio = o do seu login)" value={para} onChange={(e) => setPara(e.target.value)}
+        <input aria-label="Enviar o teste para" aria-describedby="email-teste-dica" title="Vazio = o e-mail do seu login" placeholder="seu e-mail" value={para} onChange={(e) => setPara(e.target.value)}
           style={{ minHeight: 34, borderRadius: 10, border: '1px solid rgba(var(--ink-rgb),.24)', padding: '4px 10px', font: 'inherit', minWidth: 240, background: 'var(--field-bg)', color: 'var(--ink)' }} />
+        <span id="email-teste-dica" className={css.sr}>Vazio = o e-mail do seu login</span>
         <button className={css.btn} onClick={testar} disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar e-mail de teste'}</button>
       </div>
       {res && <small role="status" style={{ fontWeight: 600 }}>{res}</small>}

@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { rotuloMarcacao } from '../lib/formato';
 import css from './AjustesPonto.module.css';
 import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 
 interface Pedido {
   id: string;
@@ -103,8 +104,10 @@ export default function AjustesPonto() {
     <div className={css.tela}>
       <div className={css.top}>
         <div>
-          <h1 className={css.h}>Ajustes de ponto</h1>
-          <p className={css.sub}>Pedidos dos funcionários. Nada muda na apuração até você decidir — e a batida original nunca é apagada.</p>
+          <div className={css.tituloLinha}>
+            <h1 className={css.h}>Ajustes de ponto</h1>
+            <Explica>Pedidos dos funcionários. Nada muda na apuração até você decidir, e a batida original nunca é apagada.</Explica>
+          </div>
           <div className={css.filtros}>
             {(['EM_ANALISE', 'APROVADO', 'RECUSADO', 'REVOGADO'] as const).map((s) => (
               <button key={s} className={`${css.filtroBtn} ${filtroStatus === s ? css.filtroOn : ''}`}
@@ -114,21 +117,20 @@ export default function AjustesPonto() {
             ))}
           </div>
         </div>
-        <button className={css.novoBtn} onClick={() => setLancando(true)}>+ Lançar ajuste</button>
+        <button className={css.novoBtn} onClick={() => setLancando(true)}>Lançar ajuste</button>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
       {msg && <p className={css.ok}>{msg}</p>}
 
       {lista.length === 0 ? (
-        <div className={css.card}><p className={css.vazio}>Nenhum pedido aguardando decisão.</p></div>
+        <div className={css.card}><p className={css.vazio}>{filtroStatus === 'EM_ANALISE' ? 'Nenhum pedido aguardando decisão.' : 'Nenhum pedido aqui.'}</p></div>
       ) : grupos.map(([chave, doGrupo]) => (
         <div key={chave} className={css.grupo}>
           <div className={css.grupoTop}>
             <Avatar id={doGrupo[0]!.empregadoId} nome={doGrupo[0]!.nome} tamanho={36} />
-            <span className={css.quem}>{doGrupo[0]!.nome}</span>
-            <span className={css.quando}>{dia(doGrupo[0]!.data)}</span>
-            {doGrupo.length > 1 && <span className={css.contador}>{doGrupo.length} pedidos neste dia</span>}
+            <span className={css.quem} title={doGrupo[0]!.nome}>{doGrupo[0]!.nome}</span>
+            <span className={css.quando}>{dia(doGrupo[0]!.data)}{doGrupo.length > 1 && ` · ${doGrupo.length} pedidos neste dia`}</span>
           </div>
           {doGrupo.map((p) => {
         const bs = batidas[p.id] ?? [];
@@ -141,8 +143,8 @@ export default function AjustesPonto() {
         return (
           <div key={p.id} className={css.ped}>
             <div className={css.pedTop}>
-              <span className={`${css.badge} ${p.tipo === 'INCLUSAO' ? css.bInc : css.bDesc}`}>
-                {p.tipo === 'INCLUSAO' ? 'inclusão' : p.tipo === 'CORRECAO' ? 'correção' : 'desconsiderar'}
+              <span className={css.tipoTxt}>
+                {p.tipo === 'INCLUSAO' ? 'Incluir batida' : p.tipo === 'CORRECAO' ? 'Corrigir horário' : 'Desconsiderar batida'}
               </span>
               <span className={css.quando}>pedido às {new Date(p.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
@@ -171,22 +173,22 @@ export default function AjustesPonto() {
                 <span className={css.colLb}>Como fica se aprovar</span>
                 <div className={css.linhaBat}>
                   {depois.map((i, idx) => (
-                    <span key={i.chave} className={`${css.bat} ${i.marca === 'ENTRA' ? css.batEntra : ''}`}>
+                    <span key={i.chave} className={`${css.bat} ${i.marca === 'ENTRA' ? css.batEntra : ''}`}
+                      title={i.marca === 'ENTRA' && p.tipo === 'INCLUSAO' ? `O funcionário marcou como ${declarado}` : undefined}>
                       <span className={css.batPapel}>{papel(idx)}</span>
                       <span className={css.batHora}>{i.hora}</span>
                     </span>
                   ))}
                 </div>
                 {depois.length % 2 === 0
-                  ? <span className={css.avisoOk}>par completo ✓</span>
+                  ? <span className={css.avisoOk}>par completo</span>
                   : <span className={css.avisoImpar}>ainda fica ímpar</span>}
               </div>
             </div>
 
-            {p.tipo === 'INCLUSAO' && posicao && (
-              <p className={css.detalhe}>
-                O funcionário marcou como <strong>{declarado}</strong>; pela ordem do dia, essa batida entra como <strong>{posicao}</strong>.
-                {divergiu && <span className={css.divergiu}> Confira antes de aprovar — a posição não bate com o que ele marcou.</span>}
+            {divergiu && (
+              <p className={css.avisoLinha}>
+                Marcou como {declarado}, mas pela ordem do dia entra como {posicao}. Confira antes de aprovar.
               </p>
             )}
 
@@ -211,17 +213,17 @@ export default function AjustesPonto() {
             )}
             {filtroStatus === 'APROVADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--ok-text)', fontWeight: 600 }}>✓ Aprovado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
+                <span className={css.decisao}>Aprovado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
               </div>
             )}
             {filtroStatus === 'RECUSADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--erro-text)', fontWeight: 600 }}>✗ Recusado{p.motivoDecisao ? ` — ${p.motivoDecisao}` : ''}</span>
+                <span className={css.decisao}>Recusado{p.motivoDecisao ? `: ${p.motivoDecisao}` : ''}</span>
               </div>
             )}
             {filtroStatus === 'REVOGADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--ash)', fontWeight: 600 }}>Revogado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
+                <span className={css.decisao}>Revogado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
               </div>
             )}
             </div>
@@ -330,10 +332,12 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
       <div className={css.fundoModal} onClick={onFechar} />
       <div className={css.modal} role="dialog" aria-label="Lançar ajuste">
         <div className={css.modalTop}>
-          <h2 className={css.modalH}>Lançar ajuste</h2>
+          <div className={css.tituloLinha}>
+            <h2 className={css.modalH}>Lançar ajuste</h2>
+            <Explica>Este lançamento já nasce valendo: não passa por aprovação. O motivo fica na auditoria.</Explica>
+          </div>
           <button className={css.gX} onClick={onFechar} aria-label="Fechar">✕</button>
         </div>
-        <p className={css.modalSub}>Este lançamento já nasce valendo — não passa por aprovação. O motivo fica na auditoria.</p>
 
         <span className={css.lb}>Funcionário</span>
         <select className={css.inp} value={empregadoId} onChange={(e) => setEmpregadoId(e.target.value)}>

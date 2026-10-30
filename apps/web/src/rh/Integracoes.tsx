@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { Explica } from '../components/Explica';
 import cssP from './Prestadores.module.css';
 import css from './Integracoes.module.css';
 
@@ -57,16 +58,16 @@ export function Integracoes() {
 
   return (
     <div className={cssP.pagina}>
-      <div className={cssP.cab}><div><h2>Integrações</h2><p>Serviços externos ligados ao PontoSnap</p></div></div>
+      <div className={cssP.cab}><div className={css.titulo}><h2>Integrações</h2><Explica>Serviços externos ligados ao PontoSnap.{!admin ? ' Só o administrador da empresa altera as integrações; você vê como está.' : ''}</Explica></div></div>
       {erro && <p className={cssP.erro} role="alert">{erro}</p>}
       {msg && <p className={cssP.okMsg} role="status">{msg}</p>}
-      {!admin && <p className={cssP.hint}>Só o administrador da empresa altera as integrações. Você vê como está.</p>}
 
       <section className={css.secao} aria-labelledby="int-aut">
         <h3 id="int-aut">
           <span className={css.logoA} aria-hidden="true">A</span>
-          <span>Autentique · assinatura eletrônica<small>Envia o espelho de ponto e o contracheque para o funcionário assinar.</small></span>
-          {c && <span className={`${cssP.tag} ${c.conectado ? cssP['t-ok'] : cssP['t-cz']} ${css.estado}`}>{c.conectado ? 'conectado' : 'desligado'}</span>}
+          <span>Autentique · assinatura eletrônica</span>
+          <Explica>Envia o espelho de ponto e o contracheque para o funcionário assinar.</Explica>
+          {c && <span className={css.estado}>{c.conectado ? 'conectado' : 'desligado'}</span>}
         </h3>
 
         {!c && !erro && <p className={cssP.hint}>Carregando…</p>}
@@ -111,12 +112,14 @@ export function Integracoes() {
               ligado={c.mostrarApp} desabilitado={!admin || ocupado} onTrocar={(v) => salvar({ mostrarApp: v }, v ? 'Documentos visíveis no app.' : 'Documentos escondidos do app.')} />
 
             <div className={cssP.campo}>
-              <label htmlFor="aut-url">Endereço de retorno (webhook) · cole no painel da Autentique</label>
+              <span className={css.titulo}>
+                <label htmlFor="aut-url">Endereço de retorno (webhook)</label>
+                <Explica>Cole no painel da Autentique, em Configurações › Webhooks: crie um para os eventos de assinatura e de documento. Com ele, o status muda na hora; sem ele, o PontoSnap confere a cada 30 minutos.</Explica>
+              </span>
               <div className={css.copia}>
                 <input id="aut-url" readOnly value={c.webhookUrl ?? ''} onFocus={(e) => e.target.select()} className={cssP.mono} />
                 <button type="button" className={cssP.btnSec} onClick={copiar}>{copiado ? 'Copiado' : 'Copiar'}</button>
               </div>
-              <small>Em <b>Configurações › Webhooks</b>, crie um para os eventos de assinatura e de documento. Com ele, o status muda na hora; sem ele, o PontoSnap confere a cada 30 minutos.</small>
             </div>
 
             <div className={cssP.campo}>
@@ -166,7 +169,7 @@ export function Integracoes() {
 function Chave({ titulo, texto, ligado, desabilitado, onTrocar }: { titulo: string; texto: string; ligado: boolean; desabilitado?: boolean; onTrocar: (v: boolean) => void }) {
   return (
     <div className={css.linha}>
-      <div><b>{titulo}</b><small>{texto}</small></div>
+      <div className={css.titulo}><b>{titulo}</b><Explica rotulo={`Sobre: ${titulo}`}>{texto}</Explica></div>
       <button type="button" role="switch" aria-checked={ligado} aria-label={titulo} className={`${css.tog} ${ligado ? css.togOn : ''}`} disabled={desabilitado} onClick={() => onTrocar(!ligado)}><i /></button>
     </div>
   );

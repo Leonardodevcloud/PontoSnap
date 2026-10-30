@@ -8,6 +8,7 @@ import { enfileirar, sincronizar, contar, type BatidaPendente } from '../lib/fil
 import type { Batida, MinhasMarcacoes } from '../tipos';
 import { Flash } from '../components/Flash';
 import { Botao } from '../components/Botao';
+import { Explica } from '../components/Explica';
 import { ParticulasCanvas, ConfeteCanvas } from './LoginFx';
 import css from './BaterPonto.module.css';
 
@@ -214,7 +215,6 @@ export function BaterPonto() {
     return (
       <div className={`appshell ${css.tipoTela}`}>
         <div className={css.tipoTit}>Qual marcação?</div>
-        <div className={css.tipoSub}>Selecione o tipo antes de registrar.</div>
         <div className={css.tipoGrid}>
           {tipos.map(([label]) => (
             <button key={label} className={css.tipoBtn} onClick={() => void confirmarTipo(label!)}>
@@ -249,10 +249,10 @@ export function BaterPonto() {
         </div>
       )}
 
-      {/* Selo de localização: informa, nunca impede. */}
+      {/* Selo de localização: informa, nunca impede. Só vira selo quando há algo a notar. */}
       {dados?.local && geo && (
         <div className={`${css.geo} ${fora ? css.geoFora : semLocalizacao ? css.geoSem : css.geoDentro}`}>
-          <span className={css.geoPt} />
+          {(fora || semLocalizacao) && <span className={css.geoPt} />}
           {geo.estado === 'ok'
             ? fora
               ? 'Fora do escritório'
@@ -292,12 +292,14 @@ export function BaterPonto() {
       {/* Fora do raio: pedimos contexto. O botão continua funcionando de qualquer jeito. */}
       {pedirObs && (
         <div className={css.obs}>
-          <div className={css.obsTit}>Onde você está?</div>
-          <p className={css.obsSub}>
-            {geo?.estado === 'ok'
-              ? 'Você está fora do endereço da empresa. Conta pro RH o motivo — leva 1 toque.'
-              : 'Não consegui ver sua localização. Se quiser, conta onde você está — mas pode bater sem isso.'}
-          </p>
+          <div className={css.obsTit}>
+            Onde você está? <span className={css.opc}>(opcional)</span>
+            <Explica lado="dir">
+              {geo?.estado === 'ok'
+                ? 'Você está fora do endereço da empresa. Conta pro RH o motivo — leva 1 toque. O ponto é registrado de qualquer jeito.'
+                : 'Não consegui ver sua localização. Se quiser, conta onde você está — mas pode bater sem isso.'}
+            </Explica>
+          </div>
           <div className={css.chips}>
             {MOTIVOS.map((m) => (
               <button
@@ -318,8 +320,8 @@ export function BaterPonto() {
       {/* A lei proíbe restringir marcação: nunca bloqueamos, só avisamos. */}
       {excedente && (
         <p className={css.aviso}>
-          Você já registrou as {esperadas} marcações previstas para hoje.
-          Pode bater de novo — o RH vai ver esta marcação a mais.
+          Já são {esperadas} marcações hoje.
+          <Explica lado="dir">Você já registrou as {esperadas} marcações previstas para hoje. Pode bater de novo — o RH vai ver esta marcação a mais.</Explica>
         </p>
       )}
 
@@ -340,7 +342,7 @@ export function BaterPonto() {
       </div>
 
       <div className={css.espaco} />
-      <Botao variante="ghost" onClick={() => navegar('/espelho')}>Ver espelho do dia</Botao>
+      <button type="button" className={css.link} onClick={() => navegar('/espelho')}>Ver espelho do dia</button>
     </div>
   );
 }

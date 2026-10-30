@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { lerReais } from '../lib/formato';
 import { api } from '../lib/api';
 import type { Tenant, PainelCobranca, Plano, Cobranca, Assinatura } from '../tipos';
+import { Explica } from '../components/Explica';
 import css from './Cobranca.module.css';
 
 const brl = (v: number | string) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -60,9 +61,9 @@ export function Cobranca() {
   return (
     <div className={css.tela}>
       <div className={css.cab}>
-        <div>
+        <div className={css.tit}>
           <h2>Cobrança</h2>
-          <p>Planos, mensalidades e situação de cada empresa.</p>
+          <Explica>Planos, mensalidades e situação de cada empresa. A mensalidade é a da cobrança mais recente; "Configurar" define plano, valor ajustado, vencimento e situação da assinatura.</Explica>
         </div>
         <button className={css.btnPlanos} onClick={() => setPlanosAberto(true)}>Gerenciar planos</button>
       </div>
@@ -70,9 +71,9 @@ export function Cobranca() {
       {erro && <p className={css.erro}>{erro}</p>}
 
       <div className={css.resumo}>
-        <div className={`${css.card} ${css.receita}`}><div className={css.n}>{brl(receita)}</div><div className={css.l}>Receita do mês</div></div>
-        <div className={css.card}><div className={css.n}>{emDia}</div><div className={css.l}>Empresas em dia</div></div>
-        <div className={`${css.card} ${css.atraso}`}><div className={css.n}>{atrasadas}</div><div className={css.l}>Em atraso</div></div>
+        <div className={css.card}><div className={css.l}>Receita do mês</div><div className={css.n}>{brl(receita)}</div></div>
+        <div className={css.card}><div className={css.l}>Empresas em dia</div><div className={css.n}>{emDia}</div></div>
+        <div className={css.card}><div className={css.l}>Em atraso</div><div className={`${css.n} ${atrasadas > 0 ? css.neg : ''}`}>{atrasadas}</div></div>
       </div>
 
       <div className={css.tabela}>
@@ -81,20 +82,17 @@ export function Cobranca() {
         </div>
         {linhas.map(({ tenant, assinatura, ultima }) => (
           <div key={tenant.id} className={css.linha}>
-            <div className={css.emp}>
-              {tenant.razaoSocial}
-              <span className={css.cnpj}>{fmtCnpj(tenant.cnpj)}</span>
-            </div>
+            <div className={css.emp} title={`${tenant.razaoSocial} · CNPJ ${fmtCnpj(tenant.cnpj)}`}>{tenant.razaoSocial}</div>
             <div className={css.plano}>{rotuloPlano(assinatura, painel?.planos ?? [])}</div>
             <div className={css.valor}>{ultima ? brl(ultima.valor) : '—'}</div>
             <div>{selo(ultima)}</div>
             <div className={css.acoes}>
-              <button className={css.btnGhost} onClick={() => setConfigPara(tenant)}>Configurar</button>
               {ultima && ultima.status !== 'PAGA' ? (
-                <button className={css.btnCoral} onClick={() => void marcarPaga(ultima.id)}>Marcar pago</button>
+                <button className={css.lk} onClick={() => void marcarPaga(ultima.id)}>Marcar pago</button>
               ) : (
-                <button className={css.btnCoral} onClick={() => void gerar(tenant.id)} disabled={!assinatura}>Gerar cobrança</button>
+                <button className={css.lk} onClick={() => void gerar(tenant.id)} disabled={!assinatura} title={!assinatura ? 'Configure a assinatura primeiro' : undefined}>Gerar cobrança</button>
               )}
+              <button className={`${css.lk} ${css.lkSec}`} onClick={() => setConfigPara(tenant)}>Configurar</button>
             </div>
           </div>
         ))}
@@ -123,8 +121,9 @@ function atrasou(c: Cobranca): boolean {
 }
 
 function selo(c: Cobranca | null) {
-  if (!c) return <span className={`${css.pill} ${css.pillNeutro}`}>Sem cobrança</span>;
-  if (c.status === 'PAGA') return <span className={`${css.pill} ${css.pillDia}`}>Pago</span>;
+  // Tag só para atraso; o resto é texto discreto.
+  if (!c) return <span className={css.selTxt}>Sem cobrança</span>;
+  if (c.status === 'PAGA') return <span className={css.selTxt}>Pago</span>;
   if (atrasou(c)) {
     const dias = Math.floor((Date.now() - new Date(`${c.vencimento}T23:59:59-0300`).getTime()) / 86400000);
     return (
@@ -133,7 +132,7 @@ function selo(c: Cobranca | null) {
       </span>
     );
   }
-  return <span className={`${css.pill} ${css.pillAberta}`}>Em aberto{c.avisoPagamentoEm ? ' · avisou pgto' : ''}</span>;
+  return <span className={css.selTxt}>Em aberto{c.avisoPagamentoEm ? <b className={css.avisou}> · avisou pgto</b> : ''}</span>;
 }
 
 function rotuloPlano(a: Assinatura | null, planos: Plano[]): string {

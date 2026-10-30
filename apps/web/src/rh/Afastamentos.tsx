@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { hojeSP } from '../lib/formato';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
+import { Explica } from '../components/Explica';
 import type { Afastamento, Empregado, TipoAfastamento } from '../tipos';
 import css from './Afastamentos.module.css';
 
@@ -71,11 +72,13 @@ export function Afastamentos() {
 
   return (
     <div className={css.tela}>
-      <h2 className={css.h}>Férias e afastamentos</h2>
-      <p className={css.sub}>
-        Sem isso, quem sai de férias aparece com <strong>um mês inteiro de falta</strong> na apuração.
-        Lançar aqui faz o dia deixar de ser esperado — não vira falta nem saldo negativo.
-      </p>
+      <div className={css.tituloLinha}>
+        <h2 className={css.h}>Férias e afastamentos</h2>
+        <Explica>
+          Sem isso, quem sai de férias aparece com <strong>um mês inteiro de falta</strong> na apuração.
+          Lançar aqui faz o dia deixar de ser esperado — não vira falta nem saldo negativo.
+        </Explica>
+      </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
       {msg && <p className={css.ok}>{msg}</p>}
@@ -83,15 +86,15 @@ export function Afastamentos() {
       <div className={css.bloco}>
         <div className={css.blocoH}>Lançar</div>
 
-        <select className={css.select} value={emp} onChange={(e) => setEmp(e.target.value)}>
+        <select className={css.select} aria-label="Funcionário" value={emp} onChange={(e) => setEmp(e.target.value)}>
           <option value="">Escolha o funcionário…</option>
           {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
         </select>
 
-        <div className={css.chips}>
+        <div className={css.chips} role="group" aria-label="Tipo de afastamento">
           {TIPOS.map((t) => (
             <button
-              key={t.v} className={`${css.chip} ${tipo === t.v ? css.chipOn : ''}`}
+              key={t.v} type="button" aria-pressed={tipo === t.v} className={`${css.chip} ${tipo === t.v ? css.chipOn : ''}`}
               onClick={() => setTipo(t.v)}
             >{t.t}</button>
           ))}
@@ -119,15 +122,14 @@ export function Afastamentos() {
       {lista.length === 0 && <p className={css.vazio}>Nenhum afastamento lançado.</p>}
       {lista.map((a) => (
         <div key={a.id} className={css.item}>
-          <div>
-            <div className={css.itemN}>{a.nome}</div>
-            <div className={css.itemD}>
-              <span className={css.tag}>{ROTULO[a.tipo] ?? a.tipo}</span>
-              {fmtData(a.dataInicio)} a {fmtData(a.dataFim)} · {dias(a.dataInicio, a.dataFim)} dias
+          <div className={css.itemTxt}>
+            <div className={css.itemN} title={a.nome}>{a.nome}</div>
+            <div className={css.itemD} title={a.observacao ?? undefined}>
+              {ROTULO[a.tipo] ?? a.tipo} · {fmtData(a.dataInicio)} a {fmtData(a.dataFim)} · {dias(a.dataInicio, a.dataFim)} dias
               {a.observacao && <span className={css.obs}> · {a.observacao}</span>}
             </div>
           </div>
-          <button className={css.remover} onClick={() => remover(a.id)}>Apagar</button>
+          <button type="button" className={css.remover} aria-label={`Apagar afastamento de ${a.nome}`} onClick={() => remover(a.id)}>Apagar</button>
         </div>
       ))}
     </div>

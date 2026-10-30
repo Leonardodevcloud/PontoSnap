@@ -17,7 +17,7 @@
 .pdf{ font-size:12px; color:var(--coral-dark); padding-left:6px; }
 
 .saldo{
-  background:var(--peach); border-radius:var(--r-md); padding:16px 18px; margin-top:18px;
+  background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:16px 18px; margin-top:18px;
   display:flex; justify-content:space-between; align-items:center;
 }
 .l{ font-size:13px; color:var(--ash); font-weight:600; }
@@ -49,7 +49,7 @@
 .dataTxt{ font-size:13.5px; color:var(--ink); font-weight:500; }
 
 /* Pedido de ajuste de ponto */
-.pedirBtn{ width:100%; margin-top:14px; background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill); padding:12px; font:inherit; font-weight:600; font-size:14px; cursor:pointer; }
+.pedirBtn{ width:100%; margin-top:14px; background:var(--white); color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.18); border-radius:var(--r-pill); padding:12px; font:inherit; font-weight:600; font-size:14px; cursor:pointer; }
 .form{ background:var(--white); border:1.5px solid var(--coral); border-radius:16px; padding:14px; margin-top:14px; }
 .opts{ display:flex; gap:8px; margin-bottom:12px; }
 .optB{ flex:1; font:inherit; font-size:12.5px; font-weight:600; padding:9px; border-radius:10px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ash); cursor:pointer; }
@@ -62,9 +62,11 @@
 .batOn{ background:var(--erro-bg); border-color:var(--erro-text); color:var(--erro-text); font-weight:600; }
 .formAcoes{ display:flex; gap:10px; align-items:center; }
 .cancelarF{ background:none; border:none; font:inherit; font-size:13px; font-weight:600; color:var(--ash); text-decoration:underline; cursor:pointer; }
-.okBox{ background:var(--ok-bg); color:var(--ok-text); border-radius:12px; padding:11px 13px; font-size:13.5px; margin-top:14px; }
-.pedBox{ background:var(--aviso-bg); border:1px solid var(--aviso-border); border-radius:12px; padding:11px 13px; font-size:13px; color:var(--ash); margin-top:12px; }
-.pedOk{ background:var(--ok-bg); border-color:var(--ok-border); }
-.pedNo{ background:var(--erro-bg); border-color:rgba(36,87,214,.3); }
-.tagInc{ font-size:12px; color:var(--ok-text); background:var(--ok-bg); padding:2px 7px; border-radius:6px; }
+.okBox{ color:var(--ok-text); font-size:13.5px; font-weight:500; margin-top:14px; }
+.pedBox{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:12px; padding:11px 13px; font-size:13px; color:var(--ash); margin-top:12px; box-shadow:inset 3px 0 0 var(--aviso-border); }
+.pedOk{ box-shadow:none; }
+.pedNo{ box-shadow:inset 3px 0 0 var(--erro-text); }
+.tagInc{ font-size:12px; color:var(--ash); }
+.pedirBtn:focus-visible, .voltarLk:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+.voltarLk{ align-self:center; background:none; border:none; padding:10px 8px; font:inherit; font-size:14px; font-weight:500; color:var(--coral-dark); cursor:pointer; }
 .pedObs{ display:block; font-size:12px; color:var(--ash); margin-top:4px; font-style:italic; }

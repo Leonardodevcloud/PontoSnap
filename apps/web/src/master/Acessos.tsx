@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { Explica } from '../components/Explica';
 import css from './Acessos.module.css';
 
 interface Vinculo { id: string; tenantId: string; perfil: string; razaoSocial: string; cnpj: string; }
@@ -80,15 +81,16 @@ export function Acessos() {
   return (
     <div className={css.tela}>
       <div className={css.top}>
-        <div>
-          <h1 className={css.h}>Acessos dos clientes</h1>
-          <p className={css.sub}>Contas de <strong>Admin</strong> e <strong>RH</strong> dos seus clientes. Use aqui quando um cliente tem mais de um CNPJ e a mesma pessoa cuida de todos.</p>
-        </div>
-      </div>
-
-      <div className={css.voce}>
-        <span>👑</span>
-        <span><strong>Seu acesso Master não entra nesta lista.</strong> Ele já enxerga todos os clientes pela aba <strong>Clientes</strong> — não precisa de liberação por empresa.</span>
+        <h1 className={css.h}>Acessos dos clientes</h1>
+        <Explica>
+          Contas de <strong>Admin</strong> e <strong>RH</strong> dos seus clientes. Use aqui quando um cliente tem mais de um CNPJ e a mesma pessoa cuida de todos.
+          <br /><br />
+          <strong>Quando usar:</strong> o cliente tem 3 CNPJs e uma única pessoa cuida do RH dos três — você abre a conta dela e adiciona as outras duas empresas.
+          <br />
+          <strong>Quando não usar:</strong> funcionário que bate ponto — ele tem CPF, vínculo e arquivo fiscal numa CNPJ só, e nunca circula entre empresas.
+          <br /><br />
+          Seu acesso Master não entra nesta lista: ele já enxerga todos os clientes pela aba Clientes.
+        </Explica>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -97,16 +99,17 @@ export function Acessos() {
       <div className={css.card}>
         {contas.length === 0 ? <p className={css.vazio}>Nenhuma conta de administração cadastrada.</p> : (
           <table className={css.tab}>
-            <thead><tr><th>Conta do cliente</th><th>Empresas que ela enxerga</th><th></th></tr></thead>
+            <thead><tr><th>Conta do cliente</th><th><span className={css.thLinha}>Empresas que ela enxerga <Explica>A troca de empresa é conferida no servidor a cada vez — o navegador não escolhe sozinho em qual CNPJ está. Conceder, retirar ou trocar o papel vale na próxima renovação de sessão (no máximo alguns minutos).</Explica></span></th><th></th></tr></thead>
             <tbody>
               {contas.map((c) => (
                 <tr key={c.id}>
                   <td>
-                    {c.empresaOrigem && <span className={css.cli}>Cliente: {c.empresaOrigem}</span>}
+                    {c.empresaOrigem && <span className={css.cli} title={`Cliente: ${c.empresaOrigem}`}>{c.empresaOrigem}</span>}
                     {c.nome && <strong className={css.emailConta}>{c.nome}</strong>}
                     <strong className={css.emailConta} style={c.nome ? { fontWeight: 500, fontSize: 12.5, color: 'var(--ash)' } : undefined}>{c.email}</strong>
                     <div className={css.meta}>
-                      {papelLongo(c.perfil)}{c.ativo ? '' : ' · inativo'}
+                      {papelLongo(c.perfil)}
+                      {!c.ativo && <span className={css.tagInativo}>Inativo</span>}
                       {(c.perfil === 'RH' || c.perfil === 'ADMIN_CLIENTE') && (
                         <button
                           className={css.trocarPapel}
@@ -114,7 +117,7 @@ export function Acessos() {
                           onClick={() => trocarPerfil(c.id, c.perfil === 'RH' ? 'ADMIN_CLIENTE' : 'RH')}
                           title={c.perfil === 'RH' ? 'Promover a Administrador' : 'Rebaixar para RH'}
                         >
-                          {trocando === c.id ? '…' : c.perfil === 'RH' ? '→ tornar Admin' : '→ tornar RH'}
+                          {trocando === c.id ? '…' : c.perfil === 'RH' ? 'tornar Admin' : 'tornar RH'}
                         </button>
                       )}
                     </div>
@@ -129,9 +132,10 @@ export function Acessos() {
                             className={css.chipPapel}
                             disabled={trocandoVinc === v.id}
                             title={v.perfil === 'RH' ? 'Tornar Admin nesta empresa' : 'Tornar RH nesta empresa'}
+                            aria-label={v.perfil === 'RH' ? `Tornar Admin em ${v.razaoSocial}` : `Tornar RH em ${v.razaoSocial}`}
                             onClick={() => trocarPerfilVinculo(v, v.perfil === 'RH' ? 'ADMIN_CLIENTE' : 'RH')}
                           >{trocandoVinc === v.id ? '…' : v.perfil === 'RH' ? '→ Admin' : '→ RH'}</button>
-                          <button className={css.chipX} title="Retirar acesso" onClick={() => desvincular(v, c.email)}>×</button>
+                          <button className={css.chipX} title="Retirar acesso" aria-label={`Retirar acesso a ${v.razaoSocial}`} onClick={() => desvincular(v, c.email)}>×</button>
                         </span>
                       ))}
                     {addPara === c.id && (
@@ -167,15 +171,6 @@ export function Acessos() {
         )}
       </div>
 
-      <div className={css.quando}>
-        <b>Quando usar:</b> o cliente tem 3 CNPJs e uma única pessoa cuida do RH dos três — você abre a conta dela e adiciona as outras duas empresas.<br />
-        <b>Quando não usar:</b> funcionário que bate ponto — ele tem CPF, vínculo e arquivo fiscal numa CNPJ só, e nunca circula entre empresas.
-      </div>
-
-      <p className={css.nota}>
-        A troca de empresa é conferida no servidor a cada vez — o navegador não escolhe sozinho em qual CNPJ está.
-        Retirar um acesso vale na próxima renovação de sessão (no máximo alguns minutos).
-      </p>
     </div>
   );
 }

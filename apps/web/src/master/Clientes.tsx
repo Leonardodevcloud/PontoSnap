@@ -6,6 +6,7 @@ import type { Tenant } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Modal } from '../components/Modal';
+import { Explica } from '../components/Explica';
 import css from './Clientes.module.css';
 
 const fmtCnpj = (c: string) => c.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
@@ -19,6 +20,8 @@ const FUSOS: { valor: string; rotulo: string }[] = [
   { valor: '-0500', rotulo: 'Rio Branco (−05)' },
 ];
 const rotuloFuso = (f?: string) => FUSOS.find((x) => x.valor === (f ?? '-0300'))?.rotulo ?? (f ?? '−03');
+/** Só mostra o fuso na lista quando foge do padrão (Brasília). */
+const fusoCurto = (f?: string) => (f && f !== '-0300' ? `${f.slice(0, 1) === '-' ? '−' : '+'}${f.slice(1, 3)}` : null);
 
 export function Clientes() {
   const [lista, setLista] = useState<Tenant[] | null>(null);
@@ -76,13 +79,12 @@ export function Clientes() {
   return (
     <div onClick={() => setMenu(null)}>
       <div className={css.head}>
-        <div><h2>Clientes</h2><p>Empresas usando o PontoSnap</p></div>
+        <div className={css.tit}>
+          <h2>Clientes</h2>
+          {lista && <span className={css.contagem}>{ativos} {ativos === 1 ? 'ativo' : 'ativos'} · {lista.length} {lista.length === 1 ? 'cadastrado' : 'cadastrados'}</span>}
+          <Explica>Empresas usando o PontoSnap. Clique na razão social para editar os dados; o menu ⋯ tem usuários, fuso horário, ATTR, reenviar acesso e inativar.</Explica>
+        </div>
         <Botao variante="coral" className={css.add} onClick={() => setAddAberto(true)}>+ Novo cliente</Botao>
-      </div>
-
-      <div className={css.stats}>
-        <div className={css.stat}><div className={css.k}>Clientes ativos</div><div className={css.v}>{lista ? ativos : '—'}</div></div>
-        <div className={css.stat}><div className={css.k}>Total cadastrados</div><div className={css.v}>{lista?.length ?? '—'}</div></div>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
@@ -90,19 +92,20 @@ export function Clientes() {
 
       <div className={css.table}>
         <div className={`${css.row} ${css.thead}`}>
-          <span>Razão social</span><span>CNPJ</span><span>Local</span><span>Fuso</span><span>Status</span><span>Criado</span><span></span>
+          <span>Razão social</span><span>CNPJ</span><span>Local</span><span>Criado</span><span>Situação</span><span></span>
         </div>
         {lista?.length === 0 && <div className={css.vazio}>Nenhum cliente ainda. Cadastre o primeiro.</div>}
         {lista?.map((t) => (
           <div key={t.id} className={css.row}>
-            <button type="button" className={`${css.rz} ${css.rzBtn}`} onClick={() => setEditarDados(t)} title="Editar dados">{t.razaoSocial}</button>
+            <button type="button" className={`${css.rz} ${css.rzBtn}`} onClick={() => setEditarDados(t)} title={`${t.razaoSocial} — editar dados`}>{t.razaoSocial}</button>
             <span className={css.mono}>{fmtCnpj(t.cnpj)}</span>
-            <span className={css.muted}>{t.localPrestacao ?? '—'}</span>
-            <span className={css.fusoCol}>{rotuloFuso(t.fuso)}</span>
-            <span className={`${css.status} ${t.ativo ? css.ativo : css.inativo}`}><span className={css.sdot} />{t.ativo ? 'Ativo' : 'Inativo'}</span>
+            <span className={css.muted} title={`Fuso: ${rotuloFuso(t.fuso)}`}>
+              {t.localPrestacao ?? '—'}{fusoCurto(t.fuso) && <span className={css.fusoCol}> · {fusoCurto(t.fuso)}</span>}
+            </span>
             <span className={css.mono}>{fmtData(t.criadoEm)}</span>
+            <span>{!t.ativo && <span className={css.tagInativo}>Inativo</span>}</span>
             <span className={css.kebabWrap} onClick={(e) => { e.stopPropagation(); setMenu(menu === t.id ? null : t.id); }}>
-              <button className={css.kebab} aria-label="Ações">⋯</button>
+              <button className={css.kebab} aria-label={`Ações de ${t.razaoSocial}`} aria-haspopup="menu" aria-expanded={menu === t.id}>⋯</button>
               {menu === t.id && (
                 <div className={css.menu} onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => { setMenu(null); setEditarDados(t); }}>Editar dados</button>
@@ -196,13 +199,15 @@ function ModalNovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCria
       <Campo rotulo="Razão social" value={razaoSocial} onChange={(e) => setRazao(e.target.value)} placeholder="Autopeças Bahia ME" />
       <Campo rotulo="CNPJ" inputMode="numeric" value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" />
       <Campo rotulo="Local de prestação" value={localPrestacao} onChange={(e) => setLocal(e.target.value)} placeholder="Feira de Santana/BA" />
-      <label className={css.selWrap}>
-        <span className={css.selLb}>Fuso horário</span>
-        <select className={css.select} value={fuso} onChange={(e) => setFuso(e.target.value)}>
+      <div className={css.selWrap}>
+        <span className={css.selLbLinha}>
+          <label htmlFor="novo-fuso" className={css.selLb}>Fuso horário</label>
+          <Explica>Rege apuração, arquivos fiscais e espelhos. Cada batida grava o fuso do momento — defina certo antes das primeiras marcações.</Explica>
+        </span>
+        <select id="novo-fuso" className={css.select} value={fuso} onChange={(e) => setFuso(e.target.value)}>
           {FUSOS.map((f) => <option key={f.valor} value={f.valor}>{f.rotulo}</option>)}
         </select>
-      </label>
-      <p className={css.fusoNota}>Rege apuração, arquivos fiscais e espelhos. Cada batida grava o fuso do momento — defina certo antes das primeiras marcações.</p>
+      </div>
       <div className={css.divider}>Quem vai administrar</div>
       <div className={css.caminhos}>
         <button className={`${css.cam} ${caminho === 'NOVO' ? css.camOn : ''}`} onClick={() => setCaminho('NOVO')}>
@@ -219,7 +224,7 @@ function ModalNovoCliente({ onFechar, onCriado }: { onFechar: () => void; onCria
         <>
           <Campo rotulo="Nome do responsável" value={adminNome} onChange={(e) => setNome(e.target.value)} placeholder="Marina Souza" />
           <Campo rotulo="E-mail do responsável" type="email" value={adminEmail} onChange={(e) => setEmail(e.target.value)} placeholder="admin@empresa.com.br" />
-          <p className={css.fusoNota}>A senha provisória é gerada pelo sistema e enviada por e-mail junto com o link. Ela também aparece aqui depois de criar.</p>
+          <p className={css.notaLinha}>Senha provisória gerada e enviada por e-mail <Explica>A senha provisória é gerada pelo sistema e enviada por e-mail junto com o link. Ela também aparece aqui depois de criar.</Explica></p>
         </>
       ) : (
         <>

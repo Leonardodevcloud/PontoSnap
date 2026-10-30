@@ -4,13 +4,14 @@ import { api } from '../lib/api';
 import { brl, dataBr, dataIsoBr, fmtCnpj, type Conferencia, type NotaFila } from '../lib/prestador';
 import { Rosto } from './Prestadores';
 import { VisorNota, type FonteNota } from '../components/VisorNota';
+import { Explica } from '../components/Explica';
 import css from './Prestadores.module.css';
 
 const MOTIVOS = ['Valor diferente', 'Tomador errado', 'Código do serviço errado', 'Descrição diferente da pedida', 'Competência errada', 'Ilegível', 'Número repetido'];
 
 function marca(n: NotaFila): { texto: string; tom: string } {
   const c = n.conferencia;
-  if (!c) return { texto: 'conferir', tom: 'cz' };
+  if (!c) return { texto: 'sem leitura', tom: 'cz' };
   if (c.arquivo === 'FOTO') return { texto: 'foto', tom: 'av' };
   if (c.valorBate === false) return { texto: 'valor ≠', tom: 'er' };
   if (c.codigoOk === false) return { texto: 'código ≠', tom: 'er' };
@@ -95,6 +96,9 @@ export function ConferirNotas() {
   const [erro, setErro] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // Motivos de recusa ficam fechados até o RH pedir (botão "Recusar…" ou tecla R).
+  const [recusa, setRecusa] = useState(false);
+  const trocar = (id: string) => { setAtual(id); setMotivo(null); setRecusa(false); };
   const recusarRef = useRef<HTMLButtonElement>(null);
   const [ampliado, setAmpliado] = useState(() => { try { return localStorage.getItem('pontosnap.conferir.ampliado') === '1'; } catch { return false; } });
   const alternarAmpliado = () => setAmpliado((v) => { try { localStorage.setItem('pontosnap.conferir.ampliado', v ? '0' : '1'); } catch { /* sem storage */ } return !v; });
@@ -123,7 +127,7 @@ export function ConferirNotas() {
     try {
       const r = await api.post<{ aprovadas: number }>('/portal/rh/aprovar', { ids });
       setMsg(`${r.aprovadas} ${r.aprovadas === 1 ? 'nota aprovada' : 'notas aprovadas'}. O prestador recebe o aviso.`);
-      setMotivo(null); setOutro('');
+      setMotivo(null); setOutro(''); setRecusa(false);
       await carregar(prox);
     } catch (e) { setErro((e as Error).message); }
     finally { setOcupado(false); }
@@ -138,7 +142,7 @@ export function ConferirNotas() {
     try {
       await api.post(`/portal/rh/notas/${n.id}/recusar`, { motivo: m });
       setMsg(`Nota de ${n.nome} recusada. Ele recebe o motivo no celular e reenvia.`);
-      setMotivo(null); setOutro('');
+      setMotivo(null); setOutro(''); setRecusa(false);
       await carregar(prox);
     } catch (e) { setErro((e as Error).message); }
     finally { setOcupado(false); }
@@ -149,10 +153,10 @@ export function ConferirNotas() {
       const alvo = e.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName) || e.metaKey || e.ctrlKey || e.altKey || !fila || !n || ocupado) return;
       if (e.key === 'a' || e.key === 'A') { e.preventDefault(); void aprovar([n.id]); }
-      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); if (!motivo) setMotivo('Valor diferente'); recusarRef.current?.focus(); }
+      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setRecusa(true); if (!motivo) setMotivo('Valor diferente'); setTimeout(() => recusarRef.current?.focus(), 0); }
       else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); alternarAmpliado(); }
-      else if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); const p = fila[idx + 1]; if (p) { setAtual(p.id); setMotivo(null); } }
-      else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); const p = fila[idx - 1]; if (p) { setAtual(p.id); setMotivo(null); } }
+      else if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); const p = fila[idx + 1]; if (p) trocar(p.id); }
+      else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); const p = fila[idx - 1]; if (p) trocar(p.id); }
     };
     window.addEventListener('keydown', tecla);
     return () => window.removeEventListener('keydown', tecla);
@@ -164,16 +168,21 @@ export function ConferirNotas() {
       <div className={css.cab}>
         <div>
           <button type="button" className={css.btnTxt} style={{ paddingLeft: 0 }} onClick={() => navegar('/rh/prestadores')}>‹ Notas de prestadores</button>
-          <h2>Conferir notas{fila ? ` · ${fila.length}` : ''}</h2>
-          <p>Atalhos: <span className={css.kbd}>A</span> aprovar · <span className={css.kbd}>R</span> recusar · <span className={css.kbd}>↓ ↑</span> próxima · <span className={css.kbd}>+ −</span> zoom · <span className={css.kbd}>F</span> ampliar</p>
+          <div className={css.tituloLinha}>
+            <h2>Conferir notas{fila ? ` · ${fila.length}` : ''}</h2>
+            <Explica rotulo="Atalhos e como funciona">
+              Fila à esquerda, a nota no meio e a conferência automática à direita. Atalhos: <b>A</b> aprovar · <b>R</b> recusar · <b>↓ ↑</b> próxima · <b>+ −</b> zoom · <b>F</b> ampliar.
+              {' '}"Aprovar as que batem" aprova de uma vez só as notas em que tudo confere (descrição diferente fica para você olhar uma a uma).
+            </Explica>
+          </div>
         </div>
         <div className={css.acoes}>
-          {batem.length > 1 && <button type="button" className={css.btnPri} disabled={ocupado} onClick={() => aprovar(batem.map((x) => x.id))}>Aprovar as {batem.length} que batem</button>}
+          {batem.length > 1 && <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => aprovar(batem.map((x) => x.id))}>Aprovar as {batem.length} que batem</button>}
         </div>
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {msg && <p className={css.okMsg} role="status">{msg}</p>}
-      {fila && fila.length === 0 && <div className={css.vazio}><b>Nenhuma nota para conferir 🎉</b><p>Quando um prestador enviar a nota pelo app, ela aparece aqui.</p></div>}
+      {fila && fila.length === 0 && <div className={css.vazio}><b>Nenhuma nota para conferir</b><p>Quando um prestador enviar a nota pelo app, ela aparece aqui.</p></div>}
 
       {fila && fila.length > 0 && (
         <div className={`${css.conf} ${ampliado ? css.confAmpliado : ''}`}>
@@ -182,10 +191,12 @@ export function ConferirNotas() {
             {fila.map((x) => {
               const m = marca(x);
               return (
-                <button key={x.id} type="button" role="option" aria-selected={x.id === atual} className={`${css.fi} ${x.id === atual ? css.fiOn : ''}`} onClick={() => { setAtual(x.id); setMotivo(null); }}>
+                <button key={x.id} type="button" role="option" aria-selected={x.id === atual} className={`${css.fi} ${x.id === atual ? css.fiOn : ''}`} onClick={() => trocar(x.id)}>
                   <span><Rosto id={x.pessoaId} semente={x.avatarSemente} tamanho={30} /></span>
-                  <span><b>{x.nome}</b><small>{x.pessoaTipo === 'MEI' ? 'MEI' : 'Motorista'} · {brl(x.valorCent)}</small></span>
-                  <span className={`${css.tag} ${css[`t-${m.tom}`]}`}>{m.texto}</span>
+                  <span><b title={x.nome}>{x.nome}</b><small title={`${x.pessoaTipo === 'MEI' ? 'MEI' : 'Motorista'} · ${brl(x.valorCent)}`}>{brl(x.valorCent)} · {x.pessoaTipo === 'MEI' ? 'MEI' : 'Motorista'}</small></span>
+                  {m.tom === 'ok' ? <span className="sr-only">bate</span>
+                    : m.tom === 'cz' ? <span className={css.filaMarca}>{m.texto}</span>
+                      : <span className={`${css.tag} ${css[`t-${m.tom}`]}`}>{m.texto}</span>}
                 </button>
               );
             })}
@@ -195,12 +206,14 @@ export function ConferirNotas() {
 
           {n && c && (
             <div className={css.check}>
-              <h4>{n.nome}</h4>
-              <p className={css.hint}>{n.rotulo} · enviada {dataIsoBr(n.enviadaEm)}{n.nf.numero ? ` · NF ${n.nf.numero}` : ''}{n.nf.data ? ` de ${dataBr(n.nf.data)}` : ''}</p>
-              <h4>Conferência automática</h4>
+              <h4 title={`${n.rotulo} · enviada ${dataIsoBr(n.enviadaEm)}${n.nf.numero ? ` · NF ${n.nf.numero}` : ''}${n.nf.data ? ` de ${dataBr(n.nf.data)}` : ''}`}>{n.nome}</h4>
+              <p className={css.hint}>{n.rotulo} · enviada {dataIsoBr(n.enviadaEm)}</p>
               {c.origem !== 'INFORMADO' ? (
                 <>
-                  <p className={css.hint}>Lido do {c.origem === 'PDF' ? 'PDF' : 'XML'} da nota{faltas(c) > 0 ? ` · ${faltas(c) === 1 ? '1 divergência' : `${faltas(c)} divergências`}` : c.descricaoOk === false ? ' · confere, mas a descrição difere do pedido' : ' · tudo confere'}</p>
+                  <p className={css.confResumo} title={`Conferência automática, lida do ${c.origem === 'PDF' ? 'PDF' : 'XML'} da nota`}>
+                    <b>{faltas(c) > 0 ? (faltas(c) === 1 ? '1 divergência' : `${faltas(c)} divergências`) : c.descricaoOk === false ? 'Confere, mas a descrição difere do pedido' : 'Tudo confere'}</b>
+                    · lido do {c.origem === 'PDF' ? 'PDF' : 'XML'}
+                  </p>
                   <table className={css.tabConf}>
                     <thead><tr><th aria-label="Situação" /><th /><th>Na nota</th></tr></thead>
                     <tbody>
@@ -222,18 +235,29 @@ export function ConferirNotas() {
                   <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota repetido' : 'Número da nota não repetido'} det={n.nf.numero ? `NF ${n.nf.numero}` : undefined} />
                   {c.arquivo === 'FOTO' && <Cl ok={null} titulo="Foto: confira a olho" />}
                   {n.pedido && <p className={css.hint}><b>Pedido:</b> {n.pedido.codigoServico ? `código ${n.pedido.codigoServico} · ` : ''}"{n.pedido.descricao}". Confira no arquivo.</p>}
-                  {c.arquivo === 'PDF' && <p className={css.hint}>Não deu para ler este PDF (escaneado ou modelo diferente): número, data e valor foram informados pelo prestador. Confira com o arquivo ao lado.</p>}
+                  {c.arquivo === 'PDF' && <p className={css.hint}>PDF não lido: dados informados pelo prestador.{' '}
+                    <Explica lado="dir">Não deu para ler este PDF (escaneado ou modelo diferente): número, data e valor foram informados pelo prestador. Confira com o arquivo ao lado.</Explica></p>}
                 </>
               )}
 
               <button type="button" className={css.btnPri} disabled={ocupado} onClick={() => aprovar([n.id])}>{faltas(c) > 0 ? 'Aprovar mesmo assim (A)' : 'Aprovar nota (A)'}</button>
-              <div className={css.motivos} role="group" aria-label="Motivo da recusa">
-                {[...MOTIVOS, 'Outro'].map((m) => <button key={m} type="button" aria-pressed={motivo === m} onClick={() => setMotivo(motivo === m ? null : m)}>{m}</button>)}
-              </div>
-              {motivo === 'Outro' && (
-                <div className={css.campo}><label htmlFor="mot-outro">Motivo</label><textarea id="mot-outro" value={outro} onChange={(e) => setOutro(e.target.value)} maxLength={500} /></div>
+              {!recusa ? (
+                <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => setRecusa(true)} aria-expanded={false}>Recusar… (R)</button>
+              ) : (
+                <div className={css.recusaBox}>
+                  <div className={css.tituloLinha}>
+                    <b style={{ fontSize: 13 }}>Motivo da recusa</b><span className={css.esp} />
+                    <button type="button" className={css.lk} onClick={() => { setRecusa(false); setMotivo(null); }}>Cancelar</button>
+                  </div>
+                  <div className={css.motivos} role="group" aria-label="Motivo da recusa">
+                    {[...MOTIVOS, 'Outro'].map((m) => <button key={m} type="button" aria-pressed={motivo === m} onClick={() => setMotivo(motivo === m ? null : m)}>{m}</button>)}
+                  </div>
+                  {motivo === 'Outro' && (
+                    <div className={css.campo}><label htmlFor="mot-outro">Motivo</label><textarea id="mot-outro" value={outro} onChange={(e) => setOutro(e.target.value)} maxLength={500} /></div>
+                  )}
+                  <button ref={recusarRef} type="button" className={css.btnSec} disabled={ocupado || !motivo || (motivo === 'Outro' && outro.trim().length < 3)} onClick={recusar}>Recusar e pedir outra</button>
+                </div>
               )}
-              <button ref={recusarRef} type="button" className={css.btnSec} disabled={ocupado || !motivo || (motivo === 'Outro' && outro.trim().length < 3)} onClick={recusar}>Recusar e pedir outra (R)</button>
             </div>
           )}
         </div>

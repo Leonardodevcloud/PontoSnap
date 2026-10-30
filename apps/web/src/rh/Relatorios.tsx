@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { minutosParaHhMm, reaisDeCentavos } from '../lib/formato';
 import type { RelatorioResp } from '../tipos';
 import { Botao } from '../components/Botao';
+import { Explica } from '../components/Explica';
 import { salvarBlob } from '../lib/download';
 import css from './Relatorios.module.css';
 
@@ -58,24 +59,31 @@ export function Relatorios() {
   return (
     <div>
       <div className={css.head}>
-        <div><h2>Relatórios</h2><p>Consolidado da competência por funcionário</p></div>
+        <div className={css.titulo}>
+          <h2>Relatórios</h2>
+          <Explica>
+            Consolidado da competência por funcionário. Valores calculados sobre o salário cadastrado (divisor 220h). Reflexo de DSR é
+            estimativa. Cobre o que a jornada gera — não é a folha completa. Não substitui validação contábil.
+            Com muitos funcionários, use “Gerar em 2º plano”: processa sem travar a tela.
+          </Explica>
+        </div>
         <div className={css.controles}>
           <input aria-label="Competência" type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
+          {rel && <button type="button" className={css.link} onClick={() => baixar('pdf')}>Baixar PDF</button>}
+          {rel && <button type="button" className={css.link} onClick={() => baixar('xlsx')}>Baixar Excel</button>}
+          <button type="button" className={css.link} onClick={gerarBackground} disabled={carregando} title="Recomendado para muitos funcionários">Gerar em 2º plano</button>
           <Botao variante="coral" className={css.btn} onClick={gerar} disabled={carregando}>{carregando ? 'Apurando…' : 'Gerar'}</Botao>
-          <Botao variante="ghost" className={css.btn} onClick={gerarBackground} disabled={carregando} title="Recomendado para muitos funcionários">2º plano</Botao>
-          {rel && <Botao variante="ghost" className={css.btn} onClick={() => baixar('pdf')}>PDF</Botao>}
-          {rel && <Botao variante="ghost" className={css.btn} onClick={() => baixar('xlsx')}>Excel</Botao>}
         </div>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
-      {carregando && <p className={css.info}>Apurando todos os funcionários da competência… (o modo 2º plano processa sem travar a tela)</p>}
+      {carregando && <p className={css.info}>Apurando todos os funcionários da competência…</p>}
       {!rel && !carregando && <p className={css.info}>Escolha a competência e clique em Gerar.</p>}
 
       {rel && (
         <>
           <div className={css.cards}>
-            <Card k="Custo em extras" v={reaisDeCentavos(rel.totais.extrasCentavos)} destaque />
+            <Card k="Custo em extras" v={reaisDeCentavos(rel.totais.extrasCentavos)} />
             <Card k="Adicional noturno" v={reaisDeCentavos(rel.totais.adicionalNoturnoCentavos)} />
             <Card k="Total de extras" v={minutosParaHhMm(rel.totais.extrasMin)} />
             <Card k="Total de faltas" v={minutosParaHhMm(rel.totais.faltaMin)} alerta={rel.totais.faltaMin > 0} />
@@ -103,7 +111,7 @@ export function Relatorios() {
             </div>
             {rel.linhas.map((l) => (
               <div key={l.empregadoId} className={css.linha}>
-                <span className={css.nome}>{l.nome}{!l.temSalario && <em className={css.semSal}> sem salário</em>}</span>
+                <span className={css.nome} title={l.temSalario ? l.nome : `${l.nome} · sem salário cadastrado`}>{l.nome}{!l.temSalario && <em className={css.semSal}> sem salário</em>}</span>
                 <span className={css.mono}>{minutosParaHhMm(l.trabalhadoMin)}</span>
                 <span className={css.mono}>{l.extrasMin ? minutosParaHhMm(l.extrasMin) : '—'}</span>
                 <span className={css.mono}>{l.noturnoMin ? minutosParaHhMm(l.noturnoMin) : '—'}</span>
@@ -125,19 +133,15 @@ export function Relatorios() {
             </div>
           </div>
 
-          <p className={css.disclaimer}>
-            Valores calculados sobre o salário cadastrado (divisor 220h). Reflexo de DSR é estimativa. Cobre o que a
-            jornada gera — não é a folha completa. Não substitui validação contábil.
-          </p>
         </>
       )}
     </div>
   );
 }
 
-function Card({ k, v, destaque, alerta }: { k: string; v: string; destaque?: boolean; alerta?: boolean }) {
+function Card({ k, v, alerta }: { k: string; v: string; alerta?: boolean }) {
   return (
-    <div className={`${css.card} ${destaque ? css.cardDestaque : ''} ${alerta ? css.cardAlerta : ''}`}>
+    <div className={`${css.card} ${alerta ? css.cardAlerta : ''}`}>
       <div className={css.cardK}>{k}</div>
       <div className={css.cardV}>{v}</div>
     </div>

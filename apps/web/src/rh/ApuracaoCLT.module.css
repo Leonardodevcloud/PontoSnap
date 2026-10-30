@@ -1,7 +1,12 @@
 .head{ margin-bottom:20px; display:flex; align-items:flex-end; justify-content:space-between; gap:20px; }
 .pdfBtn{ width:auto; white-space:nowrap; }
-.head h2{ font-size:28px; }
-.head p{ margin:6px 0 0; color:var(--ash); font-size:14px; }
+.head h2{ font-size:28px; margin:0; }
+.tituloLinha{ display:flex; align-items:center; gap:8px; }
+.linkAcao{ background:none; border:none; padding:6px 4px; font:inherit; font-size:14px; color:var(--coral-dark); font-weight:500; cursor:pointer; white-space:nowrap; }
+.linkAcao:hover:not(:disabled){ text-decoration:underline; }
+.linkAcao:disabled{ opacity:.6; cursor:default; }
+.linkAcao:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; border-radius:4px; }
+.kpiDe{ font-size:14px; font-weight:400; color:var(--ash); }
 .controles{ display:flex; gap:14px; margin-bottom:22px; flex-wrap:wrap; }
 .sel{ display:flex; flex-direction:column; gap:6px; }
 .lb{ font-size:12px; color:var(--coral-dark); }
@@ -11,10 +16,8 @@
 
 .cards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:24px; }
 .card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:14px 16px; }
-.cardDestaque{ background:var(--peach); border-color:transparent; }
-.cardAlerta{ background:var(--erro-bg); border-color:var(--erro-text); }
-.cardK{ font-size:12px; color:var(--coral-dark); }
-.cardK em{ font-style:normal; color:var(--ash); text-transform:none; letter-spacing:0; }
+.cardAlerta .cardV{ color:var(--erro-text); }
+.cardK{ font-size:12.5px; color:var(--ash); }
 .cardV{ font-family:var(--ff-display); font-weight:600; font-size:22px; line-height:1.15; margin-top:4px; }
 
 .tabela{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:hidden; }
@@ -27,14 +30,14 @@
 .mono{ font-size:12.5px; }
 .faltaTxt{ color:var(--erro-text); font-weight:600; }
 .diaVazio{ opacity:.5; }
-.viol{ background:var(--aviso-bg); }
+.viol{ box-shadow:inset 3px 0 0 var(--erro-text); }
 .sinais{ display:flex; gap:5px; flex-wrap:wrap; align-content:center; }
-.tag{ font-size:12px; background:var(--ink); color:var(--cream); padding:2px 6px; border-radius:6px; white-space:nowrap; }
-.viol .tag{ background:var(--coral-dark); }
-.tagAtraso{ background:var(--erro-text); }
+.sinais{ cursor:help; }
+.tag{ font-size:12px; background:var(--aviso-bg); color:var(--aviso-text); padding:2px 7px; border-radius:6px; white-space:nowrap; }
+.tagAtraso{ background:var(--erro-bg); color:var(--erro-text); }
+.mais{ font-size:12px; color:var(--ash); }
 
-.disclaimer{ margin-top:16px; font-size:12.5px; color:var(--ash); line-height:1.5; background:var(--white); border:1px dashed rgba(var(--ink-rgb),.2); border-radius:var(--r-md); padding:12px 14px; }
-.disclaimer strong{ color:var(--ink); }
+.disclaimer{ margin-top:16px; font-size:12.5px; color:var(--ash); line-height:1.5; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 
 .valores{ margin-top:22px; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:18px 20px; max-width:520px; }
 .valores h3{ font-size:16px; margin:0 0 12px; }
@@ -53,16 +56,19 @@
 
 /* Destinação de faltas e atrasos */
 .destinacao{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:14px; padding:16px 18px; margin:6px 0 18px; }
-.destinacao h3{ font-family:var(--ff-display); font-weight:600; font-size:16px; margin:0 0 10px; }
+.destinacao h3{ font-family:var(--ff-display); font-weight:600; font-size:16px; margin:0; }
+.secH{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.secLink{ margin-left:auto; color:var(--coral-dark); font-weight:500; font-size:14px; text-decoration:none; }
+.secLink:hover{ text-decoration:underline; }
+.destMudo{ color:var(--ash); font-size:12.5px; }
+.tagProb{ font-size:12px; padding:2px 8px; border-radius:6px; background:var(--erro-bg); color:var(--erro-text); }
 .destLinha{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(var(--ink-rgb),.06); font-size:14px; }
 .destLinha:last-of-type{ border-bottom:none; }
-.destBadge{ font-size:12px; padding:2px 9px; border-radius:6px; margin-left:8px; }
-.destDesc{ background:var(--erro-bg); color:var(--erro-text); }
-.destBanco{ background:var(--lime); color:var(--sobre-lime); }
 .destTotal{ font-weight:600; border-top:1px solid rgba(var(--ink-rgb),.14) !important; margin-top:4px; padding-top:12px; }
 .destTotal .mono{ font-size:16px; }
 .neg{ color:var(--erro-text); }
-.destAviso{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border-radius:10px; background:var(--erro-bg); border:1px solid var(--erro-text); font-size:12.5px; }
+.destAviso{ display:flex; align-items:center; gap:4px 10px; flex-wrap:wrap; margin:12px 0 0; font-size:14px; color:var(--aviso-text); }
+.destAviso::before{ content:''; width:7px; height:7px; border-radius:50%; background:currentColor; flex:none; }
 .destNota{ font-size:12.5px; color:var(--ash); margin:10px 0 0; }
 
 /* ===== Gaveta lateral: detalhe do dia ===== */

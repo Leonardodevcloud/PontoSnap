@@ -2,6 +2,7 @@
 .cab{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
 .cab h2{ font-size:28px; margin:0; line-height:1.2; }
 .cab p{ margin:4px 0 0; color:var(--ash); font-size:14px; }
+.titulo{ display:flex; align-items:center; gap:8px; }
 .voltar{ background:none; border:0; padding:0; color:var(--ash); font:inherit; font-weight:600; font-size:14px; cursor:pointer; margin-bottom:2px; }
 .voltar:hover{ color:var(--ink); }
 .acoes{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -17,15 +18,20 @@
 .btnTxt{ background:none; border:0; color:var(--ash); padding:6px 10px; min-height:34px; font-size:13px; }
 .btnTxt:hover:not(:disabled){ color:var(--ink); background:rgba(var(--ink-rgb),.06); }
 .btnPri:disabled, .btnSec:disabled, .btnTxt:disabled{ opacity:.5; cursor:not-allowed; }
+.lnk{ background:none; border:0; padding:6px 4px; min-height:34px; font:inherit; font-size:14px; font-weight:500; color:var(--coral-dark); cursor:pointer; white-space:nowrap; }
+.lnk:hover:not(:disabled){ text-decoration:underline; }
+.lnk:disabled{ opacity:.5; cursor:not-allowed; }
+.lnk:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; border-radius:4px; }
+.h4q{ display:flex; align-items:center; gap:6px; }
 .pequeno{ min-height:32px; padding:4px 12px; font-size:12.5px; }
 .btnPri:focus-visible, .btnSec:focus-visible, .btnTxt:focus-visible, .fl:focus-visible, .card:focus-visible, .chip:focus-visible, .sw:focus-visible, .addB:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 
 /* ───── lista ───── */
-.kpis{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.kpis{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .kpi{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:14px; padding:12px 14px; min-width:0; }
 .kpi small{ font-size:12px; color:var(--ash); display:block; }
 .kpi b{ display:block; font-family:var(--ff-display); font-weight:600; font-size:26px; margin-top:2px; line-height:1.2; }
-.kpi span{ font-size:12.5px; color:var(--ash); }
+.kpi b.kpiNeg{ color:var(--erro-text); }
 .filtros{ display:flex; gap:8px; flex-wrap:wrap; }
 .fl{ display:inline-flex; gap:7px; align-items:center; min-height:38px; padding:5px 14px; border-radius:999px; border:1px solid rgba(var(--ink-rgb),.22); background:var(--white); color:var(--ink); font:inherit; font-weight:500; font-size:14px; cursor:pointer; }
 .fl span{ font-size:12px; opacity:.75; }
@@ -41,9 +47,10 @@
 .tAudio{ background:var(--peach); color:var(--coral-dark); }
 .tFoto{ background:var(--tag-orange-bg); color:var(--coral-dark); }
 .tTexto{ background:var(--cream); color:var(--ash); font-family:var(--ff-display); font-weight:600; font-size:18px; }
-.card h3{ margin:0 0 4px; font-size:16px; font-weight:600; display:flex; gap:8px; align-items:center; flex-wrap:wrap; line-height:1.3; font-family:var(--ff-body); }
+.card h3{ margin:0 0 4px; font-size:16px; font-weight:600; display:flex; gap:8px; align-items:center; line-height:1.3; font-family:var(--ff-body); min-width:0; }
+.tit{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .meta{ color:var(--ash); font-size:12.5px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.tag{ font-size:12px; padding:3px 7px; border-radius:6px; background:var(--cream); color:var(--ash); font-weight:500; white-space:nowrap; }
+.tag{ font-size:12px; padding:3px 7px; border-radius:6px; background:var(--cream); color:var(--ash); font-weight:500; white-space:nowrap; flex:none; }
 .tagFix{ background:var(--lime); color:var(--sobre-lime); }
 .tagObr{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); }
 .tagAg{ background:var(--tag-blue-bg); color:var(--tag-blue-text); }
@@ -119,6 +126,8 @@ textarea.inp{ min-height:110px; resize:vertical; line-height:1.55; }
 .tg{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:9px 0; border-top:1px solid rgba(var(--ink-rgb),.08); }
 .tg:first-of-type{ border-top:0; padding-top:0; }
 .tg b{ display:block; font-size:13.5px; }
+.tgRot{ display:flex; align-items:center; gap:6px; }
+.tgRot b{ display:inline; }
 .tg small{ color:var(--ash); font-size:12.5px; line-height:1.4; display:block; }
 .sw{ width:42px; height:24px; border-radius:999px; background:rgba(var(--ink-rgb),.22); position:relative; flex-shrink:0; border:0; cursor:pointer; padding:0; }
 .sw::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:left .15s ease; }

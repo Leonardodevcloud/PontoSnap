@@ -57,8 +57,8 @@ export function PorQue({ pedido, inicio, fim, onFechar, onVerDias }: {
           <ul className={css.regras}>
             {ex.regras.map((r) => (
               <li key={r.rotulo}>
-                <div><b>{r.rotulo}</b><span>{r.texto}</span></div>
-                <Link to={r.rota} onClick={onFechar}>mudar</Link>
+                <div title={r.texto}><b>{r.rotulo}</b><span>{r.texto}</span></div>
+                <Link to={r.rota} onClick={onFechar} aria-label={`Mudar: ${r.rotulo}`}>mudar</Link>
               </li>
             ))}
           </ul>

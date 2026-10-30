@@ -13,6 +13,7 @@ import type {
 import css from './BancoHoras.module.css';
 import vt from './VisaoTodos.module.css';
 import { Avatar } from '../components/Avatar';
+import { Explica } from '../components/Explica';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
 const fmtDataHora = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
@@ -263,11 +264,15 @@ export function BancoHoras() {
 
   return (
     <div className={`${css.tela} ${aba === 'funcionario' && !sel ? css.telaLarga : ''}`}>
-      <h2 className={css.h}>Banco de horas</h2>
-      <p className={css.sub}>
-        Só existe com acordo. Sem ele, a hora extra é paga na folha — e é isso que a lei manda.
-        O acordo abaixo é o <strong>padrão da empresa</strong>: vale pra quem não tem uma regra de banco própria.
-      </p>
+      <div className={css.tituloLinha}>
+        <h2 className={css.h}>Banco de horas</h2>
+        <Explica>
+          Só existe com acordo. Sem ele, a hora extra é paga na folha, e é isso que a lei manda. O acordo da
+          aba “Da empresa” é o padrão: vale pra quem não tem uma regra de banco própria. Saldo conta só os
+          meses fechados; o mês atual fecha sozinho no dia 1 e, até lá, é previsão. Clique num funcionário
+          pra registrar folga, baixar ou corrigir saldo, lançar saldo de abertura e ver o extrato.
+        </Explica>
+      </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
       {msg && <p className={css.ok}>{msg}</p>}
@@ -289,13 +294,11 @@ export function BancoHoras() {
           <div className={css.acordoSaved}>
             {cfg.ativo
               ? <>
-                  <span className={css.pillOk}><span className={css.dot} />Ativo</span>
                   <span className={css.big}>{rotuloAcordo(cfg.tipoAcordo)}</span>
                   <span className={css.sep}>·</span>
                   <span className={css.muted}>compensar em até <b className={css.mono}>{cfg.prazoMeses} meses</b></span>
                 </>
               : <>
-                  <span className={css.pillNeutro}><span className={css.dot} />Não usam</span>
                   <span className={css.big}>Sem banco de horas</span>
                   <span className={css.muted}>hora extra é paga na folha</span>
                 </>}
@@ -303,18 +306,14 @@ export function BancoHoras() {
           </div>
 
           {cob && cob.total > 0 && (
-            <div className={css.cobertura}>
-              <span className={css.cobLinha}>
-                <b className={css.mono}>{cob.seguindoEmpresa}</b> de <b className={css.mono}>{cob.total}</b> funcionários seguem este padrão
-                {cob.comRegraPropria > 0 && <> · <b className={css.mono}>{cob.comRegraPropria}</b> têm regra de banco própria</>}
-              </span>
-              <span className={css.cobLinha}>
-                Na prática: <b className={css.mono}>{cob.comBanco}</b> com banco, <b className={css.mono}>{cob.semBanco}</b> sem.
-              </span>
+            <p className={css.cobertura}>
+              <b>{cob.seguindoEmpresa}</b> de <b>{cob.total}</b> seguem este padrão
+              {cob.comRegraPropria > 0 && <> · <b>{cob.comRegraPropria}</b> com regra própria</>}
+              {' · '}<b>{cob.comBanco}</b> com banco, <b>{cob.semBanco}</b> sem.{' '}
               <Link to="/rh/regras" className={css.cobLink}>
-                {cob.opcoesBanco > 0 ? 'ver as regras de banco →' : 'criar uma regra de banco por funcionário →'}
+                {cob.opcoesBanco > 0 ? 'Ver as regras de banco' : 'Criar uma regra de banco por funcionário'}
               </Link>
-            </div>
+            </p>
           )}
         </div>
       )}
@@ -354,14 +353,16 @@ export function BancoHoras() {
         <>
           {/* ---------- FECHAMENTO AUTOMÁTICO ---------- */}
           <div className={css.bloco}>
-            <div className={css.blocoH}>Fechamento dos meses</div>
-            <p className={css.dica} style={{ marginTop: 0 }}>
-              <strong>Automático.</strong> Todo mês encerrado é levado ao banco sozinho (na virada do mês e
-              sempre que alguém consulta um saldo). Ajuste de ponto aprovado, atestado abonado, afastamento
-              ou folga num mês já fechado fazem o mês ser refeito. Você não precisa lançar nada.
-            </p>
+            <div className={css.blocoH}>
+              Fechamento dos meses: automático
+              <Explica>
+                Todo mês encerrado é levado ao banco sozinho (na virada do mês e sempre que alguém consulta um
+                saldo). Ajuste de ponto aprovado, atestado abonado, afastamento ou folga num mês já fechado fazem
+                o mês ser refeito. Você não precisa lançar nada.
+              </Explica>
+            </div>
             <div className={css.lote}>
-              <Botao variante="lime" onClick={sincronizarAgora} disabled={sincronizando}>
+              <Botao variante="ghost" onClick={sincronizarAgora} disabled={sincronizando}>
                 {sincronizando ? 'Verificando…' : 'Verificar pendências agora'}
               </Botao>
               <button className={css.linkish} onClick={() => setModoLancar(modoLancar === 'lote' ? 'individual' : 'lote')}>
@@ -411,8 +412,10 @@ export function BancoHoras() {
                   const aberto = expandido === h.competencia;
                   return (
                     <div key={h.competencia}>
-                      <div className={css.hrow} onClick={() => setExpandido(aberto ? null : h.competencia)}>
-                        <span className={css.hcomp}>{fmtComp(h.competencia)} {h.automatico ? <em className={css.hauto}>auto</em> : <em className={css.hauto}>manual</em>}</span>
+                      <div className={css.hrow} role="button" tabIndex={0} aria-expanded={aberto}
+                        onClick={() => setExpandido(aberto ? null : h.competencia)}
+                        onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setExpandido(aberto ? null : h.competencia); } }}>
+                        <span className={css.hcomp} title={h.automatico ? 'Fechado automaticamente' : 'Refeito à mão'}>{fmtComp(h.competencia)} {!h.automatico && <em className={css.hauto}>manual</em>}</span>
                         <span className={css.mono}>{h.funcionarios}</span>
                         <span className={`${css.mono} ${h.totalMin >= 0 ? css.pos : css.neg}`}>{comSinal(h.totalMin)}</span>
                         <span className={css.mono}>{fmtDataHora(h.lancadoEm)}</span>
@@ -448,96 +451,17 @@ export function BancoHoras() {
 
       {aba === 'funcionario' && sel && (
           <div className={css.bloco}>
-            <div className={vt.crumb} style={{ marginBottom: 8 }}>
-              <button onClick={() => setSel('')}>← Todos os funcionários</button><span>/</span>
-              <span>{emps.find((e) => e.id === sel)?.nome ?? '…'}</span>
-            </div>
-            {cfg && !cfg.ativo && (
-              <p className={css.dica} style={{ marginTop: 0 }}>
-                O banco de horas está <strong>desativado</strong> para a empresa. Ative o acordo na aba
-                <strong> Da empresa</strong> para poder lançar folgas e saldos.
-              </p>
-            )}
             <div className={css.linha}>
-              <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
+              <button className={css.voltar} onClick={() => setSel('')}>← Todos</button>
+              <select className={css.select} aria-label="Funcionário" value={sel} onChange={(e) => setSel(e.target.value)}>
                 <option value="">Escolha o funcionário…</option>
                 {emps.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </select>
             </div>
-
-            {sel && (
-              <div className={css.acaoBox}>
-                <button className={`${css.acaoH} ${acao === 'folga' ? css.acaoHOn : ''}`}
-                  onClick={() => setAcao(acao === 'folga' ? null : 'folga')}>
-                  <span>Registrar folga compensatória</span>
-                  <span className={css.acaoChev}>{acao === 'folga' ? '▴' : '▾'}</span>
-                </button>
-                {acao === 'folga' && (
-                <div className={css.acaoBody}>
-                  <div className={css.folgaLinha}>
-                    <input className={css.mes} type="date" value={folgaData} max={hojeSP()}
-                      onChange={(e) => e.target.value && setFolgaData(e.target.value)} />
-                    <input className={css.folgaH} inputMode="decimal" value={folgaHoras}
-                      placeholder="horas (ou jornada do dia)"
-                      onChange={(e) => setFolgaHoras(e.target.value)} />
-                    <Botao variante="ghost" onClick={registrarFolga} disabled={regFolga}>
-                      {regFolga ? 'Registrando…' : 'Registrar folga'}
-                    </Botao>
-                  </div>
-                  <p className={css.dica}>
-                    A folga <strong>debita o banco</strong> e faz o dia <strong>não contar como falta</strong>.
-                    Deixe as horas em branco pra usar a jornada do dia do funcionário.
-                  </p>
-                </div>
-                )}
-              </div>
-            )}
-
-            {sel && banco?.ativo && banco.saldo && (
-              <CardBaixa key={sel} empregadoId={sel} banco={banco}
-                aberto={acao === 'baixa'} onToggle={() => setAcao(acao === 'baixa' ? null : 'baixa')}
-                onFeito={() => carregarBanco(sel)} />
-            )}
-
-            {sel && (
-              <div className={css.acaoBox}>
-                <button className={`${css.acaoH} ${acao === 'abertura' ? css.acaoHOn : ''}`}
-                  onClick={() => setAcao(acao === 'abertura' ? null : 'abertura')}>
-                  <span>Saldo de abertura (migração)</span>
-                  <span className={css.acaoChev}>{acao === 'abertura' ? '▴' : '▾'}</span>
-                </button>
-                {acao === 'abertura' && (
-                <div className={css.acaoBody}>
-                  <p className={css.dica} style={{ marginTop: 0, marginBottom: 10 }}>
-                    Traga o saldo que o funcionário já tinha no sistema anterior. Lance uma vez,
-                    na data em que começaram a usar o PontoSnap.
-                  </p>
-                  <div className={css.folgaLinha}>
-                    <input className={css.mes} type="date" value={abData}
-                      onChange={(e) => e.target.value && setAbData(e.target.value)} />
-                    <input className={css.folgaH} inputMode="numeric" value={abHoras}
-                      placeholder="saldo HH:MM (ex.: 12:30)"
-                      onChange={(e) => setAbHoras(e.target.value)} />
-                  </div>
-                  <div className={css.abSinal}>
-                    <button type="button"
-                      className={`${css.abSinalBtn} ${abSinal === 'mais' ? css.abSinalOn : ''}`}
-                      onClick={() => setAbSinal('mais')}>A favor (+) — tem horas guardadas</button>
-                    <button type="button"
-                      className={`${css.abSinalBtn} ${abSinal === 'menos' ? css.abSinalOnNeg : ''}`}
-                      onClick={() => setAbSinal('menos')}>Devendo (−) — deve horas</button>
-                  </div>
-                  <Botao variante="coral" onClick={lancarAbertura} disabled={abEnviando || !abHoras}>
-                    {abEnviando ? 'Lançando…' : 'Lançar saldo de abertura'}
-                  </Botao>
-                  {abMsg && <p className={css.abOk}>{abMsg}</p>}
-                  <p className={css.dica}>
-                    Só o <strong>saldo</strong> é trazido. As batidas antigas ficam no sistema anterior
-                    (o histórico fiscal de lá).
-                  </p>
-                </div>
-                )}
-              </div>
+            {cfg && !cfg.ativo && (
+              <p className={css.avisoLinha}>
+                Banco de horas desativado para a empresa. Ative o acordo na aba “Da empresa” para lançar folgas e saldos.
+              </p>
             )}
 
             {s && (
@@ -545,7 +469,7 @@ export function BancoHoras() {
                 <div className={css.cards}>
                   <div className={css.card}>
                     <div className={css.cL}>{banco!.formaCalculo === 'INTRA_MES' ? (banco!.negativoMes === 'CARREGA' ? 'Devendo de meses anteriores' : 'Saldo (acertado todo mês)') : 'Saldo (meses fechados)'}</div>
-                    <div className={css.cV}>{comSinal(s.saldoMin)}</div>
+                    <div className={`${css.cV} ${s.saldoMin < 0 ? css.neg : ''}`}>{comSinal(s.saldoMin)}</div>
                     {banco!.mesCorrente && (
                       <div className={css.cSub}>
                         mês atual <b className={css.mono}>{comSinal(banco!.mesCorrente.estimadoMin)}</b> · previsão ao fechar <b className={css.mono}>{comSinal(banco!.saldoProjetadoMin ?? s.saldoMin)}</b>
@@ -555,12 +479,12 @@ export function BancoHoras() {
                   {banco!.formaCalculo === 'INTRA_MES' ? (() => {
                     const ult = banco!.fechamentos.find((f) => f.acertoMin != null);
                     return (
-                      <div className={css.card} style={{ gridColumn: 'span 2' }}>
+                      <div className={css.card} style={{ gridColumn: 'span 2' }}
+                        title={`Regra: compensa no mês e paga a diferença · devendo ${banco!.negativoMes === 'CARREGA' ? 'passa para o mês seguinte' : 'desconta na folha'}`}>
                         <div className={css.cL}>Último acerto{ult ? ` · ${ult.competencia.slice(5)}/${ult.competencia.slice(0, 4)}` : ''}</div>
                         <div className={`${css.cV} ${ult && ult.acertoMin! < 0 ? css.neg : ''}`}>
                           {!ult ? '—' : ult.acertoMin! > 0 ? `${minutosParaHhMm(ult.acertoMin!)} pagas` : ult.acertoMin! < 0 ? `${minutosParaHhMm(-ult.acertoMin!)} descontadas` : 'nada a acertar'}
                         </div>
-                        <div className={css.cSub}>Regra: compensa no mês e paga a diferença · devendo {banco!.negativoMes === 'CARREGA' ? 'passa para o mês seguinte' : 'desconta na folha'}</div>
                       </div>
                     );
                   })() : (
@@ -581,15 +505,92 @@ export function BancoHoras() {
                   </div>
                 )}
 
+              </>
+            )}
+
+            {sel && (
+              <div className={css.acaoBox}>
+                <button className={`${css.acaoH} ${acao === 'folga' ? css.acaoHOn : ''}`}
+                  onClick={() => setAcao(acao === 'folga' ? null : 'folga')}>
+                  <span>Registrar folga compensatória</span>
+                  <span className={css.acaoChev}>{acao === 'folga' ? '▴' : '▾'}</span>
+                </button>
+                {acao === 'folga' && (
+                <div className={css.acaoBody}>
+                  <div className={css.folgaLinha}>
+                    <input className={css.mes} type="date" aria-label="Dia da folga" value={folgaData} max={hojeSP()}
+                      onChange={(e) => e.target.value && setFolgaData(e.target.value)} />
+                    <input className={css.folgaH} inputMode="decimal" value={folgaHoras} aria-label="Horas da folga"
+                      placeholder="horas (ou jornada do dia)"
+                      onChange={(e) => setFolgaHoras(e.target.value)} />
+                    <Botao variante="ghost" onClick={registrarFolga} disabled={regFolga}>
+                      {regFolga ? 'Registrando…' : 'Registrar folga'}
+                    </Botao>
+                    <Explica lado="dir">
+                      A folga debita o banco e faz o dia não contar como falta. Deixe as horas em branco pra usar a
+                      jornada do dia do funcionário.
+                    </Explica>
+                  </div>
+                </div>
+                )}
+              </div>
+            )}
+
+            {sel && banco?.ativo && banco.saldo && (
+              <CardBaixa key={sel} empregadoId={sel} banco={banco}
+                aberto={acao === 'baixa'} onToggle={() => setAcao(acao === 'baixa' ? null : 'baixa')}
+                onFeito={() => carregarBanco(sel)} />
+            )}
+
+            {sel && (
+              <div className={css.acaoBox}>
+                <button className={`${css.acaoH} ${acao === 'abertura' ? css.acaoHOn : ''}`}
+                  onClick={() => setAcao(acao === 'abertura' ? null : 'abertura')}>
+                  <span>Saldo de abertura (migração)</span>
+                  <span className={css.acaoChev}>{acao === 'abertura' ? '▴' : '▾'}</span>
+                </button>
+                {acao === 'abertura' && (
+                <div className={css.acaoBody}>
+                  <div className={css.folgaLinha}>
+                    <input className={css.mes} type="date" aria-label="Data do saldo de abertura" value={abData}
+                      onChange={(e) => e.target.value && setAbData(e.target.value)} />
+                    <input className={css.folgaH} inputMode="numeric" value={abHoras} aria-label="Saldo de abertura"
+                      placeholder="saldo HH:MM (ex.: 12:30)"
+                      onChange={(e) => setAbHoras(e.target.value)} />
+                    <Explica lado="dir">
+                      Traga o saldo que o funcionário já tinha no sistema anterior. Lance uma vez, na data em que
+                      começaram a usar o PontoSnap. Só o saldo é trazido: as batidas antigas ficam no sistema anterior
+                      (o histórico fiscal de lá).
+                    </Explica>
+                  </div>
+                  <div className={css.abSinal}>
+                    <button type="button"
+                      className={`${css.abSinalBtn} ${abSinal === 'mais' ? css.abSinalOn : ''}`}
+                      onClick={() => setAbSinal('mais')}>A favor (+) — tem horas guardadas</button>
+                    <button type="button"
+                      className={`${css.abSinalBtn} ${abSinal === 'menos' ? css.abSinalOnNeg : ''}`}
+                      onClick={() => setAbSinal('menos')}>Devendo (−) — deve horas</button>
+                  </div>
+                  <Botao variante="coral" onClick={lancarAbertura} disabled={abEnviando || !abHoras}>
+                    {abEnviando ? 'Lançando…' : 'Lançar saldo de abertura'}
+                  </Botao>
+                  {abMsg && <p className={css.abOk}>{abMsg}</p>}
+                </div>
+                )}
+              </div>
+            )}
+
+            {s && (
+              <>
                 <div className={css.blocoH} style={{ marginTop: 18 }}>Extrato</div>
                 {banco!.extrato.length === 0 && <p className={css.vazio}>Nenhum movimento.</p>}
                 {banco!.extrato.map((m, i) => (
                   <div key={`${m.data}-${i}`} className={css.ext}>
                     <span className={css.extD}>{fmtData(m.data)}</span>
                     <span className={css.extE}>{m.descricao || m.tipo}{m.competencia && (m.tipo === 'PAGAMENTO' || m.tipo === 'AJUSTE'
-                      ? <em className={`${css.extTag} ${css.extTagPago}`}>acerto {m.competencia}</em>
+                      ? <em className={css.extTag}>acerto {m.competencia}</em>
                       : <em className={css.extTag}>fechamento {m.competencia}</em>)}
-                      {!m.competencia && m.tipo === 'PAGAMENTO' && <em className={`${css.extTag} ${css.extTagPago}`}>pagamento</em>}</span>
+                      {!m.competencia && m.tipo === 'PAGAMENTO' && <em className={css.extTag}>pagamento</em>}</span>
                     <span className={`${css.extV} ${m.minutos > 0 ? '' : css.neg}`}>{comSinal(m.minutos)}</span>
                     <span className={css.extAcao}>
                       {/* Só lançamento avulso sai daqui; o de fechamento é refeito junto com o mês. */}
@@ -648,8 +649,8 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
   return (
     <>
       {semBancoEmpresa && (
-        <p className={css.dica} style={{ marginTop: 0 }}>
-          O banco de horas está <strong>desativado</strong> para a empresa. Só aparecem com saldo os funcionários que têm uma regra própria de banco.
+        <p className={css.avisoLinha}>
+          Banco de horas desativado para a empresa. Só aparecem com saldo os funcionários que têm uma regra própria de banco.
         </p>
       )}
       <div className={css.linha} style={{ marginBottom: 14 }}>
@@ -663,11 +664,11 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
       {resumo && t && (
         <>
           <div className={vt.kpis}>
-            <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Saldo do banco</div><div className={vt.kpiV}>{comSinal(t.saldoMin)}</div><div className={vt.kpiS}>meses fechados · previsão com {mesNome}: {comSinal(t.projetadoMin)}</div></div>
-            <div className={vt.kpi}><div className={vt.kpiK}>Com banco</div><div className={vt.kpiV}>{t.comBanco} / {t.funcionarios}</div><div className={vt.kpiS}>funcionários ativos</div></div>
-            <div className={`${vt.kpi} ${t.comVencido > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Vencido</div><div className={vt.kpiV}>{t.vencidoMin > 0 ? minutosParaHhMm(t.vencidoMin) : '—'}</div><div className={vt.kpiS}>{t.comVencido > 0 ? `${t.comVencido} funcionário${t.comVencido === 1 ? '' : 's'} — pagar na folha` : 'nada a pagar'}</div></div>
-            <div className={`${vt.kpi} ${t.comAVencer > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Vence em 30 dias</div><div className={vt.kpiV}>{t.aVencerMin > 0 ? minutosParaHhMm(t.aVencerMin) : '—'}</div><div className={vt.kpiS}>{t.comAVencer > 0 ? `${t.comAVencer} funcionário${t.comAVencer === 1 ? '' : 's'} — dar folga` : 'nenhum'}</div></div>
-            <div className={`${vt.kpi} ${t.devendo > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Devendo horas</div><div className={vt.kpiV}>{t.devendo}</div><div className={vt.kpiS}>com saldo negativo</div></div>
+            <div className={vt.kpi} title={`Só meses fechados · previsão com ${mesNome}: ${comSinal(t.projetadoMin)}`}><div className={vt.kpiK}>Saldo do banco</div><div className={`${vt.kpiV} ${t.saldoMin < 0 ? vt.neg : ''}`}>{comSinal(t.saldoMin)}</div><div className={vt.kpiS}>previsão {comSinal(t.projetadoMin)}</div></div>
+            <div className={vt.kpi} title="Funcionários ativos com banco de horas"><div className={vt.kpiK}>Com banco</div><div className={vt.kpiV}>{t.comBanco} / {t.funcionarios}</div></div>
+            <div className={`${vt.kpi} ${t.comVencido > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Vencido</div><div className={vt.kpiV}>{t.vencidoMin > 0 ? minutosParaHhMm(t.vencidoMin) : '—'}</div>{t.comVencido > 0 && <div className={vt.kpiS}>{t.comVencido} funcionário{t.comVencido === 1 ? '' : 's'}: pagar na folha</div>}</div>
+            <div className={vt.kpi}><div className={vt.kpiK}>Vence em 30 dias</div><div className={vt.kpiV}>{t.aVencerMin > 0 ? minutosParaHhMm(t.aVencerMin) : '—'}</div>{t.comAVencer > 0 && <div className={vt.kpiS}>{t.comAVencer} funcionário{t.comAVencer === 1 ? '' : 's'}: dar folga</div>}</div>
+            <div className={`${vt.kpi} ${t.devendo > 0 ? vt.kpiAlerta : ''}`} title="Funcionários com saldo negativo"><div className={vt.kpiK}>Devendo horas</div><div className={vt.kpiV}>{t.devendo}</div></div>
           </div>
 
           <div className={vt.tab}>
@@ -688,7 +689,7 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
                     <tr key={l.empregadoId} className={vt.row} tabIndex={0} role="button"
                       onClick={() => onAbrir(l.empregadoId)}
                       onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onAbrir(l.empregadoId); } }}>
-                      <td className={vt.comAv}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} /><span className={vt.nome}>{l.nome}<small>{l.matricula ? `#${l.matricula} · ` : ''}{l.ativo ? regraCurta(l) : 'sem banco'}</small></span></td>
+                      <td className={vt.comAv} title={`${l.nome}${l.matricula ? ` · #${l.matricula}` : ''} · ${l.ativo ? regraCurta(l) : 'sem banco'}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={34} className={vt.avTd} /><span className={`${vt.nome} ${css.nomeCorta}`}>{l.nome}</span></td>
                       {l.ativo ? (
                         <>
                           <td className={`${vt.n} ${sinal(l.saldoMin)}`}><b>{comSinal(l.saldoMin)}</b></td>
@@ -696,19 +697,25 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
                           <td className={`${vt.n} ${sinal(l.projetadoMin)} ${vt.mute}`}>{comSinal(l.projetadoMin)}</td>
                           <td className={`${vt.n} ${l.aVencerMin > 0 ? '' : vt.mute}`}>{l.aVencerMin > 0 ? minutosParaHhMm(l.aVencerMin) : '—'}</td>
                           <td className={`${vt.n} ${l.vencidoMin > 0 ? vt.neg : vt.mute}`}>{l.vencidoMin > 0 ? minutosParaHhMm(l.vencidoMin) : '—'}</td>
-                          <td>
-                            {l.vencidoMin > 0 && <span className={`${vt.pill} ${vt.pillErr}`}>pagar na folha</span>}
-                            {l.vencidoMin === 0 && l.aVencerMin > 0 && l.proximoVencimento && <span className={`${vt.pill} ${vt.pillWarn}`}>vence {fmtData(l.proximoVencimento)}</span>}
-                            {l.saldoMin < 0 && <span className={`${vt.pill} ${vt.pillWarn}`}>devendo</span>}
-                            {l.ultimoFechamento && <span className={`${vt.pill} ${vt.pillMute}`}>fechado até {fmtComp2(l.ultimoFechamento)}</span>}
-                            {!l.ultimoFechamento && <span className={`${vt.pill} ${vt.pillMute}`}>sem mês fechado</span>}
-                            {l.vencidoMin === 0 && l.aVencerMin === 0 && l.saldoMin >= 0 && <span className={`${vt.pill} ${vt.pillOk}`}>em dia</span>}
-                          </td>
+                          {(() => {
+                            // Só a situação mais grave vira tag; o resto vai no title.
+                            const probs: { t: string; c: string }[] = [];
+                            if (l.vencidoMin > 0) probs.push({ t: 'pagar na folha', c: vt.pillErr! });
+                            if (l.saldoMin < 0) probs.push({ t: 'devendo', c: vt.pillWarn! });
+                            if (l.vencidoMin === 0 && l.aVencerMin > 0 && l.proximoVencimento) probs.push({ t: `vence ${fmtData(l.proximoVencimento)}`, c: vt.pillWarn! });
+                            const fech = l.ultimoFechamento ? `fechado até ${fmtComp2(l.ultimoFechamento)}` : 'sem mês fechado';
+                            const top = probs[0];
+                            return (
+                              <td title={[...probs.map((p) => p.t), fech].join(' · ')}>
+                                {top ? <span className={`${vt.pill} ${top.c}`}>{top.t}</span> : <span className={vt.mute}>{fech}</span>}
+                                {probs.length > 1 && <span className={css.mais}>+{probs.length - 1}</span>}
+                              </td>
+                            );
+                          })()}
                         </>
                       ) : (
                         <>
-                          <td className={`${vt.n} ${vt.mute}`} colSpan={5}>extra paga na folha (sem acordo de banco)</td>
-                          <td><span className={`${vt.pill} ${vt.pillMute}`}>sem banco</span></td>
+                          <td className={vt.mute} colSpan={6}>sem banco · extra paga na folha</td>
                         </>
                       )}
                     </tr>
@@ -727,10 +734,6 @@ function TodosFuncionarios({ resumo, carregando, busca, setBusca, semBancoEmpres
                 )}
               </table>
             </div>
-          </div>
-          <div className={vt.legenda}>
-            <span>Clique no funcionário pra registrar folga, baixar ou corrigir saldo, lançar saldo de abertura e ver o extrato.</span>
-            <span>Saldo = só meses fechados. {mesNome} ainda está em andamento e fecha sozinho no dia 1 — até lá é previsão, não saldo.</span>
           </div>
         </>
       )}
@@ -860,12 +863,14 @@ function CardBaixa({ empregadoId, banco, aberto, onToggle, onFeito }: {
             <div><div className={css.prevK}>Depois</div><div className={css.prevV}>{comSinal(saldo + delta)}</div></div>
             <div className={css.prevDesc}>No extrato:<br /><b>“{desc}”</b></div>
           </div>
-          <Botao variante="coral" onClick={enviar} disabled={enviando || !horas}>
-            {enviando ? 'Lançando…' : modo === 'pago' ? `Baixar ${hh || 'horas'} como pago` : `${sinal === 'mais' ? 'Somar' : 'Tirar'} ${hh || 'horas'} ${sinal === 'mais' ? 'ao' : 'do'} banco`}
-          </Botao>
+          <div className={css.linha}>
+            <Botao variante="coral" onClick={enviar} disabled={enviando || !horas}>
+              {enviando ? 'Lançando…' : modo === 'pago' ? `Baixar ${hh || 'horas'} como pago` : `${sinal === 'mais' ? 'Somar' : 'Tirar'} ${hh || 'horas'} ${sinal === 'mais' ? 'ao' : 'do'} banco`}
+            </Botao>
+            <Explica>Fica registrado na auditoria quem lançou. Dá para desfazer pelo × do extrato.</Explica>
+          </div>
           {ok && <p className={css.abOk}>{ok}</p>}
           {erro && <p className={css.erro} role="alert">{erro}</p>}
-          <p className={css.dica}>Fica registrado na auditoria quem lançou. Dá para desfazer pelo × do extrato.</p>
         </div>
       )}
     </div>
@@ -928,16 +933,20 @@ function BaixaAberturas({ onFeito }: { onFeito: () => void }) {
       </button>
       {aberto && (
         <div className={css.acaoBody}>
-          <p className={css.loteAviso}>
-            Lista quem ainda tem <strong>saldo de abertura</strong> (importado do sistema anterior) no banco. Marque quem já recebeu essas horas
-            em dinheiro: elas saem do banco como <strong>pagamento</strong>, na data do saldo de abertura, sem mexer nas horas dos meses fechados no PontoSnap.
-          </p>
           <div className={css.loteTopo}>
             <label className={css.campoB}><span>Pago na folha de</span>
               <select className={css.select} value={comp} onChange={(e) => setComp(e.target.value)}>
                 {meses.map((m) => <option key={m} value={m}>{fmtComp(m)}</option>)}
               </select>
             </label>
+            <span className={css.loteExplica}>
+              <Explica>
+                Lista quem ainda tem saldo de abertura (importado do sistema anterior) no banco. Marque quem já recebeu
+                essas horas em dinheiro: elas saem do banco como pagamento, na data do saldo de abertura, sem mexer nas
+                horas dos meses fechados no PontoSnap. Cada baixa entra no extrato como “Horas pagas na folha de
+                {' '}{fmtComp2(comp)} (saldo de abertura)” e pode ser desfeita no × do extrato do funcionário.
+              </Explica>
+            </span>
             <label className={css.chkTodos}>
               <input type="checkbox" checked={todos}
                 onChange={(e) => setMarcados(Object.fromEntries(pendentes.map((a) => [a.empregadoId, e.target.checked])))} />
@@ -965,7 +974,7 @@ function BaixaAberturas({ onFeito }: { onFeito: () => void }) {
                       <tr key={a.empregadoId} className={on ? '' : css.loteOff}>
                         <td><input type="checkbox" checked={on} aria-label={`Baixar ${a.nome}`}
                           onChange={(e) => setMarcados({ ...marcados, [a.empregadoId]: e.target.checked })} /></td>
-                        <td><span className={vt.nome}>{a.nome}<small>{!a.bancoAtivo ? 'sem banco ativo' : a.formaCalculo === 'INTRA_MES' ? `paga a diferença no mês · devendo ${a.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}` : 'acumula no banco'} · importado em {fmtData(a.aberturaData)}</small></span></td>
+                        <td title={`${!a.bancoAtivo ? 'sem banco ativo' : a.formaCalculo === 'INTRA_MES' ? `paga a diferença no mês · devendo ${a.negativoMes === 'CARREGA' ? 'passa' : 'desconta'}` : 'acumula no banco'} · importado em ${fmtData(a.aberturaData)}`}><span className={`${vt.nome} ${css.nomeCorta}`}>{a.nome}</span></td>
                         <td className={vt.n}>{comSinal(a.aberturaMin)}</td>
                         <td className={`${vt.n} ${a.baixadoMin ? '' : vt.mute}`}>{a.baixadoMin ? minutosParaHhMm(a.baixadoMin) : '—'}</td>
                         <td className={vt.n}>
@@ -988,7 +997,6 @@ function BaixaAberturas({ onFeito }: { onFeito: () => void }) {
           </div>
           {ok && <p className={css.abOk}>{ok}</p>}
           {erro && <p className={css.erro} role="alert">{erro}</p>}
-          <p className={css.dica}>Cada baixa entra no extrato do funcionário como “Horas pagas na folha de {fmtComp2(comp)} (saldo de abertura)” e pode ser desfeita no × do extrato dele.</p>
         </div>
       )}
     </div>

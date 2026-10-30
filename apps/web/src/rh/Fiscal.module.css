@@ -1,6 +1,6 @@
-.head{ margin-bottom:24px; }
+.head{ margin-bottom:24px; display:flex; align-items:center; gap:8px; }
 .head h2{ font-size:28px; }
-.head p{ margin:6px 0 0; color:var(--ash); font-size:14px; }
+.h3Linha{ display:flex; align-items:center; gap:8px; margin:6px 0 18px; }
 .filtro{ margin-bottom:18px; }
 .selpill{ display:inline-flex; align-items:center; background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-pill); padding:8px 16px; }
 .cal{ font-size:12px; color:var(--ash); margin-right:10px; }
@@ -8,13 +8,16 @@
 .erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
 .ok{ color:#0E7A50; font-size:12.5px; font-weight:500; }
 .duo{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:760px){ .duo{ grid-template-columns:1fr; } }
 .card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:24px 26px; }
-.kicker{ font-size:12px; color:var(--coral-dark); }
-.card h3{ font-size:22px; margin:8px 0; }
-.card p{ color:var(--ash); font-size:14px; margin:0 0 18px; }
-.acts{ display:flex; gap:10px; flex-wrap:wrap; }
+.kicker{ font-size:12px; color:var(--ash); }
+.card h3{ font-size:20px; margin:0; }
+.acts{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+.link{ background:none; border:0; padding:6px 2px; font:inherit; font-size:14px; font-weight:500; color:var(--coral-dark); cursor:pointer; }
+.link:hover:not(:disabled){ text-decoration:underline; }
+.link:disabled{ opacity:.55; cursor:wait; }
+.link:focus-visible, .btn:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 .btn{ border:none; border-radius:var(--r-pill); padding:11px 18px; font-family:var(--ff-display); font-weight:500; font-size:14px; cursor:pointer; }
 .btn:disabled{ opacity:.55; cursor:wait; }
 .coral{ background:var(--coral-acao); color:var(--on-coral); }
-.ghost{ background:transparent; color:var(--ash); border:2px solid rgba(var(--ink-rgb),.12); }
-.nota{ margin-top:18px; color:var(--ash); font-size:12.5px; }
+.ghost{ background:transparent; color:var(--ink); border:1px solid rgba(var(--ink-rgb),.24); }

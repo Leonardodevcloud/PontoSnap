@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { Modal } from './Modal';
+import { Explica } from './Explica';
 import css from './GestaoUsuarios.module.css';
 
 type Papel = 'ADMIN_CLIENTE' | 'RH';
@@ -70,8 +71,12 @@ export function GestaoUsuarios({ base, modo, onVerAuditoria }: {
     <div className={css.raiz}>
       <div className={css.topo}>
         <p className={css.sub}>
-          {d ? <>{ativos.length} {ativos.length === 1 ? 'pessoa acessa' : 'pessoas acessam'} {curta(d.empresa.razao)}.</> : 'Carregando…'}
-          {' '}Cada uma entra com o próprio login, então a auditoria mostra quem fez cada coisa.
+          {d ? <>{ativos.length} {ativos.length === 1 ? 'pessoa acessa' : 'pessoas acessam'} {curta(d.empresa.razao)}</> : 'Carregando…'}
+          <Explica rotulo="Como funcionam os usuários">
+            Cada pessoa entra com o próprio login, então a auditoria mostra quem fez cada coisa.
+            Desativar não apaga: a pessoa perde o acesso (em poucos minutos, na próxima renovação de sessão) e continua na auditoria com o nome.
+            Para o histórico ficar completo, ninguém é excluído.
+          </Explica>
         </p>
         <button type="button" className={css.btnPri} onClick={() => { setMsg(null); setEditando('NOVO'); }} disabled={!d}>+ Novo usuário</button>
       </div>
@@ -94,15 +99,19 @@ export function GestaoUsuarios({ base, modo, onVerAuditoria }: {
                   <td>
                     <div className={css.pes}>
                       <span className={css.av} aria-hidden="true">{iniciais(u.nome)}</span>
-                      <span><b>{u.nome}{u.voce && <em className={css.voce}> · você</em>}</b><small>{u.email}</small></span>
+                      <span className={css.pesTxt}><b title={u.nome}>{u.nome}{u.voce && <em className={css.voce}> · você</em>}</b><small>{u.email}</small></span>
                     </div>
                   </td>
-                  <td><span className={`${css.tag} ${u.perfil === 'ADMIN_CLIENTE' ? css.tIn : css.tCz}`}>{PAPEL[u.perfil]}</span></td>
-                  <td><div className={css.chips}>{u.empresas.map((e) => <span key={e.id} className={`${css.tag} ${css.tCz}`} title={`${e.razao} · ${PAPEL[e.perfil]}`}>{curta(e.razao)}{e.perfil !== u.perfil ? ` · ${PAPEL[e.perfil]}` : ''}</span>)}</div></td>
+                  <td>{PAPEL[u.perfil]}</td>
+                  {/* Empresas em texto: a primeira e "+N"; a lista completa no title. */}
+                  <td><span className={css.emp} title={u.empresas.map((e) => `${e.razao} · ${PAPEL[e.perfil]}`).join('\n')}>
+                    {u.empresas[0] ? `${curta(u.empresas[0].razao)}${u.empresas[0].perfil !== u.perfil ? ` · ${PAPEL[u.empresas[0].perfil]}` : ''}` : '—'}
+                    {u.empresas.length > 1 && <span className={css.mute}> +{u.empresas.length - 1}</span>}
+                  </span></td>
                   <td>{quando(u.ultimoAcessoEm) ?? <span className={css.mute}>nunca entrou</span>}</td>
                   <td>{!u.ativo ? <span className={`${css.tag} ${css.tEr}`}>desativado</span>
                     : u.aguardandoPrimeiroAcesso ? <span className={`${css.tag} ${css.tAv}`}>{u.ultimoAcessoEm ? 'senha provisória' : 'convite enviado'}</span>
-                    : <span className={`${css.tag} ${css.tOk}`}>ativo</span>}</td>
+                    : <span className={css.mute}>ativo</span>}</td>
                   <td className={css.acoes}>
                     {!u.ativo ? <button type="button" className={css.lk} onClick={() => reativar(u)}>Reativar</button>
                       : <>
@@ -122,7 +131,6 @@ export function GestaoUsuarios({ base, modo, onVerAuditoria }: {
           {verInativos ? 'Esconder desativados' : `Mostrar ${inativos.length} ${inativos.length === 1 ? 'desativado' : 'desativados'}`}
         </button>
       )}
-      <p className={css.nota}><b>Desativar não apaga:</b> a pessoa perde o acesso (em poucos minutos, na próxima renovação de sessão) e continua na auditoria com o nome. Para o histórico ficar completo, ninguém é excluído.</p>
 
       {editando && d && (
         <EditorUsuario d={d} u={editando === 'NOVO' ? null : editando} base={base} modo={modo}

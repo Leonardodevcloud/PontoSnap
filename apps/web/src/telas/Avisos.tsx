@@ -82,10 +82,13 @@ export function Avisos() {
       {c.destaque === 'AUDIO' && c.audio && <div className={css.midia}><PlayerAudio caminho={caminhoApp(c.audio.midiaId)} duracaoSeg={c.audio.duracaoSeg} picos={c.audio.picos} onOuvir={() => marcarMidia(c)} /></div>}
       {c.enquete && <ResumoEnquete e={c.enquete} />}
       <div className={css.rodape}>
-        {c.enquete && !c.enquete.encerrada && !c.enquete.meuVoto && <span className={css.pedeCiencia}>Falta seu voto</span>}
-        {c.pedirCiencia && !c.cienteEm && <span className={css.pedeCiencia}>Pede ciência</span>}
-        {c.pedirCiencia && c.cienteEm && <span className={css.lido}>✓ Ciente</span>}
-        {!c.pedirCiencia && c.abertoEm && <span className={css.lido}>✓ Visto</span>}
+        {/* Uma tag só (a pendência mais importante); o "ok" vira texto discreto. */}
+        {c.pedirCiencia && !c.cienteEm
+          ? <span className={css.pedeCiencia} title={c.enquete && !c.enquete.encerrada && !c.enquete.meuVoto ? 'Pede ciência · falta seu voto' : undefined}>Pede ciência</span>
+          : c.enquete && !c.enquete.encerrada && !c.enquete.meuVoto
+            ? <span className={css.pedeCiencia}>Falta seu voto</span>
+            : c.pedirCiencia && c.cienteEm ? <span className={css.lido}>Ciente</span>
+              : c.abertoEm ? <span className={css.lido}>Visto</span> : null}
         {c.outros.length > 0 && <span>+ {c.outros.join(', ')}</span>}
         {c.reacoesAtivas && Object.keys(c.reacoes).length > 0 && (
           <span className={css.contReac}>{Object.entries(c.reacoes).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([r, n]) => <span key={r}>{r} {n}</span>)}</span>
@@ -97,7 +100,6 @@ export function Avisos() {
   return (
     <div className="appshell">
       <div className={css.h}>Avisos</div>
-      <div className={css.s}>Recados do RH para você.</div>
       {erro && <p className={css.erro}>{erro}</p>}
       {pend && (
         <button type="button" className={css.banner} onClick={() => navegar(`/avisos/${pend.id}`)}>
@@ -197,7 +199,7 @@ export function Aviso() {
       {c.pedirCiencia && (
         <div className={css.cienteBox}>
           {c.cienteEm
-            ? <p className={css.cienteOk}>✓ Ciência registrada {quando(c.cienteEm)}</p>
+            ? <p className={css.cienteOk}>Ciência registrada {quando(c.cienteEm)}</p>
             : <>
               <button type="button" className={css.btnCiente} onClick={ciente} disabled={enviando}>{enviando ? 'Registrando…' : 'Li e estou ciente'}</button>
               <small>Fica registrado com data e hora para o RH.</small>
