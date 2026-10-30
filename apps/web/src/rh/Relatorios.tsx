@@ -3,7 +3,7 @@ import { api } from '../lib/api';
 import { minutosParaHhMm, reaisDeCentavos } from '../lib/formato';
 import type { RelatorioResp } from '../tipos';
 import { Botao } from '../components/Botao';
-import { Explica } from '../components/Explica';
+import { ExplicaSecao } from '../components/ExplicaSecao';
 import { salvarBlob } from '../lib/download';
 import css from './Relatorios.module.css';
 
@@ -60,12 +60,12 @@ export function Relatorios() {
     <div>
       <div className={css.head}>
         <div className={css.titulo}>
-          <h2>Relatórios</h2>
-          <Explica>
+          <h2 className="sr-only">Relatórios</h2>
+          <ExplicaSecao>
             Consolidado da competência por funcionário. Valores calculados sobre o salário cadastrado (divisor 220h). Reflexo de DSR é
             estimativa. Cobre o que a jornada gera — não é a folha completa. Não substitui validação contábil.
             Com muitos funcionários, use “Gerar em 2º plano”: processa sem travar a tela.
-          </Explica>
+          </ExplicaSecao>
         </div>
         <div className={css.controles}>
           <input aria-label="Competência" type="month" value={mes} onChange={(e) => setMes(e.target.value)} />

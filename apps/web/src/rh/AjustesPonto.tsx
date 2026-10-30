@@ -5,6 +5,7 @@ import { rotuloMarcacao } from '../lib/formato';
 import css from './AjustesPonto.module.css';
 import { Avatar } from '../components/Avatar';
 import { Explica } from '../components/Explica';
+import { ExplicaSecao } from '../components/ExplicaSecao';
 
 interface Pedido {
   id: string;
@@ -105,8 +106,8 @@ export default function AjustesPonto() {
       <div className={css.top}>
         <div>
           <div className={css.tituloLinha}>
-            <h1 className={css.h}>Ajustes de ponto</h1>
-            <Explica>Pedidos dos funcionários. Nada muda na apuração até você decidir, e a batida original nunca é apagada.</Explica>
+            <h2 className="sr-only">Ajustes de ponto</h2>
+            <ExplicaSecao>Pedidos dos funcionários. Nada muda na apuração até você decidir, e a batida original nunca é apagada.</ExplicaSecao>
           </div>
           <div className={css.filtros}>
             {(['EM_ANALISE', 'APROVADO', 'RECUSADO', 'REVOGADO'] as const).map((s) => (

@@ -5,6 +5,7 @@ import { minutosParaHhMm, reaisDeCentavos, rotuloMarcacao } from '../lib/formato
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
 import { Explica } from '../components/Explica';
+import { ExplicaSecao } from '../components/ExplicaSecao';
 import type { ApuracaoResp, Empregado, ResultadoDiaCLT, BatidaDia, RelatorioCompetencia } from '../tipos';
 import { TabelaCompetencia, type FiltroApuracao } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
@@ -152,15 +153,15 @@ export function ApuracaoCLT() {
     <div>
       <div className={css.head}>
         <div className={css.tituloLinha}>
-          <h2>Apuração CLT</h2>
-          <Explica>
+          <h2 className="sr-only">Apuração CLT</h2>
+          <ExplicaSecao>
             Fechamento da competência pelo motor de regras: extras, noturno, faltas, atrasos, banco e valores.
             {visao === 'todos' && <>
               {' '}Clique na linha pra abrir a apuração completa; clique num número sublinhado pra ver de onde ele veio.
               {' '}Com banco de horas, extra vai pro <strong>saldo</strong> e não entra em R$; faltas e atrasos com destinação banco também não viram desconto.
               {' '}Dia com batida em aberto fica <strong>pendente</strong> (sem falta/atraso) até o ajuste. O desconto real é aplicado pela folha.
             </>}
-          </Explica>
+          </ExplicaSecao>
         </div>
         <div className={css.acoesPdf}>
           <button type="button" className={css.linkAcao} onClick={() => setLoteAberto(true)}>Apuração em lote (ZIP)</button>

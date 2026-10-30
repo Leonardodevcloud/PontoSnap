@@ -35,6 +35,7 @@ export function Afastamentos() {
   const [fim, setFim] = useState(hojeSP());
   const [obs, setObs] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [confirmar, setConfirmar] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try { setLista(await api.get<Afastamento[]>('/afastamentos')); }
@@ -66,7 +67,7 @@ export function Afastamentos() {
 
   async function remover(id: string) {
     setErro(null);
-    try { await api.del(`/afastamentos/${id}`); await carregar(); }
+    try { await api.del(`/afastamentos/${id}`); setConfirmar(null); await carregar(); }
     catch (e) { setErro((e as Error).message); }
   }
 
@@ -129,7 +130,15 @@ export function Afastamentos() {
               {a.observacao && <span className={css.obs}> · {a.observacao}</span>}
             </div>
           </div>
-          <button type="button" className={css.remover} aria-label={`Apagar afastamento de ${a.nome}`} onClick={() => remover(a.id)}>Apagar</button>
+          {confirmar === a.id ? (
+            <span className={css.confirma} role="group" aria-label={`Confirmar exclusão do afastamento de ${a.nome}`}>
+              <span>Os dias voltam para a apuração normal.</span>
+              <button type="button" className={css.confirmaSim} onClick={() => remover(a.id)}>Apagar {(ROTULO[a.tipo] ?? 'afastamento').toLowerCase()}</button>
+              <button type="button" className={css.remover} onClick={() => setConfirmar(null)} autoFocus>Cancelar</button>
+            </span>
+          ) : (
+            <button type="button" className={css.remover} aria-label={`Apagar afastamento de ${a.nome}`} onClick={() => setConfirmar(a.id)}>Apagar</button>
+          )}
         </div>
       ))}
     </div>

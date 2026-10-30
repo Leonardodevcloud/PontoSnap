@@ -344,6 +344,7 @@ export function LayoutRH() {
                 to={{ pathname: r.to, search: r.to === '/rh/espelhos' || r.to === '/rh/apuracao' ? rota.search : '' }}
                 className={`${css.aba} ${rota.pathname === r.to ? css.abaOn : ''}`}>{r.rotulo}</Link>
             ))}
+            <span id="explica-secao" key={rota.pathname} className={css.explicaSecao} />
           </div>
         )}
         <Outlet context={contexto} />

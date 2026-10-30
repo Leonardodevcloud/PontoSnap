@@ -11,6 +11,7 @@ import { VisorPdf } from '../components/VisorPdf';
 import { ContaMes } from '../components/ContaMes';
 import { RaioX } from './RaioX';
 import { Explica } from '../components/Explica';
+import { ExplicaSecao } from '../components/ExplicaSecao';
 import vt from './VisaoTodos.module.css';
 import css from './Espelhos.module.css';
 
@@ -68,7 +69,7 @@ export function Espelhos() {
   return (
     <div>
       <div className={css.head}>
-        <div className={css.tituloLinha}><h2>Espelhos</h2><Explica>Jornada e banco de horas de todo mundo no mês, ou de um funcionário dia a dia. Clique numa pessoa para ver o mês dela; clique num dia para ver as batidas.</Explica></div>
+        <div className={css.tituloLinha}><h2 className="sr-only">Espelhos</h2><ExplicaSecao>Jornada e banco de horas de todo mundo no mês, ou de um funcionário dia a dia. Clique numa pessoa para ver o mês dela; clique num dia para ver as batidas.</ExplicaSecao></div>
       </div>
 
       <div className={css.controles}>

@@ -6,6 +6,7 @@ import type { Documento, StatusDocumento, Empregado, TipoDocumento } from '../ti
 import css from './Atestados.module.css';
 import { Avatar } from '../components/Avatar';
 import { Explica } from '../components/Explica';
+import { ExplicaSecao } from '../components/ExplicaSecao';
 
 const fmtData = (d: string) => new Date(`${d}T12:00:00-0300`).toLocaleDateString('pt-BR');
 const fmtQuando = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -107,11 +108,11 @@ export function Atestados() {
     <div className={css.tela}>
       <div className={css.topo}>
         <div className={css.tituloLinha}>
-          <h2 className={css.h}>Atestados</h2>
-          <Explica>
+          <h2 className="sr-only">Atestados</h2>
+          <ExplicaSecao>
             Abonar aqui faz o dia deixar de contar como falta na apuração. Não é aprovar marcação: marcação
             não se aprova; a decisão é sobre a ausência.
-          </Explica>
+          </ExplicaSecao>
         </div>
         <button className={css.lancar} onClick={() => { setAbrindo(true); setErro(null); }}>
           Lançar atestado

@@ -52,3 +52,7 @@
 .nota strong{ color:var(--ink); }
 
 @media (max-width:520px){ .datas{ grid-template-columns:1fr; } }
+
+.confirma{ display:inline-flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; font-size:13px; color:var(--ash); }
+.confirmaSim{ border:0; border-radius:999px; background:var(--erro-text); color:#fff; font:inherit; font-size:13px; font-weight:500; padding:6px 12px; cursor:pointer; }
+.confirmaSim:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }

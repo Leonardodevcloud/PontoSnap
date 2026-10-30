@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../lib/api';
 import { salvarBlob } from '../lib/download';
 import { Explica } from '../components/Explica';
+import { ExplicaSecao } from '../components/ExplicaSecao';
 import css from './Fiscal.module.css';
 
 function mesAtual(): string {
@@ -36,8 +37,8 @@ export function Fiscal() {
   return (
     <div>
       <div className={css.head}>
-        <h2>Arquivos fiscais</h2>
-        <Explica>Exportar e assinar o AFD e o AEJ da competência (Portaria 671). Os arquivos assinados (.p7s) usam o certificado ICP-Brasil cadastrado em Certificado.</Explica>
+        <h2 className="sr-only">Arquivos fiscais</h2>
+        <ExplicaSecao>Exportar e assinar o AFD e o AEJ da competência (Portaria 671). Os arquivos assinados (.p7s) usam o certificado ICP-Brasil cadastrado em Certificado.</ExplicaSecao>
       </div>
 
       <div className={css.filtro}>
