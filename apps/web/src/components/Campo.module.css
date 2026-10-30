@@ -4,9 +4,7 @@
   transition:border-color .15s ease;
 }
 .campo:focus-within{ border-color:var(--coral); }
-.rotulo{
-  display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em;
-  color:var(--ash); font-weight:700;
+.rotulo{ display:block; font-size:12px; color:var(--ash); font-weight:600;
 }
 .input{
   border:none; outline:none; background:transparent; width:100%;

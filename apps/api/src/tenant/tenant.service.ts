@@ -1,7 +1,7 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import { tenant, pontoRep, usuario, usuarioTenant, comoMaster, type Db } from '@ponto/db';
-import { TipoIdentificador } from '@ponto/shared';
+import { tenant, pontoRep, pontoFeriado, usuario, usuarioTenant, comoMaster, type Db } from '@ponto/db';
+import { TipoIdentificador, feriadosNacionais } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { hashSenha } from '../auth/senha';
 import { gerarATTR } from '@ponto/rep-core';
@@ -111,6 +111,11 @@ export class TenantService {
         tipo: 2, tpIdtEmpregador: TipoIdentificador.CNPJ, docEmpregador: p.cnpj,
         razaoSocial: p.razaoSocial, localPrestacao: p.localPrestacao ?? null,
       });
+
+      // Já nasce com os feriados nacionais do ano corrente e do seguinte.
+      const anoAtual = Number(new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 4));
+      await tx.insert(pontoFeriado).values([anoAtual, anoAtual + 1].flatMap((a) => feriadosNacionais(a))
+        .map((f) => ({ tenantId: t.id, data: f.data, nome: f.nome, tipo: 'nacional' })));
 
       if (!caminhoB) {
         const senhaHash = await hashSenha(senha!);

@@ -10,7 +10,7 @@ body{
   line-height:1.5;
   -webkit-font-smoothing:antialiased;
 }
-h1,h2,h3{ font-family:var(--ff-display); font-weight:800; margin:0; color:var(--ink); }
+h1,h2,h3{ font-family:var(--ff-display); font-weight:600; margin:0; color:var(--ink); }
 button{ font-family:inherit; }
 /* Botões e controles não devem "selecionar texto" ao clicar/segurar —
    o ::selection lime deixava isso gritante (pior no bater ponto, 900ms). */

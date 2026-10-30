@@ -211,17 +211,17 @@ export default function AjustesPonto() {
             )}
             {filtroStatus === 'APROVADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--ok-text)', fontWeight: 700 }}>✓ Aprovado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
+                <span style={{ fontSize: 12, color: 'var(--ok-text)', fontWeight: 600 }}>✓ Aprovado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
               </div>
             )}
             {filtroStatus === 'RECUSADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--erro-text)', fontWeight: 700 }}>✗ Recusado{p.motivoDecisao ? ` — ${p.motivoDecisao}` : ''}</span>
+                <span style={{ fontSize: 12, color: 'var(--erro-text)', fontWeight: 600 }}>✗ Recusado{p.motivoDecisao ? ` — ${p.motivoDecisao}` : ''}</span>
               </div>
             )}
             {filtroStatus === 'REVOGADO' && (
               <div className={css.acoes}>
-                <span style={{ fontSize: 12, color: 'var(--ash)', fontWeight: 700 }}>Revogado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
+                <span style={{ fontSize: 12, color: 'var(--ash)', fontWeight: 600 }}>Revogado{p.decididoPor ? ` por ${p.decididoPor}` : ''}</span>
               </div>
             )}
             </div>

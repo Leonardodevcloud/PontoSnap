@@ -11,7 +11,7 @@
 .compacto .foto{ width:64px; height:64px; border-width:3px; }
 .compacto h2{ font-size:20px; }
 .tit{ min-width:0; padding-right:44px; }
-.tit h2{ margin:0; font-size:24px; font-weight:900; line-height:1.2; }
+.tit h2{ margin:0; font-size:24px; font-weight:600; line-height:1.2; }
 .tit p{ margin:4px 0 0; color:var(--ash); font-size:14px; }
 .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
 .x{ position:absolute; top:18px; right:18px; width:40px; height:40px; border-radius:50%; border:1px solid rgba(var(--ink-rgb),.15); background:var(--white); color:var(--ink); display:grid; place-items:center; cursor:pointer; }
@@ -19,7 +19,7 @@
 .x:focus-visible, .abas button:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 
 .abas{ display:flex; gap:4px; padding:0 26px; border-bottom:1px solid var(--row-border); overflow-x:auto; flex:none; }
-.abas button{ padding:12px 14px; font:inherit; font-weight:800; font-size:14px; color:var(--ash); background:none; border:0; border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; }
+.abas button{ padding:12px 14px; font:inherit; font-weight:500; font-size:14px; color:var(--ash); background:none; border:0; border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; }
 .abas button:hover{ color:var(--ink); }
 .abas .abaOn{ color:var(--ink); border-bottom-color:var(--coral); }
 

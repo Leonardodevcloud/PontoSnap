@@ -66,3 +66,35 @@ export function feriadoValePara(f: RegiaoFeriado, local: LocalTrabalho | null): 
   if (f.tipo === 'estadual') return f.uf === ufLocal;
   return f.municipioIbge === local.municipioIbge;
 }
+
+/** Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher, calendário gregoriano). */
+export function pascoa(ano: number): string {
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
+/**
+ * Feriados nacionais do ano (leis 662/49, 6.802/80, 10.607/02, 14.759/23 e a
+ * Paixão de Cristo, que a portaria anual do governo federal lista como
+ * feriado nacional). Carnaval, Corpus Christi e vésperas são ponto
+ * facultativo: não entram.
+ */
+export function feriadosNacionais(ano: number): { data: string; nome: string }[] {
+  const p = new Date(`${pascoa(ano)}T12:00:00Z`); p.setUTCDate(p.getUTCDate() - 2);
+  const d = (md: string) => `${ano}-${md}`;
+  return [
+    { data: d('01-01'), nome: 'Confraternização Universal' },
+    { data: p.toISOString().slice(0, 10), nome: 'Paixão de Cristo' },
+    { data: d('04-21'), nome: 'Tiradentes' },
+    { data: d('05-01'), nome: 'Dia do Trabalho' },
+    { data: d('09-07'), nome: 'Independência do Brasil' },
+    { data: d('10-12'), nome: 'Nossa Senhora Aparecida' },
+    { data: d('11-02'), nome: 'Finados' },
+    { data: d('11-15'), nome: 'Proclamação da República' },
+    ...(ano >= 2024 ? [{ data: d('11-20'), nome: 'Dia Nacional de Zumbi e da Consciência Negra' }] : []),
+    { data: d('12-25'), nome: 'Natal' },
+  ].sort((x, y) => x.data.localeCompare(y.data));
+}

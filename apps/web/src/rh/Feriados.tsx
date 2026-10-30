@@ -16,6 +16,7 @@ interface Regioes {
   semCidadePropria: { funcionarios: number; prestadores: number }; semLocal: number; total: number;
   cidades: { municipio: number; nome: string; uf: string; funcionarios: number; prestadores: number }[];
   feriados: FeriadoReg[]; pessoas: Pessoa[];
+  nacionaisFaltando: { data: string; nome: string }[];
 }
 
 const anoAtual = () => new Date().getFullYear();
@@ -57,6 +58,15 @@ export function Feriados() {
     catch (e) { setErro((e as Error).message); }
   }
 
+  const [adicionando, setAdicionando] = useState(false);
+  async function adicionarNacionais() {
+    setAdicionando(true); setErro(null);
+    try {
+      const r = await api.post<{ adicionados: number }>('/tratamento/feriados/nacionais', { ano });
+      avisar(`${r.adicionados} ${r.adicionados === 1 ? 'feriado nacional adicionado' : 'feriados nacionais adicionados'} em ${ano}.`);
+      await carregar();
+    } catch (e) { setErro((e as Error).message); } finally { setAdicionando(false); }
+  }
   const semRegiao = d?.feriados.filter((f) => f.semRegiao) ?? [];
   const lista = (d?.feriados ?? []).filter((f) => !soSemRegiao || f.semRegiao);
   const emp = d?.empresa;
@@ -101,6 +111,14 @@ export function Feriados() {
         <div className={css.faixa} role="status">
           <span><b>{pl(semRegiao.length, 'feriado antigo sem região', 'feriados antigos sem região')}:</b> {semRegiao.length === 1 ? 'foi cadastrado' : 'foram cadastrados'} como estadual/municipal antes desta mudança e {semRegiao.length === 1 ? 'vale' : 'valem'} para todo mundo. Defina a região de cada um.</span>
           <button type="button" className={css.lk} onClick={() => setSoSemRegiao((v) => !v)}>{soSemRegiao ? 'Ver todos' : 'Revisar'}</button>
+        </div>
+      )}
+
+      {d && d.nacionaisFaltando.length > 0 && (
+        <div className={css.nacionais} role="status">
+          <span><b>{d.nacionaisFaltando.length === d.feriados.filter((f) => f.tipo === 'nacional').length + d.nacionaisFaltando.length ? `Os feriados nacionais de ${ano} ainda não estão cadastrados.` : `Faltam ${d.nacionaisFaltando.length} ${d.nacionaisFaltando.length === 1 ? 'feriado nacional' : 'feriados nacionais'} de ${ano}.`}</b>
+            <small>{d.nacionaisFaltando.map((f) => `${f.data.slice(8, 10)}/${f.data.slice(5, 7)} ${f.nome}`).join(' · ')}</small></span>
+          <button type="button" className={css.btnPri} disabled={adicionando} onClick={adicionarNacionais}>{adicionando ? 'Adicionando…' : `Adicionar ${d.nacionaisFaltando.length === 1 ? 'o feriado' : `os ${d.nacionaisFaltando.length}`}`}</button>
         </div>
       )}
 

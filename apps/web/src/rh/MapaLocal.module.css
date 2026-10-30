@@ -6,9 +6,7 @@
   border-radius: 11px; font-size:14px; font-family: inherit; color: var(--ink);
 }
 .busca input:focus { outline: none; border-color: var(--coral); box-shadow: 0 0 0 4px rgba(36,87,214,.13); }
-.busca button {
-  background: var(--ink); color: #fff; border: none; border-radius: 11px;
-  padding: 0 18px; font-weight: 800; cursor: pointer; font-size:12.5px; white-space: nowrap;
+.busca button { background: var(--ink); color: #fff; border: none; border-radius: 11px; padding: 0 18px; font-weight:500; cursor: pointer; font-size:12.5px; white-space: nowrap;
 }
 .busca button:disabled { opacity: .5; cursor: default; }
 

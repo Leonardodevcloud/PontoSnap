@@ -17,7 +17,7 @@ export function UsuariosCliente() {
     <div>
       <div className={css.head}>
         <div>
-          <Link to="/master" style={{ fontSize: 13, fontWeight: 800, color: 'var(--coral-dark)', textDecoration: 'none' }}>‹ Clientes</Link>
+          <Link to="/master" style={{ fontSize: 13, fontWeight: 600, color: 'var(--coral-dark)', textDecoration: 'none' }}>‹ Clientes</Link>
           <h2>{t?.razaoSocial ?? 'Usuários'}</h2>
           <p>{t ? `${fmtCnpj(t.cnpj)} · usuários do painel (Admin e RH)` : 'Carregando…'}</p>
         </div>

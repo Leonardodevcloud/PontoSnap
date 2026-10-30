@@ -36,3 +36,16 @@ describe('feriados por região', () => {
     expect(Object.entries(MUNICIPIOS).every(([uf, l]) => l.every(([i]) => ufDoMunicipio(i) === uf))).toBe(true);
   });
 });
+
+import { feriadosNacionais, pascoa } from '../src';
+describe('feriados nacionais', () => {
+  it('2026 = os 10 da portaria do governo federal', () => {
+    expect(pascoa(2026)).toBe('2026-04-05');
+    expect(feriadosNacionais(2026).map((f) => f.data)).toEqual(['2026-01-01', '2026-04-03', '2026-04-21', '2026-05-01', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-11-20', '2026-12-25']);
+  });
+  it('Páscoa de outros anos', () => {
+    expect(pascoa(2025)).toBe('2025-04-20');
+    expect(pascoa(2027)).toBe('2027-03-28');
+    expect(feriadosNacionais(2027).find((f) => f.nome === 'Paixão de Cristo')?.data).toBe('2027-03-26');
+  });
+});

@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.1.1",
     "@ponto/shared": "workspace:^",
     "qrcode": "1.5.4",
     "react": "^18.3.1",

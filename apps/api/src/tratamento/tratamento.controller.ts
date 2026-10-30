@@ -111,6 +111,10 @@ export class TratamentoController {
     @Body() dto: { nome?: string; tipo?: string; uf?: string | null; municipio?: number | null; municipioNome?: string | null }) {
     return this.tratamento.editarFeriado(this.tenant(u), id, dto ?? {});
   }
+  /** Adiciona os feriados nacionais do ano (os que faltam). */
+  @Post('feriados/nacionais') nacionais(@UsuarioAtual() u: PayloadAcesso, @Body() dto: { ano: number }) {
+    return this.tratamento.adicionarNacionais(this.tenant(u), Number(dto?.ano));
+  }
   /** Tela de Feriados: cidade da empresa, cidades em uso e quem cada feriado atinge. */
   @Get('feriados/regioes') regioes(@UsuarioAtual() u: PayloadAcesso, @Query('ano') ano?: string) {
     if (!ano || !/^\d{4}$/.test(ano)) throw new BadRequestException('Informe o ano');

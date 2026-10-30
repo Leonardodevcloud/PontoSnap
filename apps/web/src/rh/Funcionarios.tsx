@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { SeletorCidade, type Cidade } from '../components/SeletorCidade';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { RaioX } from './RaioX';
-import { acordoEmpresaTxt, NIVEL, temAtencao, type EmpresaBanco, type RespCompensacao } from '../lib/compensacao';
+import { acordoEmpresaTxt, NIVEL, temAtencao, type Compensacao, type EmpresaBanco, type RespCompensacao } from '../lib/compensacao';
 import { Avatar, useAvatares } from '../components/Avatar';
 import { RevisarFotos } from './RevisarFotos';
 import { api } from '../lib/api';
@@ -12,6 +12,7 @@ import type { Empregado, Horario } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Modal } from '../components/Modal';
+import { ModalPessoa } from '../components/ModalPessoa';
 import css from './Funcionarios.module.css';
 
 const fmtCpf = (c: string) => c.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
@@ -40,253 +41,275 @@ const ehContratoHoras = (c: ConfigRegra | undefined, escalaFlexivel?: boolean) =
   !!escalaFlexivel || c?.contrato?.tipoJornada === 'CONTRATO_HORAS';
 
 
+type Filtro = 'TODOS' | 'ATENCAO' | 'MONTADAS' | 'PADRAO' | 'INATIVOS';
+type Acao = 'PIN' | 'ESCALA' | 'PERFIL' | 'RAIO' | 'SALARIO' | 'INICIO' | 'ESCALA12' | 'ACESSO' | 'CIDADE' | 'REGRAS';
+
+/**
+ * Funcionários: a lista mostra só o essencial (nome, escala, cidade e no
+ * máximo um alerta). Tudo da pessoa fica na ficha, que abre ao clicar.
+ */
 export function Funcionarios() {
   const [lista, setLista] = useState<Empregado[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [msgOk, setMsgOk] = useState<string | null>(null);
   const [addAberto, setAddAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
-  const [menu, setMenu] = useState<string | null>(null);
-  const [pinPara, setPinPara] = useState<Empregado | null>(null);
-  const [escalaPara, setEscalaPara] = useState<Empregado | null>(null);
-  const [perfilPara, setPerfilPara] = useState<Empregado | null>(null);
-  const [regrasDe, setRegrasDe] = useState<PerfilResumo | null | undefined>(undefined);
   const [perfis, setPerfis] = useState<PerfilResumo[]>([]);
   const [busca, setBusca] = useState('');
-  const [params0] = useSearchParams();
-  const [filtro, setFiltro] = useState<'TODOS' | 'MONTADAS' | 'PADRAO' | 'INATIVOS' | 'NAO_COMPENSA'>(params0.get('comp') === 'NAO_COMPENSA' ? 'NAO_COMPENSA' : 'TODOS');
+  const params0 = new URLSearchParams(window.location.search);
+  const [filtro, setFiltro] = useState<Filtro>(params0.get('comp') === 'NAO_COMPENSA' ? 'ATENCAO' : 'TODOS');
+  const [cidadeFiltro, setCidadeFiltro] = useState('');
   const [comp, setComp] = useState<RespCompensacao | null>(null);
-  const [raioDe, setRaioDe] = useState<string | null>(null);
-  const [salarioPara, setSalarioPara] = useState<Empregado | null>(null);
-  const [dataInicioPara, setDataInicioPara] = useState<Empregado | null>(null);
-  const [escala12Para, setEscala12Para] = useState<Empregado | null>(null);
-  const [acessoPara, setAcessoPara] = useState<Empregado | null>(null);
-  // Cidade de trabalho (feriados por região): marcar vários e definir de uma vez.
-  const [marcados, setMarcados] = useState<Set<string>>(new Set());
-  const [cidadePara, setCidadePara] = useState<Empregado[] | null>(null);
-  const [cidadeFiltro, setCidadeFiltro] = useState<string>('');
   const [regioes, setRegioes] = useState<RegioesResumo | null>(null);
-  const [msgOk, setMsgOk] = useState<string | null>(null);
+  // Ficha da pessoa e a ação aberta a partir dela (a ficha some enquanto a ação está aberta).
+  const [fichaId, setFichaIdSt] = useState<string | null>(null);
+  const [fichaAba, setFichaAba] = useState<AbaFicha>('jornada');
+  const setFichaId = (id: string | null) => { setFichaIdSt(id); if (id) setFichaAba('jornada'); };
+  const [acao, setAcao] = useState<{ tipo: Acao; e: Empregado } | null>(null);
+  const [regrasDe, setRegrasDe] = useState<PerfilResumo | null | undefined>(undefined);
+  // Seleção (cidade em lote).
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [cidadeLote, setCidadeLote] = useState<Empregado[] | null>(null);
 
   async function carregar() {
     try { setLista(await api.get<Empregado[]>('/empregados')); }
     catch (e) { setErro((e as Error).message); }
-    // Raio-x da compensação (o que vale de verdade: escala + perfil + acordo da empresa).
     api.get<RespCompensacao>('/ajuda/compensacao').then(setComp).catch(() => {});
     api.get<RegioesResumo>(`/tratamento/feriados/regioes?ano=${new Date().getFullYear()}`).then(setRegioes).catch(() => {});
+    api.get<PerfilResumo[]>('/perfis-regra').then(setPerfis).catch(() => {});
   }
-  const empresaCidade = regioes?.empresa?.municipioIbge ? { municipioNome: regioes.empresa.municipioNome ?? '', uf: regioes.empresa.uf } : null;
-  const cidadeDe = (e: Empregado) => e.trabalhoMunicipio ? `${e.trabalhoMunicipioNome}-${e.trabalhoUf}` : empresaCidade ? `${empresaCidade.municipioNome}-${empresaCidade.uf}` : '';
-  const chaveCidade = (e: Empregado) => String(e.trabalhoMunicipio ?? regioes?.empresa?.municipioIbge ?? 'sem');
-  const compDe = (id: string) => comp?.linhas.find((l) => l.empregadoId === id);
   useEffect(() => { void carregar(); }, []);
   const { dados: avs, trocarDesenho } = useAvatares();
   const [params, setParams] = useSearchParams();
   const revisarAberto = params.get('revisar') === '1';
   const abrirRevisar = (v: boolean) => setParams((p) => { const n = new URLSearchParams(p); if (v) n.set('revisar', '1'); else n.delete('revisar'); return n; });
-  useEffect(() => {
-    api.get<PerfilResumo[]>('/perfis-regra').then(setPerfis).catch(() => {});
-  }, [perfilPara]);
+  const avisar = (m: string) => { setMsgOk(m); setTimeout(() => setMsgOk(null), 6000); };
 
-  async function alternarAtivo(e: Empregado) {
-    setMenu(null);
-    await api.patch(`/empregados/${e.id}/ativo`, { ativo: !e.ativo }).catch(() => {});
+  const compDe = (id: string) => comp?.linhas.find((l) => l.empregadoId === id);
+  const empresaCidade = regioes?.empresa?.municipioIbge ? { municipioNome: regioes.empresa.municipioNome ?? '', uf: regioes.empresa.uf } : null;
+  const cidadeDe = (e: Empregado) => e.trabalhoMunicipio ? e.trabalhoMunicipioNome ?? '' : empresaCidade?.municipioNome ?? '';
+  const chaveCidade = (e: Empregado) => String(e.trabalhoMunicipio ?? regioes?.empresa?.municipioIbge ?? 'sem');
+  const atencao = (e: Empregado) => { const c = e.ativo ? compDe(e.id) : undefined; return !!c && temAtencao(c); };
+
+  /** O único alerta da linha (o mais importante), ou nada. */
+  function alertaDe(e: Empregado): { txt: string; tom: 'er' | 'av' | 'cz' } | null {
+    if (!e.ativo) return { txt: 'Inativo', tom: 'cz' };
+    if (!e.horarioContratualId) return { txt: 'Sem escala', tom: 'er' };
+    if (atencao(e)) return { txt: 'Horas sem compensar', tom: 'er' };
+    const a = avs?.empregados[e.id];
+    if (a?.status === 'REVISAR') return { txt: 'Foto para revisar', tom: 'av' };
+    if (a?.status === 'RECUSADA') return { txt: 'Foto recusada', tom: 'av' };
+    return null;
   }
-
-  const ativos = lista?.filter((e) => e.ativo).length ?? 0;
-
-  const temPerfil = (e: Empregado) => !!e.perfilRegraId;
-
-  /** Perfil que vale pro funcionário (o dele ou o padrão da empresa). */
 
   const visiveis = lista?.filter((e) => {
     const q = busca.trim().toLowerCase();
     if (q && !`${e.nome} ${e.cpf} ${e.matricula ?? ''}`.toLowerCase().includes(q)) return false;
     if (filtro === 'INATIVOS') return !e.ativo;
     if (!e.ativo) return false;
-    if (filtro === 'MONTADAS') return temPerfil(e);
-    if (filtro === 'PADRAO') return !temPerfil(e);
     if (cidadeFiltro && chaveCidade(e) !== cidadeFiltro) return false;
-    if (filtro === 'NAO_COMPENSA') { const c = compDe(e.id); return !!c && temAtencao(c); }
+    if (filtro === 'ATENCAO') return atencao(e) || !e.horarioContratualId;
+    if (filtro === 'MONTADAS') return !!e.perfilRegraId;
+    if (filtro === 'PADRAO') return !e.perfilRegraId;
     return true;
-  });
+  }).sort((a, b) => Number(!!alertaDe(b) && b.ativo) - Number(!!alertaDe(a) && a.ativo) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const cidadesLista = (() => {
     const m = new Map<string, { rot: string; n: number }>();
     for (const e of lista ?? []) if (e.ativo) { const k = chaveCidade(e); const c = m.get(k) ?? { rot: cidadeDe(e) || 'sem cidade', n: 0 }; c.n++; m.set(k, c); }
     return [...m.entries()].sort((a, b) => b[1].n - a[1].n);
   })();
+  const ativos = lista?.filter((e) => e.ativo).length ?? 0;
+  const nAtencao = (lista ?? []).filter((e) => e.ativo && (atencao(e) || !e.horarioContratualId)).length;
+  const nRevisar = avs?.resumo.revisar ?? 0;
   const todosMarcados = !!visiveis?.length && visiveis.every((e) => marcados.has(e.id));
+  const ficha = lista?.find((e) => e.id === fichaId) ?? null;
+  const abrir = (tipo: Acao, e: Empregado) => setAcao({ tipo, e });
+  const fecharAcao = (recarregar?: boolean) => { setAcao(null); if (recarregar) void carregar(); };
 
   return (
-    <div onClick={() => setMenu(null)}>
-      <div className={css.head}>
-        <div><h2>Funcionários</h2><p>{lista ? `${ativos} ${ativos === 1 ? 'ativo' : 'ativos'}` : 'carregando…'}</p></div>
-        <div className={css.topoAcoes}>
-          <Botao variante="ghost" className={css.add} onClick={() => setImportarAberto(true)}>Importar planilha</Botao>
-          <Botao variante="coral" className={css.add} onClick={() => setAddAberto(true)}>+ Adicionar funcionário</Botao>
+    <div className={css.pagina}>
+      <div className={css.cab}>
+        <div><h2>Funcionários</h2><p>{lista ? `${ativos} ${ativos === 1 ? 'ativo' : 'ativos'}` : 'Carregando…'}</p></div>
+        <div className={css.cabAcoes}>
+          <button type="button" className={css.lkCab} onClick={() => setImportarAberto(true)}>Importar planilha</button>
+          <button type="button" className={css.btnCab} onClick={() => setAddAberto(true)}>+ Adicionar</button>
         </div>
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
+      {msgOk && <p className={css.okMsg} role="status">{msgOk}</p>}
 
-      {avs && avs.resumo.ativos > 0 && lista && (() => {
-        const r = avs.resumo;
-        const semFoto = lista.filter((e) => e.ativo && !avs.empregados[e.id]?.foto);
-        const pct = Math.round((r.comFoto / r.ativos) * 100);
-        return (
-          <div className={css.adesao}>
-            <div className={css.adesaoRostos} aria-hidden="true">
-              {lista.filter((e) => e.ativo).slice(0, 6).map((e) => <Avatar key={e.id} id={e.id} nome={e.nome} tamanho={32} className={css.adesaoAv} />)}
-            </div>
-            <div className={css.adesaoTxt}>
-              <b>Atualização cadastral: {r.comFoto} de {r.ativos} com foto</b>
-              <div className={css.adesaoBarra} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Funcionários com foto"><i style={{ width: `${pct}%` }} /></div>
-              <small>{semFoto.length === 0 ? 'Todo mundo com foto.' : `Sem foto aparece um desenho. O app pede a foto no próximo acesso de ${semFoto.length === 1 ? semFoto[0]!.nome.split(' ')[0] : `${semFoto.length} pessoas`}.`}</small>
-            </div>
-            {r.revisar > 0 && <Botao variante="coral" className={css.add} onClick={() => abrirRevisar(true)}>Revisar {r.revisar} {r.revisar === 1 ? 'foto' : 'fotos'}</Botao>}
-          </div>
-        );
-      })()}
-
-      {comp && comp.totais.atencao > 0 && filtro !== 'NAO_COMPENSA' && (
-        <div className={css.faixaComp} role="status">
-          <div><b>{comp.totais.atencao === 1 ? '1 funcionário precisa de atenção na compensação de horas' : `${comp.totais.atencao} funcionários precisam de atenção na compensação de horas`}</b>
-            <span>Contrato de horas sem banco nem "compensa na semana" (cada dia fecha sozinho) ou sem escala. Se foi combinado compensar, ajuste.</span></div>
-          <button type="button" className={css.faixaBtn} onClick={() => setFiltro('NAO_COMPENSA')}>Ver quem é</button>
-          <Link className={css.faixaLk} to="/rh/ajuda/compensar-horas">Como resolver</Link>
+      {/* Um aviso por vez: o mais importante. */}
+      {nAtencao > 0 && filtro !== 'ATENCAO' ? (
+        <div className={css.aviso1} role="status">
+          <span><b>{nAtencao === 1 ? '1 pessoa precisa de atenção' : `${nAtencao} pessoas precisam de atenção`}</b> · sem escala ou contrato de horas sem compensar</span>
+          <button type="button" onClick={() => setFiltro('ATENCAO')}>Ver</button>
         </div>
-      )}
+      ) : nRevisar > 0 ? (
+        <div className={css.aviso1} role="status">
+          <span><b>{nRevisar === 1 ? '1 foto nova para revisar' : `${nRevisar} fotos novas para revisar`}</b> · enviadas pelo app</span>
+          <button type="button" onClick={() => abrirRevisar(true)}>Revisar</button>
+        </div>
+      ) : null}
 
-      <div className={css.filtros}>
-        <input className={css.busca} aria-label="Buscar funcionário" placeholder="Buscar por nome, CPF ou matrícula…" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
-        {([['TODOS', 'Todos'], ['MONTADAS', 'Com perfil'], ['PADRAO', 'Sem perfil (CLT)'], ['INATIVOS', 'Inativos']] as const).map(([k, rot]) => (
-          <button key={k} className={`${css.chipF} ${filtro === k ? css.chipFOn : ''}`} onClick={() => setFiltro(k)}>{rot}</button>
-        ))}
-        {comp && comp.totais.atencao > 0 && (
-          <button className={`${css.chipF} ${css.chipAlerta} ${filtro === 'NAO_COMPENSA' ? css.chipFOn : ''}`} onClick={() => setFiltro('NAO_COMPENSA')}>Atenção na compensação · {comp.totais.atencao}</button>
-        )}
+      <div className={css.barra}>
+        <input className={css.buscaN} aria-label="Buscar funcionário" placeholder="Buscar por nome, CPF ou matrícula" value={busca} onChange={(ev) => setBusca(ev.target.value)} />
+        <select className={css.selN} aria-label="Filtrar" value={filtro} onChange={(ev) => setFiltro(ev.target.value as Filtro)}>
+          <option value="TODOS">Todos os ativos</option>
+          <option value="ATENCAO">Precisam de atenção{nAtencao ? ` (${nAtencao})` : ''}</option>
+          <option value="MONTADAS">Com perfil de regra</option>
+          <option value="PADRAO">Sem perfil (CLT padrão)</option>
+          <option value="INATIVOS">Inativos</option>
+        </select>
         {cidadesLista.length > 1 && (
-          <select className={css.cidadeSel} aria-label="Filtrar por cidade de trabalho" value={cidadeFiltro} onChange={(ev) => setCidadeFiltro(ev.target.value)}>
+          <select className={css.selN} aria-label="Filtrar por cidade" value={cidadeFiltro} onChange={(ev) => setCidadeFiltro(ev.target.value)}>
             <option value="">Todas as cidades</option>
-            {cidadesLista.map(([k, c]) => <option key={k} value={k}>{c.rot} · {c.n}</option>)}
+            {cidadesLista.map(([k, c]) => <option key={k} value={k}>{c.rot} ({c.n})</option>)}
           </select>
         )}
       </div>
 
-      {msgOk && <p className={css.okMsg} role="status">{msgOk}</p>}
-      {visiveis && visiveis.length > 0 && (
-        <div className={css.loteBar}>
-          <label className={css.loteTodos}>
-            <input type="checkbox" checked={todosMarcados} onChange={() => setMarcados(todosMarcados ? new Set() : new Set(visiveis.map((e) => e.id)))} />
-            {todosMarcados ? 'Desmarcar todos' : `Marcar os ${visiveis.length} da lista`}
-          </label>
-          {marcados.size > 0 && <>
-            <b>{marcados.size} {marcados.size === 1 ? 'selecionado' : 'selecionados'}</b>
-            <button type="button" className={css.loteBtn} onClick={() => setCidadePara((lista ?? []).filter((e) => marcados.has(e.id)))}>Cidade de trabalho…</button>
-            <button type="button" className={css.loteLk} onClick={() => setMarcados(new Set())}>Limpar</button>
-          </>}
+      {marcados.size > 0 && (
+        <div className={css.lote} role="region" aria-label="Ações em lote">
+          <b>{marcados.size} {marcados.size === 1 ? 'selecionado' : 'selecionados'}</b>
+          <button type="button" className={css.loteBtn} onClick={() => setCidadeLote((lista ?? []).filter((e) => marcados.has(e.id)))}>Cidade de trabalho…</button>
+          <button type="button" className={css.loteLk} onClick={() => setMarcados(new Set())}>Limpar</button>
         </div>
       )}
 
-
-      <div className={css.cards}>
-        {visiveis?.length === 0 && <div className={css.vazio}>{lista?.length === 0 ? 'Ninguém cadastrado ainda. Adiciona o primeiro funcionário.' : 'Nenhum funcionário com esse filtro.'}</div>}
-        {visiveis?.map((e) => (
-          <div key={e.id} className={css.card}>
-            <div className={css.linha1}>
+      <div className={css.listaN}>
+        {visiveis && visiveis.length > 0 && (
+          <div className={css.listaTopo}>
+            <input type="checkbox" className={css.marca} aria-label="Selecionar todos da lista" checked={todosMarcados}
+              onChange={() => setMarcados(todosMarcados ? new Set() : new Set(visiveis.map((e) => e.id)))} />
+            <span>{visiveis.length} {visiveis.length === 1 ? 'pessoa' : 'pessoas'}</span>
+          </div>
+        )}
+        {visiveis?.length === 0 && <div className={css.vazio}>{lista?.length === 0 ? 'Ninguém cadastrado ainda. Adicione o primeiro funcionário.' : 'Ninguém com esse filtro.'}</div>}
+        {visiveis?.map((e) => {
+          const al = alertaDe(e);
+          const esc = e.escalaCodigo ?? (e.horarioContratualId ? 'Horário vinculado' : 'Sem escala');
+          return (
+            <div key={e.id} className={`${css.linhaN} ${e.ativo ? '' : css.linhaInativa}`}>
               <input type="checkbox" className={css.marca} aria-label={`Selecionar ${e.nome}`} checked={marcados.has(e.id)}
                 onChange={() => setMarcados((m) => { const n = new Set(m); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })} />
-              <Avatar id={e.id} nome={e.nome} tamanho={44} trocavel />
-              <span className={css.quem}>
-                <span className={css.nomeC}>{e.nome}</span>
-                <span className={css.metaC}>mat. {e.matricula ?? '—'} · {fmtCpf(e.cpf)} · {e.escalaCodigo ? `escala ${e.escalaCodigo}` : e.horarioContratualId ? 'horário vinculado' : 'sem horário'}</span>
-              </span>
-              {e.ativo && (() => {
-                const a = avs?.empregados[e.id];
-                if (a?.status === 'REVISAR') return <button className={`${css.tagFoto} ${css.tagRevisar}`} onClick={(ev) => { ev.stopPropagation(); abrirRevisar(true); }}>foto nova · revisar</button>;
-                if (a?.status === 'RECUSADA') return <span className={`${css.tagFoto} ${css.tagRecusada}`} title={a.motivo ?? undefined}>foto recusada · pedindo outra</span>;
-                if (!a?.foto) return <span className={css.tagFoto} title="Mostrando um desenho até a pessoa mandar a foto">{a?.temApp ? 'sem foto · pede no próximo acesso' : 'sem foto · sem acesso ao app'}</span>;
-                return null;
-              })()}
-              <span className={`${css.status} ${e.ativo ? css.ativo : css.inativo}`}><span className={css.sdot} />{e.ativo ? 'Ativo' : 'Inativo'}</span>
-              <span className={css.pinC}>{e.temPin ? 'PIN ✓' : 'sem PIN'}</span>
-              <span className={css.kebabWrap} onClick={(ev) => { ev.stopPropagation(); setMenu(menu === e.id ? null : e.id); }}>
-                <button className={css.kebab} aria-label="Ações">⋯</button>
-                {menu === e.id && (
-                  <div className={css.menu} onClick={(ev) => ev.stopPropagation()}>
-                    {!avs?.empregados[e.id]?.foto && <button onClick={() => { void trocarDesenho('CLT', e.id); setMenu(null); }}>Trocar desenho</button>}
-                    <button onClick={() => { setPinPara(e); setMenu(null); }}>Definir PIN</button>
-                    <button onClick={() => { setAcessoPara(e); setMenu(null); }}>{e.emailAcesso ? 'Resetar senha do app' : 'Criar acesso ao app'}</button>
-                    <button onClick={() => { setEscalaPara(e); setMenu(null); }}>Definir escala</button>
-                    <button onClick={() => { setPerfilPara(e); setMenu(null); }}>Perfil de regra</button>
-                    <button onClick={() => { setRaioDe(e.id); setMenu(null); }}>Como as horas contam</button>
-                    <button onClick={() => { setSalarioPara(e); setMenu(null); }}>Definir salário</button>
-                    <button onClick={() => { setDataInicioPara(e); setMenu(null); }}>Início do ponto</button>
-                    <button onClick={() => { setCidadePara([e]); setMenu(null); }}>Cidade de trabalho</button>
-                    <button onClick={() => { setEscala12Para(e); setMenu(null); }}>Gerar escala 12x36</button>
-                    <button onClick={() => { void alternarAtivo(e).then(carregar); }}>{e.ativo ? 'Inativar' : 'Reativar'}</button>
-                  </div>
-                )}
-              </span>
+              <button type="button" className={css.linhaBtn} onClick={() => setFichaId(e.id)}>
+                <Avatar id={e.id} nome={e.nome} tamanho={36} />
+                <span className={css.linhaTxt}>
+                  <span className={css.nomeN}>{e.nome}</span>
+                  <span className={css.subN}>{[esc, cidadeDe(e)].filter(Boolean).join(' · ')}</span>
+                </span>
+                {al && <span className={`${css.pillN} ${css[`pill-${al.tom}`]}`}>{al.txt}</span>}
+                <span className={css.seta} aria-hidden="true">›</span>
+              </button>
             </div>
-
-            <div className={css.perfilLinha}>
-              {(() => {
-                const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
-                const padrao = perfis.find((x) => x.padrao);
-                const efetivo = p ?? padrao;
-                return (
-                  <>
-                    {p && <button type="button" className={css.perfilBadge} onClick={() => setRegrasDe(p)} title="Ver as regras deste perfil">⚙ {p.nome}</button>}
-                    {!p && padrao && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(padrao)} title="Ver as regras deste perfil">⚙ {padrao.nome} <span className={css.herdaTxt}>(padrão da empresa)</span></button>}
-                    {!efetivo && <button type="button" className={`${css.perfilBadge} ${css.perfilHerda}`} onClick={() => setRegrasDe(null)} title="Ver as regras aplicadas">CLT padrão</button>}
-                    {(() => {
-                      const c = e.ativo ? compDe(e.id) : undefined;
-                      if (!c) return <>
-                        {ehContratoHoras(efetivo?.config, e.escalaFlexivel)
-                          ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
-                          : <span className={css.bancoResumo}>horário fixo</span>}
-                        <span className={css.bancoResumo}>{resumoBanco(efetivo?.config?.banco, comp?.empresa)}</span>
-                      </>;
-                      const at = temAtencao(c);
-                      return <>
-                        {c.jornada === 'CONTRATO_HORAS' ? <span className={`${css.bancoResumo} ${css.tagContrato}`}>contrato de horas</span>
-                          : c.jornada === '12X36' ? <span className={css.bancoResumo}>12x36</span> : c.jornada ? <span className={css.bancoResumo}>horário fixo</span> : null}
-                        <button type="button" className={`${css.compTag} ${css[`comp-${at ? 'er' : NIVEL[c.nivel].tom}`]}`} onClick={() => setRaioDe(e.id)} title="Ver como as horas são contadas">
-                          {at && <span aria-hidden="true">⚠ </span>}{NIVEL[c.nivel].rot}<span className={css.compRes}> · {c.resumo}</span>
-                        </button>
-                      </>;
-                    })()}
-                  </>
-                );
-              })()}
-              {cidadeDe(e) && <button type="button" className={`${css.bancoResumo} ${css.cidadeTag}`} onClick={() => setCidadePara([e])} title="Cidade de trabalho: define os feriados estaduais e municipais">
-                📍 {cidadeDe(e)}{!e.trabalhoMunicipio && <span className={css.herdaTxt}> (da empresa)</span>}</button>}
-              <button className={css.editarRegras} onClick={(ev) => { ev.stopPropagation(); setPerfilPara(e); }}>trocar perfil</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {ficha && !acao && regrasDe === undefined && (
+        <FichaFuncionario e={ficha} comp={compDe(ficha.id)} perfis={perfis} empresa={comp?.empresa ?? null} foto={avs?.empregados[ficha.id]}
+          cidade={cidadeDe(ficha) ? `${cidadeDe(ficha)}${ficha.trabalhoMunicipio ? `-${ficha.trabalhoUf}` : empresaCidade ? `-${empresaCidade.uf}` : ''}` : ''} cidadePropria={!!ficha.trabalhoMunicipio}
+          aba={fichaAba} onAba={setFichaAba}
+          onFechar={() => setFichaId(null)} onAcao={(t) => abrir(t, ficha)} onRegras={(p) => setRegrasDe(p)}
+          onTrocarDesenho={() => void trocarDesenho('CLT', ficha.id)} onRevisarFoto={() => abrirRevisar(true)}
+          onAtivo={async () => { await api.patch(`/empregados/${ficha.id}/ativo`, { ativo: !ficha.ativo }).catch(() => {}); avisar(`${ficha.nome} ${ficha.ativo ? 'inativado' : 'reativado'}.`); void carregar(); }} />
+      )}
 
       {addAberto && <ModalAdicionar onFechar={() => setAddAberto(false)} onCriado={() => { setAddAberto(false); void carregar(); }} />}
       {importarAberto && <ModalImportar onFechar={() => setImportarAberto(false)} onImportado={() => void carregar()} />}
-      {pinPara && <ModalPin empregado={pinPara} onFechar={() => setPinPara(null)} onSalvo={() => { setPinPara(null); void carregar(); }} />}
-      {escalaPara && <ModalEscala empregado={escalaPara} onFechar={() => setEscalaPara(null)} onSalvo={() => { setEscalaPara(null); void carregar(); }} />}
-      {raioDe && <RaioX empregadoId={raioDe} onFechar={() => setRaioDe(null)}
-        onEscala={() => { const e = lista?.find((x) => x.id === raioDe); setRaioDe(null); if (e) setEscalaPara(e); }}
-        onPerfil={() => { const e = lista?.find((x) => x.id === raioDe); setRaioDe(null); if (e) setPerfilPara(e); }} />}
-      {perfilPara && <ModalPerfil empresa={comp?.empresa ?? null} empregado={perfilPara} perfis={perfis} onFechar={() => setPerfilPara(null)} onSalvo={() => { setPerfilPara(null); void carregar(); }} />}
+      {acao?.tipo === 'PIN' && <ModalPin empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
+      {acao?.tipo === 'ESCALA' && <ModalEscala empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
+      {acao?.tipo === 'RAIO' && <RaioX empregadoId={acao.e.id} onFechar={() => fecharAcao()}
+        onEscala={() => setAcao({ tipo: 'ESCALA', e: acao.e })} onPerfil={() => setAcao({ tipo: 'PERFIL', e: acao.e })} />}
+      {acao?.tipo === 'PERFIL' && <ModalPerfil empresa={comp?.empresa ?? null} empregado={acao.e} perfis={perfis} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
       {regrasDe !== undefined && <ModalRegras perfil={regrasDe} onFechar={() => setRegrasDe(undefined)} />}
-      {salarioPara && <ModalSalario empregado={salarioPara} onFechar={() => setSalarioPara(null)} onSalvo={() => { setSalarioPara(null); void carregar(); }} />}
-      {dataInicioPara && <ModalDataInicio empregado={dataInicioPara} onFechar={() => setDataInicioPara(null)} onSalvo={() => { setDataInicioPara(null); void carregar(); }} />}
-      {escala12Para && <ModalEscala12x36 empregado={escala12Para} onFechar={() => setEscala12Para(null)} onSalvo={() => setEscala12Para(null)} />}
-      {acessoPara && <ModalAcesso empregado={acessoPara} onFechar={() => setAcessoPara(null)} onSalvo={() => { setAcessoPara(null); void carregar(); }} />}
-      {cidadePara && <ModalCidade pessoas={cidadePara} regioes={regioes} onFechar={() => setCidadePara(null)}
-        onSalvo={(m) => { setCidadePara(null); setMarcados(new Set()); setMsgOk(m); setTimeout(() => setMsgOk(null), 6000); void carregar(); }} />}
+      {acao?.tipo === 'SALARIO' && <ModalSalario empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
+      {acao?.tipo === 'INICIO' && <ModalDataInicio empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
+      {acao?.tipo === 'ESCALA12' && <ModalEscala12x36 empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao()} />}
+      {acao?.tipo === 'ACESSO' && <ModalAcesso empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
+      {acao?.tipo === 'CIDADE' && <ModalCidade pessoas={[acao.e]} regioes={regioes} onFechar={() => fecharAcao()} onSalvo={(m) => { avisar(m); fecharAcao(true); }} />}
+      {cidadeLote && <ModalCidade pessoas={cidadeLote} regioes={regioes} onFechar={() => setCidadeLote(null)}
+        onSalvo={(m) => { setCidadeLote(null); setMarcados(new Set()); avisar(m); void carregar(); }} />}
       <RevisarFotos aberto={revisarAberto} onFechar={() => abrirRevisar(false)} emps={lista ?? []} />
     </div>
   );
 }
 
+/** Ficha da pessoa: tudo dela em abas; as ações abrem a partir daqui. */
+type AbaFicha = 'jornada' | 'regras' | 'salario' | 'acesso';
+function FichaFuncionario({ e, comp: c, perfis, empresa, foto, cidade, cidadePropria, aba, onAba, onFechar, onAcao, onRegras, onTrocarDesenho, onRevisarFoto, onAtivo }: {
+  aba: AbaFicha; onAba: (a: AbaFicha) => void;
+  e: Empregado; comp?: Compensacao; perfis: PerfilResumo[]; empresa: EmpresaBanco | null;
+  foto?: { foto?: string | null; status?: string | null; temApp?: boolean; motivo?: string | null };
+  cidade: string; cidadePropria: boolean;
+  onFechar: () => void; onAcao: (t: Acao) => void; onRegras: (p: PerfilResumo | null) => void;
+  onTrocarDesenho: () => void; onRevisarFoto: () => void; onAtivo: () => Promise<void>;
+}) {
+  const [confirmar, setConfirmar] = useState(false);
+  const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
+  const padrao = perfis.find((x) => x.padrao);
+  const efetivo = p ?? padrao;
+  const at = !!c && temAtencao(c);
+  const Linha = ({ k, v, acao, onClick }: { k: string; v: ReactNode; acao?: string; onClick?: () => void }) => (
+    <div className={css.fLinha}><span className={css.fK}>{k}</span><span className={css.fV}>{v}</span>{acao && <button type="button" className={css.fLk} onClick={onClick}>{acao}</button>}</div>
+  );
+  return (
+    <ModalPessoa aberto onFechar={onFechar} largura={760}
+      foto={<Avatar id={e.id} nome={e.nome} tamanho={84} />}
+      titulo={e.nome}
+      meta={[e.matricula ? `Mat. ${e.matricula}` : null, fmtCpf(e.cpf), e.dataInicioPonto ? `ponto desde ${e.dataInicioPonto.split('-').reverse().join('/')}` : null].filter(Boolean).join(' · ')}
+      chips={<>
+        {!e.ativo && <span className={`${css.pillN} ${css['pill-cz']}`}>Inativo</span>}
+        {!e.horarioContratualId && <span className={`${css.pillN} ${css['pill-er']}`}>Sem escala</span>}
+        {at && <span className={`${css.pillN} ${css['pill-er']}`}>Horas sem compensar</span>}
+      </>}
+      abas={[{ id: 'jornada', rotulo: 'Jornada' }, { id: 'regras', rotulo: 'Banco e regras' }, { id: 'salario', rotulo: 'Salário' }, { id: 'acesso', rotulo: 'Acesso e foto' }]}
+      aba={aba} onAba={(x) => onAba(x as AbaFicha)}
+      rodape={<>
+        {confirmar
+          ? <span className={css.fConfirma}>{e.ativo ? 'Inativar: some das listas e para de bater ponto.' : 'Reativar este funcionário?'}
+              <button type="button" className={css.fLk} onClick={() => { setConfirmar(false); void onAtivo(); }}>Confirmar</button>
+              <button type="button" className={css.fLk} onClick={() => setConfirmar(false)}>Cancelar</button></span>
+          : <button type="button" className={`${css.fLk} ${e.ativo ? css.fPerigo : ''}`} onClick={() => setConfirmar(true)}>{e.ativo ? 'Inativar…' : 'Reativar'}</button>}
+        <span style={{ flex: 1 }} />
+        <button type="button" className={css.btnSecN} onClick={onFechar}>Fechar</button>
+      </>}>
+      {aba === 'jornada' && (
+        <div className={css.fGrupo}>
+          <Linha k="Escala" v={e.escalaCodigo ?? (e.horarioContratualId ? 'Horário vinculado' : <span className={css.fAlerta}>Sem escala: o ponto não é calculado</span>)} acao={e.horarioContratualId ? 'Trocar' : 'Definir'} onClick={() => onAcao('ESCALA')} />
+          <Linha k="Tipo de jornada" v={c?.jornada === 'CONTRATO_HORAS' ? 'Contrato de horas' : c?.jornada === '12X36' ? '12x36' : ehContratoHoras(efetivo?.config, e.escalaFlexivel) ? 'Contrato de horas' : 'Horário fixo'} />
+          <Linha k="Cidade de trabalho" v={cidade ? <>{cidade}{!cidadePropria && <span className={css.fMute}> (da empresa)</span>}</> : 'Sem cidade · só feriado nacional'} acao="Trocar" onClick={() => onAcao('CIDADE')} />
+          <Linha k="Início do ponto" v={e.dataInicioPonto ? e.dataInicioPonto.split('-').reverse().join('/') : 'Desde o cadastro'} acao="Alterar" onClick={() => onAcao('INICIO')} />
+          {c?.jornada === '12X36' && <Linha k="Escala 12x36" v="Dias de trabalho alternados" acao="Gerar dias" onClick={() => onAcao('ESCALA12')} />}
+          {c?.jornada !== '12X36' && <p className={css.fNota}>Escala 12x36? <button type="button" className={css.fLk} onClick={() => onAcao('ESCALA12')}>Gerar os dias da escala</button></p>}
+        </div>
+      )}
+      {aba === 'regras' && (
+        <div className={css.fGrupo}>
+          <Linha k="Como as horas contam" v={c ? <span className={at ? css.fAlerta : ''}>{NIVEL[c.nivel].rot[0]!.toUpperCase() + NIVEL[c.nivel].rot.slice(1)} · {c.resumo}</span> : resumoBanco(efetivo?.config?.banco, empresa)} acao="Ver detalhes" onClick={() => onAcao('RAIO')} />
+          <Linha k="Perfil de regra" v={p ? p.nome : padrao ? <>{padrao.nome}<span className={css.fMute}> (padrão da empresa)</span></> : 'CLT padrão'} acao="Trocar" onClick={() => onAcao('PERFIL')} />
+          <Linha k="Banco de horas" v={resumoBanco(efetivo?.config?.banco, empresa)} acao="Ver regras" onClick={() => onRegras(efetivo ?? null)} />
+          {c?.alertas.filter((a) => a.gravidade !== 'info').slice(0, 2).map((a) => <p key={a.codigo} className={css.fAviso}>{a.texto}</p>)}
+        </div>
+      )}
+      {aba === 'salario' && (
+        <div className={css.fGrupo}>
+          <Linha k="Salário mensal" v={e.salarioMensal ? Number(e.salarioMensal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Não informado'} acao={e.salarioMensal ? 'Reajustar' : 'Definir'} onClick={() => onAcao('SALARIO')} />
+          <p className={css.fNota}>O salário vale a partir da data que você escolher; os meses anteriores continuam com o valor antigo.</p>
+        </div>
+      )}
+      {aba === 'acesso' && (
+        <div className={css.fGrupo}>
+          <Linha k="App do funcionário" v={e.emailAcesso ? e.emailAcesso : 'Sem acesso ao app'} acao={e.emailAcesso ? 'Resetar senha' : 'Criar acesso'} onClick={() => onAcao('ACESSO')} />
+          <Linha k="PIN do quiosque" v={e.temPin ? 'Definido' : 'Sem PIN'} acao={e.temPin ? 'Trocar' : 'Definir'} onClick={() => onAcao('PIN')} />
+          <Linha k="Foto" v={foto?.status === 'REVISAR' ? <span className={css.fAlerta}>Foto nova para revisar</span> : foto?.status === 'RECUSADA' ? 'Recusada · pedindo outra no app' : foto?.foto ? 'Aprovada' : foto?.temApp ? 'Sem foto · pede no próximo acesso' : 'Sem foto'}
+            acao={foto?.status === 'REVISAR' ? 'Revisar' : !foto?.foto ? 'Trocar desenho' : undefined} onClick={foto?.status === 'REVISAR' ? onRevisarFoto : onTrocarDesenho} />
+        </div>
+      )}
+    </ModalPessoa>
+  );
+}
 
 interface ResultadoImport {
   criados: number;

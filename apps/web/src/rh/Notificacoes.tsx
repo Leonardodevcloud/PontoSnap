@@ -183,7 +183,7 @@ function TesteEmail() {
           style={{ minHeight: 34, borderRadius: 10, border: '1px solid rgba(var(--ink-rgb),.24)', padding: '4px 10px', font: 'inherit', minWidth: 240, background: 'var(--field-bg)', color: 'var(--ink)' }} />
         <button className={css.btn} onClick={testar} disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar e-mail de teste'}</button>
       </div>
-      {res && <small role="status" style={{ fontWeight: 700 }}>{res}</small>}
+      {res && <small role="status" style={{ fontWeight: 600 }}>{res}</small>}
     </section>
   );
 }

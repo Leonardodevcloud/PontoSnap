@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './lib/auth';
 import { App } from './App';
+import '@fontsource-variable/inter';
 import './styles/global.css';
 
 // ── Tema: aplicar ANTES do render pra evitar flash ──

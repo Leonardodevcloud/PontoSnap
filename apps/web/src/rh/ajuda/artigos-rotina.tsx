@@ -74,6 +74,7 @@ function Feriados() {
         <p>A região de cada pessoa é a <b>cidade de trabalho</b> do cadastro. Quem não tem cidade própria usa a <b>cidade da empresa</b> (no topo da tela de Feriados). Vale para funcionários e também para MEI e motoristas (dias do mês na Folha e benefícios).</p>
       </Sec>
       <Sec id="cadastrar" titulo="Cadastrar">
+        <p>Os <b>feriados nacionais já vêm cadastrados</b> (os 10 do calendário oficial, inclusive a Paixão de Cristo). Para outro ano, a tela mostra "Adicionar os feriados nacionais" quando faltar algum. Carnaval e Corpus Christi são ponto facultativo: só cadastre se a empresa folgar.</p>
         <p>Em <b>Feriados</b> › "+ Novo feriado": data, nome e abrangência; estadual pede o estado, municipal pede a cidade (lista do IBGE). A tela mostra na hora quantas pessoas o feriado atinge. Cadastre os estaduais e municipais: eles não vêm prontos.</p>
         <p>Feriado antigo marcado como "sem região" vale para todo mundo, como era antes. Use "Definir região" para corrigir.</p>
         <Ir to="/rh/feriados">Abrir Feriados</Ir>

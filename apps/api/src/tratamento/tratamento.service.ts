@@ -5,7 +5,7 @@ import {
   pontoBancoMov, pontoBancoFechamento, espelhoAssinatura, empregadoSalario, pessoalPrestador,
   comTenant, comoMaster, type Db,
 } from '@ponto/db';
-import { foraDoRaio, feriadoValePara, feriadoSemRegiao, localEfetivo, ufDoMunicipio, ufValida, type LocalTrabalho } from '@ponto/shared';
+import { foraDoRaio, feriadosNacionais, feriadoValePara, feriadoSemRegiao, localEfetivo, ufDoMunicipio, ufValida, type LocalTrabalho } from '@ponto/shared';
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarComSalarios, valorizarAcertoBanco, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente, type AcertoBancoValores } from '@ponto/apuracao-clt';
@@ -372,6 +372,18 @@ export class TratamentoService {
       return r;
     });
   }
+  /** Grava os feriados nacionais do ano que a empresa ainda não tem (não duplica). */
+  async adicionarNacionais(tenantId: string, ano: number) {
+    if (!Number.isInteger(ano) || ano < 2000 || ano > 2100) throw new BadRequestException('Ano inválido.');
+    const lista = feriadosNacionais(ano);
+    return comTenant(this.db, tenantId, async (tx) => {
+      const ja = new Set((await tx.select({ data: pontoFeriado.data }).from(pontoFeriado).where(and(
+        eq(pontoFeriado.tenantId, tenantId), eq(pontoFeriado.tipo, 'nacional'), gte(pontoFeriado.data, `${ano}-01-01`), lte(pontoFeriado.data, `${ano}-12-31`)))).map((f) => f.data));
+      const novos = lista.filter((f) => !ja.has(f.data));
+      if (novos.length) await tx.insert(pontoFeriado).values(novos.map((f) => ({ tenantId, data: f.data, nome: f.nome, tipo: 'nacional' })));
+      return { adicionados: novos.length, jaTinha: lista.length - novos.length, total: lista.length };
+    });
+  }
   listarFeriados(tenantId: string, inicio?: string, fim?: string) {
     return comTenant(this.db, tenantId, (tx) => {
       const conds = [eq(pontoFeriado.tenantId, tenantId)];
@@ -443,8 +455,11 @@ export class TratamentoService {
       if (p.tipo === 'FUNCIONARIO') c.funcionarios++; else c.prestadores++;
       cidades.set(p.local.municipioIbge, c);
     }
+    const datasNac = new Set(fers.filter((f) => f.tipo === 'nacional').map((f) => f.data));
     return {
       empresa: emp,
+      /** Feriados nacionais do ano que a empresa ainda não cadastrou. */
+      nacionaisFaltando: feriadosNacionais(Number(ano)).filter((f) => !datasNac.has(f.data)),
       semCidadePropria: { funcionarios: todos.filter((p) => p.tipo === 'FUNCIONARIO' && !p.proprio).length, prestadores: todos.filter((p) => p.tipo === 'PRESTADOR' && !p.proprio).length },
       semLocal: todos.filter((p) => !p.local).length,
       total: todos.length,

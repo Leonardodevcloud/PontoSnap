@@ -20,9 +20,12 @@
   /* Azul claro para texto/ícone em cima do fundo escuro (logo "Snap", item ativo do menu) */
   --marca-clara:#86A9FF;
   --r-lg:28px; --r-md:16px; --r-pill:100px;
-  --ff-display:'Nunito Sans', sans-serif;
-  --ff-body:'Nunito Sans', sans-serif;
-  --ff-mono:'JetBrains Mono', monospace;
+  /* Uma fonte só (Inter, servida pelo próprio sistema). --ff-mono ficou como
+     apelido: os números usam algarismos tabulares (alinham em tabela). */
+  --ff-display:'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ff-body:'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ff-mono:'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ff-codigo:ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   /* Cores semânticas de feedback */
   --ok-bg:#E5F5EE; --ok-text:#0E7A50; --ok-border:rgba(14,122,80,.3);
   --erro-bg:#FDECEA; --erro-text:#C2362B; --erro-border:rgba(194,54,43,.3);
