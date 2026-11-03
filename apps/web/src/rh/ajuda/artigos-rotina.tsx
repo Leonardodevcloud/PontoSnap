@@ -228,7 +228,7 @@ function Assinaturas() {
         <ol className={css.passos}>
           <li>Uma vez: o administrador conecta a Autentique em <b>Configurações › Integrações</b> (token da API). Comece no modo de teste.</li>
           <li><b>Subir contracheques</b> — um por pessoa ou todos de uma vez (PDFs ou ZIP). O sistema acha de quem é cada um pelo CPF ou nome; o que não achar, você escolhe.</li>
-          <li><b>Fechar a Folha do mês</b> — o espelho só vai depois disso (é gerado na hora do envio).</li>
+          <li><b>Esperar o mês terminar</b> — o espelho é gerado na hora do envio, com as batidas do mês. Não precisa fechar a Folha.</li>
           <li><b>Enviar para assinar</b> — escolha como recebem, mensagem, lembrete e prazo.</li>
           <li>Acompanhe: o status muda sozinho (enviado → visualizou → assinou/recusou). "Lembrar" reenvia para quem não assinou.</li>
         </ol>

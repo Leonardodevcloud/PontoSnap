@@ -78,9 +78,14 @@ function situacao(l: Linha, p: Painel): { rot: string; tom: 'ok' | 'av' | 'er' |
     if (env.some((d) => d.status === 'VISUALIZADO')) return { rot: `visualizou · ${ass.length} de ${env.length}`, tom: 'in', sub };
     return { rot: `enviado · ${ass.length} de ${env.length}`, tom: 'av', sub };
   }
-  if (l.pronto) return { rot: 'pronto para enviar', tom: 'cz' };
+  if (l.pronto) {
+    const v = docsAEnviar(l, p.espelhoPronto);
+    return v.espelho && !v.cc && !ATIVO(l.contracheque)
+      ? { rot: 'pronto para enviar', tom: 'cz', sub: 'só o espelho · contracheque ainda não subido' }
+      : { rot: 'pronto para enviar', tom: 'cz' };
+  }
   if (!ATIVO(l.contracheque)) return { rot: 'falta contracheque', tom: 'av' };
-  if (!p.espelhoPronto) return { rot: 'espelho não fechado', tom: 'cz', sub: 'dá para mandar só o contracheque' };
+  if (!p.espelhoPronto) return { rot: 'mês em andamento', tom: 'cz', sub: 'dá para mandar só o contracheque' };
   return { rot: 'pronto para enviar', tom: 'cz' };
 }
 
@@ -107,7 +112,7 @@ export async function abrirPdf(caminho: string) {
 // ───────────────────────── tela ─────────────────────────
 
 /**
- * Assinaturas do mês: espelho de ponto (gerado quando a Folha fecha) e
+ * Assinaturas do mês: espelho de ponto (gerado quando o mês termina) e
  * contracheque (PDF da contabilidade) de cada funcionário, enviados para
  * assinar pela Autentique e acompanhados até a assinatura.
  */
@@ -188,7 +193,7 @@ export function DocsAssinatura() {
           <div className={css.titulo}>
             <h2>Assinaturas</h2>
             <Explica>
-              Espelho de ponto (gerado quando a Folha fecha) e contracheque (PDF da contabilidade) de cada funcionário, enviados para assinar pela Autentique.
+              Espelho de ponto (gerado com as batidas, assim que o mês termina; não depende da Folha) e contracheque (PDF da contabilidade) de cada funcionário, enviados para assinar pela Autentique.
               Cada arquivo vira um documento na Autentique (até 2 por funcionário). O status atualiza sozinho quando a pessoa visualiza, assina ou recusa
               {pend ? `; ${pend} ${pend === 1 ? 'documento aguarda' : 'documentos aguardam'} assinatura` : ''}.
               {t ? ` ${t.semEmail ? `${t.semEmail} sem e-mail vão pelo WhatsApp ou pelo app.` : 'Todos recebem por e-mail.'}` : ''}
@@ -231,7 +236,7 @@ export function DocsAssinatura() {
         {([['TODOS', 'Todos'], ['PRONTOS', 'Prontos'], ['FALTA', 'Falta contracheque'], ['AGUARDANDO', 'Aguardando assinatura'], ['ASSINADOS', 'Assinados'], ['PROBLEMA', 'Recusados ou com erro']] as [Filtro, string][])
           .filter(([f]) => f === 'TODOS' || f === filtro || contagem[f] > 0).map(([f, r]) => (
           <button key={f} type="button" className={`${cssP.fl} ${filtro === f ? cssP.flOn : ''}`} aria-pressed={filtro === f} onClick={() => setFiltro(f)}
-            title={!t ? undefined : f === 'PRONTOS' ? (d!.espelhoPronto ? 'espelho + contracheque' : 'o espelho sai quando a Folha fechar')
+            title={!t ? undefined : f === 'PRONTOS' ? (d!.espelhoPronto ? 'tem espelho e/ou contracheque para mandar' : 'o espelho sai quando o mês terminar')
               : f === 'AGUARDANDO' ? `${t.enviados} enviados · ${t.visualizados} ${t.visualizados === 1 ? 'visualizou' : 'visualizaram'} · ${t.assinados} ${t.assinados === 1 ? 'assinado' : 'assinados'}`
               : f === 'FALTA' ? 'suba o PDF da contabilidade' : undefined}>{r}<span>{contagem[f]}</span></button>
         ))}
@@ -312,8 +317,8 @@ export function DocsAssinatura() {
 
 function CelulaEspelho({ l, p }: { l: Linha; p: Painel }) {
   if (ATIVO(l.espelho)) return <span className={css.doc} title={`gerado ${dia(l.espelho.criadoEm)}`}><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}</span></span>;
-  if (p.espelhoPronto) return <span className={css.doc} title={`Folha fechada ${dia(p.fechadoEm)} · sai no envio`}><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}</span></span>;
-  return <span className={css.doc} title="aguardando o fechamento da Folha"><span className={`${css.ic} ${css.icOff}`}>PDF</span><span className={css.apagado}>Aguardando Folha</span></span>;
+  if (p.espelhoPronto) return <span className={css.doc} title="gerado na hora do envio, com as batidas do mês"><span className={css.ic}>PDF</span><span>Espelho {mesCurto(p.competencia)}</span></span>;
+  return <span className={css.doc} title="o espelho sai quando o mês terminar"><span className={`${css.ic} ${css.icOff}`}>PDF</span><span className={css.apagado}>Mês em andamento</span></span>;
 }
 
 function CelulaCc({ l, onSubir }: { l: Linha; onSubir: () => void }) {
@@ -502,7 +507,7 @@ function ModalEnviar({ painel, ids, onFechar, onEnviado }: { painel: Painel; ids
   return (
     <ModalPessoa aberto onFechar={() => { if (enviando === null) onFechar(); }} compacto largura={900}
       titulo={`Enviar para assinar · ${linhas.length} ${linhas.length === 1 ? 'funcionário' : 'funcionários'}`}
-      meta={`${painel.rotulo} · ${painel.espelhoPronto ? 'espelho de ponto + contracheque' : 'contracheque (o espelho sai quando a Folha fechar)'}`}
+      meta={`${painel.rotulo} · ${painel.espelhoPronto ? 'espelho de ponto + contracheque' : 'contracheque (o espelho sai quando o mês terminar)'}`}
       rodape={<>
         <button type="button" className={cssP.btnSec} onClick={onFechar} disabled={enviando !== null}>Cancelar</button>
         <span style={{ flex: 1 }} />
@@ -548,7 +553,7 @@ function ModalEnviar({ painel, ids, onFechar, onEnviado }: { painel: Painel; ids
           {canal === 'AUTO' && <div className={cssP.lin}><span>E-mail · WhatsApp · app</span><span className={cssP.mono}>{porCanal('EMAIL')} · {porCanal('WHATSAPP')} · {porCanal('APP')}</span></div>}
           <div className={cssP.lin}><span>Fora do envio</span><span className={cssP.mono}>{fora}</span></div>
           {fora > 0 && <p className={css.nota}>Ficaram de fora {fora === 1 ? '1 pessoa' : `${fora} pessoas`}{foraSemCc ? ` (${foraSemCc} sem contracheque)` : ''} ou já enviados. Dá para enviar depois.</p>}
-          {soCc > 0 && <p className={css.nota}>{soCc === 1 ? '1 pessoa recebe' : `${soCc} pessoas recebem`} só o contracheque agora{painel.espelhoPronto ? ' (o espelho já foi)' : '; o espelho vai quando a Folha fechar'}.</p>}
+          {soCc > 0 && <p className={css.nota}>{soCc === 1 ? '1 pessoa recebe' : `${soCc} pessoas recebem`} só o contracheque agora{painel.espelhoPronto ? ' (o espelho já foi)' : '; o espelho vai quando o mês terminar'}.</p>}
           {semAviso.length > 0 && <p className={css.alerta}>{semAviso.map((x) => x.l.nome.split(' ')[0]).slice(0, 4).join(', ')}{semAviso.length > 4 ? ` e mais ${semAviso.length - 4}` : ''}: sem e-mail, celular nem acesso ao app — não {semAviso.length === 1 ? 'vai' : 'vão'} ser {semAviso.length === 1 ? 'avisado' : 'avisados'}. Cadastre um contato em Funcionários.</p>}
           {painel.integracao.sandbox
             ? <p className={css.nota}>Modo de teste ligado em Integrações: os documentos vão com a marca "teste" e não gastam crédito.</p>
@@ -605,7 +610,7 @@ function ModalDetalhe({ l, p, onFechar, recarregar, avisar, onEnviar }: {
       </>}>
       <div className={css.cards}>
         <CartaoDoc tipo="ESPELHO" d={l.espelho} p={p} ocupado={ocupado} onVer={ver}
-          vazio={p.espelhoPronto ? `Folha fechada em ${dia(p.fechadoEm)}. O espelho é gerado na hora do envio, com as batidas do mês.` : 'O espelho sai quando a Folha do mês for fechada em Folha e benefícios.'}
+          vazio={p.espelhoPronto ? 'O espelho é gerado na hora do envio, com as batidas do mês.' : 'O espelho sai quando o mês terminar.'}
           onCancelar={setCancelar} />
         <CartaoDoc tipo="CONTRACHEQUE" d={l.contracheque} p={p} ocupado={ocupado} onVer={ver}
           vazio="Ainda não subiu o contracheque deste mês."

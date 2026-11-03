@@ -90,7 +90,8 @@ export function idsDeDocumento(p: unknown): string[] {
 
 /**
  * Assinatura eletrônica (Autentique) do espelho de ponto e do contracheque.
- * O espelho é gerado pelo sistema quando a Folha do mês fecha; o contracheque
+ * O espelho é gerado pelo sistema (batidas do mês) assim que o mês termina —
+ * não depende do fechamento da Folha, é só para conferência; o contracheque
  * vem da contabilidade (PDF). Cada arquivo vira um documento na Autentique com
  * o funcionário como signatário; o status volta pelo webhook (e por uma
  * conferência periódica, se o webhook falhar).
@@ -216,11 +217,17 @@ export class AssinaturaService {
         espelho: doc('ESPELHO'), contracheque: doc('CONTRACHEQUE'),
       };
     }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    const pronto = (l: (typeof linhas)[number]) => !!r.fech && (!l.espelho || ['RASCUNHO', 'ERRO', 'CANCELADO', 'RECUSADO'].includes(l.espelho.status))
-      && !!l.contracheque && ['RASCUNHO', 'ERRO', 'RECUSADO'].includes(l.contracheque.status);
+    // Espelho sai quando o mês acabou (horário de Brasília). Não espera a Folha:
+    // é o ponto para a pessoa conferir e assinar, não o holerite.
+    const hojeBr = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
+    const espelhoPronto = comp < hojeBr;
+    // Pronto = tem algo para mandar agora: o espelho (mês terminado) e/ou o contracheque subido.
+    // O espelho vai sozinho se o contracheque ainda não chegou.
+    const pronto = (l: (typeof linhas)[number]) => (espelhoPronto && (!l.espelho || ['RASCUNHO', 'ERRO', 'CANCELADO', 'RECUSADO'].includes(l.espelho.status)))
+      || (!!l.contracheque && ['RASCUNHO', 'ERRO', 'RECUSADO'].includes(l.contracheque.status));
     const docs = linhas.flatMap((l) => [l.espelho, l.contracheque]).filter((d): d is NonNullable<typeof d> => !!d);
     return {
-      competencia: comp, rotulo: nomeMes(comp), espelhoPronto: !!r.fech, fechadoEm: r.fech?.em.toISOString() ?? null,
+      competencia: comp, rotulo: nomeMes(comp), espelhoPronto, fechadoEm: r.fech?.em.toISOString() ?? null,
       integracao: { conectado: !!integ, sandbox: integ?.sandbox ?? true, mostrarApp: integ?.mostrarApp ?? true },
       uploadsPendentes: r.uploads,
       totais: {
@@ -352,7 +359,7 @@ export class AssinaturaService {
   // ───────────────────────── enviar ─────────────────────────
 
   /**
-   * Manda para assinar: espelho (gerado agora, com o mês fechado) e
+   * Manda para assinar: espelho (gerado agora, com o mês já terminado) e
    * contracheque (o que foi subido). Já enviado e ainda válido não é
    * reenviado. Um a um, respeitando o limite da API.
    */
@@ -377,7 +384,7 @@ export class AssinaturaService {
         ? { nome: l.nome, canal: 'APP' } : l.canal === 'EMAIL' ? { nome: l.nome, canal: 'EMAIL', email: l.email } : { nome: l.nome, canal: 'WHATSAPP', telefone: l.telefone };
       const reenviavel = (s?: Status) => !s || ['RASCUNHO', 'ERRO', 'CANCELADO', 'RECUSADO'].includes(s);
 
-      // Espelho: só com o mês fechado; gerado agora (é o retrato que a pessoa assina).
+      // Espelho: só com o mês já terminado; gerado agora (é o retrato que a pessoa assina).
       if (p.espelhoPronto && reenviavel(l.espelho?.status)) {
         try {
           const pdf = await this.trat.gerarEspelhoPdf(tenantId, empId, inicio, fim);
