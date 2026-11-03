@@ -775,11 +775,24 @@ function CampoReais({ id, rotulo, valorCent, onChange, ajuda, disabled }: { id: 
   );
 }
 function CampoNum({ id, rotulo, valor, onChange, sufixo, max, disabled }: { id: string; rotulo: string; valor: number; onChange: (n: number) => void; sufixo?: string; max?: number; disabled?: boolean }) {
+  // Campo de texto (não type=number): sem setinhas, sem a roda do mouse mudando o valor
+  // e sem o "0" grudado na frente do que a pessoa digita. Pode ficar vazio enquanto digita.
+  const [txt, setTxt] = useState(String(valor));
+  const editando = useRef(false);
+  useEffect(() => { if (!editando.current) setTxt(String(valor)); }, [valor]);
+  const limitar = (n: number) => Math.max(0, Math.min(max ?? 1e9, n));
   return (
     <label className={css.campo} htmlFor={id}>
       <span>{rotulo}</span>
-      <span className={css.input}><input id={id} type="number" min={0} max={max} value={valor} disabled={disabled}
-        onChange={(e) => onChange(Math.max(0, Math.min(max ?? 1e9, Math.floor(Number(e.target.value) || 0))))} />{sufixo && <em>{sufixo}</em>}</span>
+      <span className={css.input}><input id={id} type="text" inputMode="numeric" autoComplete="off" value={txt} disabled={disabled}
+        onFocus={(e) => { editando.current = true; e.currentTarget.select(); }}
+        onChange={(e) => {
+          const dig = e.target.value.replace(/\D/g, '').slice(0, 4);
+          const n = dig === '' ? 0 : limitar(Number(dig));
+          setTxt(dig === '' ? '' : String(n));
+          onChange(n);
+        }}
+        onBlur={() => { editando.current = false; setTxt(String(valor)); }} />{sufixo && <em>{sufixo}</em>}</span>
     </label>
   );
 }
@@ -1221,6 +1234,7 @@ function PainelMei({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
       <div className={css.pCorpo}>
         {aba === 'lanc' && <>
         {fi && <BannerFechado fi={fi} />}
+        <div className={css.col}>
         <section className={css.bloco}>
           <span className={css.lb}>Base de {mesCurto(mes)}</span>
           <Linha2 k={`Contrato (desde ${mesCurto(l.valorDesde)})`} v={brl(l.valorCent)} />
@@ -1245,19 +1259,20 @@ function PainelMei({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
             <p className={css.formula}>{f.metaPaga ? 'Continua na nota fiscal (bruto), mas sai do valor a pagar.' : 'Entra na nota fiscal e no valor a pagar.'}</p>
           </>}
         </section>
+        </div>
+        <div className={css.col}>
         <section className={css.bloco}>
-          <span className={css.lb}>Nota fiscal e pagamento</span>
-          <div className={css.grade2}>
-            <CampoTexto id="nf" rotulo="Número da NF" valor={f.nfNumero ?? ''} placeholder="000214" onChange={(v) => setF({ ...f, nfNumero: v })} />
-            <CampoTexto id="nf-data" tipo="date" rotulo="Data da NF" valor={f.nfData ?? ''} onChange={(v) => setF({ ...f, nfData: v })} />
-          </div>
-          <AnexoNf pessoaTipo="MEI" pessoaId={l.id} mes={mes} periodo="MES" nome={l.nome} arquivo={l.lanc.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />
-          <Alternar<'nao' | 'sim'> rotulo="Pagamento" valor={f.pago ? 'sim' : 'nao'} onChange={(v) => setF({ ...f, pago: v === 'sim' })}
+          <span className={css.lb}>Pagamento</span>
+          <Alternar<'nao' | 'sim'> rotulo="Situação" valor={f.pago ? 'sim' : 'nao'} onChange={(v) => setF({ ...f, pago: v === 'sim' })}
             opcoes={[['nao', 'Pendente'], ['sim', 'Pago']]} />
           {l.lanc.pago && l.lanc.pagoEm && <p className={css.formula}>Pago{l.lanc.valorPagoCent != null ? ` ${brl(l.lanc.valorPagoCent)}` : ''} em {fmtPagoEm(l.lanc.pagoEm)}.</p>}
-          {fechadoMes && <p className={css.formula}>Mês fechado: os valores estão congelados, mas a nota e o pagamento ainda podem ser registrados.</p>}
+          {fechadoMes && <p className={css.formula}>Mês fechado: valores congelados; nota e pagamento ainda podem mudar.</p>}
+          <NotaDiscreta id="nf" numero={f.nfNumero ?? ''} onNumero={(v) => setF({ ...f, nfNumero: v })} data={f.nfData ?? ''} onData={(v) => setF({ ...f, nfData: v })}
+            anexo={<AnexoNf discreto pessoaTipo="MEI" pessoaId={l.id} mes={mes} periodo="MES" nome={l.nome} arquivo={l.lanc.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />}
+            temArquivo={!!l.lanc.nfArquivo} />
         </section>
         <Observacao pessoaTipo="MEI" pessoaId={l.id} mes={mes} inicial={l.lanc.observacao} disabled={fechado} />
+        </div>
         </>}
         {aba === 'dados' && <>
         <DadosContrato p={l} mes={mes} fechado={fechadoMes} empresas={empresas} onSalvo={onContrato} />
@@ -1267,12 +1282,14 @@ function PainelMei({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
         </>}
       </div>
       {aba === 'lanc' && <div className={css.pRodape}>
-        <Linha2 k="Bruto · valor da NF" v={brl(pv.brutoCent)} />
-        <Linha2 k={<span className={css.mute}>− débitos{l.debitosFuturosCent ? ' (com parcelas futuras)' : ''}{f.metaPaga && f.metaCent ? ' − meta já paga' : ''}</span>} v={pv.abat ? brl(-pv.abat) : '—'} cls={css.neg} />
-        <Linha2 cls={css.grande} k="Líquido a pagar" v={brl(pv.liquidoCent)} />
-        <p className={css.formula}>{brl(contratoCent)} + extras {brl(pv.heCent)} + feriados {brl(pv.feriadosCent)} − faltas {brl(pv.faltasCent)} + meta {brl(f.metaCent)}</p>
         {erro && <p className={css.alerta}>{erro}</p>}
-        <div className={css.rodAcoes}>
+        <div className={css.rodLinha}>
+          <div className={css.rodTotal} title={`${brl(contratoCent)} + extras ${brl(pv.heCent)} + feriados ${brl(pv.feriadosCent)} − faltas ${brl(pv.faltasCent)} + meta ${brl(f.metaCent)}`}>
+            <span>Líquido a pagar</span>
+            <strong>{brl(pv.liquidoCent)}</strong>
+            <small>NF {brl(pv.brutoCent)}{pv.abat ? <> · <span className={css.neg}>{brl(-pv.abat)}</span> {f.metaPaga && f.metaCent ? 'débitos e meta paga' : 'débitos'}</> : ''}</small>
+          </div>
+          <span className={css.rodQuebra} aria-hidden="true" />
           <AcoesFechamento fechadoMes={fechadoMes} fi={fi} pago={l.lanc.pago} nome={l.nome} onFecharPessoa={onFecharPessoa} onReabrir={onReabrirPessoa} />
           <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : fechado ? 'Salvar nota e pagamento' : 'Salvar lançamento'}</Botao>
         </div>
@@ -1329,9 +1346,10 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
       <div className={css.pCorpo}>
         {aba === 'lanc' && <>
         {fi && <BannerFechado fi={fi} />}
-        <section className={css.bloco}>
+        <section className={`${css.bloco} ${css.cheio}`}>
           <Linha2 cls={css.grande} k={`Diária · ${brl(l.valorCent)} ÷ ${l.diasMes} dias`} v={brl(l.diariaCent)} />
           <p className={css.formula}>{l.baseDias === 'SEG_SAB' ? 'Segunda a sábado' : 'Segunda a sexta'}, sem feriados. Cada semana já vem com os dias previstos da escala; ajuste se ele faltou ou trabalhou a mais. Cada semana tem a sua nota e o seu pagamento.</p>
+          {fechadoMes && <p className={css.formula}>Mês fechado: só nota e pagamento podem mudar.</p>}
           {l.debitoPendenteCent > 0 && <p className={css.debPend}><b>Débito pendente: {brl(l.debitoPendenteCent)}</b> ainda não descontado em nenhuma semana. Você escolhe a semana na hora de pagar.</p>}
         </section>
         {l.semanas.map((s, i) => {
@@ -1347,15 +1365,15 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
                 {s.pago ? <span className={`${vt.pill} ${vt.pillOk}`}>paga</span> : futura ? <span className={`${vt.pill} ${vt.pillMute}`}>em andamento</span> : <span className={`${vt.pill} ${vt.pillWarn}`}>a pagar</span>}
                 <strong className={css.semValor}>{brl(valor)}</strong>
               </div>
-              <div className={css.grade3}>
+              <div className={css.grade2}>
                 <CampoNum id={`d-${i}`} rotulo={`Dias (previsto ${s.diasAuto})`} max={7} valor={e.dias} onChange={(n) => up(i, { dias: n, datas: [] })} disabled={travada} />
                 <CampoReais id={`a-${i}`} rotulo="Adicionais" valorCent={e.adicionalCent} onChange={(c) => up(i, { adicionalCent: c })} disabled={travada} />
-                <CampoTexto id={`n-${i}`} rotulo="Nº da NF" valor={e.nfNumero} onChange={(v) => up(i, { nfNumero: v })} />
               </div>
               {(s.diasPossiveis?.length ?? 0) > 0 && <DiasSemana s={s} datas={e.datas} disabled={travada} onMarcar={(dia) => marcarDia(i, dia)} />}
               {s.debitoAplicadoCent > 0 && <p className={css.formula}>Inclui débito descontado nesta semana: {brl(-s.debitoAplicadoCent)}.</p>}
-              {e.dias > 0 && <AnexoNf pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} periodo={s.inicio} nome={`${l.nome} · semana ${fmtDia(s.inicio)}`}
-                arquivo={s.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />}
+              {e.dias > 0 && <NotaDiscreta id={`n-${i}`} numero={e.nfNumero} onNumero={(v) => up(i, { nfNumero: v })} temArquivo={!!s.nfArquivo}
+                anexo={<AnexoNf discreto pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} periodo={s.inicio} nome={`${l.nome} · semana ${fmtDia(s.inicio)}`}
+                  arquivo={s.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />} />}
               <div className={css.semAcoes}>
                 {s.pago
                   ? <><span className={css.hint}>Pago <b className={css.mono}>{brl(pagoSemana(s))}</b>{s.pagoEm ? ` em ${fmtPagoEm(s.pagoEm)}` : ''}</span>
@@ -1367,7 +1385,7 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
             </section>
           );
         })}
-        <Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} />
+        <div className={css.cheio}><Observacao pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} inicial={l.observacao} disabled={fechado} /></div>
         </>}
         {aba === 'dados' && <>
         <DadosContrato p={l} mes={mes} fechado={fechadoMes} empresas={empresas} onSalvo={onContrato} />
@@ -1377,13 +1395,14 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
         </>}
       </div>
       {aba === 'lanc' && <div className={css.pRodape}>
-        <Linha2 k="Total das notas do mês" v={brl(total)} />
-        <Linha2 k={<span className={css.mute}>− débitos do mês</span>} v={l.debitosCent ? brl(-l.debitosCent) : '—'} cls={css.neg} />
-        <Linha2 k={<span className={css.mute}>Já pago ({nPagas} de {comDias.length} semanas)</span>} v={brl(pago)} />
-        <Linha2 cls={css.grande} k="Falta pagar" v={brl(Math.max(0, total - l.debitosCent - pago))} />
         {erro && <p className={css.alerta}>{erro}</p>}
-        {fechadoMes && <p className={css.formula}>Mês fechado: só nota e pagamento podem mudar.</p>}
-        <div className={css.rodAcoes}>
+        <div className={css.rodLinha}>
+          <div className={css.rodTotal}>
+            <span>Falta pagar</span>
+            <strong>{brl(Math.max(0, total - l.debitosCent - pago))}</strong>
+            <small>Notas {brl(total)}{l.debitosCent ? <> · <span className={css.neg}>{brl(-l.debitosCent)}</span> débitos</> : ''} · pago {brl(pago)} ({nPagas} de {comDias.length} semanas)</small>
+          </div>
+          <span className={css.rodQuebra} aria-hidden="true" />
           <AcoesFechamento fechadoMes={fechadoMes} fi={fi} pago={l.semanas.some((s) => s.pago)} nome={l.nome} onFecharPessoa={onFecharPessoa} onReabrir={onReabrirPessoa} />
           {mudou && <Botao variante="ghost" className={css.btnSec} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar dias e notas'}</Botao>}
         </div>
@@ -1943,9 +1962,36 @@ const tamanho = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 
 const NF_ACEITA = '.pdf,.xml,.png,.jpg,.jpeg,.webp,application/pdf,text/xml,application/xml,image/png,image/jpeg,image/webp';
 
 /** Arquivo da nota fiscal: enviar, ver, baixar, trocar e remover. Funciona em mês fechado. */
-function AnexoNf({ pessoaTipo, pessoaId, mes, periodo, nome, arquivo, onMudou, onAviso }: {
+/**
+ * Nota do prestador, discreta: quem manda a nota agora é o próprio prestador pelo portal.
+ * Mostra o que chegou numa linha; editar o número/data à mão fica atrás de um link.
+ */
+function NotaDiscreta({ id, numero, onNumero, data, onData, anexo, temArquivo }: {
+  id: string; numero: string; onNumero: (v: string) => void; data?: string; onData?: (v: string) => void; anexo: ReactNode; temArquivo: boolean;
+}) {
+  const [editar, setEditar] = useState(false);
+  const dataBr = data ? new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR') : '';
+  const resumo = numero ? `NF ${numero}${dataBr ? ` · ${dataBr}` : ''}` : temArquivo ? 'Nota recebida' : 'Nota ainda não enviada pelo prestador';
+  return (
+    <div className={css.notaD}>
+      <div className={css.notaDLinha}>
+        <span className={numero || temArquivo ? '' : css.mute}>{resumo}</span>
+        {!editar && <button type="button" className={css.link} onClick={() => setEditar(true)}>{numero ? 'Editar' : 'Lançar à mão'}</button>}
+      </div>
+      {anexo}
+      {editar && (
+        <div id={`${id}-ed`} className={onData ? css.grade2 : undefined}>
+          <CampoTexto id={id} rotulo="Número da NF" valor={numero} placeholder="000214" onChange={onNumero} />
+          {onData && <CampoTexto id={`${id}-data`} tipo="date" rotulo="Data da NF" valor={data ?? ''} onChange={onData} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AnexoNf({ pessoaTipo, pessoaId, mes, periodo, nome, arquivo, onMudou, onAviso, discreto }: {
   pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; mes: string; periodo: string; nome: string; arquivo: PessoalNfArquivo | null;
-  onMudou: () => Promise<void>; onAviso: (m: string) => void;
+  onMudou: () => Promise<void>; onAviso: (m: string) => void; discreto?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [ocupado, setOcupado] = useState<'' | 'enviando' | 'removendo'>('');
@@ -1974,6 +2020,37 @@ function AnexoNf({ pessoaTipo, pessoaId, mes, periodo, nome, arquivo, onMudou, o
     try { await api.del(`/pessoal/nf/${arquivo.id}`); setConfirmaRemover(false); await onMudou(); onAviso(`Arquivo da nota de ${nome} removido.`); }
     catch (e) { setErro((e as Error).message); }
     finally { setOcupado(''); }
+  }
+  if (discreto) {
+    const tipoArq = arquivo ? (arquivo.mime === 'application/pdf' ? 'PDF' : arquivo.mime.includes('xml') ? 'XML' : 'Foto') : '';
+    return (
+      <div className={css.anexoD}>
+        <input ref={input} type="file" accept={NF_ACEITA} hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviar(f); }} />
+        {arquivo ? (
+          confirmaRemover ? (
+            <span className={css.anexoDLinha}>Remover o arquivo?
+              <button type="button" className={css.link} onClick={() => setConfirmaRemover(false)}>Não</button>
+              <button type="button" className={`${css.link} ${css.linkPerigo}`} disabled={!!ocupado} onClick={remover}>{ocupado === 'removendo' ? 'Removendo…' : 'Sim, remover'}</button>
+            </span>
+          ) : (
+            <span className={css.anexoDLinha}>
+              <IconeClipe /><span className={css.anexoDNome} title={`${arquivo.nome} · ${tamanho(arquivo.bytes)} · enviado ${fmtDia(arquivo.enviadoEm.slice(0, 10))}`}>{tipoArq} · {arquivo.nome}</span>
+              <button type="button" className={css.link} onClick={() => setVer(true)}>Ver</button>
+              <button type="button" className={css.link} onClick={baixar}>Baixar</button>
+              <button type="button" className={css.linkMudo} disabled={!!ocupado} onClick={() => input.current?.click()}>{ocupado === 'enviando' ? 'Enviando…' : 'Trocar'}</button>
+              <button type="button" className={css.linkMudo} onClick={() => setConfirmaRemover(true)}>Remover</button>
+            </span>
+          )
+        ) : (
+          <button type="button" className={css.linkMudo} disabled={!!ocupado} onClick={() => input.current?.click()} title="PDF, XML ou foto · até 5 MB"
+            onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) void enviar(f); }}>
+            <IconeClipe /> {ocupado === 'enviando' ? 'Enviando…' : 'Anexar arquivo por aqui'}
+          </button>
+        )}
+        {erro && <p className={css.alerta}>{erro}</p>}
+        {ver && arquivo && <VisualizarNf arquivo={arquivo} titulo={`Nota de ${nome}`} onBaixar={baixar} onFechar={() => setVer(false)} />}
+      </div>
+    );
   }
   return (
     <div className={css.anexo}>
