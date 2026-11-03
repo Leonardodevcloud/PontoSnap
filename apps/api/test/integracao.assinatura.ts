@@ -9,7 +9,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import { createHmac } from 'node:crypto';
 import JSZip from 'jszip';
-import { schema, comoMaster, tenant, empregado, usuario, pessoalFechamento, assinaturaDocumento } from '@ponto/db';
+import { schema, comoMaster, tenant, empregado, usuario, assinaturaDocumento } from '@ponto/db';
 import { PushService } from '../src/notificacao/push.service';
 import { CriptoService } from '../src/common/cripto.service';
 import { AssinaturaService, identificarContracheque, idsDeDocumento } from '../src/assinatura/assinatura.service';
@@ -52,9 +52,11 @@ class AutentiqueFalsa implements AutentiqueApi {
 
 async function main() {
   const cripto = new CriptoService();
-  const tratFalso = { gerarEspelhoPdf: async (_t: string, emp: string) => ({ buffer: await pdf(`Espelho ${emp}`), nomeArquivo: `espelho_${emp.slice(0, 6)}.pdf` }) } as unknown as TratamentoService;
+  const tratFalso = { gerarEspelhoPdf: async (_t: string, emp: string) => ({ buffer: await pdf(`Espelho ${emp}`), nomeArquivo: `espelho_${emp.slice(0, 6)}.pdf`, campos: { funcionario: { pagina: 1, x: 12, y: 80 }, gestor: { pagina: 1, x: 60, y: 80 } } }) } as unknown as TratamentoService;
   const svc = new AssinaturaService(db, cripto, tratFalso, new PushService(db), (tok) => new AutentiqueFalsa(tok));
   svc.pausaMs = 0;
+  // Começa com outubro em andamento; depois o mês "termina".
+  svc.agora = () => Date.parse('2026-10-20T12:00:00-03:00');
 
   const CNPJ = `64${String(Date.now()).slice(-12)}`;
   const t = (await comoMaster(db, (tx) => tx.insert(tenant).values({ cnpj: CNPJ, razaoSocial: 'Tuts Assina LTDA' }).returning()))[0]!;
@@ -105,14 +107,18 @@ async function main() {
   // ── enviar (mês ainda aberto: só contracheque) ──
   let env = await svc.enviar(t.id, { competencia: COMP, empregadoIds: [ana.id] }, 'rh');
   p = await svc.painel(t.id, COMP);
-  ok(env.enviados === 1 && !p.linhas.find((l) => l.empregadoId === ana.id)!.espelho, 'Folha aberta: espelho não vai; contracheque vai');
-  await comoMaster(db, (tx) => tx.insert(pessoalFechamento).values({ tenantId: t.id, competencia: COMP, snapshot: {} }));
+  ok(env.enviados === 1 && !p.linhas.find((l) => l.empregadoId === ana.id)!.espelho, 'mês em andamento: espelho não vai; contracheque vai');
+  // O mês terminou: o espelho libera sem precisar fechar a Folha.
+  svc.agora = () => Date.parse('2026-11-03T12:00:00-03:00');
+  ok((await svc.painel(t.id, COMP)).espelhoPronto, 'mês terminado: espelho pronto mesmo com a Folha aberta');
   env = await svc.enviar(t.id, { competencia: COMP, empregadoIds: [ana.id, bruno.id, caio.id], mensagem: 'Seguem seus documentos', lembrete: 'DAILY', prazo: '2026-11-10' }, 'rh');
   p = await svc.painel(t.id, COMP);
   const docsF = [...AutentiqueFalsa.docs.values()];
   const deAna = docsF.filter((d) => d.n.signatario.email === `ana.${CNPJ}@gmail.com`);
   ok(env.enviados === 5 && env.erros.length === 0, `mês fechado: 3 espelhos + 2 contracheques (o da Ana já tinha ido) (${JSON.stringify(env)})`);
   ok(deAna.length === 2 && deAna.every((d) => d.n.sandbox && d.n.signatario.canal === 'EMAIL'), 'Ana: por e-mail, em modo de teste');
+  ok(docsF.every((d) => d.n.empresa?.email === 'rh@tuts.com') && docsF.every((d) => !!d.n.campoSignatario),
+    'empresa (dono da conta) assina junto; o funcionário tem campo de assinatura no PDF');
   ok(docsF.some((d) => d.n.signatario.canal === 'WHATSAPP' && d.n.signatario.telefone === '+5571988881234'), 'Bruno: pelo WhatsApp (+55)');
   ok(docsF.some((d) => d.n.signatario.canal === 'APP' && d.n.lembrete === null), 'Caio: só app (sem lembrete por e-mail)');
   ok(p.linhas.every((l) => l.espelho?.status === 'ENVIADO' && l.contracheque?.status === 'ENVIADO'), 'todos os 6 documentos como ENVIADO');

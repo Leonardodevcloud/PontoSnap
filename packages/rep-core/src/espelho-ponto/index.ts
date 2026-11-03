@@ -145,8 +145,20 @@ function hhmmDeMinutos(min: number): string {
   return `${min < 0 ? '-' : ''}${Math.floor(a / 60)}h${String(a % 60).padStart(2, '0')}`;
 }
 
+/** Onde fica a linha de assinatura, em % da página (para a assinatura eletrônica cair no lugar). */
+export interface CampoAssinaturaPdf { pagina: number; x: number; y: number }
+export interface CamposEspelho { funcionario: CampoAssinaturaPdf; gestor: CampoAssinaturaPdf }
+
 export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
+  return gerarEspelhoPontoPdfComCampos(d).then((r) => r.buffer);
+}
+
+/** Igual ao gerarEspelhoPontoPdf, mas diz também onde estão as linhas de assinatura. */
+export async function gerarEspelhoPontoPdfComCampos(d: DadosEspelho): Promise<{ buffer: Buffer; campos: CamposEspelho | null }> {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } });
+  let paginas = 1;
+  doc.on('pageAdded', () => { paginas++; });
+  let campos: CamposEspelho | null = null;
   const chunks: Buffer[] = [];
   doc.on('data', (c: Buffer) => chunks.push(c));
   const pronto = new Promise<Buffer>((res) => doc.on('end', () => res(Buffer.concat(chunks))));
@@ -310,7 +322,7 @@ export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
 
   // ---- Concordância + assinaturas ----
   y += 44;
-  if (y > doc.page.height - 80) { doc.addPage({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } }); y = 60; }
+  if (y > doc.page.height - 104) { doc.addPage({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } }); y = 60; }
 
   if (d.assinaturaEletronica) {
     carimboAssinatura(doc, 34, y, larguraUtil, d.assinaturaEletronica);
@@ -319,15 +331,24 @@ export function gerarEspelhoPontoPdf(d: DadosEspelho): Promise<Buffer> {
   } else {
     doc.font('Helvetica').fontSize(8.5).fillColor(TINTA)
       .text('Concordo com as marcações acima registradas.', 34, y, { width: larguraUtil });
-    const yl = y + 42;
+    const yl = y + 58; // espaço para o carimbo da assinatura eletrônica acima da linha
     const larguraAss = (larguraUtil - 60) / 2;
     doc.moveTo(34, yl).lineTo(34 + larguraAss, yl).strokeColor(TINTA).lineWidth(0.6).stroke();
     doc.moveTo(34 + larguraAss + 60, yl).lineTo(34 + larguraUtil, yl).strokeColor(TINTA).lineWidth(0.6).stroke();
     doc.font('Helvetica').fontSize(8).fillColor(CINZA)
       .text('Assinatura do funcionário', 34, yl + 4, { width: larguraAss, align: 'center' })
       .text('Assinatura do gestor', 34 + larguraAss + 60, yl + 4, { width: larguraAss, align: 'center' });
+    // Canto superior esquerdo do carimbo da assinatura: centrado na linha, logo acima dela.
+    const W = doc.page.width, H = doc.page.height;
+    const LARG = 150, ALT = 38;
+    const campo = (x0: number): CampoAssinaturaPdf => ({
+      pagina: paginas,
+      x: Math.round(((x0 + larguraAss / 2 - LARG / 2) / W) * 1000) / 10,
+      y: Math.round(((yl - ALT) / H) * 1000) / 10,
+    });
+    campos = { funcionario: campo(34), gestor: campo(34 + larguraAss + 60) };
   }
 
   doc.end();
-  return pronto;
+  return { buffer: await pronto, campos };
 }

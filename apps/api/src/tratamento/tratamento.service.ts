@@ -9,7 +9,7 @@ import { foraDoRaio, feriadosNacionais, feriadoValePara, feriadoSemRegiao, local
 import { DB } from '../database/database.module';
 import { apurarJornada } from './apuracao';
 import { apurarPeriodo, valorizarComSalarios, valorizarAcertoBanco, calcularBanco, diaSemana, type EntradaDia, type ResultadoValores, type SalarioVigente, type AcertoBancoValores } from '@ponto/apuracao-clt';
-import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdf, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
+import { gerarRelatorioApuracaoPdf, gerarRelatorioCompetenciaPdf as montarPdfCompetencia, gerarEspelhoPontoPdfComCampos, type CamposEspelho, inicioDoDia, fimDoDia, dataLocalDe, offsetMin, diaDaSemanaLocal, type DiaRelatorio, type LinhaEspelho } from '@ponto/rep-core';
 import { montarRegrasApuracao, jornadaFlexivel, type ItensResolvidos } from './montar-regras';
 import { resolverItens } from './resolver-itens';
 import { ajustesAprovados, aplicarAjustes } from './ajustes';
@@ -1171,7 +1171,7 @@ export class TratamentoService {
   async gerarEspelhoPdf(
     tenantId: string, empregadoId: string, inicioStr: string, fimStr: string,
     assinatura?: { nome: string; cpf: string; em: string; via: string; hashDocumento?: string; referencia?: string } | null,
-  ): Promise<{ buffer: Buffer; nomeArquivo: string }> {
+  ): Promise<{ buffer: Buffer; nomeArquivo: string; campos: CamposEspelho | null }> {
     const c = await this.conteudoEspelho(tenantId, empregadoId, inicioStr, fimStr);
     const emp0 = { nome: c.nome, matricula: c.matricula };
 
@@ -1186,7 +1186,7 @@ export class TratamentoService {
       bancoSaldoAcumulado: this.hhmm(apBanco.saldoAcumuladoMin),
     } : c.totais;
 
-    const buffer = await gerarEspelhoPontoPdf({
+    const { buffer, campos } = await gerarEspelhoPontoPdfComCampos({
       empresa: c.empresa, cnpj: c.cnpj, endereco: c.endereco,
       nome: c.nome, matricula: c.matricula, cpf: c.cpf,
       competenciaInicio: inicioStr, competenciaFim: fimStr, fuso: c.fuso,
@@ -1196,7 +1196,7 @@ export class TratamentoService {
     });
 
     const ref = (emp0.matricula ?? empregadoId).replace(/[^\w-]/g, '');
-    return { buffer, nomeArquivo: `espelho_${ref}_${inicioStr}_a_${fimStr}.pdf` };
+    return { buffer, nomeArquivo: `espelho_${ref}_${inicioStr}_a_${fimStr}.pdf`, campos };
   }
 
   /**

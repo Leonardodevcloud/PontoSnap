@@ -10,7 +10,8 @@ import { CriptoService } from '../common/cripto.service';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { PushService } from '../notificacao/push.service';
 import { textosDoPdf } from '../portal/pdf-texto';
-import { AutentiqueHttp, ErroAutentique, type AutentiqueApi, type SignatarioAutentique } from './autentique.client';
+import { AutentiqueHttp, ErroAutentique, type AutentiqueApi, type NovoDocumento, type SignatarioAutentique } from './autentique.client';
+import { campoAssinaturaDoPdf } from './campo-pdf';
 
 /** Fábrica do cliente da Autentique (os testes trocam por uma falsa). */
 export const AUTENTIQUE_FABRICA = 'AUTENTIQUE_FABRICA';
@@ -101,6 +102,8 @@ export class AssinaturaService {
   private readonly log = new Logger(AssinaturaService.name);
   /** Pausa entre chamadas (a API aceita 60 por minuto). Os testes zeram. */
   pausaMs = 1100;
+  /** Relógio (os testes trocam para simular o mês em andamento / terminado). */
+  agora = () => Date.now();
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -219,7 +222,7 @@ export class AssinaturaService {
     }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     // Espelho sai quando o mês acabou (horário de Brasília). Não espera a Folha:
     // é o ponto para a pessoa conferir e assinar, não o holerite.
-    const hojeBr = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
+    const hojeBr = new Date(this.agora() - 3 * 3600_000).toISOString().slice(0, 7);
     const espelhoPronto = comp < hojeBr;
     // Pronto = tem algo para mandar agora: o espelho (mês terminado) e/ou o contracheque subido.
     // O espelho vai sozinho se o contracheque ainda não chegou.
@@ -375,6 +378,8 @@ export class AssinaturaService {
     const [a, m] = d.competencia.split('-');
     const inicio = `${a}-${m}-01`, fim = ultimoDia(d.competencia);
     const res = { enviados: 0, pulados: 0, erros: [] as { nome: string; tipo: Tipo; erro: string }[] };
+    // Quem assina pela empresa: o dono da conta da Autentique (o e-mail que ela mostrou ao conectar).
+    const empresa = emailValido(integ.contaEmail) ?? null;
     const avisar = new Map<string, string>();
 
     for (const empId of [...new Set(d.empregadoIds)]) {
@@ -389,7 +394,8 @@ export class AssinaturaService {
         try {
           const pdf = await this.trat.gerarEspelhoPdf(tenantId, empId, inicio, fim);
           const doc = await this.gravarEspelho(tenantId, empId, d.competencia, pdf.buffer, pdf.nomeArquivo);
-          await this.mandar(tenantId, api, doc, `Espelho de ponto · ${nomeMes(d.competencia)} · ${l.nome}`, pdf.buffer, sig, integ.sandbox, d, autor);
+          await this.mandar(tenantId, api, doc, `Espelho de ponto · ${nomeMes(d.competencia)} · ${l.nome}`, pdf.buffer, sig, integ.sandbox, d, autor,
+            { campoSignatario: pdf.campos?.funcionario ?? null, empresa: empresa ? { email: empresa, campo: pdf.campos?.gestor ?? null } : null });
           res.enviados++; if (l.temApp) avisar.set(empId, l.nome);
         } catch (e) { res.erros.push({ nome: l.nome, tipo: 'ESPELHO', erro: (e as Error).message }); }
         await this.dormir();
@@ -399,7 +405,10 @@ export class AssinaturaService {
         try {
           const doc = await this.doc(tenantId, l.contracheque.id);
           const bytes = this.cripto.decifrarBytes(doc.arquivo);
-          await this.mandar(tenantId, api, doc, `Contracheque · ${nomeMes(d.competencia)} · ${l.nome}`, bytes, sig, integ.sandbox, d, autor);
+          // Contracheque vem da contabilidade: acha a linha de assinatura no próprio PDF.
+          // A empresa também assina, mas sem campo fixo (o holerite não tem linha para ela).
+          await this.mandar(tenantId, api, doc, `Contracheque · ${nomeMes(d.competencia)} · ${l.nome}`, bytes, sig, integ.sandbox, d, autor,
+            { campoSignatario: await campoAssinaturaDoPdf(bytes), empresa: empresa ? { email: empresa } : null });
           res.enviados++; if (l.temApp) avisar.set(empId, l.nome);
         } catch (e) { res.erros.push({ nome: l.nome, tipo: 'CONTRACHEQUE', erro: (e as Error).message }); }
         await this.dormir();
@@ -431,10 +440,12 @@ export class AssinaturaService {
   }
 
   private async mandar(tenantId: string, api: AutentiqueApi, doc: Doc, nome: string, bytes: Buffer, sig: SignatarioAutentique, sandbox: boolean,
-    o: { mensagem?: string | null; lembrete?: 'DAILY' | 'WEEKLY' | null; prazo?: string | null }, autor: string) {
+    o: { mensagem?: string | null; lembrete?: 'DAILY' | 'WEEKLY' | null; prazo?: string | null }, autor: string,
+    campos?: Pick<NovoDocumento, 'campoSignatario' | 'empresa'>) {
     try {
       const r = await api.criarDocumento({
         nome, mensagem: o.mensagem ?? null, lembrete: sig.canal === 'APP' ? null : o.lembrete ?? null, prazo: o.prazo ?? null, sandbox, signatario: sig,
+        campoSignatario: campos?.campoSignatario ?? null, empresa: campos?.empresa ?? null,
         arquivo: bytes, arquivoNome: `${nome.replace(/[^\w\s.-]+/g, '').replace(/\s+/g, '_').slice(0, 80)}.pdf`,
       });
       await comTenant(this.db, tenantId, (tx) => tx.update(assinaturaDocumento).set({

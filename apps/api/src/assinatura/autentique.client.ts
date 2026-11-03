@@ -13,9 +13,15 @@ export interface SignatarioAutentique {
   /** +55DDDNUMERO */
   telefone?: string | null;
 }
+/** Onde a assinatura aparece no PDF: x/y em % da página (canto superior esquerdo), página a partir de 1. */
+export interface CampoAutentique { pagina: number; x: number; y: number }
 export interface NovoDocumento {
   nome: string; mensagem?: string | null; lembrete?: 'DAILY' | 'WEEKLY' | null; prazo?: string | null;
   sandbox: boolean; signatario: SignatarioAutentique; arquivo: Buffer; arquivoNome: string;
+  /** Onde o funcionário assina no PDF. Sem isso a assinatura só sai na página de certificado. */
+  campoSignatario?: CampoAutentique | null;
+  /** Quem assina pela empresa (o dono da conta na Autentique) e onde. */
+  empresa?: { email: string; campo?: CampoAutentique | null } | null;
 }
 export interface SituacaoAutentique {
   visualizadoEm: string | null; assinadoEm: string | null; recusadoEm: string | null; motivoRecusa: string | null;
@@ -75,16 +81,22 @@ export class AutentiqueHttp implements AutentiqueApi {
     if (s.canal === 'EMAIL' && s.email) signer.email = s.email;
     else if (s.canal === 'WHATSAPP' && s.telefone) { signer.phone = s.telefone; signer.delivery_method = 'DELIVERY_METHOD_WHATSAPP'; }
     else signer.name = s.nome;
+    const pos = (c?: CampoAutentique | null) => c ? [{ x: c.x.toFixed(1), y: c.y.toFixed(1), z: c.pagina, element: 'SIGNATURE' }] : undefined;
+    if (n.campoSignatario) signer.positions = pos(n.campoSignatario);
+    const signers: Record<string, unknown>[] = [signer];
+    if (n.empresa?.email) signers.push({ email: n.empresa.email, action: 'SIGN', ...(n.empresa.campo ? { positions: pos(n.empresa.campo) } : {}) });
     const document: Record<string, unknown> = { name: n.nome, refusable: true };
     if (n.mensagem) document.message = n.mensagem;
     if (n.lembrete) document.reminder = n.lembrete;
     if (n.prazo) document.deadline_at = `${n.prazo}T23:59:59-03:00`;
     const q = `mutation Criar($document: DocumentInput!, $signers: [SignerInput!]!, $file: Upload!) {
       createDocument(sandbox: ${n.sandbox ? 'true' : 'false'}, document: $document, signers: $signers, file: $file) { id signatures { public_id email name action { name } } } }`;
-    const d = await this.gql<{ createDocument: { id: string; signatures: { public_id: string; action: { name: string } | null }[] } }>(
-      q, { document, signers: [signer] }, { dados: n.arquivo, nome: n.arquivoNome });
-    // A primeira assinatura é a do dono da conta só quando ele também assina; aqui pegamos a de ação SIGN.
-    const sig = d.createDocument.signatures.find((x) => (x.action?.name ?? '').toUpperCase() === 'SIGN') ?? d.createDocument.signatures[d.createDocument.signatures.length - 1];
+    const d = await this.gql<{ createDocument: { id: string; signatures: { public_id: string; email: string | null; action: { name: string } | null }[] } }>(
+      q, { document, signers }, { dados: n.arquivo, nome: n.arquivoNome });
+    // A do funcionário: de ação SIGN e que não é a da empresa.
+    const emp = (n.empresa?.email ?? '').toLowerCase();
+    const assinam = d.createDocument.signatures.filter((x) => (x.action?.name ?? '').toUpperCase() === 'SIGN');
+    const sig = assinam.find((x) => !emp || (x.email ?? '').toLowerCase() !== emp) ?? assinam[0] ?? d.createDocument.signatures[d.createDocument.signatures.length - 1];
     return { id: d.createDocument.id, publicId: sig?.public_id ?? null };
   }
 
@@ -94,10 +106,16 @@ export class AutentiqueHttp implements AutentiqueApi {
       signatures: { action: { name: string } | null; viewed: Ev | null; signed: Ev | null; rejected: Ev | null }[];
     } }>(`query { document(id: ${JSON.stringify(id)}) { files { signed } signatures { action { name } viewed { created_at } signed { created_at } rejected { created_at reason } } } }`);
     if (!d.document) return null;
-    const sig = d.document.signatures.find((x) => (x.action?.name ?? '').toUpperCase() === 'SIGN') ?? d.document.signatures[0];
+    // Funcionário e empresa assinam: só conta como assinado quando todos de ação SIGN assinaram.
+    const assinam = d.document.signatures.filter((x) => (x.action?.name ?? '').toUpperCase() === 'SIGN');
+    const todas = assinam.length ? assinam : d.document.signatures.slice(0, 1);
+    const datas = (f: (x: (typeof todas)[number]) => string | null | undefined) => todas.map(f).filter((v): v is string => !!v).sort();
+    const recusa = todas.find((x) => x.rejected?.created_at);
+    const assinadas = datas((x) => x.signed?.created_at);
     return {
-      visualizadoEm: sig?.viewed?.created_at ?? null, assinadoEm: sig?.signed?.created_at ?? null,
-      recusadoEm: sig?.rejected?.created_at ?? null, motivoRecusa: sig?.rejected?.reason ?? null,
+      visualizadoEm: datas((x) => x.viewed?.created_at)[0] ?? null,
+      assinadoEm: assinadas.length === todas.length ? assinadas[assinadas.length - 1]! : null,
+      recusadoEm: recusa?.rejected?.created_at ?? null, motivoRecusa: recusa?.rejected?.reason ?? null,
       arquivoAssinadoUrl: d.document.files?.signed ?? null,
     };
   }
