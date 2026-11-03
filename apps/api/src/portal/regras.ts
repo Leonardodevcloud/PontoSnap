@@ -48,7 +48,7 @@ const plural = (n: number, s: string, p: string) => `${n} ${n === 1 ? s : p}`;
 function linhasDebito(debitos: LinhaDebito[], pessoaId: string): LinhaDetalheNota[] {
   return debitos.filter((d) => d.pessoaId === pessoaId && d.parcelaCent > 0).map((d) => ({
     rotulo: d.tipo === 'FIXO' || d.parcelas <= 1 ? d.descricao : `${d.descricao} (parcela ${d.parcelaAtual}/${d.parcelas})`,
-    valorCent: d.parcelaCent, tipo: 'MENOS' as const,
+    valorCent: d.parcelaCent, tipo: 'MENOS' as const, foraDaNota: true,
   }));
 }
 
@@ -69,9 +69,9 @@ export function detalheMei(m: LinhaMei, debitos: LinhaDebito[], competencia: str
   const somaDebs = debs.reduce((a, d) => a + d.valorCent, 0);
   l.push(...debs);
   const futuros = m.debitosFuturosCent ?? 0;
-  if (futuros > 0) l.push({ rotulo: 'Parcelas restantes de débitos (desligamento)', valorCent: futuros, tipo: 'MENOS' });
-  if (m.debitosCent - somaDebs - futuros > 0) l.push({ rotulo: 'Outros descontos', valorCent: m.debitosCent - somaDebs - futuros, tipo: 'MENOS' });
-  if (m.metaDescontadaCent) l.push({ rotulo: 'Meta já paga antes', valorCent: m.metaDescontadaCent, tipo: 'MENOS' });
+  if (futuros > 0) l.push({ rotulo: 'Parcelas restantes de débitos (desligamento)', valorCent: futuros, tipo: 'MENOS', foraDaNota: true });
+  if (m.debitosCent - somaDebs - futuros > 0) l.push({ rotulo: 'Outros descontos', valorCent: m.debitosCent - somaDebs - futuros, tipo: 'MENOS', foraDaNota: true });
+  if (m.metaDescontadaCent) l.push({ rotulo: 'Meta já paga antes', valorCent: m.metaDescontadaCent, tipo: 'MENOS', foraDaNota: true });
   return fechar(l, m.liquidoCent);
 }
 
@@ -81,11 +81,22 @@ export function detalheSemana(m: LinhaMot, s: SemanaMot): LinhaDetalheNota[] {
     rotulo: `${plural(s.dias, 'dia', 'dias')} × R$ ${reaisBr(m.diariaCent)}`, valorCent: s.totalCent - s.adicionalCent, tipo: 'BASE',
   }];
   if (s.adicionalCent) l.push({ rotulo: 'Adicional da semana', valorCent: s.adicionalCent, tipo: 'MAIS' });
-  if (s.debitoAplicadoCent) l.push({ rotulo: 'Débito descontado nesta semana', valorCent: s.debitoAplicadoCent, tipo: 'MENOS' });
+  if (s.debitoAplicadoCent) l.push({ rotulo: 'Débito descontado nesta semana', valorCent: s.debitoAplicadoCent, tipo: 'MENOS', foraDaNota: true });
   return fechar(l, valorSemana(s));
 }
 
 export const valorSemana = (s: SemanaMot) => s.totalCent - s.debitoAplicadoCent;
+
+/** Linha que sai do pagamento e não da nota (débito, meta já paga). Notas antigas não têm a marca: vale o rótulo. */
+export const foraDaNota = (l: LinhaDetalheNota) => l.tipo === 'MENOS' && (l.foraDaNota ?? !/falta|arredondamento/i.test(l.rotulo));
+
+/**
+ * Valor da NOTA FISCAL (bruto). O `valorCent` da nota é o que o prestador
+ * recebe (líquido): a nota sai pelo bruto e os descontos saem no pagamento.
+ */
+export function valorDaNf(n: { valorCent: number; detalhe: LinhaDetalheNota[] | null | undefined }): number {
+  return n.valorCent + (n.detalhe ?? []).filter(foraDaNota).reduce((a, l) => a + l.valorCent, 0);
+}
 
 function fechar(l: LinhaDetalheNota[], total: number): LinhaDetalheNota[] {
   const soma = l.reduce((a, x) => a + (x.tipo === 'MENOS' ? -x.valorCent : x.valorCent), 0);

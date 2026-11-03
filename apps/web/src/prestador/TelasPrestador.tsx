@@ -28,7 +28,7 @@ function Item({ n, onClick }: { n: Nota; onClick: () => void }) {
         <small>{n.nf.numero ? `NF ${n.nf.numero}` : 'sem nota'}{n.periodo !== 'MES' ? ` · ${n.detalhe[0]?.rotulo.split(' ×')[0] ?? ''}` : ''}</small>
       </span>
       <span className={css.itemDir}>
-        <b>{brl(n.valorCent)}</b>
+        <b title={n.nfCent !== n.valorCent ? `Nota ${brl(n.nfCent)} · você recebe ${brl(n.valorCent)}` : undefined}>{brl(n.nfCent)}</b>
         {/* Tag só quando falta algo do prestador; o resto é texto discreto. */}
         {st.tom === 'er' || st.tom === 'av'
           ? <span className={`${css.tag} ${css[`t-${st.tom}`]}`}>{st.texto}</span>

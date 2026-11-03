@@ -135,7 +135,7 @@ export function ConferirNotas() {
   async function recusar() {
     if (!n) return;
     const m = motivo === 'Outro' ? outro.trim() : motivo === 'Valor diferente' && n.nfValorCent != null
-      ? `Valor diferente: a nota veio com ${brl(n.nfValorCent)} e o valor de ${n.rotulo.toLowerCase()} é ${brl(n.valorCent)}.` : motivo;
+      ? `Valor diferente: a nota veio com ${brl(n.nfValorCent)} e a nota de ${n.rotulo.toLowerCase()} é de ${brl(n.nfCent)}.` : motivo;
     if (!m) { setErro('Escolha o motivo — o prestador vê no app.'); return; }
     setOcupado(true); setErro(null);
     const prox = proximoId();
@@ -217,7 +217,7 @@ export function ConferirNotas() {
                   <table className={css.tabConf}>
                     <thead><tr><th aria-label="Situação" /><th /><th>Na nota</th></tr></thead>
                     <tbody>
-                      <LinhaConf ok={c.valorBate} rot="valor" nota={c.lido?.valorCent != null ? brl(c.lido.valorCent) : '—'} esp={brl(n.valorCent)} />
+                      <LinhaConf ok={c.valorBate} rot="valor" nota={c.lido?.valorCent != null ? brl(c.lido.valorCent) : '—'} esp={brl(n.nfCent)} />
                       {c.lido?.cnpjPrestador && <LinhaConf ok={c.prestadorOk} rot="prestador" nota={fmtCnpj(c.lido.cnpjPrestador)} esp={n.documento ? fmtCnpj(n.documento) : 'sem CNPJ no cadastro'} />}
                       {c.lido?.cnpjTomador && <LinhaConf ok={c.tomadorOk} rot="tomador" nota={fmtCnpj(c.lido.cnpjTomador)} esp={n.tomadorEsperado ? fmtCnpj(n.tomadorEsperado) : '—'} />}
                       {n.pedido?.codigoServico && c.codigoOk !== undefined && <LinhaConf ok={c.codigoOk ?? null} rot="código" nota={c.lido?.codigoServico ?? 'não lido'} esp={n.pedido.codigoServico} />}
@@ -230,7 +230,7 @@ export function ConferirNotas() {
               ) : (
                 <>
                   <Cl ok={c.valorBate} titulo={c.valorBate ? 'Valor bate com o fechamento' : c.valorBate === false ? 'Valor diferente do fechamento' : 'Valor não informado'}
-                    det={`Esperado ${brl(n.valorCent)}${n.nfValorCent != null ? ` · na nota ${brl(n.nfValorCent)}` : ''} (informado pelo prestador)`} />
+                    det={`Esperado ${brl(n.nfCent)}${n.nfValorCent != null ? ` · na nota ${brl(n.nfValorCent)}` : ''} (informado pelo prestador)`} />
                   <Cl ok={c.competenciaOk} titulo="Emitida depois do período" det={n.nf.data ? dataBr(n.nf.data) : undefined} />
                   <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota repetido' : 'Número da nota não repetido'} det={n.nf.numero ? `NF ${n.nf.numero}` : undefined} />
                   {c.arquivo === 'FOTO' && <Cl ok={null} titulo="Foto: confira a olho" />}

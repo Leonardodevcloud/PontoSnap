@@ -4,7 +4,9 @@ import type { FechadoIndividual } from '../tipos';
 export type StatusNota = 'AGUARDANDO' | 'ENVIADA' | 'APROVADA' | 'RECUSADA';
 export type Situacao = 'NAO_LIBERADO' | 'FALTA' | 'CONFERIR' | 'RECUSADA' | 'CONTESTOU' | 'APROVADA' | 'RH';
 
-export interface LinhaDetalhe { rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS' }
+export interface LinhaDetalhe { rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS'; foraDaNota?: boolean }
+/** Desconto que sai do pagamento, não da nota fiscal (débito, meta já paga). Notas antigas não têm a marca: vale o rótulo. */
+export const foraDaNota = (l: LinhaDetalhe) => l.tipo === 'MENOS' && (l.foraDaNota ?? !/falta|arredondamento/i.test(l.rotulo));
 export interface Conferencia {
   arquivo: 'PDF' | 'XML' | 'FOTO'; origem: 'XML' | 'PDF' | 'INFORMADO';
   valorBate: boolean | null; numeroRepetido: boolean; competenciaOk: boolean | null; tomadorOk: boolean | null; prestadorOk: boolean | null;
@@ -16,7 +18,8 @@ export interface Conferencia {
 export interface ArquivoNf { id: string; nome: string; mime: string; bytes: number }
 export interface Nota {
   id: string; pessoaTipo: 'MEI' | 'MOTORISTA'; competencia: string; periodo: string; rotulo: string; fim: string | null;
-  valorCent: number; detalhe: LinhaDetalhe[]; versao: number; liberadoEm: string; prazo: string | null;
+  /** valorCent: o que o prestador recebe (líquido) · nfCent: valor da nota fiscal (bruto). */
+  valorCent: number; nfCent: number; detalhe: LinhaDetalhe[]; versao: number; liberadoEm: string; prazo: string | null;
   pedirConfirmacao: boolean; status: StatusNota; vistoEm: string | null;
   confirmacao: 'CONFERE' | 'CONTESTOU' | null; contestacao: string | null; resposta: string | null; respondidoEm: string | null;
   enviadaEm: string | null; motivoRecusa: string | null; conferidaEm: string | null; conferencia: Conferencia | null; nfValorCent: number | null;
@@ -97,7 +100,7 @@ export function statusParaPrestador(n: Nota): { texto: string; tom: 'ok' | 'av' 
 
 export type StatusAcesso = 'ATIVO' | 'CONVIDADO' | 'SEM' | 'BLOQUEADO' | 'CONVITE_VENCIDO';
 export interface UnidadeRh {
-  periodo: string; rotulo: string; valorCent: number; situacao: Situacao; atrasada: boolean; pago: boolean;
+  periodo: string; rotulo: string; valorCent: number; nfCent?: number | null; situacao: Situacao; atrasada: boolean; pago: boolean;
   valorPagoCent: number | null; pagoEm: string | null; nota: Nota | null;
   nf: { numero: string | null; arquivo: (ArquivoNf & { pessoaId: string; competencia: string; periodo: string }) | null }; tipo: 'MEI' | 'MOTORISTA';
 }

@@ -50,8 +50,8 @@ function itensConferencia(c: Conferencia, nota: Nota, eu: Eu): ItemConf[] {
   const l = c.lido ?? {};
   const r: ItemConf[] = [];
   if (c.valorBate !== null) r.push(c.valorBate
-    ? { ok: true, titulo: 'Valor igual ao fechamento', detalhe: brl(nota.valorCent) }
-    : { ok: false, titulo: 'Valor diferente do fechamento', detalhe: `na nota ${l.valorCent != null ? brl(l.valorCent) : '—'} · esperado ${brl(nota.valorCent)}` });
+    ? { ok: true, titulo: 'Valor igual ao fechamento', detalhe: brl(nota.nfCent) }
+    : { ok: false, titulo: 'Valor diferente do fechamento', detalhe: `na nota ${l.valorCent != null ? brl(l.valorCent) : '—'} · esperado ${brl(nota.nfCent)}` });
   if (l.cnpjPrestador) r.push(c.prestadorOk === false
     ? { ok: false, titulo: 'Emitida em outro CNPJ', detalhe: `na nota ${fmtCnpj(l.cnpjPrestador)}${eu.prestador.documento ? ` · o seu ${fmtCnpj(eu.prestador.documento)}` : ''}` }
     : { ok: c.prestadorOk, titulo: 'Emitida no seu CNPJ', detalhe: fmtCnpj(l.cnpjPrestador) });
@@ -98,7 +98,7 @@ export function EnviarNota() {
   const [feito, setFeito] = useState<(Nota & { conferencia: Conferencia }) | null>(null);
   const [verConferidos, setVerConferidos] = useState(false);
 
-  useEffect(() => { if (nota && !valor) setValor(reais(nota.valorCent)); }, [nota?.id]);
+  useEffect(() => { if (nota && !valor) setValor(reais(nota.nfCent)); }, [nota?.id]);
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
   if (!eu) return <div className={css.tela}><div className={css.esqueleto} aria-busy="true" /></div>;
@@ -123,7 +123,7 @@ export function EnviarNota() {
     e.target.value = '';
     if (!f) return;
     setErro(null); setLeitura(null); setNumero(''); setData(hoje());
-    if (nota) setValor(reais(nota.valorCent));
+    if (nota) setValor(reais(nota.nfCent));
     try {
       const ehXml = /xml/.test(f.type) || /\.xml$/i.test(f.name);
       if (ehXml) {
@@ -146,7 +146,7 @@ export function EnviarNota() {
   }
 
   const valorCent = Math.round(lerReais(valor) * 100);
-  const valorDifere = valor.trim() !== '' && valorCent !== nota.valorCent;
+  const valorDifere = valor.trim() !== '' && valorCent !== nota.nfCent;
   const conf = leitura?.conferencia ?? null;
   const itensConf = conf ? itensConferencia(conf, nota, eu) : [];
   const problemas = itensConf.filter((i) => i.ok === false && !i.aviso);
@@ -173,12 +173,12 @@ export function EnviarNota() {
     return (
       <div className={css.tela}>
         <h1 className={css.h}>Nota enviada ✓</h1>
-        <p className={css.s}>{nota.rotulo} · {brl(nota.valorCent)}</p>
+        <p className={css.s}>{nota.rotulo} · {brl(nota.nfCent)}</p>
         <section className={css.card}>
           <h3>Conferência automática</h3>
           <div className={css.chk}>
             <Cl ok={c.valorBate} titulo={c.valorBate ? 'Valor bate com o fechamento' : c.valorBate === false ? 'Valor diferente do fechamento' : 'Valor não verificado'}
-              detalhe={feito.nfValorCent != null ? `Esperado ${brl(nota.valorCent)} · na nota ${brl(feito.nfValorCent)}` : undefined} />
+              detalhe={feito.nfValorCent != null ? `Esperado ${brl(nota.nfCent)} · na nota ${brl(feito.nfValorCent)}` : undefined} />
             <Cl ok={!c.numeroRepetido} titulo={c.numeroRepetido ? 'Número de nota já usado antes' : 'Número da nota não repetido'} />
             <Cl ok={c.competenciaOk} titulo={c.competenciaOk === false ? 'Data de emissão antes do período' : 'Data de emissão'} />
             {c.origem !== 'INFORMADO' && c.lido?.cnpjTomador && <Cl ok={c.tomadorOk} titulo={c.tomadorOk === false ? 'Tomador diferente' : 'Tomador certo'} detalhe={c.lido?.cnpjTomador ? fmtCnpj(c.lido.cnpjTomador) : undefined} />}
@@ -190,7 +190,7 @@ export function EnviarNota() {
         <section className={css.card}>
           <h3>Depois de enviar</h3>
           <div className={css.tl}>
-            <div className={`${css.tli} ${css.feito}`}><i>✓</i><div><b>{nota.periodo === 'MES' ? 'Mês fechado' : 'Semana fechada'}</b><small>{dataIsoBr(nota.liberadoEm)} · {brl(nota.valorCent)}</small></div></div>
+            <div className={`${css.tli} ${css.feito}`}><i>✓</i><div><b>{nota.periodo === 'MES' ? 'Mês fechado' : 'Semana fechada'}</b><small>{dataIsoBr(nota.liberadoEm)} · {brl(nota.nfCent)}</small></div></div>
             <div className={`${css.tli} ${css.feito}`}><i>✓</i><div><b>Nota enviada</b><small>agora · o RH confere</small></div></div>
             <div className={`${css.tli} ${css.agora}`}><i>3</i><div><b>Nota aprovada</b><small>você recebe aviso no celular</small></div></div>
             <div className={css.tli}><i>4</i><div><b>Pagamento</b><small>{eu.prestador.chavePix ? `Pix na chave ${eu.prestador.chavePix}` : 'o RH registra quando pagar'}</small></div></div>
@@ -205,7 +205,7 @@ export function EnviarNota() {
     <div className={css.tela}>
       <button type="button" className={css.voltar} onClick={() => navegar(-1)}>‹ Voltar</button>
       <h1 className={css.h}>Enviar nota · {nota.periodo === 'MES' ? nota.rotulo.split('/')[0]!.toLowerCase() : nota.rotulo.replace('Semana ', 'semana ')}</h1>
-      <p className={css.s}>Valor da nota: <b>{brl(nota.valorCent)}</b>{nota.prazo ? ` · prazo ${dataBr(nota.prazo)}` : ''}</p>
+      <p className={css.s}>Valor da nota: <b>{brl(nota.nfCent)}</b>{nota.prazo ? ` · prazo ${dataBr(nota.prazo)}` : ''}</p>
 
       {!arq ? (
         <div className={css.up}>
@@ -220,7 +220,7 @@ export function EnviarNota() {
         <div className={css.arq}>
           <span className={css.arqIc}>{previa ? <img src={previa} alt="" /> : arq.mime.includes('xml') ? 'XML' : 'PDF'}</span>
           <div><b>{arq.nome}</b><small>{kb(arq.bytes)}</small></div>
-          <button type="button" onClick={() => { setArq(null); setLeitura(null); setPrevia(null); setNumero(''); setData(hoje()); setValor(reais(nota.valorCent)); }}>trocar</button>
+          <button type="button" onClick={() => { setArq(null); setLeitura(null); setPrevia(null); setNumero(''); setData(hoje()); setValor(reais(nota.nfCent)); }}>trocar</button>
         </div>
       )}
 
@@ -279,7 +279,7 @@ export function EnviarNota() {
           <div className={css.campo}>
             <label htmlFor="nf-valor">Valor da nota (R$){valorDoArq && <em className={css.doArq}>{fonte}</em>}</label>
             <input id="nf-valor" inputMode="decimal" className={valorDoArq ? css.auto : undefined} value={valor} onChange={(e) => setValor(e.target.value)} aria-describedby="nf-valor-ajuda" />
-            <small id="nf-valor-ajuda">{valorDifere ? `⚠ Diferente do fechamento (${brl(nota.valorCent)}). O RH pode pedir outra nota.` : 'Igual ao valor do fechamento.'}</small>
+            <small id="nf-valor-ajuda">{valorDifere ? `⚠ Diferente do fechamento (${brl(nota.nfCent)}). O RH pode pedir outra nota.` : 'Igual ao valor do fechamento.'}</small>
           </div>
         </>
       )}

@@ -280,7 +280,7 @@ export function Prestadores() {
               <tr>
                 <th style={{ width: 36 }}><input type="checkbox" className={css.chk} aria-label="Selecionar todos" checked={todasMarcadas}
                   onChange={() => setSel(todasMarcadas ? new Set() : new Set(linhas.map((l) => l.id)))} /></th>
-                <th>Prestador</th><th className={css.r}>Valor da nota</th><th>Nota</th><th>App</th><th>Pagamento</th><th />
+                <th>Prestador</th><th className={css.r} title="O que o prestador recebe (já com débitos e meta paga descontados). A nota fiscal sai pelo bruto.">A pagar</th><th>Nota</th><th>App</th><th>Pagamento</th><th />
               </tr>
             </thead>
             <tbody>
@@ -439,7 +439,8 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
           return (
             <div key={u.periodo} className={css.unid}>
               <div className={css.unidTopo}><b>{u.rotulo}</b><TagSituacao s={u.situacao} atrasada={u.atrasada} /></div>
-              <div className={css.lin}><span>Valor</span><span className={css.mono}>{brl(u.valorCent)}{n && n.versao > 1 ? ` · versão ${n.versao}` : ''}</span></div>
+              {u.nfCent != null && u.nfCent !== u.valorCent && <div className={css.lin}><span>Valor da nota</span><span className={css.mono}>{brl(u.nfCent)}</span></div>}
+              <div className={css.lin}><span>{u.nfCent != null && u.nfCent !== u.valorCent ? 'A pagar' : 'Valor'}</span><span className={css.mono}>{brl(u.valorCent)}{n && n.versao > 1 ? ` · versão ${n.versao}` : ''}</span></div>
               {n?.prazo && <div className={css.lin}><span>Prazo</span><span>{dataBr(n.prazo)}</span></div>}
               {n && <div className={css.lin}><span>Liberado</span><span>{dataIsoBr(n.liberadoEm)}{n.vistoEm ? ` · viu ${haQuanto(n.vistoEm)}` : ' · não abriu'}</span></div>}
               {u.nf.numero && <div className={css.lin}><span>NF</span><span className={css.mono}>{u.nf.numero}{n?.nf.data ? ` · ${dataBr(n.nf.data)}` : ''}</span></div>}
@@ -546,7 +547,7 @@ function ResumoPessoa({ l, d }: { l: LinhaRh; d: PainelRh }) {
   return (
     <div className={css.bloco}>
       <h4>{d.rotulo}</h4>
-      <div className={css.lin}><span>{l.tipo === 'MEI' ? 'Valor da nota' : 'Total das semanas'}</span><span className={css.mono}><b>{brl(l.valorCent)}</b></span></div>
+      <div className={css.lin}><span>{l.tipo === 'MEI' ? 'A pagar' : 'Total das semanas'}</span><span className={css.mono}><b>{brl(l.valorCent)}</b></span></div>
       {l.pagoCent > 0 && <div className={css.lin}><span>Pago</span><span className={css.mono}>{brl(l.pagoCent)}</span></div>}
       {fi && <p className={css.infoFech}>{fi.motivo === 'DESLIGAMENTO'
         ? `Desligamento: valores congelados até ${dataBr(fi.ultimoDia ?? '')}${fi.proporcional ? ' (contrato proporcional)' : ''}${fi.debitosFuturosCent ? `, com ${brl(fi.debitosFuturosCent)} de parcelas futuras de débito` : ''}. Fechado por ${fi.por ?? 'RH'} em ${dataIsoBr(fi.em)}.`

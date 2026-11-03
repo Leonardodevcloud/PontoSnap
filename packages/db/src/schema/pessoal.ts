@@ -219,7 +219,11 @@ export const prestadorConvite = pgTable('prestador_convite', {
 });
 
 /** Linha do "como chegou nesse valor" que o prestador vê. */
-export interface LinhaDetalheNota { rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS' }
+export interface LinhaDetalheNota {
+  rotulo: string; valorCent: number; tipo?: 'BASE' | 'MAIS' | 'MENOS';
+  /** Desconto que sai do pagamento, não da nota fiscal (débito, meta já paga). */
+  foraDaNota?: boolean;
+}
 /** O que foi pedido na nota (mesmo formato de InstrucoesNota em @ponto/shared). */
 export interface InstrucoesNota {
   modeloId: string | null; modeloNome: string | null;

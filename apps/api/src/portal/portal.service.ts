@@ -16,7 +16,7 @@ import { hashSenha } from '../auth/senha';
 import { centavos } from '../pessoal/calculo';
 import {
   conferir, dataBr, detalheMei, detalheSemana, diaMes, fimDaSemana, gerarCodigo, lerNfseXml, linkWhatsapp, maisUrgente, mascararPix,
-  mensagemConvite, emailLogin, reaisBr, rotuloMes, rotuloPeriodo, situacaoDe, valorSemana, type Situacao, type StatusNota,
+  mensagemConvite, emailLogin, reaisBr, rotuloMes, rotuloPeriodo, situacaoDe, valorDaNf, valorSemana, type Situacao, type StatusNota,
 } from './regras';
 import { lerNfseDoPdf } from './pdf-texto';
 import { ModeloNotaService, instrucoesDe, modeloDe } from './modelo-nota.service';
@@ -125,7 +125,8 @@ export class PortalService {
     // Sem pedido congelado: só as notas ainda não enviadas usam o modelo de agora
     // (nota enviada antes de existir o modelo não ganha um pedido retroativo).
     const faltam = notas.filter((n) => !n.instrucoes && (n.status === 'AGUARDANDO' || n.status === 'RECUSADA'));
-    for (const n of notas) if (n.instrucoes) out.set(n.id, n.instrucoes);
+    // Pedido congelado de antes guardava o líquido: o valor da nota é sempre o bruto.
+    for (const n of notas) if (n.instrucoes) out.set(n.id, { ...n.instrucoes, valorCent: valorDaNf(n) });
     if (!faltam.length) return out;
     const ids = [...new Set(faltam.map((n) => n.pessoaId))];
     const pessoas = await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), inArray(pessoalPrestador.id, ids)));
@@ -135,7 +136,7 @@ export class PortalService {
       const p = pessoas.find((x) => x.id === n.pessoaId);
       const m = p ? modeloDe(p, modelos) : null;
       const dias = lancs.find((l) => l.pessoaId === n.pessoaId && l.competencia === n.competencia && l.periodo === n.periodo)?.diasDatas;
-      out.set(n.id, p && m ? instrucoesDe(m, p, n, dias) : null);
+      out.set(n.id, p && m ? instrucoesDe(m, p, { ...n, valorCent: valorDaNf(n) }, dias) : null);
     }
     return out;
   }
@@ -149,7 +150,8 @@ export class PortalService {
     return {
       id: n.id, pessoaTipo: n.pessoaTipo, competencia: n.competencia, periodo: n.periodo,
       rotulo: rotuloPeriodo(n.competencia, n.periodo), fim: n.periodo === 'MES' ? null : fimDaSemana(n.periodo),
-      valorCent: n.valorCent, detalhe: n.detalhe, versao: n.versao, liberadoEm: n.liberadoEm.toISOString(), prazo: n.prazo,
+      // valorCent = o que o prestador recebe; nfCent = o valor da nota fiscal (bruto).
+      valorCent: n.valorCent, nfCent: valorDaNf(n), detalhe: n.detalhe, versao: n.versao, liberadoEm: n.liberadoEm.toISOString(), prazo: n.prazo,
       pedirConfirmacao: n.pedirConfirmacao, status: n.status as StatusNota, vistoEm: n.vistoEm?.toISOString() ?? null,
       confirmacao: n.confirmacao, contestacao: n.contestacao, resposta: n.resposta, respondidoEm: n.respondidoEm?.toISOString() ?? null,
       enviadaEm: n.enviadaEm?.toISOString() ?? null, motivoRecusa: n.motivoRecusa, conferidaEm: n.conferidaEm?.toISOString() ?? null,
@@ -355,7 +357,7 @@ export class PortalService {
       .from(pessoalLancamento).where(and(eq(pessoalLancamento.tenantId, tenantId), eq(pessoalLancamento.pessoaId, p.id))))
       .filter((x) => x.nf && !(x.comp === n.competencia && x.per === n.periodo)).map((x) => x.nf!));
     return conferir({
-      mime: e.mime, esperadoCent: n.valorCent, competencia: n.competencia, periodo: n.periodo,
+      mime: e.mime, esperadoCent: valorDaNf(n), competencia: n.competencia, periodo: n.periodo,
       informado: e.informado, lido: e.lido, fonte: e.fonte,
       documentoPrestador: p.documento, cnpjTomador: pedido?.tomador.cnpj ?? (this.tomadorDe(p, emp).cnpj || null), numerosAnteriores: outras,
       codigoServico: pedido?.codigoServico ?? null, descricao: pedido?.descricao ?? null,
@@ -448,7 +450,7 @@ export class PortalService {
       const lancsP = await this.lancamentosDe(tx, tenantId, idsP, d.competencia);
       const pedidoDe = (i: Item): InstrucoesNota | null => {
         const p = pessoasP.find((x) => x.id === i.pessoaId); const m = p ? modeloDe(p, modelosP) : null;
-        return p && m ? instrucoesDe(m, p, { competencia: d.competencia, periodo: i.periodo, valorCent: i.valorCent }, lancsP.find((l) => l.pessoaId === i.pessoaId && l.periodo === i.periodo)?.diasDatas) : null;
+        return p && m ? instrucoesDe(m, p, { competencia: d.competencia, periodo: i.periodo, valorCent: valorDaNf(i) }, lancsP.find((l) => l.pessoaId === i.pessoaId && l.periodo === i.periodo)?.diasDatas) : null;
       };
       const avisos: { usuarioId?: string; titulo: string; corpo: string; tag: string }[] = [];
       let novas = 0, alteradas = 0, iguais = 0;
@@ -462,18 +464,18 @@ export class PortalService {
             valorCent: i.valorCent, detalhe: i.detalhe, prazo, pedirConfirmacao: !!d.pedirConfirmacao, instrucoes: pedidoDe(i),
           }).returning();
           novas++;
-          avisos.push({ usuarioId: contas.get(i.pessoaId), titulo: `${i.periodo === 'MES' ? `${rotulo} fechado` : `${rotulo} fechada`}: R$ ${reaisBr(i.valorCent)}`,
-            corpo: corpoPrazo, tag: `nota-liberada-${r!.id}-v1` });
-        } else if (atual.valorCent !== i.valorCent) {
+          avisos.push({ usuarioId: contas.get(i.pessoaId), titulo: `${i.periodo === 'MES' ? `${rotulo} fechado` : `${rotulo} fechada`}: nota de R$ ${reaisBr(valorDaNf(i))}`,
+            corpo: `${valorDaNf(i) !== i.valorCent ? `Você recebe R$ ${reaisBr(i.valorCent)}. ` : ''}${corpoPrazo}`, tag: `nota-liberada-${r!.id}-v1` });
+        } else if (atual.valorCent !== i.valorCent || valorDaNf(atual) !== valorDaNf(i)) {
           const jaEnviada = atual.status === 'ENVIADA' || atual.status === 'APROVADA';
           await tx.update(pessoalNota).set({
             valorCent: i.valorCent, detalhe: i.detalhe, versao: atual.versao + 1, prazo, pedirConfirmacao: !!d.pedirConfirmacao, instrucoes: pedidoDe(i),
             liberadoEm: new Date(), confirmacao: null, confirmadoEm: null, contestacao: null, resposta: null, respondidoEm: null,
-            ...(jaEnviada ? { status: 'RECUSADA', motivoRecusa: `O valor foi corrigido de R$ ${reaisBr(atual.valorCent)} para R$ ${reaisBr(i.valorCent)}. Envie uma nota com o novo valor.`, conferidaEm: new Date(), conferidaPor: 'RH' } : {}),
+            ...(jaEnviada ? { status: 'RECUSADA', motivoRecusa: `O valor da nota foi corrigido de R$ ${reaisBr(valorDaNf(atual))} para R$ ${reaisBr(valorDaNf(i))}. Envie uma nota com o novo valor.`, conferidaEm: new Date(), conferidaPor: 'RH' } : {}),
           }).where(eq(pessoalNota.id, atual.id));
           alteradas++;
           avisos.push({ usuarioId: contas.get(i.pessoaId), titulo: `${rotulo}: o valor mudou`,
-            corpo: `Novo valor: R$ ${reaisBr(i.valorCent)}. ${jaEnviada ? 'Envie uma nota com o novo valor.' : corpoPrazo}`, tag: `nota-liberada-${atual.id}-v${atual.versao + 1}` });
+            corpo: `Nota de R$ ${reaisBr(valorDaNf(i))}${valorDaNf(i) !== i.valorCent ? ` · você recebe R$ ${reaisBr(i.valorCent)}` : ''}. ${jaEnviada ? 'Envie uma nota com o novo valor.' : corpoPrazo}`, tag: `nota-liberada-${atual.id}-v${atual.versao + 1}` });
         } else {
           // Mesmo valor: o pedido acompanha o modelo de agora enquanto a nota não foi enviada.
           const aindaNaoEnviou = atual.status === 'AGUARDANDO' || atual.status === 'RECUSADA';
@@ -534,7 +536,7 @@ export class PortalService {
       const pago = !!lanc?.pago;
       const atrasada = !!n?.prazo && n.prazo < hoje && (sit === 'FALTA' || sit === 'RECUSADA');
       return {
-        periodo, rotulo: rotuloPeriodo(competencia, periodo), valorCent: n?.valorCent ?? valorCent, situacao: sit, atrasada, pago,
+        periodo, rotulo: rotuloPeriodo(competencia, periodo), valorCent: n?.valorCent ?? valorCent, nfCent: n ? valorDaNf(n) : null, situacao: sit, atrasada, pago,
         valorPagoCent: pago && lanc?.valorPago != null ? centavos(lanc.valorPago) : null, pagoEm: pago ? lanc?.pagoEm?.toISOString() ?? null : null,
         nota: n ? this.visao(n, { lanc, arquivo: arq ?? null }) : null,
         nf: { numero: lanc?.nfNumero ?? null, arquivo: arq ?? null },
@@ -640,7 +642,7 @@ export class PortalService {
     });
     for (const n of r.ns) {
       await this.avisar(tenantId, r.contas.get(n.pessoaId), {
-        titulo: `Nota aprovada · ${rotuloPeriodo(n.competencia, n.periodo)}`, corpo: `O RH aprovou sua nota de R$ ${reaisBr(n.valorCent)}. Agora é só aguardar o pagamento.`,
+        titulo: `Nota aprovada · ${rotuloPeriodo(n.competencia, n.periodo)}`, corpo: `O RH aprovou sua nota de R$ ${reaisBr(valorDaNf(n))}. Agora é só aguardar o pagamento de R$ ${reaisBr(n.valorCent)}.`,
         url: '/', tag: `nota-aprovada-${n.id}-v${n.versao}`,
       });
     }
@@ -701,8 +703,8 @@ export class PortalService {
   private textoLembrete(n: Nota, tag: string) {
     const rot = rotuloPeriodo(n.competencia, n.periodo);
     return n.status === 'RECUSADA'
-      ? { titulo: `Falta a nota corrigida · ${rot}`, corpo: `O RH pediu outra nota de R$ ${reaisBr(n.valorCent)}. Envie pelo app.`, url: '/', tag }
-      : { titulo: `Sua nota de R$ ${reaisBr(n.valorCent)}`, corpo: `${rot}: ${n.prazo ? `o prazo é ${diaMes(n.prazo)}. ` : ''}Emita e envie pelo app.`, url: '/', tag };
+      ? { titulo: `Falta a nota corrigida · ${rot}`, corpo: `O RH pediu outra nota de R$ ${reaisBr(valorDaNf(n))}. Envie pelo app.`, url: '/', tag }
+      : { titulo: `Sua nota de R$ ${reaisBr(valorDaNf(n))}`, corpo: `${rot}: ${n.prazo ? `o prazo é ${diaMes(n.prazo)}. ` : ''}Emita e envie pelo app.`, url: '/', tag };
   }
 
   /** Marca como pago (valor = o liberado) e avisa o prestador. */

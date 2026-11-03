@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { brl, dataBr, dataIsoBr, diaMes, fmtCnpj, passoDe, reais, type Eu, type Nota } from '../lib/prestador';
+import { brl, dataBr, dataIsoBr, diaMes, fmtCnpj, foraDaNota, passoDe, reais, type Eu, type LinhaDetalhe, type Nota } from '../lib/prestador';
 import { Explica } from '../components/Explica';
 import css from './Prestador.module.css';
 
@@ -31,6 +31,17 @@ function Copiar({ rotulo, valor, mostrar }: { rotulo: string; valor: string; mos
   );
 }
 
+function LinhaValor({ l }: { l: LinhaDetalhe }) {
+  return (
+    <div className={css.lin}>
+      <span>{l.rotulo}</span>
+      <span className={`${css.mono} ${l.tipo === 'MENOS' ? css.neg : ''}`}>
+        {l.tipo === 'MENOS' ? '− ' : l.tipo === 'MAIS' ? '+ ' : ''}{brl(l.valorCent)}
+      </span>
+    </div>
+  );
+}
+
 /**
  * O valor de um período (mês do MEI ou semana do motorista): passos, ação
  * principal, confirmação do valor, como chegou no valor e dados para emitir.
@@ -48,6 +59,10 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
   const [erro, setErro] = useState<string | null>(null);
   const [verDetalhe, setVerDetalhe] = useState(true);
   const mes = nota.periodo === 'MES';
+  // A nota sai pelo bruto; débitos e meta já paga saem só do pagamento.
+  const daNota = nota.detalhe.filter((l) => !foraDaNota(l));
+  const descontos = nota.detalhe.filter(foraDaNota);
+  const temDesconto = nota.nfCent !== nota.valorCent;
 
   async function confirmar(confere: boolean) {
     setSalvando(true); setErro(null);
@@ -72,13 +87,19 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
         </div>
       )}
 
-      <section className={css.hero} aria-label={`${nota.rotulo}: ${brl(nota.valorCent)}`}>
+      <section className={css.hero} aria-label={`${nota.rotulo}: nota de ${brl(nota.nfCent)}${temDesconto ? `, você recebe ${brl(nota.valorCent)}` : ''}`}>
         <small>{nota.rotulo} · {mes ? 'fechado' : 'fechada'}</small>
-        <span className={css.valor}>{brl(nota.valorCent)}</span>
+        <span className={css.valor}>{brl(nota.nfCent)}</span>
         <div className={css.heroLin}>
-          <span>Valor da sua nota</span>
+          <span>Valor para emitir a nota</span>
           {nota.prazo && !nota.pago && nota.status !== 'APROVADA' && <span>prazo {diaMes(nota.prazo)}</span>}
         </div>
+        {temDesconto && (
+          <div className={css.heroRecebe}>
+            <span>Você recebe</span><b>{brl(nota.valorCent)}</b>
+            <small>{brl(nota.nfCent - nota.valorCent)} de descontos saem no pagamento, não na nota</small>
+          </div>
+        )}
         <div className={css.passos} aria-hidden="true">
           {passos.map((_, i) => <i key={i} className={i < passo ? css.feito : i === 1 && recusada ? css.passoErro : ''} />)}
         </div>
@@ -121,15 +142,12 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
 
       <section className={css.card}>
         <h3>Como chegou nesse valor</h3>
-        {verDetalhe && nota.detalhe.map((l, i) => (
-          <div key={i} className={css.lin}>
-            <span>{l.rotulo}</span>
-            <span className={`${css.mono} ${l.tipo === 'MENOS' ? css.neg : ''}`}>
-              {l.tipo === 'MENOS' ? '− ' : l.tipo === 'MAIS' ? '+ ' : ''}{brl(l.valorCent)}
-            </span>
-          </div>
-        ))}
-        <div className={css.total}><span>Valor da nota</span><span className={css.mono}>{brl(nota.valorCent)}</span></div>
+        {verDetalhe && daNota.map((l, i) => <LinhaValor key={i} l={l} />)}
+        <div className={css.total}><span>Valor da nota fiscal</span><span className={css.mono}>{brl(nota.nfCent)}</span></div>
+        {temDesconto && <>
+          {verDetalhe && descontos.map((l, i) => <LinhaValor key={`d${i}`} l={l} />)}
+          <div className={css.total}><span>Você recebe</span><span className={css.mono}>{brl(nota.valorCent)}</span></div>
+        </>}
         <div className={css.linksCard}>
           {nota.detalhe.length > 4 && (
             <button type="button" className={css.linkTexto} onClick={() => setVerDetalhe((v) => !v)} aria-expanded={verDetalhe}>{verDetalhe ? 'Esconder detalhes' : 'Ver detalhes'}</button>
@@ -146,7 +164,7 @@ export function PainelNota({ eu, nota, onMudou }: { eu: Eu; nota: Nota; onMudou:
           <Copiar rotulo="Tomador" valor={eu.tomador.nome} />
           {eu.tomador.cnpj && <Copiar rotulo="CNPJ do tomador" valor={eu.tomador.cnpj} mostrar={fmtCnpj(eu.tomador.cnpj)} />}
           {nota.descricao && <Copiar rotulo="Descrição do serviço" valor={nota.descricao} />}
-          <Copiar rotulo="Valor" valor={reais(nota.valorCent)} />
+          <Copiar rotulo="Valor da nota" valor={reais(nota.nfCent)} />
           <a className={css.emissor} href={eu.emissorUrl} target="_blank" rel="noopener noreferrer">Abrir o emissor de NFS-e ↗</a>
         </section>
       )}
@@ -179,7 +197,7 @@ function DadosPedido({ nota, emissorUrl }: { nota: Nota; emissorUrl: string }) {
       {p.tomador.telefone && <Copiar rotulo="Telefone" valor={p.tomador.telefone} />}
       {p.tomador.email && <Copiar rotulo="E-mail" valor={p.tomador.email} />}
       {p.codigoServico && <Copiar rotulo="Código do serviço" valor={p.codigoServico} mostrar={`${p.codigoServico}${p.codigoDescricao ? ` — ${p.codigoDescricao}` : ''}`} />}
-      <Copiar rotulo="Valor" valor={reais(nota.valorCent)} mostrar={brl(nota.valorCent)} />
+      <Copiar rotulo="Valor da nota" valor={reais(nota.nfCent)} mostrar={brl(nota.nfCent)} />
       <Copiar rotulo="Descrição" valor={p.descricao} />
       {p.observacao && <p className={css.obsPedido}>{p.observacao}</p>}
       {nota.textoPedido && (

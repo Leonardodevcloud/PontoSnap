@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  conferir, detalheMei, detalheSemana, fimDaSemana, gerarCodigo, lerNfseXml, linkWhatsapp, maisUrgente, mascararPix, mensagemConvite, rotuloPeriodo, situacaoDe,
+  conferir, detalheMei, detalheSemana, fimDaSemana, gerarCodigo, lerNfseXml, linkWhatsapp, maisUrgente, mascararPix, mensagemConvite, rotuloPeriodo, situacaoDe, valorDaNf,
 } from '../src/portal/regras';
 import type { LinhaMei, LinhaMot, SemanaMot, LinhaDebito } from '../src/pessoal/pessoal.service';
 
@@ -115,5 +115,27 @@ describe('convite', () => {
   it('Pix mascarado', () => {
     expect(mascararPix('joao@gmail.com')).toBe('j•••@gmail.com');
     expect(mascararPix('12345678900')).toBe('•••8900');
+  });
+});
+
+describe('valorDaNf: a nota sai pelo bruto, os descontos saem do pagamento', () => {
+  it('soma de volta débitos e meta já paga (marcados), mas não faltas', () => {
+    const detalhe = [
+      { rotulo: 'Contrato mensal', valorCent: 475400, tipo: 'BASE' as const },
+      { rotulo: 'Horas extras (15h)', valorCent: 53483, tipo: 'MAIS' as const },
+      { rotulo: 'Meta de outubro', valorCent: 50000, tipo: 'MAIS' as const },
+      { rotulo: '1 falta', valorCent: 18000, tipo: 'MENOS' as const },
+      { rotulo: 'Celular (parcela 10/10)', valorCent: 56231, tipo: 'MENOS' as const, foraDaNota: true },
+      { rotulo: 'Meta já paga antes', valorCent: 50000, tipo: 'MENOS' as const, foraDaNota: true },
+    ];
+    expect(valorDaNf({ valorCent: 475400 + 53483 + 50000 - 18000 - 56231 - 50000, detalhe })).toBe(475400 + 53483 + 50000 - 18000);
+  });
+  it('nota antiga sem a marca: reconhece pelo rótulo', () => {
+    const detalhe = [
+      { rotulo: 'Contrato mensal', valorCent: 475400, tipo: 'BASE' as const },
+      { rotulo: 'Celular (parcela 10/10)', valorCent: 56231, tipo: 'MENOS' as const },
+      { rotulo: '2 faltas', valorCent: 30000, tipo: 'MENOS' as const },
+    ];
+    expect(valorDaNf({ valorCent: 475400 - 56231 - 30000, detalhe })).toBe(475400 - 30000);
   });
 });
