@@ -52,6 +52,22 @@ export interface Eu {
   empresa: string; tomador: { nome: string; cnpj: string }; emissorUrl: string; notas: Nota[];
 }
 
+/** Previsão do mês no app do prestador (GET /portal/eu/previsao). */
+export interface SemanaPrevisao {
+  inicio: string; fim: string; dias: number; diasAuto: number; adicionalCent: number;
+  nfCent: number; debitoCent: number; recebeCent: number;
+  diasNoMes: string[]; feriados: string[]; diasDatas: string[] | null; pago: boolean;
+  nota: { id: string; status: StatusNota } | null;
+}
+interface PrevisaoBase {
+  competencia: string; rotulo: string; meses: string[]; hoje: string; fechado: boolean;
+  debitos: { descricao: string; valorCent: number }[];
+}
+export type Previsao =
+  | (PrevisaoBase & { tipo: 'MEI' | 'MOTORISTA'; noMes: false })
+  | (PrevisaoBase & { tipo: 'MEI'; noMes: true; baseDias: 'SEG_SAB' | 'SEG_SEX'; diasMes: number; valorDiaCent: number; nfCent: number; recebeCent: number; contratoCent: number; nota: { id: string; status: StatusNota } | null; fechadoIndividual: boolean })
+  | (PrevisaoBase & { tipo: 'MOTORISTA'; noMes: true; baseDias: 'SEG_SAB' | 'SEG_SEX'; diariaCent: number; nfCent: number; debitosCent: number; recebeCent: number; debitoPendenteCent: number; semanas: SemanaPrevisao[] });
+
 export const reais = (c: number) => (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const brl = (c: number) => `R$ ${reais(c)}`;
 export const diaMes = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;

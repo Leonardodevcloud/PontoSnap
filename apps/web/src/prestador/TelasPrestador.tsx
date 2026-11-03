@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { pushSuportado, temSubscriptionAtiva, ativarNotificacoes, desativarNotificacoes } from '../lib/push';
@@ -8,6 +8,7 @@ import { Caricatura, hash } from '../components/Avatar';
 import { BotaoTema } from '../components/BotaoTema';
 import { Explica } from '../components/Explica';
 import { PainelNota } from './PainelNota';
+import { PrevisaoPrestador } from './Previsao';
 import { usePrestador } from './LayoutPrestador';
 import css from './Prestador.module.css';
 
@@ -42,7 +43,9 @@ function Item({ n, onClick }: { n: Nota; onClick: () => void }) {
 export function InicioPrestador() {
   const { eu, erro, recarregar } = usePrestador();
   const navegar = useNavigate();
-  const nota = eu ? notaEmDestaque(eu.notas) : null;
+  const [params, setParams] = useSearchParams();
+  const previsao = params.get('ver') === 'previsao';
+  const nota = eu && !previsao ? notaEmDestaque(eu.notas) : null;
   useVisto(nota);
   if (erro && !eu) return <div className={css.tela}><p className={css.erro}>{erro}</p></div>;
   if (!eu) return <div className={css.tela}><div className={css.esqueleto} aria-busy="true" /></div>;
@@ -51,6 +54,11 @@ export function InicioPrestador() {
     <div className={css.tela}>
       <h1 className={css.oi}>Oi, {primeiroNome(eu.prestador.nome)}</h1>
       <div className={css.tipo}>{tipoRotulo(eu)}</div>
+      <div className={css.segInicio} role="group" aria-label="O que ver">
+        <button type="button" aria-pressed={!previsao} onClick={() => setParams({}, { replace: true })}>Para emitir</button>
+        <button type="button" aria-pressed={previsao} onClick={() => setParams({ ver: 'previsao' }, { replace: true })}>Previsão</button>
+      </div>
+      {previsao ? <PrevisaoPrestador /> : <>
       {nota ? <PainelNota eu={eu} nota={nota} onMudou={recarregar} /> : (
         <div className={css.vazio}>
           <b>Nada para emitir ainda</b>
@@ -65,6 +73,7 @@ export function InicioPrestador() {
           {outras.map((n) => <Item key={n.id} n={n} onClick={() => navegar(`/notas/${n.id}`)} />)}
         </>
       )}
+      </>}
     </div>
   );
 }

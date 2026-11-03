@@ -114,6 +114,8 @@ export interface SemanaMot {
   inicio: string; fim: string; diasAuto: number; dias: number; adicionalCent: number; nfNumero: string | null; pago: boolean; totalCent: number; nfArquivo: NfArquivo | null;
   /** Datas da semana que caem no mês (para marcar) e as marcadas como trabalhadas (nota: {dias}). */
   diasPossiveis?: string[]; diasDatas?: string[] | null;
+  /** Feriados da semana (que valem para a cidade da pessoa) — só informativo. */
+  feriados?: string[];
   /** Débito do mês descontado nesta semana e o pagamento da semana (valor e hora). */
   debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
 }
@@ -263,6 +265,17 @@ export class PessoalService {
       nome: pessoalNfArquivo.arquivoNome, mime: pessoalNfArquivo.arquivoMime, bytes: pessoalNfArquivo.arquivoBytes, criadoEm: pessoalNfArquivo.criadoEm,
     }).from(pessoalNfArquivo).where(and(eq(pessoalNfArquivo.tenantId, tenantId), eq(pessoalNfArquivo.competencia, comp)));
     return new Map(rows.map((r) => [`${r.pessoaTipo}:${r.pessoaId}:${r.periodo}`, { id: r.id, nome: r.nome, mime: r.mime, bytes: r.bytes, enviadoEm: r.criadoEm.toISOString() }]));
+  }
+
+  /**
+   * Só os prestadores de um mês (para a previsão no app do prestador): o mês
+   * fechado vem do retrato; aberto, calcula sem os CLT (bem mais leve).
+   */
+  async prestadoresDoMes(tenantId: string, comp: string): Promise<CompetenciaPessoal> {
+    this.validarComp(comp);
+    const fech = await comTenant(this.db, tenantId, (tx) => this.fechamento(tx, tenantId, comp));
+    if (fech) return this.sobreporPagamento(tenantId, { ...(fech.snapshot as CompetenciaPessoal), fechado: true, fechadoEm: fech.fechadoEm.toISOString() });
+    return this.calcular(tenantId, comp, { soPrestadores: true });
   }
 
   private async calcular(tenantId: string, comp: string, opts: { soPrestadores?: boolean } = {}): Promise<CompetenciaPessoal> {
@@ -519,7 +532,7 @@ export class PessoalService {
           const adicionalCent = centavos(l?.adicional);
           const { totalCent } = calcularSemanaMotorista({ mensalCent: valorCent, diasMes, dias, adicionalCent });
           return { inicio: s.inicio, fim: s.fim, diasAuto, dias, adicionalCent, nfNumero: l?.nfNumero ?? null, pago: l?.pago ?? false, totalCent,
-            diasPossiveis: s.dias, diasDatas: l?.diasDatas ?? null,
+            diasPossiveis: s.dias, diasDatas: l?.diasDatas ?? null, feriados: s.dias.filter((d) => feriados.has(d)),
             nfArquivo: dados.nfs.get(`MOTORISTA:${p.id}:${s.inicio}`) ?? null,
             debitoAplicadoCent: centavos(l?.debitoAplicado), ...pagamentoDe(l) };
         });

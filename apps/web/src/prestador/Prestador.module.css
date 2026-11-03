@@ -180,3 +180,49 @@
 .btnTudo{ margin-top:10px; }
 .avisoI{ background:var(--aviso-bg); color:var(--aviso-text); font-weight:600; }
 .avisoTxt{ margin:10px 0 0; background:var(--aviso-bg); color:var(--aviso-text); border-radius:10px; padding:9px 11px; font-size:13px; line-height:1.45; }
+
+/* ── Previsão do mês (Início › Previsão) ── */
+.segMes, .segInicio{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; background:rgba(var(--ink-rgb),.06); border-radius:999px; padding:3px; gap:2px; }
+.segMes button, .segInicio button{ border:0; background:none; font:inherit; font-size:13.5px; font-weight:500; color:var(--ash); padding:8px 0; border-radius:999px; cursor:pointer; min-height:36px; }
+.segMes button[aria-pressed="true"], .segInicio button[aria-pressed="true"]{ background:var(--white); color:var(--ink); box-shadow:0 1px 3px rgba(var(--ink-rgb),.12); }
+.segMes button:focus-visible, .segInicio button:focus-visible, .semPrev:focus-visible{ outline:3px solid var(--coral); outline-offset:2px; }
+.segMes{ max-width:260px; }
+.barraPrev{ display:flex; gap:3px; height:8px; margin-top:8px; }
+.barraPrev i{ border-radius:9px; background:rgba(var(--ink-rgb),.1); }
+.barraPrev i.bPaga{ background:var(--ok-text); }
+.barraPrev i.bAtual{ background:var(--coral); }
+.barraPrev i.bPassada{ background:rgba(var(--ink-rgb),.32); }
+.legPrev{ display:flex; gap:14px; font-size:11.5px; color:var(--ash); margin-top:2px; }
+.legPrev span::before{ content:''; display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; background:rgba(var(--ink-rgb),.15); }
+.legPrev .lPaga::before{ background:var(--ok-text); }
+.legPrev .lAtual::before{ background:var(--coral); }
+.secaoPrev{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--ash); margin:6px 2px -2px; }
+.semPrev{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:16px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; width:100%; text-align:left; font:inherit; color:var(--ink); }
+button.semPrev{ cursor:pointer; }
+.semAtual{ border-color:rgba(var(--marca-rgb),.45); box-shadow:inset 3px 0 0 var(--coral); }
+.semFeita{ opacity:.72; }
+.semTopo{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.semTopo b{ display:block; font-size:15px; font-weight:600; }
+.semTopo small{ font-size:12.5px; color:var(--ash); }
+.semDir{ text-align:right; flex-shrink:0; }
+.semDir strong{ display:block; font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; }
+.semDir span{ font-size:12px; color:var(--ash); white-space:nowrap; }
+.tagAtual{ background:var(--info-bg); color:var(--info-text); font-weight:500; margin-top:2px; }
+.notaPrev{ margin:0; font-size:12.5px; color:var(--ash); line-height:1.45; }
+.notaPrev b{ color:var(--ink); font-weight:600; }
+.linPrev{ display:flex; justify-content:space-between; font-size:13px; color:var(--ash); border-top:1px solid var(--row-border); padding-top:8px; }
+.linPrev b{ color:var(--ink); font-weight:500; font-variant-numeric:tabular-nums; }
+.linPrev b.neg{ color:var(--erro-text); }
+.diasPrev{ display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:4px; }
+.diaP{ display:flex; flex-direction:column; align-items:center; gap:1px; padding:5px 0 4px; border-radius:9px; font-size:12.5px; font-weight:600; background:var(--cream); color:var(--ink); }
+.diaP small{ font-size:10px; font-weight:500; color:var(--ash); }
+.dPassou{ color:var(--ash); }
+.dHoje{ background:var(--coral); color:var(--on-coral); }
+.dHoje small{ color:var(--on-coral); opacity:.85; }
+.d_fer{ background:var(--aviso-bg); color:var(--aviso-text); }
+.d_fer small{ color:var(--aviso-text); }
+.d_folga{ background:transparent; color:rgba(var(--ink-rgb),.3); }
+.d_folga small{ color:rgba(var(--ink-rgb),.3); }
+.d_fora{ background:transparent; border:1px dashed rgba(var(--ink-rgb),.15); color:rgba(var(--ink-rgb),.25); }
+.d_fora small{ color:rgba(var(--ink-rgb),.25); }
+.rodPrev{ margin:2px 6px 0; font-size:12px; color:var(--ash); line-height:1.5; text-align:center; }

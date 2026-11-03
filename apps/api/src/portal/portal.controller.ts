@@ -33,6 +33,7 @@ export class PortalConviteController {
 export class PortalPrestadorController {
   constructor(private readonly svc: PortalService) {}
   @Get() eu(@UsuarioAtual() u: PayloadAcesso) { return this.svc.eu(t(u), u.sub); }
+  @Get('previsao') previsao(@UsuarioAtual() u: PayloadAcesso, @Query('mes') mes?: string) { return this.svc.previsao(t(u), u.sub, mes); }
   @Post('notas/:id/visto') visto(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.svc.marcarVisto(t(u), u.sub, id); }
   @Post('notas/:id/confirmar') confirmar(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ConfirmarValorDto) {
     return this.svc.confirmar(t(u), u.sub, id, dto);

@@ -265,6 +265,58 @@ export class PortalService {
     };
   }
 
+  /**
+   * Previsão do mês para o próprio prestador: quanto vai emitir em cada
+   * semana (motorista) ou no mês (MEI), pela escala e pelos feriados, com os
+   * débitos que saem do pagamento. Valores ainda abertos podem mudar.
+   */
+  async previsao(tenantId: string, usuarioId: string, mes?: string) {
+    const p = await this.prestadorDoUsuario(tenantId, usuarioId);
+    const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+    const atual = hoje.slice(0, 7);
+    const comp = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : atual;
+    // Só o mês atual e o seguinte (passado está nas notas; mais longe é chute).
+    const prox = new Date(`${atual}-15T12:00:00Z`); prox.setUTCMonth(prox.getUTCMonth() + 1);
+    const proximo = prox.toISOString().slice(0, 7);
+    if (comp !== atual && comp !== proximo) throw new BadRequestException('Previsão só do mês atual e do próximo.');
+    const c = await this.pessoal.prestadoresDoMes(tenantId, comp);
+    const notas = await comTenant(this.db, tenantId, (tx) => tx.select().from(pessoalNota)
+      .where(and(eq(pessoalNota.tenantId, tenantId), eq(pessoalNota.pessoaId, p.id), eq(pessoalNota.competencia, comp))));
+    const notaDe = (periodo: string) => {
+      const n = notas.find((x) => x.periodo === periodo);
+      return n ? { id: n.id, status: n.status as StatusNota } : null;
+    };
+    const debitos = c.debitos.filter((d) => d.pessoaId === p.id).map((d) => ({
+      descricao: d.tipo === 'FIXO' || d.parcelas <= 1 ? d.descricao : `${d.descricao} (${d.parcelaAtual}/${d.parcelas})`, valorCent: d.parcelaCent,
+    }));
+    const base = { competencia: comp, rotulo: rotuloMes(comp), meses: [atual, proximo], hoje, fechado: !!c.fechado, debitos };
+    if (p.tipo === 'MEI') {
+      const m = c.mei.find((x) => x.id === p.id);
+      if (!m) return { ...base, tipo: 'MEI' as const, noMes: false as const };
+      return {
+        ...base, tipo: 'MEI' as const, noMes: true as const, baseDias: m.baseDias, diasMes: m.diasMes, valorDiaCent: m.valorDiaCent,
+        nfCent: m.brutoCent, recebeCent: m.liquidoCent, contratoCent: m.proporcional?.contratoCent ?? m.valorCent,
+        nota: notaDe('MES'), fechadoIndividual: !!m.fechadoIndividual,
+      };
+    }
+    const m = c.motoristas.find((x) => x.id === p.id);
+    if (!m) return { ...base, tipo: 'MOTORISTA' as const, noMes: false as const };
+    const semanas = m.semanas.filter((s) => s.dias > 0 || s.diasAuto > 0).map((s) => ({
+      // fim real da semana (a última do mês passa para o outro mês)
+      inicio: s.inicio, fim: domingoDe(s.fim), dias: s.dias, diasAuto: s.diasAuto, adicionalCent: s.adicionalCent,
+      nfCent: s.totalCent, debitoCent: s.debitoAplicadoCent, recebeCent: s.totalCent - s.debitoAplicadoCent,
+      diasNoMes: s.diasPossiveis ?? [], feriados: s.feriados ?? [], diasDatas: s.diasDatas ?? null,
+      pago: s.pago, nota: notaDe(s.inicio),
+    }));
+    return {
+      ...base, tipo: 'MOTORISTA' as const, noMes: true as const, baseDias: m.baseDias, diariaCent: m.diariaCent,
+      nfCent: m.totalCent, debitosCent: m.debitosCent, recebeCent: m.liquidoCent,
+      /** Débito do mês ainda sem semana: sai de alguma das próximas, na hora do pagamento. */
+      debitoPendenteCent: m.debitoPendenteCent ?? 0,
+      semanas,
+    };
+  }
+
   private descricao(p: Prestador, comp: string, periodo: string) {
     const servico = p.funcao?.trim() || (p.tipo === 'MOTORISTA' ? 'Serviço de transporte e entregas' : 'Prestação de serviços');
     return periodo === 'MES'
@@ -931,4 +983,11 @@ export class PortalService {
     }
     return { lembretes };
   }
+}
+
+/** O domingo que fecha a semana de uma data (a própria, se já for domingo). */
+function domingoDe(d: string): string {
+  const x = new Date(`${d}T12:00:00Z`);
+  x.setUTCDate(x.getUTCDate() + ((7 - x.getUTCDay()) % 7));
+  return x.toISOString().slice(0, 10);
 }
