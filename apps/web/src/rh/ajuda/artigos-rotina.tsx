@@ -71,7 +71,7 @@ function Feriados() {
           <li><b>Estadual</b> — só quem trabalha naquele estado (ex.: 2 de Julho, só na Bahia).</li>
           <li><b>Municipal</b> — só quem trabalha naquela cidade. Quem é de Lauro de Freitas trabalha normal no feriado de Salvador.</li>
         </ul>
-        <p>A região de cada pessoa é a <b>cidade de trabalho</b> do cadastro. Quem não tem cidade própria usa a <b>cidade da empresa</b> (no topo da tela de Feriados). Vale para funcionários e também para MEI e motoristas (dias do mês na Folha e benefícios).</p>
+        <p>A região de cada pessoa é a <b>cidade de trabalho</b> do cadastro. Quem não tem cidade própria usa a <b>cidade da empresa</b> (no topo da tela de Feriados). Vale para funcionários e também para MEI e motoristas (dias do mês).</p>
       </Sec>
       <Sec id="cadastrar" titulo="Cadastrar">
         <p>Os <b>feriados nacionais já vêm cadastrados</b> (os 10 do calendário oficial, inclusive a Paixão de Cristo). Para outro ano, a tela mostra "Adicionar os feriados nacionais" quando faltar algum. Carnaval e Corpus Christi são ponto facultativo: só cadastre se a empresa folgar.</p>
@@ -80,7 +80,7 @@ function Feriados() {
         <Ir to="/rh/feriados">Abrir Feriados</Ir>
       </Sec>
       <Sec id="cidade" titulo="Cidade de trabalho de cada pessoa">
-        <p>Em <b>Funcionários</b>: marque várias pessoas (ou filtre pela cidade) e use "Cidade de trabalho…" para definir de uma vez; ou "⋯ › Cidade de trabalho" numa pessoa. Para MEI e motoristas, na aba Dados da Folha e benefícios ou em Notas de prestadores › Dados e contato.</p>
+        <p>Em <b>Funcionários</b>: marque várias pessoas (ou filtre pela cidade) e use "Cidade de trabalho…" para definir de uma vez; ou "⋯ › Cidade de trabalho" numa pessoa. Para MEI e motoristas, em Prestadores › pessoa › Dados e contato.</p>
         <Aviso tipo="aviso">Use a cidade onde a pessoa trabalha, não onde mora. Feriado num mês já fechado só vale depois de reabrir o mês.</Aviso>
         <Ir to="/rh/funcionarios">Abrir Funcionários</Ir>
       </Sec>
@@ -168,14 +168,14 @@ function FecharMes() {
           <li><b>Pedidos</b> — decida ajustes e atestados.</li>
           <li><b>Férias e afastamentos</b> — confira se estão lançados.</li>
           <li><b>Ponto do mês</b> — confira espelhos e apuração.</li>
-          <li><b>Folha e benefícios</b> — "Conferir folha" → "Gerar benefícios" → "Prestadores" → "Fechar mês". Os números ficam congelados; só o administrador reabre.</li>
-          <li><b>Notas de prestadores</b> — liberar valores e conferir as notas.</li>
+          <li><b>Folha CLT</b> — "Salários" → "Benefícios" → "Débitos" → "Fechar mês". Os números ficam congelados; só o administrador reabre. Fechar o mês também fecha o valor dos MEI.</li>
+          <li><b>Prestadores</b> — fechar e enviar o valor (motorista: toda semana; MEI: depois de fechar o mês), conferir as notas e pagar.</li>
           <li><b>Assinaturas</b> — mandar espelho e contracheque para assinar.</li>
           <li><b>Relatórios e arquivos</b> — consolidado, AFD e AEJ.</li>
         </ol>
-        <Ir to="/rh/pessoal">Abrir Folha e benefícios</Ir>
+        <Ir to="/rh/pessoal">Abrir Folha CLT</Ir>
       </Sec>
-      <Sec id="folha" titulo="Folha e benefícios em resumo">
+      <Sec id="folha" titulo="Folha CLT em resumo">
         <L>
           <li><b>Folha CLT</b>: valor do dia = salário ÷ dias de trabalho do mês; extras, faltas e atrasos vêm do ponto.</li>
           <li><b>Benefícios</b> (VR/VA, VT, cesta): padrão da empresa ou valor próprio. A carga é do mês seguinte, com acerto do que não foi usado (falta, feriado, férias, atestado).</li>
@@ -190,21 +190,21 @@ function FecharMes() {
 function Prestadores() {
   return (
     <>
-      <p className={css.lead}>MEI recebe por mês com nota fiscal; motorista recebe por semana. Depois do fechamento, os valores são liberados no app do prestador, que envia a nota por lá.</p>
+      <p className={css.lead}>Tudo de MEI e motorista fica em <b>Prestadores</b>. Motorista é por semana (uma nota por semana); MEI é por mês. Os 4 passos aparecem no topo da tela, com o que está parado em cada um.</p>
       <Sec id="fluxo" titulo="O caminho da nota">
         <ol className={css.passos}>
-          <li><b>Liberar valores</b> — em Notas de prestadores, depois de fechar a Folha.</li>
+          <li><b>Fechar e enviar</b> — motorista: quando a semana termina, ela aparece como "pronta para fechar"; confira os dias ("Ajustar dias") e clique em "Fechar e enviar". MEI: feche o mês na Folha CLT e envie o mês.</li>
           <li>O prestador recebe o aviso no celular, com tudo o que vai na nota (do modelo de nota), e envia a NFS-e. O sistema lê o PDF/XML e confere valor, CNPJs, data, código do serviço e descrição.</li>
-          <li><b>Conferir notas</b> — aprovar ou pedir correção.</li>
-          <li><b>Pagar</b> — registrar o pagamento (Pix).</li>
+          <li><b>Conferir nota</b> — a fila diz em uma palavra como cada nota está ("tudo confere", "valor diferente"). Aprovar libera o pagamento; "Pedir outra nota" já vai com o motivo.</li>
+          <li><b>Pagamentos</b> — só aparece o que foi aprovado (autorizado a pagar), com chave Pix e QR. Marque quem já foi pago.</li>
         </ol>
-        <Ir to="/rh/prestadores">Abrir Notas de prestadores</Ir>
+        <Ir to="/rh/prestadores">Abrir Prestadores</Ir>
       </Sec>
       <Sec id="modelos" titulo="Modelos de nota (tomador, código e descrição)">
-        <p>Em <b>Notas de prestadores › Modelos de nota</b>, crie um modelo por operação (ex.: "Motoristas sob demanda"): tomador completo, código do serviço (ex.: 26.01.01) e o texto da descrição com campos automáticos — <b>mês</b>, <b>período</b>, <b>dias trabalhados</b>, nome, valor.</p>
+        <p>Em <b>Prestadores › Modelos de nota</b>, crie um modelo por operação (ex.: "Motoristas sob demanda"): tomador completo, código do serviço (ex.: 26.01.01) e o texto da descrição com campos automáticos — <b>mês</b>, <b>período</b>, <b>dias trabalhados</b>, nome, valor.</p>
         <ul className={css.lista}>
           <li>Marque o modelo como <b>padrão dos motoristas</b> (ou dos MEI): todo mundo do tipo já usa, inclusive quem entrar depois. Para uma operação diferente, use "Aplicar a pessoas".</li>
-          <li><b>Dias trabalhados</b>: na Folha e benefícios, na semana do motorista, toque nos dias em que ele trabalhou. A nota sai com "(13/10 e 16/10)". Sem marcar, vai o período da semana.</li>
+          <li><b>Dias trabalhados</b>: em Prestadores › semana › Ajustar, na semana do motorista, toque nos dias em que ele trabalhou. A nota sai com "(13/10 e 16/10)". Sem marcar, vai o período da semana.</li>
           <li>O texto é montado na hora de liberar e fica guardado com a nota. Mudou o modelo? Libere de novo: as notas ainda não enviadas pegam o texto novo.</li>
           <li>Na conferência, código do serviço errado é problema; descrição diferente só avisa (você decide).</li>
         </ul>
@@ -299,8 +299,8 @@ export const ARTIGOS_ROTINA: Artigo[] = [
     secoes: [{ id: 'espelhos', titulo: 'Espelhos' }, { id: 'apuracao', titulo: 'Apuração CLT' }, { id: 'nao-bate', titulo: 'Não bateu?' }] },
   { slug: 'fechar-mes', titulo: 'Fechar o mês: a ordem certa', cat: 'MES', minutos: 3, resumo: 'Do ajuste das batidas à folha, notas, assinaturas e arquivos fiscais.',
     busca: 'fechar mês fechamento folha benefícios vr vt cesta débitos reabrir competência', rotas: ['/rh/pessoal'], Corpo: FecharMes,
-    secoes: [{ id: 'ordem', titulo: 'Ordem do fechamento' }, { id: 'folha', titulo: 'Folha e benefícios' }] },
-  { slug: 'prestadores', titulo: 'Notas de prestadores (MEI e motoristas)', cat: 'MES', minutos: 2, resumo: 'Liberar valores, conferir notas, pagar e fechar uma pessoa sozinha.',
+    secoes: [{ id: 'ordem', titulo: 'Ordem do fechamento' }, { id: 'folha', titulo: 'Folha CLT' }] },
+  { slug: 'prestadores', titulo: 'Prestadores (MEI e motoristas)', cat: 'MES', minutos: 2, resumo: 'Fechar e enviar a semana ou o mês, conferir notas, pagar e fechar uma pessoa sozinha.',
     busca: 'prestador mei motorista nota fiscal nfs-e liberar pagar pix desligamento fechar pessoa modelo de nota tomador cnae código do serviço descrição dias trabalhados', rotas: ['/rh/prestadores', '/rh/prestadores/conferir', '/rh/prestadores/modelos'], Corpo: Prestadores,
     secoes: [{ id: 'fluxo', titulo: 'O caminho da nota' }, { id: 'modelos', titulo: 'Modelos de nota' }, { id: 'uma-pessoa', titulo: 'Fechar uma pessoa' }, { id: 'acesso', titulo: 'Acesso do prestador' }] },
   { slug: 'assinaturas', titulo: 'Assinaturas: espelho e contracheque', cat: 'MES', minutos: 2, resumo: 'Subir contracheques, enviar pela Autentique e acompanhar.',

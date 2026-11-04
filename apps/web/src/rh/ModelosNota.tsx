@@ -68,7 +68,7 @@ export function ModelosNota() {
     <div className={p.pagina}>
       <div className={p.cab}>
         <div>
-          <Link to="/rh/prestadores" className={css.voltar}>‹ Notas de prestadores</Link>
+          <Link to="/rh/prestadores" className={css.voltar}>‹ Prestadores</Link>
           <div className={p.tituloLinha}>
             <h2>Modelos de nota</h2>
             <Explica>O que o prestador coloca na nota, por operação (tomador, código do serviço e descrição). Configure uma vez; vale para todos os fechamentos. O texto da nota é montado na hora de liberar o valor e fica guardado com ela. Mudou o modelo? As notas que ainda não foram enviadas pegam o texto novo ao liberar de novo.</Explica>

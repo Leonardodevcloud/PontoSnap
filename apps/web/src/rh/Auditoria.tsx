@@ -43,9 +43,9 @@ function legivel(acao: string): string {
     [/POST \/portal\/rh\/notas\/.*\/recusar/, 'Recusou nota de prestador'],
     [/POST \/portal\/rh\/pagar/, 'Registrou pagamento de prestador'],
     [/modelos-nota/, 'Alterou modelo de nota fiscal'],
-    [/PUT \/pessoal\/lancamento/, 'Lançou valores na Folha e benefícios'],
-    [/POST \/pessoal\/fechar/, 'Fechou o mês na Folha e benefícios'],
-    [/POST \/pessoal\/reabrir/, 'Reabriu o mês na Folha e benefícios'],
+    [/PUT \/pessoal\/lancamento/, 'Lançou valores na Folha CLT'],
+    [/POST \/pessoal\/fechar/, 'Fechou o mês na Folha CLT'],
+    [/POST \/pessoal\/reabrir/, 'Reabriu o mês na Folha CLT'],
   ];
   for (const [re, txt] of regras) if (re.test(acao)) return txt;
   return acao;

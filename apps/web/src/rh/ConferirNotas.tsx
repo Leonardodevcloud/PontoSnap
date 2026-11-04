@@ -1,23 +1,42 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { brl, dataBr, dataIsoBr, fmtCnpj, type Conferencia, type NotaFila } from '../lib/prestador';
+import { brl, dataBr, dataIsoBr, fmtCnpj, type NotaFila } from '../lib/prestador';
 import { Rosto } from './Prestadores';
 import { VisorNota, type FonteNota } from '../components/VisorNota';
 import { Explica } from '../components/Explica';
 import css from './Prestadores.module.css';
 
-const MOTIVOS = ['Valor diferente', 'Tomador errado', 'Código do serviço errado', 'Descrição diferente da pedida', 'Competência errada', 'Ilegível', 'Número repetido'];
+const MOTIVOS = ['Valor diferente', 'Tomador errado', 'CNPJ do prestador errado', 'Código do serviço errado', 'Descrição diferente da pedida', 'Competência errada', 'Ilegível', 'Número repetido'];
 
-function marca(n: NotaFila): { texto: string; tom: string } {
+/** Como a nota está, em palavras (uma só por nota na fila). */
+function marca(n: NotaFila): { texto: string; tom: 'ok' | 'av' | 'er' } {
   const c = n.conferencia;
-  if (!c) return { texto: 'sem leitura', tom: 'cz' };
-  if (c.arquivo === 'FOTO') return { texto: 'foto', tom: 'av' };
-  if (c.valorBate === false) return { texto: 'valor ≠', tom: 'er' };
-  if (c.codigoOk === false) return { texto: 'código ≠', tom: 'er' };
-  if (!c.bate) return { texto: 'olhar', tom: 'av' };
-  if (c.descricaoOk === false) return { texto: 'descrição ≠', tom: 'av' };
-  return { texto: 'bate', tom: 'ok' };
+  if (!c || c.arquivo === 'FOTO' || c.origem === 'INFORMADO') return c?.valorBate === false ? { texto: 'valor diferente', tom: 'er' } : { texto: 'conferir à mão', tom: 'av' };
+  if (c.valorBate === false) return { texto: 'valor diferente', tom: 'er' };
+  if (c.codigoOk === false) return { texto: 'código errado', tom: 'er' };
+  if (c.tomadorOk === false) return { texto: 'tomador errado', tom: 'er' };
+  if (c.prestadorOk === false) return { texto: 'CNPJ errado', tom: 'er' };
+  if (c.numeroRepetido) return { texto: 'número repetido', tom: 'er' };
+  if (c.competenciaOk === false) return { texto: 'data errada', tom: 'er' };
+  if (!c.bate) return { texto: 'olhar com atenção', tom: 'av' };
+  if (c.descricaoOk === false) return { texto: 'descrição diferente', tom: 'av' };
+  return { texto: 'tudo confere', tom: 'ok' };
+}
+
+/** A frase de cima do painel: o resultado da conferência e o motivo sugerido para pedir outra. */
+function veredito(n: NotaFila): { tom: 'ok' | 'av' | 'er'; frase: string; motivo: string | null } {
+  const c = n.conferencia;
+  const lido = c?.lido?.valorCent ?? n.nfValorCent;
+  if (c?.valorBate === false) return { tom: 'er', frase: `O valor da nota não bate: veio ${lido != null ? brl(lido) : '—'}, o certo é ${brl(n.nfCent)}.`, motivo: 'Valor diferente' };
+  if (!c || c.arquivo === 'FOTO' || c.origem === 'INFORMADO') return { tom: 'av', frase: 'Não deu para ler o arquivo sozinho: confira olhando a nota ao lado.', motivo: null };
+  if (c.codigoOk === false) return { tom: 'er', frase: 'O código do serviço está diferente do pedido.', motivo: 'Código do serviço errado' };
+  if (c.tomadorOk === false) return { tom: 'er', frase: 'O tomador da nota está errado.', motivo: 'Tomador errado' };
+  if (c.prestadorOk === false) return { tom: 'er', frase: 'O CNPJ de quem emitiu não é o do prestador.', motivo: 'CNPJ do prestador errado' };
+  if (c.numeroRepetido) return { tom: 'er', frase: 'Esse número de nota já foi usado antes.', motivo: 'Número repetido' };
+  if (c.competenciaOk === false) return { tom: 'er', frase: 'A nota foi emitida antes do período trabalhado.', motivo: 'Competência errada' };
+  if (c.descricaoOk === false) return { tom: 'av', frase: 'Tudo confere, mas a descrição está diferente do pedido. Você decide.', motivo: 'Descrição diferente da pedida' };
+  return { tom: 'ok', frase: 'Tudo confere. Pode aprovar.', motivo: null };
 }
 
 /** Arquivo da nota (PDF, imagem ou XML) dentro da tela. */
@@ -56,7 +75,6 @@ function Cl({ ok, titulo, det }: { ok: boolean | null; titulo: string; det?: str
  * Conferir notas em sequência: fila à esquerda, a nota no meio e a
  * conferência automática à direita. Atalhos: A aprova, R recusa, ↓/↑ navega.
  */
-const faltas = (c: Conferencia) => [c.valorBate, c.prestadorOk, c.tomadorOk, c.codigoOk, c.competenciaOk, !c.numeroRepetido].filter((x) => x === false).length;
 
 /** Linha da conferência: o que está na nota e, quando diverge, o esperado. */
 /** Palavras de `a` que não aparecem em `b` (sem acento/pontuação) ficam marcadas. */
@@ -117,7 +135,8 @@ export function ConferirNotas() {
   const n = fila?.find((x) => x.id === atual) ?? null;
   const idx = fila && n ? fila.indexOf(n) : -1;
   // Lote só com as que batem em tudo (descrição diferente o RH olha uma a uma).
-  const batem = (fila ?? []).filter((x) => x.conferencia?.bate && x.conferencia.descricaoOk !== false);
+  // (lida do arquivo: nota de foto ou com dados só informados fica para olhar uma a uma)
+  const batem = (fila ?? []).filter((x) => marca(x).tom === 'ok');
 
   const proximoId = () => (fila && idx >= 0 ? (fila[idx + 1] ?? fila[idx - 1])?.id ?? null : null);
   async function aprovar(ids: string[]) {
@@ -153,7 +172,7 @@ export function ConferirNotas() {
       const alvo = e.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName) || e.metaKey || e.ctrlKey || e.altKey || !fila || !n || ocupado) return;
       if (e.key === 'a' || e.key === 'A') { e.preventDefault(); void aprovar([n.id]); }
-      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setRecusa(true); if (!motivo) setMotivo('Valor diferente'); setTimeout(() => recusarRef.current?.focus(), 0); }
+      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setRecusa(true); if (!motivo) setMotivo(veredito(n).motivo ?? 'Valor diferente'); setTimeout(() => recusarRef.current?.focus(), 0); }
       else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); alternarAmpliado(); }
       else if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); const p = fila[idx + 1]; if (p) trocar(p.id); }
       else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); const p = fila[idx - 1]; if (p) trocar(p.id); }
@@ -163,22 +182,22 @@ export function ConferirNotas() {
   });
 
   const c = n?.conferencia;
+  const vd = n ? veredito(n) : null;
   return (
     <div className={css.pagina}>
       <div className={css.cab}>
         <div>
-          <button type="button" className={css.btnTxt} style={{ paddingLeft: 0 }} onClick={() => navegar('/rh/prestadores')}>‹ Notas de prestadores</button>
+          <button type="button" className={css.btnTxt} style={{ paddingLeft: 0 }} onClick={() => navegar('/rh/prestadores')}>‹ Prestadores</button>
           <div className={css.tituloLinha}>
             <h2>Conferir notas{fila ? ` · ${fila.length}` : ''}</h2>
+            <span className={css.txtMudo}>Aprovar = liberar para o financeiro pagar</span>
             <Explica rotulo="Atalhos e como funciona">
               Fila à esquerda, a nota no meio e a conferência automática à direita. Atalhos: <b>A</b> aprovar · <b>R</b> recusar · <b>↓ ↑</b> próxima · <b>+ −</b> zoom · <b>F</b> ampliar.
-              {' '}"Aprovar as que batem" aprova de uma vez só as notas em que tudo confere (descrição diferente fica para você olhar uma a uma).
+              {' '}"Aprovar as que conferem" aprova de uma vez só as notas em que tudo confere (descrição diferente fica para você olhar uma a uma). Nota aprovada aparece em Prestadores › Pagamentos.
             </Explica>
           </div>
         </div>
-        <div className={css.acoes}>
-          {batem.length > 1 && <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => aprovar(batem.map((x) => x.id))}>Aprovar as {batem.length} que batem</button>}
-        </div>
+
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {msg && <p className={css.okMsg} role="status">{msg}</p>}
@@ -194,25 +213,29 @@ export function ConferirNotas() {
                 <button key={x.id} type="button" role="option" aria-selected={x.id === atual} className={`${css.fi} ${x.id === atual ? css.fiOn : ''}`} onClick={() => trocar(x.id)}>
                   <span><Rosto id={x.pessoaId} semente={x.avatarSemente} tamanho={30} /></span>
                   <span><b title={x.nome}>{x.nome}</b><small title={`${x.pessoaTipo === 'MEI' ? 'MEI' : 'Motorista'} · ${brl(x.valorCent)}`}>{brl(x.valorCent)} · {x.pessoaTipo === 'MEI' ? 'MEI' : 'Motorista'}</small></span>
-                  {m.tom === 'ok' ? <span className="sr-only">bate</span>
-                    : m.tom === 'cz' ? <span className={css.filaMarca}>{m.texto}</span>
-                      : <span className={`${css.tag} ${css[`t-${m.tom}`]}`}>{m.texto}</span>}
+                  <span className={`${css.filaSt} ${css[`fs-${m.tom}`]}`}>{m.texto}</span>
                 </button>
               );
             })}
+            {batem.length > 1 && (
+              <div className={css.filaLote}>
+                <small>As que conferem dá pra aprovar juntas.</small>
+                <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => aprovar(batem.map((x) => x.id))}>Aprovar as {batem.length} que conferem</button>
+              </div>
+            )}
           </div>
 
           {n && <Visor n={n} ampliado={ampliado} onAmpliar={alternarAmpliado} />}
 
           {n && c && (
             <div className={css.check}>
-              <h4 title={`${n.rotulo} · enviada ${dataIsoBr(n.enviadaEm)}${n.nf.numero ? ` · NF ${n.nf.numero}` : ''}${n.nf.data ? ` de ${dataBr(n.nf.data)}` : ''}`}>{n.nome}</h4>
+              <h4 title={`${n.rotulo} · enviada ${dataIsoBr(n.enviadaEm)}${n.nf.numero ? ` · NF ${n.nf.numero}` : ''}${n.nf.data ? ` de ${dataBr(n.nf.data)}` : ''}`}>{n.nome}{n.nf.numero ? ` · NF ${n.nf.numero}` : ''}</h4>
               <p className={css.hint}>{n.rotulo} · enviada {dataIsoBr(n.enviadaEm)}</p>
+              <p className={`${css.veredito} ${css[`vd-${vd!.tom}`]}`} role="status">{vd!.frase}</p>
               {c.origem !== 'INFORMADO' ? (
                 <>
                   <p className={css.confResumo} title={`Conferência automática, lida do ${c.origem === 'PDF' ? 'PDF' : 'XML'} da nota`}>
-                    <b>{faltas(c) > 0 ? (faltas(c) === 1 ? '1 divergência' : `${faltas(c)} divergências`) : c.descricaoOk === false ? 'Confere, mas a descrição difere do pedido' : 'Tudo confere'}</b>
-                    · lido do {c.origem === 'PDF' ? 'PDF' : 'XML'}
+                    O que o sistema conferiu (lido do {c.origem === 'PDF' ? 'PDF' : 'XML'}):
                   </p>
                   <table className={css.tabConf}>
                     <thead><tr><th aria-label="Situação" /><th /><th>Na nota</th></tr></thead>
@@ -240,13 +263,19 @@ export function ConferirNotas() {
                 </>
               )}
 
-              <button type="button" className={css.btnPri} disabled={ocupado} onClick={() => aprovar([n.id])}>{faltas(c) > 0 ? 'Aprovar mesmo assim (A)' : 'Aprovar nota (A)'}</button>
-              {!recusa ? (
-                <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => setRecusa(true)} aria-expanded={false}>Recusar… (R)</button>
-              ) : (
+              {/* O botão principal muda conforme o caso: com problema, pedir outra; sem, aprovar. */}
+              {!recusa && (vd!.tom === 'er' ? <>
+                <button type="button" className={`${css.btnPri} ${css.btnPedir}`} disabled={ocupado} onClick={() => { setRecusa(true); setMotivo(vd!.motivo); }}>Pedir outra nota (R)</button>
+                <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => aprovar([n.id])}>Aprovar mesmo assim (A)</button>
+              </> : <>
+                <button type="button" className={css.btnPri} disabled={ocupado} onClick={() => aprovar([n.id])}>Aprovar · liberar para pagar (A)</button>
+                <button type="button" className={css.btnSec} disabled={ocupado} onClick={() => { setRecusa(true); setMotivo(vd!.motivo); }}>Pedir outra nota… (R)</button>
+              </>)}
+              {!recusa && <p className={css.atalhos}><kbd>A</kbd> aprovar · <kbd>R</kbd> pedir outra · <kbd>↓</kbd> próxima</p>}
+              {recusa && (
                 <div className={css.recusaBox}>
                   <div className={css.tituloLinha}>
-                    <b style={{ fontSize: 13 }}>Motivo da recusa</b><span className={css.esp} />
+                    <b style={{ fontSize: 13 }}>Por que pedir outra nota?</b><span className={css.esp} />
                     <button type="button" className={css.lk} onClick={() => { setRecusa(false); setMotivo(null); }}>Cancelar</button>
                   </div>
                   <div className={css.motivos} role="group" aria-label="Motivo da recusa">
@@ -255,7 +284,8 @@ export function ConferirNotas() {
                   {motivo === 'Outro' && (
                     <div className={css.campo}><label htmlFor="mot-outro">Motivo</label><textarea id="mot-outro" value={outro} onChange={(e) => setOutro(e.target.value)} maxLength={500} /></div>
                   )}
-                  <button ref={recusarRef} type="button" className={css.btnSec} disabled={ocupado || !motivo || (motivo === 'Outro' && outro.trim().length < 3)} onClick={recusar}>Recusar e pedir outra</button>
+                  <small className={css.hint}>O prestador recebe o motivo no celular e manda outra nota.</small>
+                  <button ref={recusarRef} type="button" className={`${css.btnPri} ${css.btnPedir}`} disabled={ocupado || !motivo || (motivo === 'Outro' && outro.trim().length < 3)} onClick={recusar}>Pedir outra nota</button>
                 </div>
               )}
             </div>

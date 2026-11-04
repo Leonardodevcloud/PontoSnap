@@ -154,7 +154,7 @@ export class PortalService {
       valorCent: n.valorCent, nfCent: valorDaNf(n), detalhe: n.detalhe, versao: n.versao, liberadoEm: n.liberadoEm.toISOString(), prazo: n.prazo,
       pedirConfirmacao: n.pedirConfirmacao, status: n.status as StatusNota, vistoEm: n.vistoEm?.toISOString() ?? null,
       confirmacao: n.confirmacao, contestacao: n.contestacao, resposta: n.resposta, respondidoEm: n.respondidoEm?.toISOString() ?? null,
-      enviadaEm: n.enviadaEm?.toISOString() ?? null, motivoRecusa: n.motivoRecusa, conferidaEm: n.conferidaEm?.toISOString() ?? null,
+      enviadaEm: n.enviadaEm?.toISOString() ?? null, motivoRecusa: n.motivoRecusa, conferidaEm: n.conferidaEm?.toISOString() ?? null, conferidaPor: n.conferidaPor ?? null,
       conferencia: n.conferencia ?? null, nfValorCent: n.nfValorCent,
       nf: { numero: l?.nfNumero ?? null, data: l?.nfData ?? null, arquivo: extra.arquivo ?? null },
       pago, pagoEm: pago ? l?.pagoEm?.toISOString() ?? null : null,
@@ -260,7 +260,8 @@ export class PortalService {
       emissorUrl: EMISSOR_NFSE,
       notas: lista.map((n) => {
         const pedido = pedidos.get(n.id) ?? null;
-        return { ...n, descricao: pedido?.descricao ?? this.descricao(p, n.competencia, n.periodo), pedido, textoPedido: pedido ? textoInstrucoesNota(pedido) : null };
+        // Quem aprovou é assunto interno do RH: o prestador não vê.
+        return { ...n, conferidaPor: null, descricao: pedido?.descricao ?? this.descricao(p, n.competencia, n.periodo), pedido, textoPedido: pedido ? textoInstrucoesNota(pedido) : null };
       }),
     };
   }
@@ -579,7 +580,8 @@ export class PortalService {
       if (conv && conv.expiraEm > agora) return { status: 'CONVIDADO' as const, temPush: false, conviteExpiraEm: conv.expiraEm.toISOString() };
       return { status: (c ? 'BLOQUEADO' : conv ? 'CONVITE_VENCIDO' : 'SEM') as 'BLOQUEADO' | 'CONVITE_VENCIDO' | 'SEM', temPush: false, conviteExpiraEm: null };
     };
-    const unidade = (id: string, tipo: 'MEI' | 'MOTORISTA', periodo: string, valorCent: number) => {
+    /** `nfVivoCent`: valor da nota calculado agora (antes de liberar); `dias`: dias da semana do motorista. */
+    const unidade = (id: string, tipo: 'MEI' | 'MOTORISTA', periodo: string, valorCent: number, nfVivoCent: number, dias: number | null = null) => {
       const n = dados.notas.find((x) => x.pessoaId === id && x.periodo === periodo) ?? null;
       const lanc = dados.lancs.find((l) => l.pessoaId === id && l.periodo === periodo);
       const arq = dados.arqs.find((a) => a.pessoaId === id && a.periodo === periodo);
@@ -588,7 +590,7 @@ export class PortalService {
       const pago = !!lanc?.pago;
       const atrasada = !!n?.prazo && n.prazo < hoje && (sit === 'FALTA' || sit === 'RECUSADA');
       return {
-        periodo, rotulo: rotuloPeriodo(competencia, periodo), valorCent: n?.valorCent ?? valorCent, nfCent: n ? valorDaNf(n) : null, situacao: sit, atrasada, pago,
+        periodo, rotulo: rotuloPeriodo(competencia, periodo), valorCent: n?.valorCent ?? valorCent, nfCent: n ? valorDaNf(n) : nfVivoCent, dias, situacao: sit, atrasada, pago,
         valorPagoCent: pago && lanc?.valorPago != null ? centavos(lanc.valorPago) : null, pagoEm: pago ? lanc?.pagoEm?.toISOString() ?? null : null,
         nota: n ? this.visao(n, { lanc, arquivo: arq ?? null }) : null,
         nf: { numero: lanc?.nfNumero ?? null, arquivo: arq ?? null },
@@ -597,10 +599,10 @@ export class PortalService {
     };
 
     const linhas = [
-      ...comp.mei.map((m) => ({ id: m.id, tipo: 'MEI' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null, unidades: [unidade(m.id, 'MEI', 'MES', m.liquidoCent)] })),
+      ...comp.mei.map((m) => ({ id: m.id, tipo: 'MEI' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null, unidades: [unidade(m.id, 'MEI', 'MES', m.liquidoCent, m.brutoCent)] })),
       ...comp.motoristas.map((m) => ({
         id: m.id, tipo: 'MOTORISTA' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null,
-        unidades: m.semanas.filter((s) => s.dias > 0).map((s) => unidade(m.id, 'MOTORISTA', s.inicio, valorSemana(s))),
+        unidades: m.semanas.filter((s) => s.dias > 0).map((s) => unidade(m.id, 'MOTORISTA', s.inicio, valorSemana(s), s.totalCent, s.dias)),
       })),
     ].map((l) => {
       const p = pr.get(l.id);
@@ -609,6 +611,8 @@ export class PortalService {
       return {
         ...l, empresa: p?.empresa ?? null, funcao: p?.funcao ?? null, documento: p?.documento ?? null, telefone: p?.telefone ?? null, email: p?.email ?? null,
         tomadorNome: p?.tomadorNome ?? null, tomadorCnpj: p?.tomadorCnpj ?? null, avatarSemente: p?.avatarSemente ?? null,
+        /** Chave Pix completa (o RH paga por ela). */
+        chavePix: p?.chavePix ?? null,
         cidade: p?.trabalhoMunicipio ? { uf: p.trabalhoUf, municipio: p.trabalhoMunicipio, municipioNome: p.trabalhoMunicipioNome } : null,
         /** Modelo de nota: o escolhido (id) e o que vale (escolhido ou padrão do tipo). */
         modeloNotaId: p?.modeloNotaId ?? null, modeloNota: p ? (() => { const m = modeloDe(p, dados.modelos); return m ? { id: m.id, nome: m.nome, padrao: !p.modeloNotaId } : null; })() : null,

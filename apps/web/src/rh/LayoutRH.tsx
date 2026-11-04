@@ -40,8 +40,8 @@ const GRUPOS: GrupoMenu[] = [
     titulo: 'Fechamento do mês',
     itens: [
       { to: '/rh/banco', rotulo: 'Banco de horas', icone: 'relogio' },
-      { to: '/rh/pessoal', rotulo: 'Folha e benefícios', icone: 'dinheiro' },
-      { to: '/rh/prestadores', rotulo: 'Notas de prestadores', icone: 'check' },
+      { to: '/rh/pessoal', rotulo: 'Folha CLT', icone: 'dinheiro' },
+      { to: '/rh/prestadores', rotulo: 'Prestadores', icone: 'check', tambem: ['/rh/prestadores/conferir', '/rh/prestadores/modelos'] },
       { to: '/rh/documentos', rotulo: 'Assinaturas', icone: 'lapis' },
       { to: '/rh/relatorios', rotulo: 'Relatórios e arquivos', icone: 'documento', tambem: ['/rh/fiscal'] },
     ],
@@ -79,7 +79,7 @@ const SECOES: { rotas: { to: string; rotulo: string }[] }[] = [
 const NOMES: Record<string, string> = {
   '/rh': 'Início', '/rh/espelhos': 'Ponto do mês · Espelhos', '/rh/apuracao': 'Ponto do mês · Apuração CLT',
   '/rh/batidas-faltando': 'Batidas faltando', '/rh/ajustes': 'Pedidos · Ajustes de ponto', '/rh/atestados': 'Pedidos · Atestados',
-  '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e benefícios', '/rh/prestadores': 'Notas de prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
+  '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha CLT', '/rh/prestadores': 'Prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
   '/rh/relatorios': 'Relatórios', '/rh/fiscal': 'Arquivos fiscais', '/rh/funcionarios': 'Funcionários', '/rh/comunicacao': 'Comunicação interna', '/rh/comunicacao/novo': 'Novo comunicado', '/rh/escalas': 'Escalas',
   '/rh/regras': 'Regras de cálculo', '/rh/feriados': 'Feriados', '/rh/local': 'Local e cerca', '/rh/dispositivos': 'Quiosques',
   '/rh/auditoria': 'Auditoria', '/rh/usuarios': 'Usuários', '/rh/notificacoes': 'Notificações do app', '/rh/assinatura': 'Plano e cobrança',

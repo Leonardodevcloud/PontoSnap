@@ -229,7 +229,7 @@ export class AtencaoService {
           titulo: `${semNf.length} ${plural(semNf.length, 'nota fiscal faltando', 'notas fiscais faltando')}`,
           texto: 'Prestador sem nota fiscal fica sem comprovante do pagamento do mês.',
           pessoas: semNf,
-          acao: { rotulo: 'Anexar NF', rota: `/rh/pessoal?mes=${comp}&aba=prestadores` },
+          acao: { rotulo: 'Ver prestadores', rota: `/rh/prestadores?mes=${comp}` },
         });
       }
       if (!pess.padrao && pess.clt.length > 0) {

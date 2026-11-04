@@ -22,7 +22,7 @@ export interface Nota {
   valorCent: number; nfCent: number; detalhe: LinhaDetalhe[]; versao: number; liberadoEm: string; prazo: string | null;
   pedirConfirmacao: boolean; status: StatusNota; vistoEm: string | null;
   confirmacao: 'CONFERE' | 'CONTESTOU' | null; contestacao: string | null; resposta: string | null; respondidoEm: string | null;
-  enviadaEm: string | null; motivoRecusa: string | null; conferidaEm: string | null; conferencia: Conferencia | null; nfValorCent: number | null;
+  enviadaEm: string | null; motivoRecusa: string | null; conferidaEm: string | null; conferidaPor?: string | null; conferencia: Conferencia | null; nfValorCent: number | null;
   nf: { numero: string | null; data: string | null; arquivo: ArquivoNf | null };
   pago: boolean; pagoEm: string | null; valorPagoCent: number | null; lembretes: number; lembreteEm: string | null;
   /** Só no app: descrição pronta para colar no emissor. */
@@ -116,14 +116,14 @@ export function statusParaPrestador(n: Nota): { texto: string; tom: 'ok' | 'av' 
 
 export type StatusAcesso = 'ATIVO' | 'CONVIDADO' | 'SEM' | 'BLOQUEADO' | 'CONVITE_VENCIDO';
 export interface UnidadeRh {
-  periodo: string; rotulo: string; valorCent: number; nfCent?: number | null; situacao: Situacao; atrasada: boolean; pago: boolean;
+  periodo: string; rotulo: string; valorCent: number; nfCent?: number | null; dias?: number | null; situacao: Situacao; atrasada: boolean; pago: boolean;
   valorPagoCent: number | null; pagoEm: string | null; nota: Nota | null;
   nf: { numero: string | null; arquivo: (ArquivoNf & { pessoaId: string; competencia: string; periodo: string }) | null }; tipo: 'MEI' | 'MOTORISTA';
 }
 export interface LinhaRh {
   id: string; tipo: 'MEI' | 'MOTORISTA'; nome: string; valorCent: number; unidades: UnidadeRh[];
   empresa: string | null; funcao: string | null; documento: string | null; telefone: string | null; email: string | null;
-  tomadorNome: string | null; tomadorCnpj: string | null; avatarSemente: number | null;
+  tomadorNome: string | null; tomadorCnpj: string | null; avatarSemente: number | null; chavePix?: string | null;
   cidade?: { uf: string | null; municipio: number; municipioNome: string | null } | null;
   acesso: { status: StatusAcesso; temPush: boolean; conviteExpiraEm: string | null };
   situacao: Situacao; atrasada: boolean; vistoEm: string | null; pago: boolean; pagoCent: number;

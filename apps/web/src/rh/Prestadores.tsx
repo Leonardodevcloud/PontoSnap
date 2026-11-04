@@ -14,6 +14,8 @@ import { Icone } from '../components/Icone';
 import { FecharPessoa } from './FecharPessoa';
 import { CidadeTrabalho } from '../components/CidadeTrabalho';
 import { Explica } from '../components/Explica';
+import { Esteira, Pagamentos, SemanasMotoristas, type PassoEsteira } from './PrestadoresVisoes';
+import { PixPrestador } from './GestaoPessoal';
 import css from './Prestadores.module.css';
 
 const mesHoje = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
@@ -70,7 +72,7 @@ function infoAcesso(l: LinhaRh): { texto: string; tom: 'ok' | 'av' | 'er' | 'cz'
   if (a.status === 'ATIVO') return { texto: a.temPush ? 'ativo' : 'ativo · sem push', tom: 'ok', dica: a.temPush ? 'Notificações ligadas' : 'Sem notificação no celular' };
   if (a.status === 'CONVIDADO') return { texto: `convidado · até ${dataIsoBr(a.conviteExpiraEm)}`, tom: 'av', dica: 'Convite enviado, ainda não criou a senha' };
   if (a.status === 'BLOQUEADO') return { texto: 'bloqueado', tom: 'er', dica: 'Acesso cortado pelo RH' };
-  return { texto: a.status === 'CONVITE_VENCIDO' ? 'convite venceu' : 'sem acesso', tom: 'cz', dica: 'O RH sobe a nota pela Folha e benefícios' };
+  return { texto: a.status === 'CONVITE_VENCIDO' ? 'convite venceu' : 'sem acesso', tom: 'cz', dica: 'O RH sobe a nota em Prestadores › Ajustar/Lançamentos' };
 }
 /** Tag de acesso: só quando não está ativo; ativo vira texto simples. */
 function TagAcesso({ l }: { l: LinhaRh }) {
@@ -79,9 +81,12 @@ function TagAcesso({ l }: { l: LinhaRh }) {
   return <span className={`${css.tag} ${css[`t-${i.tom}`]}`} title={i.dica}>{i.texto}</span>;
 }
 
+type Ver = 'motoristas' | 'mei' | 'pagamentos';
+
 /**
- * Notas de prestadores: o RH libera o valor do mês (MEI) ou da semana
- * (motorista), acompanha quem mandou, confere, lembra, paga e dá acesso ao app.
+ * Prestadores (MEI e motoristas), na ordem do trabalho: fechar e enviar o
+ * valor → esperar a nota → conferir → pagar. Motorista por semana, MEI por
+ * mês, e Pagamentos para o financeiro (só o que foi aprovado).
  */
 export function Prestadores() {
   const [params, setParams] = useSearchParams();
@@ -92,16 +97,18 @@ export function Prestadores() {
   const [msg, setMsg] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('TODOS');
   const [busca, setBusca] = useState('');
-  // Todos / MEI / Motorista, como na Folha e benefícios. Fica na URL para voltar no mesmo filtro.
-  const tipo = (params.get('tipo') === 'MEI' || params.get('tipo') === 'MOTORISTA' ? params.get('tipo') : '') as '' | 'MEI' | 'MOTORISTA';
-  const setTipo = (t: '' | 'MEI' | 'MOTORISTA') => { const p = new URLSearchParams(params); if (t) p.set('tipo', t); else p.delete('tipo'); setParams(p, { replace: true }); };
-  const doTipo = (l: LinhaRh) => !tipo || l.tipo === tipo;
+  // Visão: Motoristas (por semana ou por pessoa), MEI ou Pagamentos. Fica na URL.
+  const verParam = params.get('ver') as Ver | null;
+  const porPessoa = params.get('por') === 'pessoa';
+  const semanaPag = params.get('semana');
+  const mudar = (m: Record<string, string | null>) => { const p = new URLSearchParams(params); for (const [k, x] of Object.entries(m)) { if (x) p.set(k, x); else p.delete(k); } setParams(p, { replace: true }); };
   const [ordem, setOrdemSt] = useState<Ordem>(lerOrdem);
   const setOrdem = (o: Ordem) => { setOrdemSt(o); try { localStorage.setItem('pontosnap.prestadores.ordem', o); } catch { /* sem storage */ } };
   const [fechar, setFechar] = useState<{ id: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO' } | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [aberto, setAberto] = useState<string | null>(null);
-  const [liberar, setLiberar] = useState(params.get('liberar') === '1');
+  const [liberar, setLiberar] = useState<{ tipo?: 'MEI' | 'MOTORISTA'; semana?: string } | null>(params.get('liberar') === '1' ? {} : null);
+  const [pix, setPix] = useState<{ l: LinhaRh; u: UnidadeRh } | null>(null);
   const [convidar, setConvidar] = useState<string[] | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
@@ -111,6 +118,19 @@ export function Prestadores() {
   }, [mes]);
   useEffect(() => { setD(null); setSel(new Set()); void carregar(); }, [carregar]);
   const avisar = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 5000); };
+  const ver: Ver = verParam === 'mei' || verParam === 'pagamentos' || verParam === 'motoristas' ? verParam
+    : d && d.totais.motoristas === 0 && d.totais.mei > 0 ? 'mei' : 'motoristas';
+  const tipo: '' | 'MEI' | 'MOTORISTA' = ver === 'mei' ? 'MEI' : ver === 'motoristas' ? 'MOTORISTA' : '';
+  const doTipo = (l: LinhaRh) => !tipo || l.tipo === tipo;
+  function irPasso(p: PassoEsteira) {
+    if (p === 'FECHAR') {
+      if (tipo === 'MEI' && d && !d.fechado) { navegar(`/rh/pessoal?mes=${mes}`); return; }
+      setLiberar({ tipo: tipo === 'MEI' ? 'MEI' : 'MOTORISTA' });
+    } else if (p === 'NOTA') { mudar({ por: tipo === 'MOTORISTA' ? 'pessoa' : null }); setFiltro('FALTA'); }
+    else if (p === 'CONFERIR') navegar('/rh/prestadores/conferir');
+    else mudar({ ver: 'pagamentos', por: null, semana: null });
+  }
+  const ajustar = (l: LinhaRh) => navegar(`/rh/pessoal?mes=${mes}&aba=prestadores&abrir=${l.tipo}:${l.id}&de=prestadores`);
   const ir = (m: string) => { const p = new URLSearchParams(params); p.set('mes', m); p.delete('liberar'); setParams(p, { replace: true }); };
 
   const linhas = useMemo(() => {
@@ -153,58 +173,49 @@ export function Prestadores() {
   const t = d?.totais;
   const semModelo = (d?.linhas ?? []).filter((l) => !l.modeloNota).length;
   const faltamIds = (d?.linhas ?? []).filter(doTipo).flatMap((l) => l.unidades).filter((u) => u.nota && (u.situacao === 'FALTA' || u.situacao === 'RECUSADA')).map((u) => u.nota!.id);
-  const semanasPend = d ? d.semanas.filter((s) => s.encerrada && !s.liberada && s.motoristas > 0).length : 0;
-  const meiPend = d ? !d.meiLiberado && d.fechado && d.totais.mei > 0 : false;
-  const pendentesLib = meiPend || semanasPend > 0;
-  // Um aviso por vez: mês aberto > valor sem liberar > prestadores sem modelo.
-  const aviso: 'ABERTO' | 'LIBERAR' | 'MODELO' | null = !d ? null
-    : !d.fechado && d.totais.mei > 0 ? 'ABERTO'
-      : pendentesLib && d.fechado ? 'LIBERAR'
-        : d.linhas.length > 0 && semModelo > 0 ? 'MODELO' : null;
+  // Um aviso por vez (o que falta liberar já aparece na esteira).
+  const aviso: 'MODELO' | null = d && d.linhas.length > 0 && semModelo > 0 ? 'MODELO' : null;
 
   return (
     <div className={css.pagina}>
       <div className={css.cab}>
-        <div>
-          <div className={css.tituloLinha}>
-            <h2>Notas de prestadores</h2>
-            <Explica>O RH libera o valor do mês (MEI) ou da semana (motorista), acompanha quem mandou a nota, confere, lembra e registra o pagamento. Quem não tem acesso ao app continua como hoje: o RH sobe a nota pela Folha e benefícios. Lembrete automático todo dia às 9h para quem ainda não mandou, até 7 dias depois do prazo.</Explica>
-          </div>
-          <p>{d ? `${d.rotulo} · ${d.fechado ? `fechado em ${dataIsoBr(d.fechadoEm)}` : 'em aberto'}${d.meiLiberado ? ' e liberado' : ''}` : 'Carregando…'}</p>
+        <div className={css.tituloLinha}>
+          <h2>Prestadores</h2>
+          <Explica>MEI (por mês) e motoristas (por semana), na ordem do trabalho: fechar e enviar o valor para o app → o prestador manda a nota → o RH confere e aprova → o financeiro paga. Aprovar a nota é o que libera o pagamento. Lembrete automático às 9h para quem ainda não mandou a nota, até 7 dias depois do prazo.</Explica>
         </div>
         <div className={css.acoes}>
-          <Link className={css.lk} to="/rh/prestadores/modelos" title={semModelo && aviso !== 'MODELO' ? `${semModelo} sem modelo de nota` : undefined}>
-            Modelos de nota{semModelo > 0 && aviso !== 'MODELO' ? ` · ${semModelo} sem` : ''}
-          </Link>
-          <button type="button" className={css.lk} onClick={() => setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id))} disabled={!d || !t?.semAcesso}
-            title={t?.semAcesso ? `${t.semAcesso} sem acesso ao app` : 'Todos já têm acesso'}>
-            Dar acesso em lote
-          </button>
+          <div className={css.seg} role="group" aria-label="Visão">
+            {([['motoristas', 'Motoristas · semanal', t?.motoristas], ['mei', 'MEI · mensal', t?.mei],
+              ['pagamentos', 'Pagamentos', d ? d.linhas.flatMap((l) => l.unidades).filter((u) => !u.pago && (u.situacao === 'APROVADA' || u.situacao === 'RH')).length : undefined]] as [Ver, string, number | undefined][])
+              .map(([k, r, n]) => (
+                <button key={k} type="button" aria-pressed={ver === k} onClick={() => { mudar({ ver: k, semana: null }); setFiltro('TODOS'); setSel(new Set()); }}>
+                  {r}{n != null && <span className={css.segN}>{n}</span>}
+                </button>
+              ))}
+          </div>
           <span className={css.comp}>
             <button type="button" aria-label="Mês anterior" onClick={() => ir(somarMes(mes, -1))}>‹</button>
             <input type="month" aria-label="Competência" value={mes} onChange={(e) => e.target.value && ir(e.target.value)} />
             <button type="button" aria-label="Próximo mês" onClick={() => ir(somarMes(mes, 1))} disabled={mes >= mesHoje()}>›</button>
           </span>
-          <Link className={css.btnSec} to="/rh/prestadores/conferir" aria-disabled={!t?.conferir}>Conferir {t?.conferir ?? 0} {t?.conferir === 1 ? 'nota' : 'notas'}</Link>
-          <button type="button" className={css.btnPri} onClick={() => setLiberar(true)} disabled={!d}>Liberar valores</button>
+          <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/pessoal?mes=${mes}&novo=${tipo === 'MEI' ? 'MEI' : 'MOTORISTA'}`)}>Adicionar prestador</button>
         </div>
+      </div>
+      <div className={css.subAcoes}>
+        <span className={css.txtMudo}>{d ? `${d.rotulo} · ${d.fechado ? `folha fechada em ${dataIsoBr(d.fechadoEm)}` : 'folha em aberto'}` : 'Carregando…'}</span>
+        <span className={css.esp} />
+        <Link className={css.lk} to="/rh/prestadores/modelos" title={semModelo && aviso !== 'MODELO' ? `${semModelo} sem modelo de nota` : undefined}>
+          Modelos de nota{semModelo > 0 && aviso !== 'MODELO' ? ` · ${semModelo} sem` : ''}
+        </Link>
+        <button type="button" className={css.lk} onClick={() => setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id))} disabled={!d || !t?.semAcesso}
+          title={t?.semAcesso ? `${t.semAcesso} sem acesso ao app` : 'Todos já têm acesso'}>
+          Dar acesso ao app{t?.semAcesso ? ` · ${t.semAcesso} sem` : ''}
+        </button>
+        <button type="button" className={css.lk} disabled={!d || ocupado} onClick={() => zip()}>Baixar notas (ZIP)</button>
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {msg && <p className={css.okMsg} role="status">{msg}</p>}
 
-      {d && aviso === 'ABERTO' && (
-        <p className={css.avisoLinha} role="status">
-          {d.rotulo} ainda está aberto: feche o mês para liberar o valor de cada MEI.
-          <button type="button" className={css.lk} onClick={() => navegar(`/rh/pessoal?mes=${mes}`)}>Ir para o fechamento</button>
-          <Explica>Feche o mês na Folha e benefícios para liberar o valor de cada MEI. As semanas dos motoristas já podem ser liberadas em "Liberar valores".</Explica>
-        </p>
-      )}
-      {d && aviso === 'LIBERAR' && (
-        <p className={css.avisoLinha} role="status">
-          {[meiPend ? `${d.totais.mei} MEI` : '', semanasPend ? `${semanasPend} semana(s) de motorista` : ''].filter(Boolean).join(' e ')} com valor fechado esperando a liberação.
-          <button type="button" className={css.lk} onClick={() => setLiberar(true)}>Liberar agora</button>
-        </p>
-      )}
       {d && aviso === 'MODELO' && (
         <p className={css.avisoLinha} role="status">
           {semModelo === d.linhas.length ? 'Nenhum prestador tem modelo de nota.' : `${semModelo} ${semModelo === 1 ? 'prestador sem modelo de nota.' : 'prestadores sem modelo de nota.'}`}
@@ -213,27 +224,39 @@ export function Prestadores() {
         </p>
       )}
 
-      {t && (
-        <div className={css.kpis}>
-          <div className={css.kpi} title={`${t.mei} MEI · ${t.motoristas} motoristas`}><small>A pagar a prestadores</small><b>{brl(t.aPagarCent)}</b><span>{t.pessoas} pessoas</span></div>
-          <div className={css.kpi} title={t.convidados ? `${t.convidados} convidados` : undefined}><small>Com acesso ao app</small><b>{t.comAcesso} <span>de {t.pessoas}</span></b>{t.semAcesso ? <span>{t.semAcesso} sem acesso</span> : null}</div>
-          <div className={css.kpi} title={`${t.aprovadas} aprovadas`}><small>Notas recebidas</small><b>{t.recebidas} <span>de {t.notas}</span></b><span>{t.conferir} para conferir</span></div>
-          <div className={css.kpi} title={`${t.recusadas ? `${t.recusadas} recusadas · ` : ''}Lembrete automático às 9h`}><small>Faltam enviar</small><b>{t.faltam}</b>{t.recusadas ? <span>{t.recusadas} recusadas</span> : null}</div>
-          <div className={css.kpi}><small>Pagos</small><b>{t.pagos}</b><span>{brl(t.pagosCent)}</span></div>
+      {d && ver !== 'pagamentos' && <Esteira d={d} tipo={tipo === 'MEI' ? 'MEI' : 'MOTORISTA'} onPasso={irPasso} />}
+
+      {!d && !erro && <div className={css.vazio}><p>Carregando…</p></div>}
+
+      {d && ver === 'pagamentos' && (
+        <Pagamentos d={d} ocupado={ocupado} semana={semanaPag} onLimparSemana={() => mudar({ semana: null })}
+          onPagar={pagar} onPix={(l, u) => setPix({ l, u })} onAbrir={setAberto} onConferir={() => navegar('/rh/prestadores/conferir')} />
+      )}
+
+      {d && ver === 'motoristas' && (
+        <div className={css.subAcoes}>
+          <div className={`${css.seg} ${css.segPeq}`} role="group" aria-label="Agrupar motoristas">
+            <button type="button" aria-pressed={!porPessoa} onClick={() => mudar({ por: null })}>Por semana</button>
+            <button type="button" aria-pressed={porPessoa} onClick={() => mudar({ por: 'pessoa' })}>Por pessoa</button>
+          </div>
         </div>
       )}
 
+      {d && ver === 'motoristas' && !porPessoa && (
+        <SemanasMotoristas d={d} ocupado={ocupado}
+          onFecharEnviar={(semana) => setLiberar({ tipo: 'MOTORISTA', semana })}
+          onConferir={() => navegar('/rh/prestadores/conferir')}
+          onPagarSemana={(semana) => mudar({ ver: 'pagamentos', semana, por: null })}
+          onLembrar={(ids) => lembrar(ids)} onPix={(l, u) => setPix({ l, u })} onAbrir={setAberto} onAjustar={ajustar} />
+      )}
+
+      {d && (ver === 'mei' || (ver === 'motoristas' && porPessoa)) && <>
       <div className={css.ferramentas}>
         <label className={css.buscaGrande}>
           <Icone nome="busca" tamanho={18} />
           <input type="search" placeholder="Nome, empresa ou CPF/CNPJ" aria-label="Buscar prestador" value={busca} onChange={(e) => setBusca(e.target.value)} />
           {busca && <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca">✕</button>}
         </label>
-        <div className={`${css.seg} ${css.segTipo}`} role="group" aria-label="Tipo de prestador">
-          {([['', 'Todos'], ['MEI', 'MEI'], ['MOTORISTA', 'Motorista']] as const).map(([v, t]) => (
-            <button key={t} type="button" aria-pressed={tipo === v} onClick={() => setTipo(v)}>{t}</button>
-          ))}
-        </div>
         <span className={css.esp} />
         <label className={css.ordem}>
           <span>Ordem:</span>
@@ -250,7 +273,7 @@ export function Prestadores() {
           ))}
         </div>
         <span className={css.esp} />
-        {(busca || tipo) && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.length}</span>}
+        {busca && d && <span className={css.achados} role="status">{linhas.length} de {d.linhas.filter(doTipo).length}</span>}
         {faltamIds.length > 0 && <button type="button" className={css.lk} disabled={ocupado} onClick={() => lembrar(faltamIds)}
           title="Envia lembrete agora para quem ainda não mandou ou teve a nota recusada">Lembrar os {faltamIds.length}</button>}
       </div>
@@ -268,10 +291,10 @@ export function Prestadores() {
       )}
 
       {!d && !erro && <div className={css.vazio}><p>Carregando…</p></div>}
-      {d && d.linhas.length === 0 && <div className={css.vazio}><b>Nenhum prestador em {d.rotulo}</b><p>Cadastre MEI e motoristas na Folha e benefícios.</p></div>}
+      {d && d.linhas.length === 0 && <div className={css.vazio}><b>Nenhum prestador em {d.rotulo}</b><p>Cadastre pelo botão "Adicionar prestador".</p></div>}
       {d && d.linhas.length > 0 && linhas.length === 0 && (
         <div className={css.vazio}><b>Ninguém encontrado</b><p>{busca ? `Nada com "${busca}" neste filtro.` : 'Nenhum prestador neste filtro.'}</p>
-          <button type="button" className={css.btnSec} onClick={() => { setBusca(''); setFiltro('TODOS'); setTipo(''); }}>Limpar busca e filtro</button></div>
+          <button type="button" className={css.btnSec} onClick={() => { setBusca(''); setFiltro('TODOS'); }}>Limpar busca e filtro</button></div>
       )}
       {d && linhas.length > 0 && (
         <div className={css.tabela}>
@@ -293,6 +316,8 @@ export function Prestadores() {
         </div>
       )}
 
+      </>}
+
       {linhaAberta && d && !fechar && (
         <DetalhePrestador key={linhaAberta.id} l={linhaAberta} d={d} mes={mes} ocupado={ocupado} onFechar={() => setAberto(null)}
           onLembrar={(ids) => lembrar(ids)} onPagar={(ids) => pagar(ids)} onConvidar={() => setConvidar([linhaAberta.id])}
@@ -306,8 +331,10 @@ export function Prestadores() {
           onFechado={async (m) => { setFechar(null); avisar(m); await carregar(); }} /> : null;
       })()}
 
-      {liberar && d && <ModalLiberar d={d} onFechar={() => setLiberar(false)}
-        onLiberado={async (m) => { setLiberar(false); avisar(m); await carregar(); }} />}
+      {liberar && d && <ModalLiberar d={d} tipoInicial={liberar.tipo} semanaInicial={liberar.semana} onFechar={() => setLiberar(null)}
+        onLiberado={async (m) => { setLiberar(null); avisar(m); await carregar(); }} />}
+      {pix && <PixPrestador mes={mes} tipo={pix.l.tipo} id={pix.l.id} semana={pix.u.tipo === 'MOTORISTA' ? pix.u.periodo : undefined}
+        onFechar={() => setPix(null)} onPago={async (m) => { setPix(null); avisar(m); await carregar(); }} />}
       {convidar && d && <ModalConvites ids={convidar} linhas={d.linhas} onFechar={() => { setConvidar(null); void carregar(); }} />}
     </div>
   );
@@ -413,8 +440,8 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
             <button type="button" className={css.btnTxt} onClick={() => setConfirmarReabrir(false)}>Cancelar</button></span>
         : <button type="button" className={css.btnTxt} onClick={() => setConfirmarReabrir(true)}>Reabrir pessoa</button>)}
       <span style={{ flex: 1 }} />
-      <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/pessoal?mes=${mes}&aba=prestadores&abrir=${l.tipo}:${l.id}`)}>
-        {d.fechado || fi ? 'Abrir na Folha' : 'Lançar extras e faltas'}
+      <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/pessoal?mes=${mes}&aba=prestadores&abrir=${l.tipo}:${l.id}&de=prestadores`)}>
+        {d.fechado || fi ? 'Ver lançamentos' : l.tipo === 'MEI' ? 'Lançar extras e faltas' : 'Ajustar dias'}
       </button>
       {!d.fechado && !fi && <button type="button" className={css.btnPri} onClick={() => onFecharPessoa('ANTECIPADO')}>Fechar só esta pessoa</button>}
     </>
@@ -485,7 +512,7 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
           {l.acesso.status === 'BLOQUEADO' && <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={salvando}
             onClick={() => chamar(() => api.post(`/portal/rh/prestadores/${l.id}/acesso`, { ativo: true }), `Acesso de ${l.nome} devolvido.`)}>Devolver acesso</button>}
         </div>
-        <p className={css.hint}>{l.acesso.status === 'ATIVO' ? 'Entra com o e-mail cadastrado em Dados e contato.' : 'Sem acesso, o RH sobe a nota pela Folha e benefícios.'}</p>
+        <p className={css.hint}>{l.acesso.status === 'ATIVO' ? 'Entra com o e-mail cadastrado em Dados e contato.' : 'Sem acesso, o RH lança a nota pelo painel da pessoa.'}</p>
       </div>
     )}
 
@@ -565,10 +592,10 @@ function ResumoPessoa({ l, d }: { l: LinhaRh; d: PainelRh }) {
 }
 
 /** Fechar e liberar: MEI (mês fechado) ou semana do motorista, com prazo, aviso e confirmação do valor. */
-function ModalLiberar({ d, onFechar, onLiberado }: { d: PainelRh; onFechar: () => void; onLiberado: (m: string) => Promise<void> }) {
+function ModalLiberar({ d, tipoInicial, semanaInicial, onFechar, onLiberado }: { d: PainelRh; tipoInicial?: 'MEI' | 'MOTORISTA'; semanaInicial?: string; onFechar: () => void; onLiberado: (m: string) => Promise<void> }) {
   const semanasLib = d.semanas.filter((s) => s.motoristas > 0);
-  const [tipo, setTipo] = useState<'MEI' | 'MOTORISTA'>(d.fechado && d.totais.mei > 0 ? 'MEI' : 'MOTORISTA');
-  const [semanas, setSemanas] = useState<Set<string>>(new Set(semanasLib.filter((s) => s.encerrada && !s.liberada).map((s) => s.inicio)));
+  const [tipo, setTipo] = useState<'MEI' | 'MOTORISTA'>(tipoInicial ?? (semanaInicial ? 'MOTORISTA' : d.fechado && d.totais.mei > 0 ? 'MEI' : 'MOTORISTA'));
+  const [semanas, setSemanas] = useState<Set<string>>(new Set(semanaInicial ? [semanaInicial] : semanasLib.filter((s) => s.encerrada && !s.liberada).map((s) => s.inicio)));
   const [prazo, setPrazo] = useState(proxDiaUtil(d.hoje, tipo === 'MEI' ? 3 : 2));
   const [avisar, setAvisar] = useState(true);
   const [confirmar, setConfirmar] = useState(false);
@@ -594,16 +621,16 @@ function ModalLiberar({ d, onFechar, onLiberado }: { d: PainelRh; onFechar: () =
   }
 
   return (
-    <Modal titulo={`Liberar ${d.rotulo.split('/')[0]!.toLowerCase()} para os prestadores`} onFechar={onFechar}>
+    <Modal titulo={`Fechar e enviar · ${d.rotulo.split('/')[0]!.toLowerCase()}`} onFechar={onFechar}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p className={css.hint}>Cada prestador vê no app o resumo dele e o valor exato da nota.{' '}
+        <p className={css.hint}>Congela o valor e manda para o app: cada prestador vê o resumo dele e o valor exato da nota.{' '}
           <Explica>O valor é o retrato do fechamento: se precisar corrigir, reabra o mês, corrija e libere de novo — o prestador recebe aviso de que o valor mudou.</Explica></p>
         <div className={css.seg} role="group" aria-label="O que liberar">
           <button type="button" aria-pressed={tipo === 'MEI'} onClick={() => { setTipo('MEI'); setPrazo(proxDiaUtil(d.hoje, 3)); }}>MEI · mês</button>
           <button type="button" aria-pressed={tipo === 'MOTORISTA'} onClick={() => { setTipo('MOTORISTA'); setPrazo(proxDiaUtil(d.hoje, 2)); }}>Motoristas · semana</button>
         </div>
         {tipo === 'MEI' && d.meiLiberado && <p className={css.hint}><b>Já liberado.</b> Liberar de novo atualiza prazo e confirmação; só quem teve o valor alterado (mês reaberto e corrigido) recebe aviso.</p>}
-        {tipo === 'MEI' && !d.fechado && <p className={css.erro}>Feche {d.rotulo} na Folha e benefícios antes de liberar os MEI.</p>}
+        {tipo === 'MEI' && !d.fechado && <p className={css.erro}>Feche {d.rotulo} na Folha CLT antes de liberar os MEI.</p>}
         {tipo === 'MOTORISTA' && (
           <div className={css.semList}>
             {semanasLib.length === 0 && <p className={css.hint}>Nenhuma semana com motorista neste mês.</p>}
@@ -637,7 +664,7 @@ function ModalLiberar({ d, onFechar, onLiberado }: { d: PainelRh; onFechar: () =
         <div className={css.rodape}>
           <button type="button" className={css.btnSec} onClick={onFechar}>Voltar</button>
           <button type="button" className={css.btnPri} disabled={enviando || alvo.length === 0 || (tipo === 'MEI' && !d.fechado) || (tipo === 'MOTORISTA' && semanas.size === 0)} onClick={liberar}>
-            {enviando ? 'Liberando…' : `Liberar para ${alvo.length}`}
+            {enviando ? 'Enviando…' : `Fechar e enviar para ${alvo.length}`}
           </button>
         </div>
       </div>

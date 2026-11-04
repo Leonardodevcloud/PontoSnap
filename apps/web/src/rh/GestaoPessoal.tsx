@@ -137,7 +137,7 @@ export function GestaoPessoal() {
     finally { setCarregando(false); }
   }, [mes]);
   useEffect(() => { void recarregar(); }, [recarregar, sessao?.tenantId]);
-  // Vindo de "Notas de prestadores": ?abrir=MEI:<id> abre a pessoa direto.
+  // Vindo de "Prestadores": ?abrir=MEI:<id> abre a pessoa direto.
   useEffect(() => {
     const alvo = params.get('abrir');
     if (!alvo || !dados) return;
@@ -189,7 +189,13 @@ export function GestaoPessoal() {
   const [abaPainel, setAbaPainel] = useState<'lanc' | 'dados'>('lanc');
   const [fecharP, setFecharP] = useState<{ tipo: 'MEI' | 'MOTORISTA'; id: string; motivo: 'DESLIGAMENTO' | 'ANTECIPADO' } | null>(null);
   const abrir = (p: Painel, el?: HTMLElement | null) => { gatilho.current = el ?? (document.activeElement as HTMLElement); setAbaPainel('lanc'); setPainel(p); };
-  const fecharPainel = () => { setPainel(null); setTimeout(() => gatilho.current?.focus?.(), 0); };
+  // Veio de Prestadores para lançar uma pessoa: ao fechar, volta para lá.
+  const voltarPrestadores = useRef(params.get('de') === 'prestadores');
+  const fecharPainel = () => {
+    setPainel(null);
+    if (voltarPrestadores.current) { voltarPrestadores.current = false; navegarRota(`/rh/prestadores?mes=${mes}`); return; }
+    setTimeout(() => gatilho.current?.focus?.(), 0);
+  };
   const avisar = (msg: string, desfazer?: () => Promise<void>) => setToast({ msg, desfazer });
 
   const empresas = [...new Set([...(dados?.mei ?? []), ...(dados?.motoristas ?? [])].map((x) => x.empresa).filter((x): x is string => !!x))].sort();
@@ -277,7 +283,7 @@ export function GestaoPessoal() {
   return (
     <div className={css.pagina}>
       <div className={css.topo}>
-        <h2>Gestão de pessoal</h2>
+        <h2>Folha CLT</h2>
         <div className={css.seg} role="group" aria-label="Visão">
           <button type="button" aria-pressed={visao === 'fech'} onClick={() => ir({ aba: ultimaAba.current })}>Fechamento do mês</button>
           <button type="button" aria-pressed={visao === 'hist'} onClick={() => ir({ aba: 'historico' })}>Histórico</button>
@@ -312,8 +318,10 @@ export function GestaoPessoal() {
 
         <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
           {([
-            ['folha', 'Folha CLT', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length],
-            ['prestadores', 'Prestadores', d ? d.mei.length + d.motoristas.length : undefined], ['debitos', 'Débitos', d?.debitos.length],
+            ['folha', 'Salários', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length],
+            // Prestadores (MEI e motoristas) têm tela própria; a aba só aparece quando vem de lá para lançar.
+            ...(aba === 'prestadores' ? [['prestadores', 'Lançamentos de prestadores', d ? d.mei.length + d.motoristas.length : undefined]] : []),
+            ['debitos', 'Débitos', d?.debitos.length],
           ] as [Aba, string, number | undefined][]).map(([k, t, n]) => {
             const pendente = passos.find((p) => p.aba === k)?.status === 'aviso';
             return (
@@ -324,8 +332,12 @@ export function GestaoPessoal() {
             );
           })}
         </div>
+        {aba === 'prestadores' && (
+          <p className={css.avisoAba} role="note">O acompanhamento das notas e os pagamentos ficam em <Link to={`/rh/prestadores?mes=${mes}`}>Prestadores</Link>. Aqui é só para lançar extras, faltas e dias.</p>
+        )}
         {(() => {
           // Um aviso por vez: só o da aba aberta.
+          if (aba === 'prestadores') return null;
           const p = passos.find((x) => x.aba === aba);
           return p?.status === 'aviso' && d ? <p className={css.avisoAba} role="note">{p.texto}</p> : null;
         })()}
@@ -2524,4 +2536,42 @@ function ResumoAba({ aba, d }: { aba: Aba; d: PessoalCompetencia }) {
     ...(fixos(d.debitos).length ? [{ k: 'Fixos mensais', v: `${brl(soma(fixos(d.debitos), (x) => x.parcelaCent))}/mês`, s: `${fixos(d.debitos).length} débito${fixos(d.debitos).length > 1 ? 's' : ''} sem prazo` }] : []),
   ]} />;
   return null;
+}
+
+/**
+ * Pix de um prestador fora da Folha (tela Prestadores › Pagamentos): carrega o
+ * mês, monta o mesmo QR Code da Folha e registra o pagamento ao confirmar.
+ */
+export function PixPrestador({ mes, tipo, id, semana, onFechar, onPago }: {
+  mes: string; tipo: 'MEI' | 'MOTORISTA'; id: string; semana?: string; onFechar: () => void; onPago: (msg: string) => void;
+}) {
+  const [d, setD] = useState<PessoalCompetencia | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const carregar = useCallback(async () => {
+    try { setD(await api.get<PessoalCompetencia>(`/pessoal/competencia?comp=${mes}`)); } catch (e) { setErro((e as Error).message); }
+  }, [mes]);
+  useEffect(() => { void carregar(); }, [carregar]);
+  const alvo = useMemo(() => {
+    if (!d) return null;
+    if (tipo === 'MEI') { const l = d.mei.find((x) => x.id === id); return l ? pixMei(l, d.debitos) : null; }
+    const l = d.motoristas.find((x) => x.id === id); const s = l?.semanas.find((x) => x.inicio === semana);
+    return l && s ? pixSemana(l, s, d.debitos) : null;
+  }, [d, tipo, id, semana]);
+  if (erro) return <Dialogo titulo="Não deu para abrir o Pix" confirmar="Fechar" onCancelar={onFechar} onConfirmar={onFechar}><p>{erro}</p></Dialogo>;
+  if (!d) return null;
+  if (!alvo || !normalizarChave(alvo.chave)) {
+    return <Dialogo titulo="Sem chave Pix" confirmar="Fechar" onCancelar={onFechar} onConfirmar={onFechar}>
+      <p>{alvo ? `${alvo.nome} não tem chave Pix válida no cadastro. Cadastre em Prestadores › Dados e contato, ou pague por fora e use "Pago".` : 'Não achei este pagamento no mês.'}</p>
+    </Dialogo>;
+  }
+  return <ModalPix alvo={alvo} mes={mes} onFechar={onFechar} onRegistrar={async (r, pago, valorCent, debitoCent) => {
+    try {
+      await api.put('/pessoal/pagamento', {
+        pessoaTipo: r.pessoaTipo, pessoaId: r.pessoaId, competencia: mes, semanas: r.semanas, periodo: r.periodo,
+        pago, valorPago: pago && valorCent != null ? valorCent / 100 : null,
+        ...(r.periodo ? { debitoAplicado: (pago ? (debitoCent ?? r.debitoAplicadoCent ?? 0) : 0) / 100 } : {}),
+      });
+      onPago(pago ? `${r.nome}: pago ${brl(valorCent ?? 0)}.` : `${r.nome}: pagamento desfeito.`);
+    } catch (e) { setErro((e as Error).message); }
+  }} />;
 }

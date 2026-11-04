@@ -124,7 +124,7 @@ export function FecharPessoa({ pessoa, mes, motivoInicial = 'DESLIGAMENTO', temA
           <label className={`${css.op} ${liberar ? css.on : ''}`}>
             <input type="checkbox" checked={liberar} onChange={(e) => setLiberar(e.target.checked)} />
             <span><b>Liberar a nota para {mei ? 'emitir' : 'as semanas'} agora</b>
-              <small>{app ? 'Recebe o aviso no celular e envia a nota pelo app.' : 'Sem app: o RH sobe a nota pela Folha e benefícios.'}</small></span>
+              <small>{app ? 'Recebe o aviso no celular e envia a nota pelo app.' : 'Sem app: o RH lança a nota pelo painel da pessoa.'}</small></span>
           </label>
           {app && motivo === 'DESLIGAMENTO' && (
             <label className={`${css.op} ${cortar ? css.on : ''}`}>
