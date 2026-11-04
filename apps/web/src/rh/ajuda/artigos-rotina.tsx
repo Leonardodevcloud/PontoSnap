@@ -168,7 +168,7 @@ function FecharMes() {
           <li><b>Pedidos</b> — decida ajustes e atestados.</li>
           <li><b>Férias e afastamentos</b> — confira se estão lançados.</li>
           <li><b>Ponto do mês</b> — confira espelhos e apuração.</li>
-          <li><b>Folha CLT</b> — "Salários" → "Benefícios" → "Débitos" → "Fechar mês". Os números ficam congelados; só o administrador reabre. Fechar o mês também fecha o valor dos MEI.</li>
+          <li><b>Folha CLT</b> — "Salários" → "Benefícios" → "Fechar mês" (os débitos ficam no menu <b>Débitos</b>, logo abaixo). Os números ficam congelados; só o administrador reabre. Fechar o mês também fecha o valor dos MEI.</li>
           <li><b>Prestadores</b> — fechar e enviar o valor (motorista: toda semana; MEI: depois de fechar o mês), conferir as notas e pagar.</li>
           <li><b>Assinaturas</b> — mandar espelho e contracheque para assinar.</li>
           <li><b>Relatórios e arquivos</b> — consolidado, AFD e AEJ.</li>

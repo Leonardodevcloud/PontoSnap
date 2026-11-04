@@ -140,7 +140,7 @@ export function FecharPessoa({ pessoa, mes, motivoInicial = 'DESLIGAMENTO', temA
           {!c && !carregando && <p className={css.vazio}>{erro ?? 'Sem prévia.'}</p>}
           {c && (mei ? <ResumoMei m={c as PessoalLinhaMei} futuros={previa!.futurosCent} /> : <ResumoMot m={c as PessoalLinhaMot} futuros={previa!.futurosCent} />)}
           {c && previa!.futurosCent > 0 && (
-            <p className={css.aviso}>No desligamento, as parcelas de débito que ainda iam cair ({brl(previa!.futurosCent)}) são descontadas agora. Para não descontar, ajuste o débito na aba Débitos antes de fechar.</p>
+            <p className={css.aviso}>No desligamento, as parcelas de débito que ainda iam cair ({brl(previa!.futurosCent)}) são descontadas agora. Para não descontar, ajuste o débito na tela Débitos (menu ao lado) antes de fechar.</p>
           )}
         </section>
       </div>

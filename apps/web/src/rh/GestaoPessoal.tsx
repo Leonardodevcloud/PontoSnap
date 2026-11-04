@@ -98,7 +98,8 @@ type Dialogo =
   | null;
 type Toast = { msg: string; desfazer?: () => Promise<void> } | null;
 
-export function GestaoPessoal() {
+/** soDebitos: a mesma tela, reduzida aos débitos (menu "Débitos", separado da Folha CLT). */
+export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {}) {
   const { sessao } = useAuth();
   const [params, setParams] = useSearchParams();
   const navegarRota = useNavigate();
@@ -106,7 +107,7 @@ export function GestaoPessoal() {
   const abaBruta = params.get('aba');
   // Links antigos (?aba=mei / ?aba=motoristas) caem na aba única de prestadores.
   const abaParam = (abaBruta === 'mei' || abaBruta === 'motoristas' ? 'prestadores' : abaBruta) as Aba | null;
-  const aba: Aba = abaParam && ABAS.includes(abaParam) ? abaParam : 'folha';
+  const aba: Aba = soDebitos ? 'debitos' : abaParam && ABAS.includes(abaParam) && abaParam !== 'debitos' ? abaParam : 'folha';
   const novo = params.get('novo') as 'MEI' | 'MOTORISTA' | null;
   const ir = useCallback((p: { mes?: string; aba?: Aba; novo?: string | null; pessoa?: string | null }) => {
     setParams((at) => {
@@ -118,6 +119,8 @@ export function GestaoPessoal() {
       return n;
     });
   }, [setParams]);
+  // Débitos saíram da Folha CLT para tela própria: link antigo (?aba=debitos) vai pra lá.
+  useEffect(() => { if (!soDebitos && abaBruta === 'debitos') navegarRota(`/rh/debitos?mes=${mes}`, { replace: true }); }, [soDebitos, abaBruta, mes, navegarRota]);
 
   const [dados, setDados] = useState<PessoalCompetencia | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -297,11 +300,11 @@ export function GestaoPessoal() {
   return (
     <div className={css.pagina}>
       <div className={css.topo}>
-        <h2>Folha CLT</h2>
-        <div className={css.seg} role="group" aria-label="Visão">
+        <h2>{soDebitos ? 'Débitos' : 'Folha CLT'}</h2>
+        {!soDebitos && <div className={css.seg} role="group" aria-label="Visão">
           <button type="button" aria-pressed={visao === 'fech'} onClick={() => ir({ aba: ultimaAba.current })}>Fechamento do mês</button>
           <button type="button" aria-pressed={visao === 'hist'} onClick={() => ir({ aba: 'historico' })}>Histórico</button>
-        </div>
+        </div>}
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
 
@@ -321,21 +324,20 @@ export function GestaoPessoal() {
             ? <span className={`${css.chip} ${css.chipOk}`} title={`Fechado em ${new Date(d.fechadoEm!).toLocaleDateString('pt-BR')}`}>fechado em {new Date(d.fechadoEm!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
             : <span className={`${css.chip} ${css.chipAberto}`}>em aberto</span>)}
           <span className={css.esp} />
-          {fechado && d && (d.mei.length > 0 || d.motoristas.length > 0) && (
+          {!soDebitos && fechado && d && (d.mei.length > 0 || d.motoristas.length > 0) && (
             <Botao variante="ghost" className={css.btnSec} onClick={() => navegarRota(`/rh/prestadores?mes=${mes}&liberar=1`)}>Liberar para os prestadores</Botao>
           )}
-          {fechado
+          {soDebitos ? null : fechado
             ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
             : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}
         </div>
         {fechado && <p className={css.fechadoLinha}>Os números de {mesCurto(mes)} são o retrato do fechamento e não mudam mais. Nota fiscal e pagamento ainda podem ser registrados.</p>}
 
-        <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
+        {!soDebitos && <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
           {([
             ['folha', 'Salários', d?.clt.length], ['beneficios', 'Benefícios', d?.clt.length],
             // Prestadores (MEI e motoristas) têm tela própria; a aba só aparece quando vem de lá para lançar.
             ...(aba === 'prestadores' ? [['prestadores', 'Lançamentos de prestadores', d ? d.mei.length + d.motoristas.length : undefined]] : []),
-            ['debitos', 'Débitos', d?.debitos.length],
           ] as [Aba, string, number | undefined][]).map(([k, t, n]) => {
             const pendente = passos.find((p) => p.aba === k)?.status === 'aviso';
             return (
@@ -345,7 +347,7 @@ export function GestaoPessoal() {
               </button>
             );
           })}
-        </div>
+        </div>}
         {aba === 'prestadores' && (
           <p className={css.avisoAba} role="note">O acompanhamento das notas e os pagamentos ficam em <Link to={`/rh/prestadores?mes=${mes}`}>Prestadores</Link>. Aqui é só para lançar extras, faltas e dias.</p>
         )}
@@ -391,7 +393,7 @@ export function GestaoPessoal() {
         onRemover={(id, descricao, nome) => setDialogo({ tipo: 'remDebito', id, descricao, nome })}
         onEncerrar={(x) => setDialogo({ tipo: 'encDebito', id: x.id, descricao: x.descricao, nome: x.nome, valorCent: x.parcelaCent })} />}
 
-      {d && d.foraDoMes.length > 0 && (
+      {!soDebitos && d && d.foraDoMes.length > 0 && (
         <div className={css.fora}>
           <span className={css.lb}>Fora de {mesCurto(mes)}</span>
           {d.foraDoMes.map((f) => (

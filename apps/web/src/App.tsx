@@ -151,6 +151,7 @@ export function App() {
         <Route path="espelhos" element={<ComMesPadrao><Espelhos /></ComMesPadrao>} />
         <Route path="apuracao" element={<ComMesPadrao><ApuracaoCLT /></ComMesPadrao>} />
         <Route path="pessoal" element={<ComMesPadrao><GestaoPessoal /></ComMesPadrao>} />
+        <Route path="debitos" element={<ComMesPadrao><GestaoPessoal key="debitos" soDebitos /></ComMesPadrao>} />
         <Route path="prestadores" element={<ComMesPadrao><Prestadores /></ComMesPadrao>} />
         <Route path="prestadores/conferir" element={<ConferirNotas />} />
         <Route path="prestadores/modelos" element={<ModelosNota />} />
