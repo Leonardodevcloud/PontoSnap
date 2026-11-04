@@ -63,7 +63,7 @@ export function detalheMei(m: LinhaMei, debitos: LinhaDebito[], competencia: str
     : { rotulo: 'Contrato mensal', valorCent: m.valorCent, tipo: 'BASE' }];
   if (m.heCent) l.push({ rotulo: `Horas extras (${horas(m.lanc.heMin)})`, valorCent: m.heCent, tipo: 'MAIS' });
   if (m.feriadosCent) l.push({ rotulo: `Feriados trabalhados (${m.lanc.feriadosTrab})`, valorCent: m.feriadosCent, tipo: 'MAIS' });
-  if (m.lanc.metaCent) l.push({ rotulo: `Meta de ${nomeMes(competencia)}`, valorCent: m.lanc.metaCent, tipo: 'MAIS' });
+  if (m.lanc.metaCent) l.push({ rotulo: `Meta (comissão) de ${nomeMes(competencia)}${m.lanc.metaPaga ? ' · já paga antes' : ' · paga agora'}`, valorCent: m.lanc.metaCent, tipo: 'MAIS' });
   if (m.faltasCent) l.push({ rotulo: plural(m.lanc.faltas, 'falta', 'faltas'), valorCent: m.faltasCent, tipo: 'MENOS' });
   const debs = linhasDebito(debitos, m.id);
   const somaDebs = debs.reduce((a, d) => a + d.valorCent, 0);
@@ -71,7 +71,7 @@ export function detalheMei(m: LinhaMei, debitos: LinhaDebito[], competencia: str
   const futuros = m.debitosFuturosCent ?? 0;
   if (futuros > 0) l.push({ rotulo: 'Parcelas restantes de débitos (desligamento)', valorCent: futuros, tipo: 'MENOS', foraDaNota: true });
   if (m.debitosCent - somaDebs - futuros > 0) l.push({ rotulo: 'Outros descontos', valorCent: m.debitosCent - somaDebs - futuros, tipo: 'MENOS', foraDaNota: true });
-  if (m.metaDescontadaCent) l.push({ rotulo: 'Meta já paga antes', valorCent: m.metaDescontadaCent, tipo: 'MENOS', foraDaNota: true });
+  if (m.metaDescontadaCent) l.push({ rotulo: 'Meta (comissão) já paga antes — sai do pagamento', valorCent: m.metaDescontadaCent, tipo: 'MENOS', foraDaNota: true });
   return fechar(l, m.liquidoCent);
 }
 

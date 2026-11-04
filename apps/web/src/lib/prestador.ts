@@ -120,6 +120,8 @@ export interface UnidadeRh {
   /** Motorista: dias previstos pela escala (seg–sáb / seg–sex, sem feriado). Diferente de `dias` = ajustado à mão. */
   diasAuto?: number | null; situacao: Situacao; atrasada: boolean; pago: boolean;
   valorPagoCent: number | null; pagoEm: string | null; nota: Nota | null;
+  /** Composição do valor antes de liberar (liberada: vale nota.detalhe, congelado). */
+  detalhe?: LinhaDetalhe[] | null;
   nf: { numero: string | null; arquivo: (ArquivoNf & { pessoaId: string; competencia: string; periodo: string }) | null }; tipo: 'MEI' | 'MOTORISTA';
 }
 export interface LinhaRh {

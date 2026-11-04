@@ -582,7 +582,7 @@ export class PortalService {
       return { status: (c ? 'BLOQUEADO' : conv ? 'CONVITE_VENCIDO' : 'SEM') as 'BLOQUEADO' | 'CONVITE_VENCIDO' | 'SEM', temPush: false, conviteExpiraEm: null };
     };
     /** `nfVivoCent`: valor da nota calculado agora (antes de liberar); `dias`: dias da semana do motorista. */
-    const unidade = (id: string, tipo: 'MEI' | 'MOTORISTA', periodo: string, valorCent: number, nfVivoCent: number, dias: number | null = null, diasAuto: number | null = null) => {
+    const unidade = (id: string, tipo: 'MEI' | 'MOTORISTA', periodo: string, valorCent: number, nfVivoCent: number, dias: number | null = null, diasAuto: number | null = null, detalheVivo: LinhaDetalheNota[] | null = null) => {
       const n = dados.notas.find((x) => x.pessoaId === id && x.periodo === periodo) ?? null;
       const lanc = dados.lancs.find((l) => l.pessoaId === id && l.periodo === periodo);
       const arq = dados.arqs.find((a) => a.pessoaId === id && a.periodo === periodo);
@@ -594,16 +594,18 @@ export class PortalService {
         periodo, rotulo: rotuloPeriodo(competencia, periodo), valorCent: n?.valorCent ?? valorCent, nfCent: n ? valorDaNf(n) : nfVivoCent, dias, diasAuto, situacao: sit, atrasada, pago,
         valorPagoCent: pago && lanc?.valorPago != null ? centavos(lanc.valorPago) : null, pagoEm: pago ? lanc?.pagoEm?.toISOString() ?? null : null,
         nota: n ? this.visao(n, { lanc, arquivo: arq ?? null }) : null,
+        /** Composição do valor calculada agora (antes de liberar); liberada, vale a da nota (congelada). */
+        detalhe: n ? null : detalheVivo,
         nf: { numero: lanc?.nfNumero ?? null, arquivo: arq ?? null },
         tipo,
       };
     };
 
     const linhas = [
-      ...comp.mei.map((m) => ({ id: m.id, tipo: 'MEI' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null, unidades: [unidade(m.id, 'MEI', 'MES', m.liquidoCent, m.brutoCent)] })),
+      ...comp.mei.map((m) => ({ id: m.id, tipo: 'MEI' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null, unidades: [unidade(m.id, 'MEI', 'MES', m.liquidoCent, m.brutoCent, null, null, detalheMei(m, comp.debitos, competencia))] })),
       ...comp.motoristas.map((m) => ({
         id: m.id, tipo: 'MOTORISTA' as const, nome: m.nome, valorCent: m.liquidoCent, fechadoIndividual: m.fechadoIndividual ?? null,
-        unidades: m.semanas.filter((s) => s.dias > 0).map((s) => unidade(m.id, 'MOTORISTA', s.inicio, valorSemana(s), s.totalCent, s.dias, s.diasAuto)),
+        unidades: m.semanas.filter((s) => s.dias > 0).map((s) => unidade(m.id, 'MOTORISTA', s.inicio, valorSemana(s), s.totalCent, s.dias, s.diasAuto, detalheSemana(m, s))),
       })),
     ].map((l) => {
       const p = pr.get(l.id);

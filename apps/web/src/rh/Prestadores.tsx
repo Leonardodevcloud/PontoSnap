@@ -5,8 +5,8 @@ import { salvarBlob } from '../lib/download';
 import { mascaraDoc } from '../lib/formato';
 import { normalizarChave } from '../lib/pix';
 import {
-  brl, dataBr, dataIsoBr, diaMes, fmtTel, haQuanto, ROTULO_SITUACAO, TOM_SITUACAO,
-  type ConviteGerado, type LinhaRh, type ListaModelos, type PainelRh, type Situacao, type UnidadeRh,
+  brl, foraDaNota, dataBr, dataIsoBr, diaMes, fmtTel, haQuanto, ROTULO_SITUACAO, TOM_SITUACAO,
+  type ConviteGerado, type LinhaDetalhe, type LinhaRh, type ListaModelos, type PainelRh, type Situacao, type UnidadeRh,
 } from '../lib/prestador';
 import { Caricatura, hash, useAvatares } from '../components/Avatar';
 import { Modal } from '../components/Modal';
@@ -477,6 +477,7 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
               <div className={css.unidTopo}><b>{u.rotulo}</b><TagSituacao s={u.situacao} atrasada={u.atrasada} /></div>
               {u.nfCent != null && u.nfCent !== u.valorCent && <div className={css.lin}><span>Valor da nota</span><span className={css.mono}>{brl(u.nfCent)}</span></div>}
               <div className={css.lin}><span>{u.nfCent != null && u.nfCent !== u.valorCent ? 'A pagar' : 'Valor'}</span><span className={css.mono}>{brl(u.valorCent)}{n && n.versao > 1 ? ` · versão ${n.versao}` : ''}</span></div>
+              <Composicao linhas={n?.detalhe ?? u.detalhe ?? []} nfCent={u.nfCent ?? u.valorCent} aPagarCent={u.valorCent} congelado={!!n} />
               {n?.prazo && <div className={css.lin}><span>Prazo</span><span>{dataBr(n.prazo)}</span></div>}
               {n && <div className={css.lin}><span>Liberado</span><span>{dataIsoBr(n.liberadoEm)}{n.vistoEm ? ` · viu ${haQuanto(n.vistoEm)}` : ' · não abriu'}</span></div>}
               {u.nf.numero && <div className={css.lin}><span>NF</span><span className={css.mono}>{u.nf.numero}{n?.nf.data ? ` · ${dataBr(n.nf.data)}` : ''}</span></div>}
@@ -673,6 +674,32 @@ function LoginPrestador({ l, ocupado, onMudou, onErro }: { l: LinhaRh; ocupado: 
         </>}
       </>}
     </>
+  );
+}
+
+/**
+ * De onde sai o valor: o que entra na nota (contrato, extras, feriados,
+ * comissão, faltas) e o que sai só no pagamento (débitos, comissão já paga).
+ */
+function Composicao({ linhas, nfCent, aPagarCent, congelado }: { linhas: LinhaDetalhe[]; nfCent: number; aPagarCent: number; congelado: boolean }) {
+  if (!linhas.length) return null;
+  const naNota = linhas.filter((l) => !foraDaNota(l));
+  const noPagamento = linhas.filter(foraDaNota);
+  const sinal = (l: LinhaDetalhe) => (l.tipo === 'MENOS' ? '−' : l.tipo === 'MAIS' ? '+' : '');
+  const Linha = ({ l }: { l: LinhaDetalhe }) => (
+    <div className={`${css.compLin} ${l.tipo === 'MENOS' ? css.compMenos : ''}`}><span>{l.rotulo}</span><span className={css.mono}>{sinal(l)} {brl(l.valorCent)}</span></div>
+  );
+  return (
+    <div className={css.comp}>
+      <div className={css.compTit}>Como chegou nesse valor{congelado ? '' : ' (prévia — ainda não enviada)'}</div>
+      {naNota.map((l, i) => <Linha key={`n${i}`} l={l} />)}
+      <div className={`${css.compLin} ${css.compTotal}`}><span>Valor da nota</span><span className={css.mono}>{brl(nfCent)}</span></div>
+      {noPagamento.length > 0 && <>
+        <div className={css.compSub}>Sai só do pagamento (não entra na nota)</div>
+        {noPagamento.map((l, i) => <Linha key={`p${i}`} l={l} />)}
+        <div className={`${css.compLin} ${css.compTotal}`}><span>A pagar</span><span className={css.mono}>{brl(aPagarCent)}</span></div>
+      </>}
+    </div>
   );
 }
 

@@ -24,7 +24,7 @@ describe('como chegou no valor', () => {
 
   it('MEI: linhas fecham com o líquido', () => {
     const l = detalheMei(mei, debs, '2026-10');
-    expect(l.map((x) => x.rotulo)).toEqual(['Contrato mensal', 'Horas extras (6h)', 'Meta de outubro', '1 falta', 'Adiantamento (parcela 2/4)']);
+    expect(l.map((x) => x.rotulo)).toEqual(['Contrato mensal', 'Horas extras (6h)', 'Meta (comissão) de outubro · paga agora', '1 falta', 'Adiantamento (parcela 2/4)']);
     expect(soma(l)).toBe(mei.liquidoCent);
   });
   it('MEI: diferença vira ajuste (nunca mostra conta que não bate)', () => {
