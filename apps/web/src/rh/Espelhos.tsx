@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/formato';
 import { salvarBlob } from '../lib/download';
@@ -47,6 +47,14 @@ export function Espelhos() {
 
   const [emps, setEmps] = useState<Empregado[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  // Voltou de um lançamento (Ajustes): mostra o que foi feito por alguns segundos.
+  const loc = useLocation();
+  const [aviso, setAviso] = useState<string | null>((loc.state as { aviso?: string } | null)?.aviso ?? null);
+  useEffect(() => {
+    const a = (loc.state as { aviso?: string } | null)?.aviso;
+    if (a) setAviso(a);
+  }, [loc.state]);
+  useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(null), 8000); return () => clearTimeout(t); }, [aviso]);
 
   useEffect(() => {
     api.get<Empregado[]>('/empregados')
@@ -95,6 +103,7 @@ export function Espelhos() {
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
+      {aviso && <p className={css.aviso} role="status">{aviso}</p>}
 
       {visao === 'todos' && <Todos mes={mes} emps={emps} onAbrir={(id) => ir({ emp: id })} onErro={setErro} />}
       {visao === 'um' && !dia && empregadoId && (
@@ -405,6 +414,8 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
   }, [empregadoId, data, onErro]);
 
   const r = esp?.resumo;
+  // Depois de lançar, volta para o mês do funcionário (onde se clica o próximo dia).
+  const voltar = encodeURIComponent(`/rh/espelhos?mes=${mes}&emp=${empregadoId}`);
 
   return (
     <>
@@ -453,9 +464,9 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
             })()}
             {r?.paresIncompletos && <div className={css.aviso}>Batida em aberto — falta uma saída/entrada.</div>}
             <div className={vt.acoes} style={{ marginTop: 14 }}>
-              <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}`} className={css.linkBtn}>Lançar ajuste neste dia</Link>
+              <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}&voltar=${voltar}`} className={css.linkBtn}>Lançar ajuste neste dia</Link>
               {(esp.situacao === 'Falta' || (esp.situacao == null && (r?.saldoMinutos ?? 0) < 0)) && (
-                <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}&tipo=FOLGA`} className={css.linkBtn}>Lançar folga neste dia</Link>
+                <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}&tipo=FOLGA&voltar=${voltar}`} className={css.linkBtn}>Lançar folga neste dia</Link>
               )}
             </div>
           </div>

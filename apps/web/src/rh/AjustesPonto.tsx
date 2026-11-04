@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { rotuloMarcacao } from '../lib/formato';
 import css from './AjustesPonto.module.css';
@@ -59,6 +59,9 @@ export default function AjustesPonto() {
   const [enviando, setEnviando] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const [lancando, setLancando] = useState(false);
+  const navegar = useNavigate();
+  // Veio de outra tela (espelho do funcionário, apuração): ao lançar ou cancelar, volta pra lá.
+  const voltarPara = (() => { const v = params.get('voltar'); return v && v.startsWith('/rh/') && !v.startsWith('//') ? v : null; })();
 
   const [filtroStatus, setFiltroStatus] = useState('EM_ANALISE');
   const [folgas, setFolgas] = useState<FolgaLancada[]>([]);
@@ -273,9 +276,11 @@ export default function AjustesPonto() {
           empregadoIdInicial={params.get('empregadoId') ?? ''}
           tipoInicial={params.get('tipo') === 'FOLGA' ? 'FOLGA' : undefined}
           dataInicial={params.get('data') ?? ''}
-          onFechar={() => { setLancando(false); setParams({}); }}
+          onFechar={() => { setLancando(false); if (voltarPara) { navegar(voltarPara); return; } setParams({}); }}
           onPronto={(m) => {
-            setLancando(false); setParams({});
+            setLancando(false);
+            if (voltarPara) { navegar(voltarPara, { state: { aviso: m ?? 'Ajuste lançado — já vale na apuração.' } }); return; }
+            setParams({});
             setMsg(m ?? 'Ajuste lançado — já vale na apuração.');
             void carregar();
           }}
@@ -285,6 +290,7 @@ export default function AjustesPonto() {
   );
 }
 
+const SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 interface EmpLite { id: string; nome: string; ativo: boolean }
 /** "2" → 120 · "1,5" → 90 · "1:30" → 90 · inválido → null */
 function lerHoras(t: string): number | null {
@@ -307,6 +313,7 @@ function ModalLancar({ empregadoIdInicial, dataInicial, tipoInicial, onFechar, o
   const [emps, setEmps] = useState<EmpLite[]>([]);
   const [empregadoId, setEmpregadoId] = useState(empregadoIdInicial);
   const [data, setData] = useState(dataInicial || new Date().toISOString().slice(0, 10));
+  const [fixo, setFixo] = useState(!!empregadoIdInicial && !!dataInicial);
   const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO' | 'FOLGA'>(tipoInicial ?? 'INCLUSAO');
   // Folga concedida: por feriado trabalhado (com a data dele) ou outro motivo.
   const [porFeriado, setPorFeriado] = useState(true);
@@ -417,6 +424,13 @@ function ModalLancar({ empregadoIdInicial, dataInicial, tipoInicial, onFechar, o
           <button className={css.gX} onClick={onFechar} aria-label="Fechar">✕</button>
         </div>
 
+        {fixo ? (
+          // Veio de um dia do espelho: funcionário e dia já escolhidos.
+          <div className={css.fixoLinha}>
+            <span><b>{emps.find((e) => e.id === empregadoId)?.nome ?? 'Carregando…'}</b> · {SEMANA[new Date(`${data}T12:00:00Z`).getUTCDay()]} {data.split('-').reverse().join('/')}</span>
+            <button className={css.cancelar} onClick={() => setFixo(false)}>trocar</button>
+          </div>
+        ) : <>
         <span className={css.lb}>Funcionário</span>
         <select className={css.inp} value={empregadoId} onChange={(e) => setEmpregadoId(e.target.value)}>
           <option value="">— escolher —</option>
@@ -426,6 +440,7 @@ function ModalLancar({ empregadoIdInicial, dataInicial, tipoInicial, onFechar, o
         <span className={css.lb}>Dia</span>
         <input className={css.inp} type="date" value={data} max={tipo === 'FOLGA' ? undefined : new Date().toISOString().slice(0, 10)}
           onChange={(e) => setData(e.target.value)} />
+        </>}
 
         {empregadoId && data && (
           <div className={css.diaCtx}>

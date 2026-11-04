@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { minutosParaHhMm, reaisDeCentavos, rotuloMarcacao } from '../lib/formato';
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
@@ -508,6 +508,7 @@ function GavetaDia({ data, dia, batidas, esperadas, pares, nome, empregadoId, on
   empregadoId: string;
   onFechar: () => void;
 }) {
+  const loc = useLocation();
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar(); };
     window.addEventListener('keydown', esc);
@@ -605,7 +606,7 @@ function GavetaDia({ data, dia, batidas, esperadas, pares, nome, empregadoId, on
         )}
 
         <div className={css.gAcoes}>
-          <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}`} className={css.gBtn}>Lançar ajuste neste dia</Link>
+          <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}&voltar=${encodeURIComponent(loc.pathname + loc.search)}`} className={css.gBtn}>Lançar ajuste neste dia</Link>
           <Link to={`/rh/espelhos?data=${data}`} className={css.gBtn2}>Abrir espelho</Link>
         </div>
       </aside>
