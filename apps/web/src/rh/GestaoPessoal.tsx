@@ -145,8 +145,12 @@ export function GestaoPessoal() {
     const alvo = params.get('abrir');
     if (!alvo || !dados) return;
     const [tipo, id] = alvo.split(':');
-    if (id && (tipo === 'MEI' || tipo === 'MOTORISTA')) { setFocoSemana(params.get('semana')); abrir({ tipo: tipo === 'MEI' ? 'mei' : 'mot', id }); }
-    setParams((at) => { const n = new URLSearchParams(at); n.delete('abrir'); n.delete('semana'); return n; }, { replace: true });
+    if (id && (tipo === 'MEI' || tipo === 'MOTORISTA')) {
+      setFocoSemana(params.get('semana')); abrir({ tipo: tipo === 'MEI' ? 'mei' : 'mot', id });
+      // ?painel=dados: abre direto em "Dados e acesso" (valor e escala/dias do contrato).
+      if (params.get('painel') === 'dados') setAbaPainel('dados');
+    }
+    setParams((at) => { const n = new URLSearchParams(at); n.delete('abrir'); n.delete('semana'); n.delete('painel'); return n; }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dados]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t); }, [toast]);

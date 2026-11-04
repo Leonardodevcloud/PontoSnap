@@ -241,9 +241,22 @@ async function main() {
   const av = await cad.avatares(t.id);
   ok(!!av.prestadores[carlos!.id]?.foto, 'RH vê a foto do prestador nas listas');
 
+  // ── Pix e senha pelo RH ──
+  await portal.salvarContato(t.id, carlos!.id, { chavePix: ' carlos@pix.com ' });
+  painel = await portal.painel(t.id, COMP);
+  ok(painel.linhas.find((l) => l.id === carlos!.id)!.chavePix === 'carlos@pix.com', 'RH cadastra/troca a chave Pix em Dados e contato');
+  ok((await portal.acessoDe(t.id, carlos!.id)).login === novoEmail, 'Acesso ao app mostra o e-mail de login');
+  const prov = await portal.senhaPrestador(t.id, carlos!.id, 'PROVISORIA');
+  ok(!!prov.senhaProvisoria && prov.senhaProvisoria.length >= 8 && !!(await falha(auth.login(novoEmail, 'Senha123!'))), 'senha provisória: a antiga deixa de valer');
+  const lp = await auth.login(novoEmail, prov.senhaProvisoria!);
+  ok(lp.perfil === 'PRESTADOR' && (lp as { deveTrocarSenha?: boolean }).deveTrocarSenha === true, 'entra com a provisória e é obrigado a trocar');
+  ok((await portal.senhaPrestador(t.id, carlos!.id, 'LINK')).senhaProvisoria === null, 'link por e-mail não devolve senha');
+  ok(!!(await falha(portal.senhaPrestador(t.id, renata!.id, 'PROVISORIA'))), 'sem acesso criado: não gera senha');
+
   // ── cortar acesso ──
   await portal.definirAcesso(t.id, carlos!.id, false);
-  ok(!!(await falha(auth.login(novoEmail, 'Senha123!'))), 'acesso cortado: login recusado');
+  ok(!!(await falha(auth.login(novoEmail, prov.senhaProvisoria!))), 'acesso cortado: login recusado');
+  ok(!!(await falha(portal.senhaPrestador(t.id, carlos!.id, 'PROVISORIA'))), 'acesso cortado: não gera senha');
   painel = await portal.painel(t.id, COMP);
   ok(painel.linhas.find((l) => l.id === carlos!.id)!.acesso.status === 'BLOQUEADO', 'painel mostra bloqueado');
 

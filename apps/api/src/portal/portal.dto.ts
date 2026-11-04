@@ -82,6 +82,13 @@ export class ContatoDto {
   @IsOptional() @IsString() @MaxLength(20) documento?: string | null;
   @IsOptional() @IsString() @MaxLength(160) tomadorNome?: string | null;
   @IsOptional() @IsString() @MaxLength(20) tomadorCnpj?: string | null;
+  /** Chave Pix (CPF, CNPJ, celular, e-mail ou aleatória). Vazio = sem chave. */
+  @IsOptional() @IsString() @MaxLength(140) chavePix?: string | null;
+}
+
+/** Senha do prestador: link por e-mail ou senha provisória (troca obrigatória na 1ª entrada). */
+export class SenhaPrestadorDto {
+  @IsIn(['LINK', 'PROVISORIA']) modo!: 'LINK' | 'PROVISORIA';
 }
 
 export class ModeloNotaDto {

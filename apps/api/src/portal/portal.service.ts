@@ -13,6 +13,7 @@ import { EmailService } from '../email/email.service';
 import { emailConvitePrestador } from '../email/templates';
 import { AuthService } from '../auth/auth.service';
 import { hashSenha } from '../auth/senha';
+import { senhaProvisoria } from '../tenant/tenant.service';
 import { centavos } from '../pessoal/calculo';
 import {
   conferir, dataBr, detalheMei, detalheSemana, diaMes, fimDaSemana, gerarCodigo, lerNfseXml, linkWhatsapp, maisUrgente, mascararPix,
@@ -886,7 +887,7 @@ export class PortalService {
     return comTenant(this.db, tenantId, async (tx) => {
       const p = (await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, tenantId), eq(pessoalPrestador.id, prestadorId))).limit(1))[0];
       if (!p) throw new NotFoundException('Prestador não encontrado');
-      const conta = (await tx.select({ id: usuario.id, ativo: usuario.ativo }).from(usuario)
+      const conta = (await tx.select({ id: usuario.id, ativo: usuario.ativo, email: usuario.email }).from(usuario)
         .where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, prestadorId), eq(usuario.perfil, 'PRESTADOR'))).limit(1))[0];
       const conv = (await tx.select().from(prestadorConvite).where(and(eq(prestadorConvite.tenantId, tenantId), eq(prestadorConvite.prestadorId, prestadorId), isNull(prestadorConvite.usadoEm)))
         .orderBy(desc(prestadorConvite.criadoEm)).limit(1))[0];
@@ -906,6 +907,8 @@ export class PortalService {
       return {
         status, temPush, conviteExpiraEm: status === 'CONVIDADO' ? conv!.expiraEm.toISOString() : null,
         documento: p.documento, telefone: p.telefone, email: p.email, convite,
+        /** E-mail com que ele entra no app (o da conta; sem conta, o do cadastro). */
+        login: conta ? conta.email : p.email,
       };
     });
   }
@@ -918,8 +921,29 @@ export class PortalService {
     return { ativo };
   }
 
-  /** Contato, documento e tomador. Mudou o CPF/CNPJ: o login acompanha. */
-  async salvarContato(tenantId: string, id: string, d: { telefone?: string | null; email?: string | null; documento?: string | null; tomadorNome?: string | null; tomadorCnpj?: string | null }) {
+  /**
+   * Nova senha para o prestador (esqueceu, ou o RH precisa liberar a entrada):
+   * - LINK: manda o link de "criar nova senha" para o e-mail de login (vale 1h);
+   * - PROVISORIA: gera uma senha que o RH passa para ele; na 1ª entrada o app
+   *   obriga a trocar. A senha volta só nesta resposta — não fica guardada.
+   */
+  async senhaPrestador(tenantId: string, prestadorId: string, modo: 'LINK' | 'PROVISORIA') {
+    const conta = await comTenant(this.db, tenantId, async (tx) => (await tx.select({ id: usuario.id, email: usuario.email, ativo: usuario.ativo }).from(usuario)
+      .where(and(eq(usuario.tenantId, tenantId), eq(usuario.prestadorId, prestadorId), eq(usuario.perfil, 'PRESTADOR'))).limit(1))[0]);
+    if (!conta) throw new BadRequestException('Este prestador ainda não criou o acesso. Mande o convite pelo botão "Convidar".');
+    if (!conta.ativo) throw new BadRequestException('O acesso está cortado. Devolva o acesso antes de gerar uma senha.');
+    if (modo === 'LINK') {
+      await this.auth.solicitarRecuperacao(conta.email);
+      return { modo, email: conta.email, senhaProvisoria: null };
+    }
+    const senha = senhaProvisoria();
+    const senhaHash = await hashSenha(senha);
+    await comTenant(this.db, tenantId, (tx) => tx.update(usuario).set({ senhaHash, deveTrocarSenha: true }).where(eq(usuario.id, conta.id)));
+    return { modo, email: conta.email, senhaProvisoria: senha };
+  }
+
+  /** Contato, documento, tomador e chave Pix. Mudou o CPF/CNPJ: o login acompanha. */
+  async salvarContato(tenantId: string, id: string, d: { telefone?: string | null; email?: string | null; documento?: string | null; tomadorNome?: string | null; tomadorCnpj?: string | null; chavePix?: string | null }) {
     if (d.email && !emailLogin(d.email)) throw new BadRequestException('E-mail inválido.');
     const doc = d.documento === undefined ? undefined : d.documento?.replace(/\D/g, '') || null;
     if (doc && doc.length !== 11 && doc.length !== 14) throw new BadRequestException('CPF/CNPJ inválido.');

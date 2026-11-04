@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { salvarBlob } from '../lib/download';
 import { mascaraDoc } from '../lib/formato';
+import { normalizarChave } from '../lib/pix';
 import {
   brl, dataBr, dataIsoBr, diaMes, fmtTel, haQuanto, ROTULO_SITUACAO, TOM_SITUACAO,
   type ConviteGerado, type LinhaRh, type ListaModelos, type PainelRh, type Situacao, type UnidadeRh,
@@ -412,7 +413,9 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
   const pagoAlgo = l.unidades.some((u) => u.pago);
   const doc = l.documento ? mascaraDoc(l.documento) : null;
   const [resp, setResp] = useState('');
-  const [contato, setContato] = useState({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? '') });
+  const [contato, setContato] = useState({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? ''), pix: l.chavePix ?? '' });
+  const pixLido = contato.pix.trim() ? normalizarChave(contato.pix) : null;
+  const pixInvalido = !!contato.pix.trim() && !pixLido;
   const [salvando, setSalvando] = useState(false);
   const [modelos, setModelos] = useState<ListaModelos['modelos'] | null>(null);
   useEffect(() => {
@@ -420,7 +423,7 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
     api.get<ListaModelos>('/portal/rh/modelos-nota').then((r) => setModelos(r.modelos)).catch(() => setModelos([]));
   }, [aba, modelos]);
   const padraoTipo = modelos?.find((m) => m.padraoTipo === l.tipo) ?? null;
-  useEffect(() => { setContato({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? '') }); }, [l.id]);
+  useEffect(() => { setContato({ telefone: l.telefone ?? '', email: l.email ?? '', documento: mascaraDoc(l.documento ?? ''), tomadorNome: l.tomadorNome ?? '', tomadorCnpj: mascaraDoc(l.tomadorCnpj ?? ''), pix: l.chavePix ?? '' }); }, [l.id]);
 
   async function chamar(f: () => Promise<unknown>, m: string) {
     setSalvando(true); onErro(null);
@@ -510,6 +513,7 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
     {aba === 'acesso' && (
       <div className={css.bloco}>
         <h4>Acesso ao app</h4>
+        <LoginPrestador l={l} ocupado={salvando} onMudou={onMudou} onErro={onErro} />
         <div className={css.lin}><span>Situação</span><TagAcesso l={l} /></div>
         <div className={css.acoes}>
           {l.acesso.status !== 'ATIVO' && <button type="button" className={`${css.btnPri} ${css.pequeno}`} onClick={onConvidar}>{l.acesso.status === 'CONVIDADO' ? 'Gerar novo convite' : 'Convidar'}</button>}
@@ -518,18 +522,28 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
           {l.acesso.status === 'BLOQUEADO' && <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={salvando}
             onClick={() => chamar(() => api.post(`/portal/rh/prestadores/${l.id}/acesso`, { ativo: true }), `Acesso de ${l.nome} devolvido.`)}>Devolver acesso</button>}
         </div>
-        <p className={css.hint}>{l.acesso.status === 'ATIVO' ? 'Entra com o e-mail cadastrado em Dados e contato.' : 'Sem acesso, o RH lança a nota pelo painel da pessoa.'}</p>
+        {l.acesso.status !== 'ATIVO' && <p className={css.hint}>Sem acesso, o RH lança a nota pelo painel da pessoa.</p>}
       </div>
     )}
 
     {aba === 'dados' && (
       <form className={css.bloco} onSubmit={(e) => {
         e.preventDefault();
+        if (pixInvalido) { onErro('Chave Pix não reconhecida. Use CPF, CNPJ, celular com DDD, e-mail ou a chave aleatória.'); return; }
         void chamar(() => api.patch(`/portal/rh/prestadores/${l.id}/contato`, {
           telefone: contato.telefone || null, email: contato.email || null, documento: contato.documento || null,
-          tomadorNome: contato.tomadorNome || null, tomadorCnpj: contato.tomadorCnpj || null,
+          tomadorNome: contato.tomadorNome || null, tomadorCnpj: contato.tomadorCnpj || null, chavePix: contato.pix.trim() || null,
         }), 'Dados salvos.');
       }}>
+        <div className={css.tituloLinha}>
+          <h4>{l.tipo === 'MOTORISTA' ? 'Escala e valor' : 'Valor e dias'}</h4>
+          <Explica>{l.tipo === 'MOTORISTA' ? 'A escala do motorista é a base de dias do contrato: segunda a sábado ou segunda a sexta. É ela que dá os dias previstos de cada semana e a diária (valor mensal ÷ dias do mês). Mudar vale a partir do mês que você escolher.' : 'Valor mensal e base de dias do contrato. Mudar vale a partir do mês que você escolher.'}</Explica>
+          <span className={css.esp} />
+          <button type="button" className={css.lk} onClick={() => navegar(`/rh/pessoal?mes=${mes}&aba=prestadores&abrir=${l.tipo}:${l.id}&painel=dados&de=prestadores`)}>
+            {l.tipo === 'MOTORISTA' ? 'Ver / mudar escala' : 'Ver / reajustar'}
+          </button>
+        </div>
+        <p className={css.hint}>{l.tipo === 'MOTORISTA' ? 'Lá, clique em "Reajustar valor ou dias" e responda "Trabalha no sábado?".' : 'Lá, clique em "Reajustar valor ou dias".'}</p>
         <h4>Feriados</h4>
         <CidadeTrabalho key={`cid-${l.id}`} tipo="PRESTADOR" id={l.id} atual={l.cidade} onSalvo={(m) => void onMudou(m)} />
         <div className={css.tituloLinha}>
@@ -555,6 +569,11 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
           <div className={css.campo}><label htmlFor="c-doc">CPF/CNPJ</label><input id="c-doc" value={contato.documento} onChange={(e) => setContato({ ...contato, documento: mascaraDoc(e.target.value) })} /></div>
           <div className={css.campo}><label htmlFor="c-tel">Celular (WhatsApp)</label><input id="c-tel" inputMode="tel" value={contato.telefone} onChange={(e) => setContato({ ...contato, telefone: e.target.value })} /></div>
           <div className={`${css.campo} ${css.campoInteiro}`}><label htmlFor="c-email">E-mail (usuário de login)</label><input id="c-email" type="email" value={contato.email} onChange={(e) => setContato({ ...contato, email: e.target.value })} /></div>
+          <div className={`${css.campo} ${css.campoInteiro}`}>
+            <label htmlFor="c-pix">Chave Pix (para o pagamento)</label>
+            <input id="c-pix" value={contato.pix} onChange={(e) => setContato({ ...contato, pix: e.target.value })} placeholder="CPF, CNPJ, celular com DDD, e-mail ou chave aleatória" aria-invalid={pixInvalido} />
+            <small className={pixInvalido ? css.campoErro : css.hint}>{pixInvalido ? 'Não reconheci essa chave. Confira se está completa.' : pixLido ? `Chave do tipo ${ROT_PIX[pixLido.tipo]}.` : 'Sem chave, o pagamento aparece como "sem chave Pix".'}</small>
+          </div>
           <div className={css.campo}><label htmlFor="c-tom">Tomador da nota</label><input id="c-tom" value={contato.tomadorNome} onChange={(e) => setContato({ ...contato, tomadorNome: e.target.value })} placeholder="Vazio = razão social da empresa" /></div>
           <div className={css.campo}><label htmlFor="c-tomc">CNPJ do tomador</label><input id="c-tomc" value={contato.tomadorCnpj} onChange={(e) => setContato({ ...contato, tomadorCnpj: mascaraDoc(e.target.value) })} placeholder="Vazio = CNPJ da empresa" /></div>
         </div>
@@ -562,6 +581,98 @@ function DetalhePrestador({ l, d, mes, ocupado, onFechar, onLembrar, onPagar, on
       </form>
     )}
     </ModalPessoa>
+  );
+}
+
+const ROT_PIX = { CPF: 'CPF', CNPJ: 'CNPJ', TELEFONE: 'celular', EMAIL: 'e-mail', ALEATORIA: 'aleatória' } as const;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * Aba "Acesso ao app": o e-mail com que a pessoa entra (ver e trocar) e a
+ * senha (link por e-mail ou senha provisória, que ele troca na 1ª entrada).
+ * O RH nunca escolhe nem vê a senha definitiva do prestador.
+ */
+function LoginPrestador({ l, ocupado, onMudou, onErro }: { l: LinhaRh; ocupado: boolean; onMudou: (m: string) => Promise<void>; onErro: (m: string | null) => void }) {
+  const [login, setLogin] = useState<string | null | undefined>(undefined);
+  const [editando, setEditando] = useState(false);
+  const [novo, setNovo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [confirmar, setConfirmar] = useState<'LINK' | 'PROVISORIA' | null>(null);
+  const [gerada, setGerada] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const temConta = l.acesso.status === 'ATIVO' || l.acesso.status === 'BLOQUEADO';
+  const carregar = () => api.get<{ login: string | null }>(`/portal/rh/prestadores/${l.id}/acesso`).then((r) => setLogin(r.login)).catch(() => setLogin(l.email));
+  useEffect(() => { void carregar(); setEditando(false); setGerada(null); setConfirmar(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [l.id]);
+
+  async function salvarEmail() {
+    const e = novo.trim().toLowerCase();
+    if (!EMAIL_RE.test(e)) { onErro('E-mail inválido.'); return; }
+    setEnviando(true); onErro(null);
+    try {
+      await api.patch(`/portal/rh/prestadores/${l.id}/contato`, { email: e });
+      setEditando(false); await carregar();
+      await onMudou(temConta ? `E-mail de login de ${l.nome} trocado. A senha continua a mesma.` : `E-mail de ${l.nome} salvo.`);
+    } catch (x) { onErro((x as Error).message); } finally { setEnviando(false); }
+  }
+  async function senha(modo: 'LINK' | 'PROVISORIA') {
+    setEnviando(true); onErro(null); setConfirmar(null);
+    try {
+      const r = await api.post<{ email: string; senhaProvisoria: string | null }>(`/portal/rh/prestadores/${l.id}/senha`, { modo });
+      if (modo === 'PROVISORIA') { setGerada(r.senhaProvisoria); setCopiado(false); }
+      else await onMudou(`Link para criar nova senha enviado para ${r.email} (vale 1 hora).`);
+    } catch (x) { onErro((x as Error).message); } finally { setEnviando(false); }
+  }
+  const tel = (l.telefone ?? '').replace(/\D/g, '');
+  const msgWhats = gerada && login ? `Olá, ${l.nome.split(' ')[0]}! Sua senha provisória do app é: ${gerada}\nEntre com o e-mail ${login}. No primeiro acesso o app pede para você criar a sua senha.` : '';
+
+  return (
+    <>
+      <div className={css.lin}><span>E-mail de login</span>
+        {login === undefined ? <span className={css.txtMudo}>carregando…</span>
+          : login ? <span className={css.mono}>{login}</span> : <span className={`${css.tag} ${css['t-er']}`}>sem e-mail</span>}</div>
+      {!editando ? (
+        <div className={css.acoes}>
+          <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={ocupado || enviando} onClick={() => { setNovo(login ?? ''); setEditando(true); }}>{login ? 'Trocar e-mail' : 'Cadastrar e-mail'}</button>
+        </div>
+      ) : (
+        <div className={css.campo}>
+          <label htmlFor="a-email">Novo e-mail de login</label>
+          <input id="a-email" type="email" autoComplete="off" value={novo} onChange={(e) => setNovo(e.target.value)} autoFocus />
+          <small className={css.hint}>{temConta ? 'A partir de agora ele entra com este e-mail. A senha não muda.' : 'É o e-mail que vai no convite e vira o login dele.'}</small>
+          <div className={css.acoes}>
+            <button type="button" className={`${css.btnPri} ${css.pequeno}`} disabled={enviando || !novo.trim() || novo.trim().toLowerCase() === login} onClick={salvarEmail}>{enviando ? 'Salvando…' : 'Salvar e-mail'}</button>
+            <button type="button" className={css.btnTxt} onClick={() => setEditando(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {temConta && <>
+        <h4 style={{ marginTop: 8 }}>Senha</h4>
+        {l.acesso.status === 'BLOQUEADO' ? <p className={css.hint}>Acesso cortado: devolva o acesso antes de gerar uma senha.</p> : <>
+          <p className={css.hint}>Esqueceu a senha ou não consegue entrar? Mande um link para ele criar uma nova, ou gere uma senha provisória para passar por WhatsApp. Na primeira entrada com a provisória, o app obriga a criar a dele.</p>
+          {confirmar ? (
+            <p className={css.confirma}>{confirmar === 'LINK' ? `Mandar o link para ${login}?` : 'Gerar senha provisória? A senha atual dele deixa de valer na hora.'}
+              <button type="button" className={`${css.btnPri} ${css.pequeno}`} disabled={enviando} onClick={() => void senha(confirmar)}>{enviando ? 'Enviando…' : 'Confirmar'}</button>
+              <button type="button" className={css.btnTxt} onClick={() => setConfirmar(null)}>Cancelar</button></p>
+          ) : (
+            <div className={css.acoes}>
+              <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={ocupado || enviando || !login} onClick={() => setConfirmar('LINK')}>Enviar link de nova senha</button>
+              <button type="button" className={`${css.btnSec} ${css.pequeno}`} disabled={ocupado || enviando} onClick={() => { setGerada(null); setConfirmar('PROVISORIA'); }}>Gerar senha provisória</button>
+            </div>
+          )}
+          {gerada && (
+            <div className={css.senhaBox} role="status">
+              <div className={css.lin}><span>Senha provisória</span><b className={css.mono} style={{ fontSize: 16, letterSpacing: 1 }}>{gerada}</b></div>
+              <small className={css.hint}>Aparece só agora. Passe para {l.nome.split(' ')[0]}; ele troca no primeiro acesso.</small>
+              <div className={css.acoes} style={{ marginTop: 6 }}>
+                <button type="button" className={`${css.btnSec} ${css.pequeno}`} onClick={async () => { try { await navigator.clipboard.writeText(msgWhats); setCopiado(true); } catch { /* sem clipboard */ } }}>{copiado ? 'Copiado ✓' : 'Copiar mensagem'}</button>
+                {tel.length >= 10 && <a className={`${css.btnSec} ${css.pequeno}`} href={`https://wa.me/${tel.startsWith('55') ? tel : `55${tel}`}?text=${encodeURIComponent(msgWhats)}`} target="_blank" rel="noopener noreferrer">Mandar no WhatsApp</a>}
+              </div>
+            </div>
+          )}
+        </>}
+      </>}
+    </>
   );
 }
 

@@ -275,3 +275,7 @@
   .cab .seg{ max-width:100%; overflow-x:auto; }
   .cab .seg button{ white-space:nowrap; font-size:12.5px; padding:6px 10px; }
 }
+
+/* Dados e contato / Acesso ao app */
+.campoErro{ color:var(--erro-text); font-size:13px; font-weight:600; }
+.senhaBox{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.15); border-left:3px solid var(--coral-acao); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px; }

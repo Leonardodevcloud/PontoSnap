@@ -9,7 +9,7 @@ import { PortalService } from './portal.service';
 import { ModeloNotaService } from './modelo-nota.service';
 import {
   AplicarModeloDto, ModeloNotaDto,
-  AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, ConvidarDto, EnviarNotaDto, LerNotaDto, FecharPessoaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
+  AceitarConviteDto, AcessoDto, ConfirmarValorDto, ContatoDto, SenhaPrestadorDto, ConvidarDto, EnviarNotaDto, LerNotaDto, FecharPessoaDto, IdsDto, LembrarNotasDto, LiberarDto, RecusarDto, ResponderDto,
 } from './portal.dto';
 
 const t = (u: PayloadAcesso): string => {
@@ -95,6 +95,10 @@ export class PortalRhController {
   }
   @Post('prestadores/:id/acesso') acesso(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AcessoDto) {
     return this.svc.definirAcesso(t(u), id, dto.ativo);
+  }
+  /** Nova senha do prestador: link por e-mail ou senha provisória mostrada ao RH. */
+  @Post('prestadores/:id/senha') senha(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SenhaPrestadorDto) {
+    return this.svc.senhaPrestador(t(u), id, dto.modo);
   }
   /** Contato (celular/e-mail), documento e tomador — usados no convite e na nota. */
   @Patch('prestadores/:id/contato') contato(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ContatoDto) {
