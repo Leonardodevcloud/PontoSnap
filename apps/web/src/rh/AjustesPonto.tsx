@@ -61,9 +61,15 @@ export default function AjustesPonto() {
   const [lancando, setLancando] = useState(false);
 
   const [filtroStatus, setFiltroStatus] = useState('EM_ANALISE');
+  const [folgas, setFolgas] = useState<FolgaLancada[]>([]);
+  const [removendo, setRemovendo] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setErro(null);
+    if (filtroStatus === 'FOLGAS') {
+      try { setFolgas(await api.get<FolgaLancada[]>('/ajustes/folgas')); } catch (e) { setErro((e as Error).message); }
+      return;
+    }
     try {
       const pend = await api.get<Pedido[]>(`/ajustes/todos?status=${filtroStatus}`);
       setLista(pend);
@@ -93,6 +99,15 @@ export default function AjustesPonto() {
     finally { setEnviando(null); }
   }
 
+  async function removerFolga(f: FolgaLancada) {
+    setErro(null); setEnviando(f.id);
+    try {
+      await api.del(`/ajustes/folgas/${f.id}`);
+      setMsg(`Folga de ${f.nome.split(' ')[0]} em ${dia(f.data)} removida — o dia volta a ser apurado normalmente.`);
+      setRemovendo(null); await carregar();
+    } catch (e) { setErro((e as Error).message); } finally { setEnviando(null); }
+  }
+
   // Vários pedidos do mesmo funcionário no mesmo dia ficam juntos.
   const mapa = new Map<string, Pedido[]>();
   for (const p of lista) {
@@ -110,10 +125,10 @@ export default function AjustesPonto() {
             <ExplicaSecao>Pedidos dos funcionários. Nada muda na apuração até você decidir, e a batida original nunca é apagada.</ExplicaSecao>
           </div>
           <div className={css.filtros}>
-            {(['EM_ANALISE', 'APROVADO', 'RECUSADO', 'REVOGADO'] as const).map((s) => (
+            {(['EM_ANALISE', 'APROVADO', 'RECUSADO', 'REVOGADO', 'FOLGAS'] as const).map((s) => (
               <button key={s} className={`${css.filtroBtn} ${filtroStatus === s ? css.filtroOn : ''}`}
                 onClick={() => setFiltroStatus(s)}>
-                {s === 'EM_ANALISE' ? 'Pendentes' : s === 'APROVADO' ? 'Aprovados' : s === 'RECUSADO' ? 'Recusados' : 'Revogados'}
+                {s === 'EM_ANALISE' ? 'Pendentes' : s === 'APROVADO' ? 'Aprovados' : s === 'RECUSADO' ? 'Recusados' : s === 'REVOGADO' ? 'Revogados' : 'Folgas lançadas'}
               </button>
             ))}
           </div>
@@ -124,7 +139,27 @@ export default function AjustesPonto() {
       {erro && <p className={css.erro}>{erro}</p>}
       {msg && <p className={css.ok}>{msg}</p>}
 
-      {lista.length === 0 ? (
+      {filtroStatus === 'FOLGAS' ? (
+        folgas.length === 0
+          ? <div className={css.card}><p className={css.vazio}>Nenhuma folga lançada. Use "Lançar ajuste" › "Lançar folga".</p></div>
+          : <div className={css.card}>
+            <p className={css.folgaInfo}>Folga concedida: o dia não conta como falta e <b>não mexe no banco de horas</b>.</p>
+            {folgas.map((f) => (
+              <div key={f.id} className={css.folgaLinha}>
+                <Avatar id={f.empregadoId} nome={f.nome} tamanho={32} />
+                <span className={css.folgaTxt}>
+                  <b title={f.nome}>{f.nome}</b>
+                  <small>{f.feriadoRef ? `feriado trabalhado em ${dia(f.feriadoRef)}` : 'folga concedida'}{f.motivo ? ` · ${f.motivo}` : ''}</small>
+                </span>
+                <span className={css.folgaDia}>{dia(f.data)}</span>
+                {removendo === f.id
+                  ? <span className={css.folgaAcoes}><button className={css.no} disabled={enviando === f.id} onClick={() => void removerFolga(f)}>Confirmar remoção</button>
+                    <button className={css.cancelar} onClick={() => setRemovendo(null)}>Cancelar</button></span>
+                  : <button className={css.no} onClick={() => setRemovendo(f.id)}>Remover</button>}
+              </div>
+            ))}
+          </div>
+      ) : lista.length === 0 ? (
         <div className={css.card}><p className={css.vazio}>{filtroStatus === 'EM_ANALISE' ? 'Nenhum pedido aguardando decisão.' : 'Nenhum pedido aqui.'}</p></div>
       ) : grupos.map(([chave, doGrupo]) => (
         <div key={chave} className={css.grupo}>
@@ -238,9 +273,9 @@ export default function AjustesPonto() {
           empregadoIdInicial={params.get('empregadoId') ?? ''}
           dataInicial={params.get('data') ?? ''}
           onFechar={() => { setLancando(false); setParams({}); }}
-          onPronto={() => {
+          onPronto={(m) => {
             setLancando(false); setParams({});
-            setMsg('Ajuste lançado — já vale na apuração.');
+            setMsg(m ?? 'Ajuste lançado — já vale na apuração.');
             void carregar();
           }}
         />
@@ -250,6 +285,7 @@ export default function AjustesPonto() {
 }
 
 interface EmpLite { id: string; nome: string; ativo: boolean }
+interface FolgaLancada { id: string; empregadoId: string; nome: string; data: string; motivo: string | null; feriadoRef: string | null; criadoEm: string }
 interface BatidaLite { id: string; dtMarcacao: string; nsr: number | null }
 
 /**
@@ -257,12 +293,15 @@ interface BatidaLite { id: string; dtMarcacao: string; nsr: number | null }
  * pra tirar uma batida a mais ou incluir uma que faltou sem esperar o pedido.
  */
 function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
-  empregadoIdInicial: string; dataInicial: string; onFechar: () => void; onPronto: () => void;
+  empregadoIdInicial: string; dataInicial: string; onFechar: () => void; onPronto: (msg?: string) => void;
 }) {
   const [emps, setEmps] = useState<EmpLite[]>([]);
   const [empregadoId, setEmpregadoId] = useState(empregadoIdInicial);
   const [data, setData] = useState(dataInicial || new Date().toISOString().slice(0, 10));
-  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO'>('INCLUSAO');
+  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO' | 'FOLGA'>('INCLUSAO');
+  // Folga concedida: por feriado trabalhado (com a data dele) ou outro motivo.
+  const [porFeriado, setPorFeriado] = useState(true);
+  const [feriadoRef, setFeriadoRef] = useState('');
   const [hora, setHora] = useState('');
   const [tpMarc, setTpMarc] = useState<'E' | 'S'>('E');
   const [dia, setDia] = useState<{ batidas: BatidaLite[]; pares: { entrada: string; saida: string }[]; esperadas: number }>({ batidas: [], pares: [], esperadas: 0 });
@@ -307,6 +346,17 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
 
   async function enviar() {
     if (!empregadoId) { setErro('Escolha o funcionário.'); return; }
+    if (tipo === 'FOLGA') {
+      if (porFeriado && !/^\d{4}-\d{2}-\d{2}$/.test(feriadoRef)) { setErro('Informe o dia do feriado que ele trabalhou.'); return; }
+      if (!porFeriado && obs.trim().length < 5) { setErro('Escreva o motivo da folga — fica registrado na auditoria.'); return; }
+      setErro(null); setEnviando(true);
+      try {
+        await api.post('/ajustes/folgas', { empregadoId, data, feriadoRef: porFeriado ? feriadoRef : null, motivo: obs.trim() || null });
+        const nome = emps.find((e) => e.id === empregadoId)?.nome.split(' ')[0] ?? 'Funcionário';
+        onPronto(`Folga de ${nome} em ${data.split('-').reverse().join('/')} lançada — o dia não conta como falta e o banco de horas não muda.`);
+      } catch (e) { setErro((e as Error).message); setEnviando(false); }
+      return;
+    }
     if (obs.trim().length < 5) { setErro('Escreva o motivo — fica registrado na auditoria.'); return; }
     if ((tipo === 'INCLUSAO' || tipo === 'CORRECAO') && !/^\d{2}:\d{2}$/.test(hora)) { setErro('Informe a hora (HH:MM).'); return; }
     if ((tipo === 'DESCONSIDERAR' || tipo === 'CORRECAO') && !alvo) { setErro('Escolha qual batida.'); return; }
@@ -347,7 +397,7 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
         </select>
 
         <span className={css.lb}>Dia</span>
-        <input className={css.inp} type="date" value={data} max={new Date().toISOString().slice(0, 10)}
+        <input className={css.inp} type="date" value={data} max={tipo === 'FOLGA' ? undefined : new Date().toISOString().slice(0, 10)}
           onChange={(e) => setData(e.target.value)} />
 
         {empregadoId && data && (
@@ -389,7 +439,28 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
           <button className={`${css.optB} ${tipo === 'INCLUSAO' ? css.optOn : ''}`} onClick={() => setTipo('INCLUSAO')}>Incluir batida que faltou</button>
           <button className={`${css.optB} ${tipo === 'CORRECAO' ? css.optOn : ''}`} onClick={() => setTipo('CORRECAO')}>Corrigir horário</button>
           <button className={`${css.optB} ${tipo === 'DESCONSIDERAR' ? css.optOn : ''}`} onClick={() => setTipo('DESCONSIDERAR')}>Tirar batida a mais</button>
+          <button className={`${css.optB} ${tipo === 'FOLGA' ? css.optOn : ''}`} onClick={() => setTipo('FOLGA')}>Lançar folga (abona o dia)</button>
         </div>
+
+        {tipo === 'FOLGA' && (
+          <>
+            <p className={css.folgaInfo}>
+              O dia vira folga: <b>não conta como falta</b> e <b>não mexe no banco de horas</b>. Para folga que desconta horas do banco, use Banco de horas › Folga compensatória.
+            </p>
+            {batidas.length > 0 && <p className={css.erroModal}>Este dia tem {batidas.length} {batidas.length === 1 ? 'batida' : 'batidas'}: ele trabalhou. Escolha o dia em que ele folgou.</p>}
+            <span className={css.lb}>Por quê</span>
+            <div className={css.opts}>
+              <button className={`${css.optB} ${porFeriado ? css.optOn : ''}`} onClick={() => setPorFeriado(true)}>Trabalhou em feriado</button>
+              <button className={`${css.optB} ${!porFeriado ? css.optOn : ''}`} onClick={() => setPorFeriado(false)}>Outro motivo</button>
+            </div>
+            {porFeriado && (
+              <>
+                <span className={css.lb}>Dia do feriado trabalhado</span>
+                <input className={css.inp} type="date" value={feriadoRef} onChange={(e) => setFeriadoRef(e.target.value)} />
+              </>
+            )}
+          </>
+        )}
 
         {(tipo === 'CORRECAO' || tipo === 'DESCONSIDERAR') && (
           <>
@@ -422,13 +493,13 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
           </>
         )}
 
-        <span className={css.lb}>Motivo</span>
+        <span className={css.lb}>{tipo === 'FOLGA' && porFeriado ? 'Observação (opcional)' : 'Motivo'}</span>
         <textarea className={css.inp} rows={2} value={obs} onChange={(e) => setObs(e.target.value)}
-          placeholder="Ex.: batida duplicada confirmada com o funcionário." />
+          placeholder={tipo === 'FOLGA' ? (porFeriado ? 'Ex.: folga da convenção pelo feriado de Finados.' : 'Ex.: folga de aniversário prevista na convenção.') : 'Ex.: batida duplicada confirmada com o funcionário.'} />
 
         {erro && <p className={css.erroModal}>{erro}</p>}
         <div className={css.acoes}>
-          <button className={css.ok2} onClick={enviar} disabled={enviando}>{enviando ? 'Lançando…' : 'Lançar'}</button>
+          <button className={css.ok2} onClick={enviar} disabled={enviando || (tipo === 'FOLGA' && batidas.length > 0)}>{enviando ? 'Lançando…' : tipo === 'FOLGA' ? 'Lançar folga' : 'Lançar'}</button>
           <button className={css.cancelar} onClick={onFechar}>Cancelar</button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SolicitarAjusteDto {
   @IsOptional() @IsString() empregadoId?: string;
@@ -14,4 +14,13 @@ export class SolicitarAjusteDto {
 export class DecidirAjusteDto {
   @IsBoolean() aprovar!: boolean;
   @IsOptional() @IsString() @MaxLength(200) motivo?: string;
+}
+
+/** Folga concedida pelo RH: abona o dia sem mexer no banco de horas. */
+export class FolgaConcedidaDto {
+  @IsUUID() empregadoId!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) data!: string;
+  /** Folga por feriado trabalhado: a data do feriado. */
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) feriadoRef?: string | null;
+  @IsOptional() @IsString() @MaxLength(200) motivo?: string | null;
 }

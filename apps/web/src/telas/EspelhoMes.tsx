@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm } from '../lib/formato';
-import type { ApuracaoResp, TipoAfastamento } from '../tipos';
+import type { ApuracaoResp, TipoDiaFora } from '../tipos';
 import { ContaMes } from '../components/ContaMes';
 import { Explica } from '../components/Explica';
 import css from './EspelhoMes.module.css';
@@ -27,9 +27,9 @@ const rotuloMes = (comp: string) =>
 
 const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
-const ROTULO_AFAST: Record<TipoAfastamento, string> = {
+const ROTULO_AFAST: Record<TipoDiaFora, string> = {
   FERIAS: 'Férias', INSS: 'Afastamento (INSS)', MATERNIDADE: 'Licença-maternidade',
-  PATERNIDADE: 'Licença-paternidade', SUSPENSAO: 'Suspensão', OUTRO: 'Afastamento',
+  PATERNIDADE: 'Licença-paternidade', SUSPENSAO: 'Suspensão', OUTRO: 'Afastamento', FOLGA: 'Folga',
 };
 
 /** Saldo com sinal, do jeito que se lê num espelho de ponto. */

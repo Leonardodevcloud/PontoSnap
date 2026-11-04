@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, Delete } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards, Delete } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { AjusteService } from './ajuste.service';
-import { SolicitarAjusteDto, DecidirAjusteDto } from './dto/ajuste.dto';
+import { SolicitarAjusteDto, DecidirAjusteDto, FolgaConcedidaDto } from './dto/ajuste.dto';
+import { FolgaService } from './folga.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -11,7 +12,7 @@ import type { PayloadAcesso } from '../auth/token';
 @Controller('ajustes')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AjusteController {
-  constructor(private readonly ajustes: AjusteService) {}
+  constructor(private readonly ajustes: AjusteService, private readonly folgas: FolgaService) {}
 
   private tenant(u: PayloadAcesso): string {
     if (!u.tenantId) throw new Error('Sem tenant no token');
@@ -64,6 +65,23 @@ export class AjusteController {
   @Delete(':id')
   revogar(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.ajustes.revogar(this.tenant(u), id, u.email ?? 'RH');
+  }
+
+  /** Folga concedida pelo RH (ex.: feriado trabalhado): abona o dia, não mexe no banco. */
+  @Post('folgas')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  criarFolga(@UsuarioAtual() u: PayloadAcesso, @Body() dto: FolgaConcedidaDto) {
+    return this.folgas.criar(this.tenant(u), u.sub, dto);
+  }
+  @Get('folgas')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  listarFolgas(@UsuarioAtual() u: PayloadAcesso, @Query('empregadoId') empregadoId?: string, @Query('de') de?: string, @Query('ate') ate?: string) {
+    return this.folgas.listar(this.tenant(u), { empregadoId, de, ate });
+  }
+  @Delete('folgas/:id')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  removerFolga(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) {
+    return this.folgas.remover(this.tenant(u), id);
   }
 
   /** RH lança o ajuste direto (já aprovado) — ex.: tirar batida a mais. */

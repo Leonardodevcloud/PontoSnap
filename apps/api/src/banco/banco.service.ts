@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, gt, isNotNull, min, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, isNotNull, isNull, min, or, sql } from 'drizzle-orm';
 import {
   pontoBancoMov, pontoBancoFechamento, pontoAusencia, pontoHorarioContratual, pontoMarcacao,
   tenant, empregado, pontoPerfilRegra, comTenant, comoMaster, type Db,
@@ -147,9 +147,11 @@ export class BancoService {
         throw new BadRequestException('Este lançamento veio do fechamento de um mês. Para desfazer, refaça a competência.');
       }
       if (mov.descricao === 'Folga compensatória') {
+        // Só a folga do banco (origem BANCO ou antiga, sem origem): a folga concedida em Ajustes fica.
         await tx.delete(pontoAusencia).where(and(
           eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, mov.empregadoId),
-          eq(pontoAusencia.data, mov.data), eq(pontoAusencia.tipo, 4)));
+          eq(pontoAusencia.data, mov.data), eq(pontoAusencia.tipo, 4),
+          or(isNull(pontoAusencia.origem), eq(pontoAusencia.origem, 'BANCO'))));
         await reabrirCompetencia(tx as never, tenantId, mov.empregadoId, competenciaDe(mov.data));
       }
       await tx.delete(pontoBancoMov).where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId)));
@@ -769,9 +771,9 @@ export class BancoService {
       const jaTem = (await tx.select({ id: pontoAusencia.id }).from(pontoAusencia).where(and(
         eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, empregadoId),
         eq(pontoAusencia.data, data), eq(pontoAusencia.tipo, 4))).limit(1))[0];
-      if (jaTem) throw new BadRequestException('Já existe uma folga compensatória registrada nesse dia.');
+      if (jaTem) throw new BadRequestException('Já existe uma folga registrada nesse dia (do banco ou concedida em Ajustes).');
 
-      await tx.insert(pontoAusencia).values({ tenantId, empregadoId, tipo: 4, data, qtMinutos: minutos });
+      await tx.insert(pontoAusencia).values({ tenantId, empregadoId, tipo: 4, data, qtMinutos: minutos, origem: 'BANCO' });
       const [mov] = await tx.insert(pontoBancoMov).values({
         tenantId, empregadoId, data, minutos: -minutos, tipo: 'DEBITO',
         descricao: 'Folga compensatória',

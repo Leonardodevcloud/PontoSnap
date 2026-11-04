@@ -64,6 +64,16 @@ export const pontoAusencia = pgTable('ponto_ausencia', {
   tipoMovBh: smallint('tipo_mov_bh'),
   repId: uuid('rep_id').references(() => pontoRep.id),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+  /**
+   * Tipo 4 (folga), migration 0065: BANCO = folga compensatória do banco (debita
+   * a jornada); CONCEDIDA = folga dada pelo RH que só abona o dia (não mexe no
+   * banco). Nulo = antigo, do banco.
+   */
+  origem: varchar('origem', { length: 12 }),
+  motivo: varchar('motivo', { length: 200 }),
+  /** Folga por feriado trabalhado: a data do feriado. */
+  feriadoRef: date('feriado_ref'),
+  criadoPor: uuid('criado_por'),
 });
 
 /** Calendário de feriados por cliente (nacional/estadual/municipal). */

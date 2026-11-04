@@ -290,7 +290,7 @@ export interface ApuracaoResp {
   fim: string;
   resultado: ResultadoPeriodoCLT;
   /** Férias/licenças do período — a tela escreve o motivo no dia. */
-  afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
+  afastamentos?: { tipo: TipoDiaFora; dataInicio: string; dataFim: string; observacao: string | null }[];
   /** Pra onde vão faltas/atrasos/extras, segundo a regra do funcionário. */
   destinacao?: Destinacao;
   /** Banco de horas no contexto do período: anterior + mês = acumulado. Null = sem banco. */
@@ -483,6 +483,8 @@ export interface Documento {
 // ---- Férias, INSS e licenças ----
 
 export type TipoAfastamento = 'FERIAS' | 'INSS' | 'MATERNIDADE' | 'PATERNIDADE' | 'SUSPENSAO' | 'OUTRO';
+/** Na apuração, além dos afastamentos vem a folga concedida pelo RH (Ajustes). */
+export type TipoDiaFora = TipoAfastamento | 'FOLGA';
 
 export interface Afastamento {
   id: string;
@@ -640,7 +642,7 @@ export interface LinhaCompetencia {
   banco: BancoPeriodo | null;
   destinacao?: Destinacao;
   sinais: SinaisCompetencia;
-  afastamentos?: { tipo: TipoAfastamento; dataInicio: string; dataFim: string; observacao: string | null }[];
+  afastamentos?: { tipo: TipoDiaFora; dataInicio: string; dataFim: string; observacao: string | null }[];
   assinada: boolean;
 }
 

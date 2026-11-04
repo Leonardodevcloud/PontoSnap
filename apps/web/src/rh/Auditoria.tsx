@@ -18,6 +18,8 @@ function legivel(acao: string): string {
     [/POST \/empregados\/.*\/acesso/, 'Criou acesso de funcionário'],
     [/POST \/documentos\/.*\/decidir/, 'Decidiu sobre atestado'],
     [/POST \/documentos/, 'Enviou atestado'],
+    [/POST \/ajustes\/folgas/, 'Lançou folga concedida'],
+    [/DELETE \/ajustes\/folgas/, 'Removeu folga concedida'],
     [/POST \/afastamentos/, 'Lançou férias/afastamento'],
     [/DELETE \/afastamentos/, 'Removeu férias/afastamento'],
     [/POST \/banco\/config/, 'Alterou acordo de banco de horas'],

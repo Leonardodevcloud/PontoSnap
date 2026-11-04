@@ -19,7 +19,7 @@ const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosPar
 const hhOuTraco = (m: number) => (m > 0 ? minutosParaHhMm(m) : '—');
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const ROTULO_AFAST: Record<string, string> = {
-  FERIAS: 'férias', INSS: 'INSS', MATERNIDADE: 'lic. maternidade', PATERNIDADE: 'lic. paternidade', SUSPENSAO: 'suspensão', OUTRO: 'afastado',
+  FERIAS: 'férias', INSS: 'INSS', MATERNIDADE: 'lic. maternidade', PATERNIDADE: 'lic. paternidade', SUSPENSAO: 'suspensão', OUTRO: 'afastado', FOLGA: 'folga',
 };
 
 /** Pílulas de situação de uma linha: só o que exige olhar do RH. */

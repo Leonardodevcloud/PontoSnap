@@ -829,9 +829,17 @@ export class TratamentoService {
 
       // O motor é puro e não conhece "férias". O motivo vem junto do resultado
       // para a tela poder escrever Férias em vez de deixar o dia em branco.
-      const afastamentos = afast.map((a) => ({
-        tipo: a.tipo, dataInicio: a.dataInicio, dataFim: a.dataFim, observacao: a.observacao,
-      }));
+      const afastamentos = [
+        ...afast.map((a) => ({
+          tipo: a.tipo, dataInicio: a.dataInicio, dataFim: a.dataFim, observacao: a.observacao,
+        })),
+        // Folga concedida pelo RH (Ajustes): na conta já é descanso (tipo 4);
+        // aqui só ganha o rótulo "Folga" para as telas e o espelho.
+        ...aus.filter((a) => a.tipo === 4 && a.origem === 'CONCEDIDA' && a.data >= inicioStr && a.data <= fimStr).map((a) => ({
+          tipo: 'FOLGA', dataInicio: a.data, dataFim: a.data,
+          observacao: a.feriadoRef ? `feriado trabalhado em ${a.feriadoRef.split('-').reverse().join('/')}${a.motivo ? ` · ${a.motivo}` : ''}` : a.motivo,
+        })),
+      ];
 
       const destinacao = resumirDestinacao(resultado, {
         destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
@@ -1125,13 +1133,13 @@ export class TratamentoService {
       const eventos: string[] = [];
       if (d.ehDescansoDia && d.minutosTrabalhados > 0) eventos.push('Trabalho em descanso');
       const afast = afastPorDia.get(d.data);
-      if (afast) eventos.push(afast === 'FERIAS' ? 'Férias' : afast === 'ATESTADO' ? 'Atestado' : afast);
+      if (afast) eventos.push(afast === 'FERIAS' ? 'Férias' : afast === 'ATESTADO' ? 'Atestado' : afast === 'FOLGA' ? 'Folga concedida' : afast);
       if (orig.some((b) => b.origem === 'INCLUIDA')) eventos.push('Batida incluída (ajuste)');
       if (orig.some((b) => b.origem === 'DESCONSIDERADA')) eventos.push('Batida desconsiderada (ajuste)');
       for (const o of d.observacoes ?? []) if (!eventos.includes(o)) eventos.push(o);
 
       const tipoDia: LinhaEspelho['tipoDia'] =
-        afast === 'FERIAS' ? 'FOLGA'
+        afast === 'FERIAS' || afast === 'FOLGA' ? 'FOLGA'
         : afast === 'ATESTADO' ? 'ATESTADO'
         : d.faltaInjustificada ? 'FALTA'
         : eventos.some((e) => /feriado/i.test(e)) ? 'FERIADO'

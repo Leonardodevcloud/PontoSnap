@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/formato';
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
-import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, ResultadoDiaCLT, TipoAfastamento } from '../tipos';
+import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, ResultadoDiaCLT, TipoDiaFora } from '../tipos';
 import { TabelaCompetencia } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
@@ -33,9 +33,9 @@ const rotuloMes = (comp: string) => new Date(`${comp}-01T12:00:00-0300`).toLocal
 const diaSemanaCurto = (iso: string) => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(`${iso}T12:00:00-0300`).getUTCDay()];
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
-const ROTULO_AFAST: Record<TipoAfastamento, string> = {
+const ROTULO_AFAST: Record<TipoDiaFora, string> = {
   FERIAS: 'Férias', INSS: 'Afastamento (INSS)', MATERNIDADE: 'Licença-maternidade',
-  PATERNIDADE: 'Licença-paternidade', SUSPENSAO: 'Suspensão', OUTRO: 'Afastamento',
+  PATERNIDADE: 'Licença-paternidade', SUSPENSAO: 'Suspensão', OUTRO: 'Afastamento', FOLGA: 'Folga',
 };
 
 export function Espelhos() {

@@ -117,6 +117,7 @@ export class FiscalService {
         empregadoId: m.empregadoId, tipo: TIPO_AEJ_MOV_BANCO, data: m.data,
         qtMinutos: Math.abs(m.minutos), tipoMovBh: m.tipo === 'CREDITO' ? MOV_BH_CREDITO : MOV_BH_DEBITO,
       }));
+      // Datas do registro 07 ao meio-dia UTC: a data não muda com o fuso do servidor.
       return montarAEJ({
         rep: {
           tipoIdEmpregador: rep.tipoIdEmpregador, documentoEmpregador: rep.documentoEmpregador,
@@ -131,12 +132,14 @@ export class FiscalService {
           seqEntSaida: t.seqEntSaida, fonteMarc: t.fonteMarc, codHorContratual: t.codHorContratual, motivo: t.motivo,
         })),
         ausencias: [
-          ...ausencias.map((a) => ({
-            cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(a.data),
+          // Folga concedida sem feriado não tem código no AEJ (o código 4 é
+          // "folga compensatória de feriado"): como abono, simplesmente não vai.
+          ...ausencias.filter((a) => !(a.origem === 'CONCEDIDA' && !a.feriadoRef)).map((a) => ({
+            cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(`${a.data}T12:00:00Z`),
             qtMinutos: a.qtMinutos, tipoMovBH: null,
           })),
           ...ausenciasBanco.map((a) => ({
-            cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(a.data),
+            cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(`${a.data}T12:00:00Z`),
             qtMinutos: a.qtMinutos, tipoMovBH: a.tipoMovBh,
           })),
         ],
