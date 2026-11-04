@@ -106,7 +106,7 @@ export default function AjustesPonto() {
     setErro(null); setEnviando(f.id);
     try {
       await api.del(`/ajustes/folgas/${f.id}`);
-      setMsg(`Folga de ${f.nome.split(' ')[0]} em ${dia(f.data)} removida — o dia volta a ser apurado normalmente.`);
+      setMsg(`Folga de ${f.nome.split(' ')[0]} em ${dia(f.data)} removida — o dia volta a ser apurado normalmente${f.tipo !== 'CONCEDIDA' && f.minutos ? ` e ${horasMin(f.minutos)} voltam para o banco de horas` : ''}.`);
       setRemovendo(null); await carregar();
     } catch (e) { setErro((e as Error).message); } finally { setEnviando(null); }
   }
@@ -146,13 +146,16 @@ export default function AjustesPonto() {
         folgas.length === 0
           ? <div className={css.card}><p className={css.vazio}>Nenhuma folga lançada. Use "Lançar ajuste" › "Lançar folga".</p></div>
           : <div className={css.card}>
-            <p className={css.folgaInfo}>Folga concedida: o dia não conta como falta e <b>não mexe no banco de horas</b>.</p>
+            <p className={css.folgaInfo}>Todas as folgas lançadas (aqui ou no Banco de horas). <b>Remover</b> faz o dia voltar a ser apurado normalmente; se a folga saiu do banco, as horas voltam para o saldo.</p>
             {folgas.map((f) => (
               <div key={f.id} className={css.folgaLinha}>
                 <Avatar id={f.empregadoId} nome={f.nome} tamanho={32} />
                 <span className={css.folgaTxt}>
                   <b title={f.nome}>{f.nome}</b>
-                  <small>{f.feriadoRef ? `feriado trabalhado em ${dia(f.feriadoRef)}` : 'folga concedida'}{f.motivo ? ` · ${f.motivo}` : ''}</small>
+                  <small>
+                    <span className={f.tipo === 'CONCEDIDA' ? css.tagDada : css.tagBanco}>{f.tipo === 'CONCEDIDA' ? 'folga dada · não mexe no banco' : f.tipo === 'BANCO_HORAS' ? `banco de horas · ${horasMin(f.minutos ?? 0)} (parte do dia)` : `banco de horas · ${horasMin(f.minutos ?? 0)}`}</span>
+                    {f.feriadoRef ? ` feriado trabalhado em ${dia(f.feriadoRef)}` : ''}{f.motivo ? ` · ${f.motivo}` : ''}
+                  </small>
                 </span>
                 <span className={css.folgaDia}>{dia(f.data)}</span>
                 {removendo === f.id
@@ -300,7 +303,8 @@ function lerHoras(t: string): number | null {
   const n = Number(v.replace(',', '.'));
   return v && Number.isFinite(n) && n > 0 ? Math.round(n * 60) : null;
 }
-interface FolgaLancada { id: string; empregadoId: string; nome: string; data: string; motivo: string | null; feriadoRef: string | null; criadoEm: string }
+interface FolgaLancada { id: string; empregadoId: string; nome: string; data: string; motivo: string | null; feriadoRef: string | null; criadoEm: string; tipo: 'CONCEDIDA' | 'BANCO_DIA' | 'BANCO_HORAS'; minutos: number | null }
+const horasMin = (m: number) => `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, '0') : ''}`;
 interface BatidaLite { id: string; dtMarcacao: string; nsr: number | null }
 
 /**

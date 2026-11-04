@@ -107,3 +107,7 @@
 .folgaAcoes{ display:inline-flex; gap:8px; align-items:center; }
 
 .fixoLinha{ display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--cream); border-radius:11px; padding:10px 12px; font-size:14px; }
+
+.tagDada, .tagBanco{ display:inline-block; font-size:11.5px; font-weight:600; padding:1px 8px; border-radius:var(--r-pill); margin-right:4px; }
+.tagDada{ background:rgba(var(--ink-rgb),.08); color:var(--ink); }
+.tagBanco{ background:var(--aviso-bg); color:var(--aviso-text); }

@@ -498,14 +498,20 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
   const [sel, setSel] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-  const [modo, setModo] = useState<'corrigir' | 'mudar'>('corrigir');
+  // Padrão: mudar a partir de uma data (preserva o passado). "Corrigir" reescreve
+  // todo o histórico — quem trocou de escala e usava ele via dias antigos virarem extra/falta.
+  const [modo, setModo] = useState<'corrigir' | 'mudar'>('mudar');
   const [dataInicio, setDataInicio] = useState(() => new Date().toISOString().slice(0, 10));
+  const [historico, setHistorico] = useState<{ codigo: string; dataInicio: string | null; dataFim: string | null; horarioId: string }[]>([]);
+  const [confirmaCorrigir, setConfirmaCorrigir] = useState(false);
+  const br = (d: string) => d.split('-').reverse().join('/');
 
   useEffect(() => {
     api.get<Horario[]>('/tratamento/horarios')
-      .then((l) => { setHorarios(l); if (l[0]) setSel(l[0].id); })
+      .then((l) => { setHorarios(l); const atual = l.find((h) => h.id === empregado.horarioContratualId) ?? l[0]; if (atual) setSel(atual.id); })
       .catch((e) => setErro((e as Error).message));
-  }, []);
+    api.get<typeof historico>(`/tratamento/empregados/${empregado.id}/escalas`).then(setHistorico).catch(() => setHistorico([]));
+  }, [empregado.id, empregado.horarioContratualId]);
 
   async function salvar() {
     setErro(null); setEnviando(true);
@@ -525,6 +531,17 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
         <p className={css.aviso}>Nenhuma escala cadastrada ainda. Crie uma em <strong>Escalas</strong> primeiro.</p>
       ) : (
         <>
+          {historico.length > 0 && (
+            <div className={css.histEscala}>
+              <span className={css.selLb}>Escalas de {empregado.nome.split(' ')[0]}</span>
+              {historico.map((h, i) => (
+                <div key={i} className={css.histLinha}>
+                  <b>{h.codigo}</b>
+                  <span>{h.dataInicio ? `de ${br(h.dataInicio)}` : 'desde o início'}{h.dataFim ? ` até ${br(h.dataFim)}` : ' em diante (atual)'}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <label className={css.selWrap}>
             <span className={css.selLb}>Escala</span>
             <select className={css.select} value={sel} onChange={(e) => setSel(e.target.value)}>
@@ -533,12 +550,12 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
           </label>
           <div className={css.modoEscala}>
             <label className={css.radioLinha}>
-              <input type="radio" checked={modo === 'corrigir'} onChange={() => setModo('corrigir')} />
-              <span><strong>Corrigir cadastro</strong> — a escala estava errada. Vale para toda a apuração.</span>
+              <input type="radio" checked={modo === 'mudar'} onChange={() => setModo('mudar')} />
+              <span><strong>Mudar a partir de uma data</strong> — o funcionário trocou de escala. Os dias antes da data continuam com a escala antiga.</span>
             </label>
             <label className={css.radioLinha}>
-              <input type="radio" checked={modo === 'mudar'} onChange={() => setModo('mudar')} />
-              <span><strong>Mudar a partir de uma data</strong> — o funcionário trocou de escala. O passado é preservado.</span>
+              <input type="radio" checked={modo === 'corrigir'} onChange={() => { setModo('corrigir'); setConfirmaCorrigir(false); }} />
+              <span><strong>Corrigir cadastro</strong> — a escala sempre esteve errada. <b>Reescreve todo o histórico</b>, inclusive meses já fechados.</span>
             </label>
           </div>
           {modo === 'mudar' && (
@@ -549,9 +566,15 @@ function ModalEscala({ empregado, onFechar, onSalvo }: { empregado: Empregado; o
           )}
         </>
       )}
+      {modo === 'corrigir' && horarios.length > 0 && (
+        <label className={css.radioLinha}>
+          <input type="checkbox" checked={confirmaCorrigir} onChange={(e) => setConfirmaCorrigir(e.target.checked)} />
+          <span>Entendi: todos os dias passados passam a ser calculados com esta escala. Se ele <b>mudou</b> de escala (ex.: deixou de trabalhar sábado), use "Mudar a partir de uma data" — senão os dias antigos viram hora extra ou falta.</span>
+        </label>
+      )}
       {erro && <p className={css.erroModal}>{erro}</p>}
       {horarios.length > 0 && (
-        <Botao variante="coral" onClick={salvar} disabled={enviando || !sel || (modo === 'mudar' && !dataInicio)}>
+        <Botao variante="coral" onClick={salvar} disabled={enviando || !sel || (modo === 'mudar' && !dataInicio) || (modo === 'corrigir' && !confirmaCorrigir)}>
           {enviando ? 'Salvando…' : modo === 'mudar' ? 'Mudar escala' : 'Vincular escala'}
         </Botao>
       )}

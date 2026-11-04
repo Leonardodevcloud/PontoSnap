@@ -11,6 +11,8 @@ import { and, eq } from 'drizzle-orm';
 import { schema, comoMaster, comTenant, tenant, empregado, pontoRep, pontoHorarioContratual, pontoMarcacao, pontoBancoMov } from '@ponto/db';
 import { BancoService } from '../src/banco/banco.service';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
+import { AjusteService } from '../src/ajuste/ajuste.service';
+import { FolgaService } from '../src/ajuste/folga.service';
 const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', user: 'app_user', password: 'x', max: 3 });
 const db = drizzle(client, { schema });
 const trat = new TratamentoService(db); const banco = new BancoService(db, trat);
@@ -59,6 +61,14 @@ const em = (d: string, hm: string) => new Date(`${d}T${hm}:00-0300`);
   ok(/cumpriu a jornada inteira/.test(await (async () => { try { await banco.registrarFolga(t.id, emp.id, '2026-10-21', 120); return ''; } catch (e) { return (e as Error).message; } })()), 'dia trabalhado inteiro: não tira horas do banco por nada');
   ok(/maior/.test(await (async () => { try { await banco.registrarFolga(t.id, emp.id, '2026-10-30', 600); return ''; } catch (e) { return (e as Error).message; } })()), 'folga maior que a jornada do dia é recusada');
   ok(/não é dia de trabalho/.test(await (async () => { try { await banco.registrarFolga(t.id, emp.id, '2026-10-25'); return ''; } catch (e) { return (e as Error).message; } })()), 'domingo (fora da escala) é recusado');
+  // Folgas lançadas (Ajustes): aparecem TODAS, inclusive as do banco; remover devolve as horas.
+  const folgas = new FolgaService(db, new AjusteService(db));
+  const lista = await folgas.listar(t.id, { empregadoId: emp.id });
+  ok(lista.some((x) => x.data === SAB && x.tipo === 'BANCO_DIA' && x.minutos === 240) && lista.some((x) => x.data === QUI && x.tipo === 'BANCO_HORAS' && x.minutos === 120),
+    `lista mostra a folga do banco do sábado (4h) e a de 2h (${lista.map((x) => `${x.data}:${x.tipo}`).join(', ')})`);
+  const rm = await folgas.remover(t.id, lista.find((x) => x.data === SAB)!.id);
+  const a2 = await ver('removida');
+  ok(rm.devolvidoAoBancoMin === 240 && a2.debito === 0 && a2.falta === 240, `remover a folga do sábado: 4h voltam pro banco e o dia volta a ser falta (débito ${a2.debito}, falta ${a2.falta})`);
   console.log(falhas === 0 ? '\nTudo certo' : `\n${falhas} FALHA(S)`);
   await client.end();
   process.exit(falhas ? 1 : 0);

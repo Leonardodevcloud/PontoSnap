@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
-import { pontoAusencia, pontoAfastamento, empregado, comTenant, type Db } from '@ponto/db';
+import { and, asc, eq, gte, isNull, lte } from 'drizzle-orm';
+import { pontoAusencia, pontoAfastamento, pontoBancoMov, empregado, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { reabrirCompetencia } from '../banco/fechamento';
 import { AjusteService } from './ajuste.service';
@@ -63,30 +63,49 @@ export class FolgaService {
     });
   }
 
-  /** Folgas concedidas (mais recentes primeiro), por funcionário e/ou período. */
+  /**
+   * TODAS as folgas lançadas (mais recentes primeiro): a concedida (não mexe no
+   * banco) e a do banco de horas, de dia inteiro ou de algumas horas — venham
+   * de Ajustes ou da tela do Banco de horas.
+   */
   async listar(tenantId: string, f: { empregadoId?: string; de?: string; ate?: string }) {
     return comTenant(this.db, tenantId, async (tx) => {
-      const conds = [eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.tipo, TIPO_FOLGA), eq(pontoAusencia.origem, 'CONCEDIDA')];
+      const conds = [eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.tipo, TIPO_FOLGA)];
       if (f.empregadoId) conds.push(eq(pontoAusencia.empregadoId, f.empregadoId));
       if (f.de && DATA.test(f.de)) conds.push(gte(pontoAusencia.data, f.de));
       if (f.ate && DATA.test(f.ate)) conds.push(lte(pontoAusencia.data, f.ate));
       const rows = await tx.select({
         id: pontoAusencia.id, empregadoId: pontoAusencia.empregadoId, nome: empregado.nome, data: pontoAusencia.data,
         motivo: pontoAusencia.motivo, feriadoRef: pontoAusencia.feriadoRef, criadoEm: pontoAusencia.criadoEm,
+        origem: pontoAusencia.origem, minutos: pontoAusencia.qtMinutos,
       }).from(pontoAusencia).innerJoin(empregado, eq(empregado.id, pontoAusencia.empregadoId))
         .where(and(...conds)).orderBy(asc(pontoAusencia.data));
-      return rows.reverse().map((r) => ({ ...r, criadoEm: r.criadoEm.toISOString() }));
+      // Sem origem = folga do banco lançada antes de existir a folga concedida.
+      return rows.reverse().map((r) => ({
+        ...r, criadoEm: r.criadoEm.toISOString(),
+        tipo: r.origem === 'CONCEDIDA' ? 'CONCEDIDA' as const : r.origem === 'BANCO_PARCIAL' ? 'BANCO_HORAS' as const : 'BANCO_DIA' as const,
+      }));
     });
   }
 
-  /** Lançou errado: apaga e o dia volta a ser apurado normalmente. */
+  /**
+   * Lançou errado: apaga e o dia volta a ser apurado normalmente. Folga do
+   * banco: devolve as horas (apaga o débito lançado junto com ela).
+   */
   async remover(tenantId: string, id: string) {
     return comTenant(this.db, tenantId, async (tx) => {
       const [f] = await tx.delete(pontoAusencia).where(and(
-        eq(pontoAusencia.id, id), eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.origem, 'CONCEDIDA'))).returning();
+        eq(pontoAusencia.id, id), eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.tipo, TIPO_FOLGA))).returning();
       if (!f) throw new NotFoundException('Folga não encontrada');
+      if (f.origem !== 'CONCEDIDA') {
+        const mov = (await tx.select({ id: pontoBancoMov.id }).from(pontoBancoMov).where(and(
+          eq(pontoBancoMov.tenantId, tenantId), eq(pontoBancoMov.empregadoId, f.empregadoId), eq(pontoBancoMov.data, f.data),
+          eq(pontoBancoMov.descricao, 'Folga compensatória'), isNull(pontoBancoMov.competencia),
+          ...(f.qtMinutos != null ? [eq(pontoBancoMov.minutos, -f.qtMinutos)] : []))).limit(1))[0];
+        if (mov) await tx.delete(pontoBancoMov).where(eq(pontoBancoMov.id, mov.id));
+      }
       await reabrirCompetencia(tx as never, tenantId, f.empregadoId, competenciaDe(f.data));
-      return { removido: true };
+      return { removido: true, devolvidoAoBancoMin: f.origem === 'CONCEDIDA' ? 0 : (f.qtMinutos ?? 0) };
     });
   }
 }

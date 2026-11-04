@@ -101,6 +101,18 @@ export class TratamentoService {
     });
   }
 
+  /** Escalas do funcionário ao longo do tempo (mais recente primeiro). */
+  async historicoEscalas(tenantId: string, empregadoId: string) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const vs = await tx.select({ dataInicio: empregadoEscalaVigencia.dataInicio, dataFim: empregadoEscalaVigencia.dataFim, codigo: pontoHorarioContratual.codigo, horarioId: pontoHorarioContratual.id })
+        .from(empregadoEscalaVigencia).innerJoin(pontoHorarioContratual, eq(pontoHorarioContratual.id, empregadoEscalaVigencia.horarioContratualId))
+        .where(and(eq(empregadoEscalaVigencia.tenantId, tenantId), eq(empregadoEscalaVigencia.empregadoId, empregadoId)))
+        .orderBy(desc(empregadoEscalaVigencia.dataInicio));
+      return vs.filter((v) => v.dataFim == null || v.dataFim >= v.dataInicio)
+        .map((v) => ({ ...v, dataInicio: v.dataInicio <= '2000-01-01' ? null : v.dataInicio }));
+    });
+  }
+
   /**
    * Mudança REAL de escala a partir de uma data: encerra a vigência atual no dia
    * anterior e abre a nova a partir de dataInicio. O passado é preservado — a

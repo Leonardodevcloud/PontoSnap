@@ -265,3 +265,8 @@
   .buscaN{ flex-basis:100%; }
   .selN{ flex:1 1 40%; min-width:0; }
 }
+
+/* Histórico de escalas no modal */
+.histEscala{ display:flex; flex-direction:column; gap:4px; background:var(--cream); border-radius:11px; padding:10px 12px; margin-bottom:10px; }
+.histLinha{ display:flex; justify-content:space-between; gap:10px; font-size:13.5px; }
+.histLinha span{ color:var(--ash); }

@@ -30,6 +30,10 @@ export class TratamentoController {
   @Delete('horarios/:id') excluirHorario(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.tratamento.excluirHorario(this.tenant(u), id);
   }
+  /** Histórico de escalas do funcionário (qual valeu em cada período). */
+  @Get('empregados/:id/escalas') escalas(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+    return this.tratamento.historicoEscalas(this.tenant(u), id);
+  }
   /** Mudança de escala a partir de uma data (preserva o passado). */
   @Post('empregados/:id/mudar-escala') mudarEscala(
     @UsuarioAtual() u: PayloadAcesso, @Param('id') id: string,
