@@ -271,6 +271,7 @@ export default function AjustesPonto() {
       {lancando && (
         <ModalLancar
           empregadoIdInicial={params.get('empregadoId') ?? ''}
+          tipoInicial={params.get('tipo') === 'FOLGA' ? 'FOLGA' : undefined}
           dataInicial={params.get('data') ?? ''}
           onFechar={() => { setLancando(false); setParams({}); }}
           onPronto={(m) => {
@@ -300,13 +301,13 @@ interface BatidaLite { id: string; dtMarcacao: string; nsr: number | null }
  * Lançamento direto do RH: nasce aprovado (não passa por decisão). É o caminho
  * pra tirar uma batida a mais ou incluir uma que faltou sem esperar o pedido.
  */
-function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
-  empregadoIdInicial: string; dataInicial: string; onFechar: () => void; onPronto: (msg?: string) => void;
+function ModalLancar({ empregadoIdInicial, dataInicial, tipoInicial, onFechar, onPronto }: {
+  empregadoIdInicial: string; dataInicial: string; tipoInicial?: 'FOLGA'; onFechar: () => void; onPronto: (msg?: string) => void;
 }) {
   const [emps, setEmps] = useState<EmpLite[]>([]);
   const [empregadoId, setEmpregadoId] = useState(empregadoIdInicial);
   const [data, setData] = useState(dataInicial || new Date().toISOString().slice(0, 10));
-  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO' | 'FOLGA'>('INCLUSAO');
+  const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR' | 'CORRECAO' | 'FOLGA'>(tipoInicial ?? 'INCLUSAO');
   // Folga concedida: por feriado trabalhado (com a data dele) ou outro motivo.
   const [porFeriado, setPorFeriado] = useState(true);
   const [feriadoRef, setFeriadoRef] = useState('');

@@ -130,3 +130,8 @@
 .um{ max-width:880px; }
 .kpis5{ grid-template-columns:repeat(5, minmax(0,1fr)) !important; }
 @media (max-width:640px){ .kpis5{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; } }
+
+/* Situação do dia no resumo */
+.tagFalta, .tagFolga{ margin-left:8px; font-size:12px; font-weight:600; padding:2px 8px; border-radius:var(--r-pill); vertical-align:middle; }
+.tagFalta{ background:var(--erro-bg); color:var(--erro-text); }
+.tagFolga{ background:rgba(var(--ink-rgb),.08); color:var(--ink); }

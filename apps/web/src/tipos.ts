@@ -113,6 +113,9 @@ export interface EspelhoResp {
   /** Batidas que entraram por ajuste aprovado (não têm NSR). */
   incluidas?: { dtMarcacao: string; tpMarc: string | null; motivo: string }[];
   resumo: ResumoJornada;
+  /** Como o dia contou na apuração do mês: Falta, Folga, Feriado, Férias, Afastamento (null = dia normal). */
+  situacao?: string | null;
+  observacoes?: string[];
 }
 
 export interface ExtraClassificada { min: number; adicionalPct: number; motivo: string; }

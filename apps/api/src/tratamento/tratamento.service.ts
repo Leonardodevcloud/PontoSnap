@@ -268,6 +268,32 @@ export class TratamentoService {
 
   /** Espelho do dia de um funcionário (somente leitura — não grava tratamento). */
   async espelhoDia(tenantId: string, empregadoId: string, dataStr: string) {
+    const base = await this.espelhoDiaBase(tenantId, empregadoId, dataStr);
+    // O resumo vem da MESMA apuração do mês (jornada daquele dia da semana,
+    // feriado, folga, afastamento, horas abonadas) — antes usava sempre a
+    // jornada cheia da escala e mostrava -8h num sábado de 4h ou num dia de folga.
+    const ap = await this.apurarPeriodoCLT(tenantId, empregadoId, dataStr, dataStr, []).catch(() => null);
+    const d = ap?.resultado.dias.find((x) => x.data === dataStr);
+    if (!ap || !d || d.pendente) return base;
+    const motivoFora = ap.afastamentos.find((a) => dataStr >= a.dataInicio && dataStr <= a.dataFim);
+    const situacao = motivoFora ? (motivoFora.tipo === 'FOLGA' ? 'Folga' : motivoFora.tipo === 'FERIAS' ? 'Férias' : 'Afastamento')
+      : ap.feriados.includes(dataStr) ? 'Feriado'
+      : d.faltaInjustificada ? 'Falta'
+      : d.ehDescansoDia ? 'Folga' : null;
+    return {
+      ...base,
+      resumo: {
+        ...base.resumo,
+        minutosContratados: d.minutosContratados,
+        // Falta de dia inteiro fica fora do saldo no motor (a destinação decide); aqui mostra o dia inteiro.
+        saldoMinutos: d.faltaMin > 0 ? -d.faltaMin : d.saldoMin,
+      },
+      situacao,
+      observacoes: d.observacoes,
+    };
+  }
+
+  private async espelhoDiaBase(tenantId: string, empregadoId: string, dataStr: string) {
     return comTenant(this.db, tenantId, async (tx) => {
       const emp = (await tx.select().from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];

@@ -453,13 +453,16 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
             })()}
             {r?.paresIncompletos && <div className={css.aviso}>Batida em aberto — falta uma saída/entrada.</div>}
             <div className={vt.acoes} style={{ marginTop: 14 }}>
-              <Link to={`/rh/ajustes?emp=${empregadoId}&data=${data}`} className={css.linkBtn}>Lançar ajuste neste dia</Link>
+              <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}`} className={css.linkBtn}>Lançar ajuste neste dia</Link>
+              {(esp.situacao === 'Falta' || (esp.situacao == null && (r?.saldoMinutos ?? 0) < 0)) && (
+                <Link to={`/rh/ajustes?empregadoId=${empregadoId}&data=${data}&tipo=FOLGA`} className={css.linkBtn}>Lançar folga neste dia</Link>
+              )}
             </div>
           </div>
 
           {r && (
             <div className={css.resumo}>
-              <div className={css.rHead}>Resumo do dia</div>
+              <div className={css.rHead}>Resumo do dia{esp.situacao ? <span className={esp.situacao === 'Falta' ? css.tagFalta : css.tagFolga}>{esp.situacao}</span> : null}</div>
               <div className={css.metric}><span className={css.mL}>Trabalhado</span><span className={css.mV}>{minutosParaHhMm(r.minutosTrabalhados)}</span></div>
               <div className={css.metric}><span className={css.mL}>Contratado</span><span className={css.mVsub}>{minutosParaHhMm(r.minutosContratados)}</span></div>
               <div className={css.metric}>
@@ -470,7 +473,10 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
               <div className={css.disclaimer}>
                 {r.paresIncompletos
                   ? 'Com batida em aberto, o dia não entra no banco de horas até ser fechado (ou ajustado).'
-                  : 'Saldo do dia pela jornada contratada. O que vai pro banco segue a regra do funcionário (destinação de atrasos e faltas).'}
+                  : esp.situacao === 'Falta'
+                    ? 'Falta de dia inteiro: segue a regra do funcionário (normalmente desconta na folha). Se foi folga, lance a folga neste dia: "não mexe no banco" ou "desconta do banco de horas".'
+                    : esp.situacao === 'Folga' ? 'Dia de folga: não conta como falta.'
+                    : 'Saldo do dia pela jornada daquele dia. O que vai pro banco segue a regra do funcionário (destinação de atrasos e faltas).'}
               </div>
             </div>
           )}
