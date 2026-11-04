@@ -151,7 +151,7 @@ export class BancoService {
         await tx.delete(pontoAusencia).where(and(
           eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, mov.empregadoId),
           eq(pontoAusencia.data, mov.data), eq(pontoAusencia.tipo, 4),
-          or(isNull(pontoAusencia.origem), eq(pontoAusencia.origem, 'BANCO'))));
+          or(isNull(pontoAusencia.origem), eq(pontoAusencia.origem, 'BANCO'), eq(pontoAusencia.origem, 'BANCO_PARCIAL'))));
         await reabrirCompetencia(tx as never, tenantId, mov.empregadoId, competenciaDe(mov.data));
       }
       await tx.delete(pontoBancoMov).where(and(eq(pontoBancoMov.id, movimentoId), eq(pontoBancoMov.tenantId, tenantId)));
@@ -750,22 +750,42 @@ export class BancoService {
     if (!cfg.ativo) throw new BadRequestException('Este funcionário não tem banco de horas ativo');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new BadRequestException('Data inválida (use AAAA-MM-DD)');
 
+    // Jornada DAQUELE dia pela escala vigente nele (sábado de meio turno = 4h,
+    // não as 8h da semana) e se ele bateu ponto no dia.
+    const ap = await this.tratamento.apurarPeriodoCLT(tenantId, empregadoId, data, data, []);
+    const jornadaDia = ap.feriados.includes(data) ? 0 : (ap.jornadaEscala[data] ?? 0);
+    const trabalhouMin = ap.resultado.dias.find((d) => d.data === data)?.minutosTrabalhados ?? 0;
+    const br = data.split('-').reverse().join('/');
+
+    const manual = minutosManual ?? null;
+    if (jornadaDia <= 0 && manual == null) {
+      throw new BadRequestException(`${br} não é dia de trabalho na escala dele${ap.feriados.includes(data) ? ' (feriado)' : ''}: não há horas para tirar do banco.`);
+    }
+    const minutos: number = manual ?? jornadaDia;
+    if (minutos <= 0) throw new BadRequestException('Informe as horas da folga.');
+    if (jornadaDia > 0 && minutos > jornadaDia) {
+      throw new BadRequestException(`A jornada de ${br} é de ${Math.floor(jornadaDia / 60)}h${String(jornadaDia % 60).padStart(2, '0')}: a folga não pode ser maior que isso.`);
+    }
+    // Dia inteiro: o dia vira descanso. Parte do dia (saída antecipada, chegada
+    // tarde, ou ele trabalhou um pedaço): só aquelas horas são abonadas — o
+    // dia continua de trabalho, senão o que ele trabalhou viraria hora extra.
+    const parcial = jornadaDia > 0 && minutos < jornadaDia;
+    // Dia inteiro de folga num dia em que ele bateu ponto não existe: ou é
+    // saída antecipada (lança as horas) ou a data está errada.
+    if (!parcial && trabalhouMin > 0) throw new BadRequestException(`${br} tem batidas. Para saída antecipada, lance só as horas que ele saiu mais cedo.`);
+    // Saída antecipada num dia já batido: só pode sair do banco o que de fato faltou.
+    const faltouMin = Math.max(0, jornadaDia - trabalhouMin);
+    if (parcial && trabalhouMin > 0 && minutos > faltouMin + 10) {
+      const hm = (m: number) => `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+      throw new BadRequestException(faltouMin === 0
+        ? `Em ${br} ele cumpriu a jornada inteira (${hm(trabalhouMin)}): não há horas para tirar do banco.`
+        : `Em ${br} ele trabalhou ${hm(trabalhouMin)} de ${hm(jornadaDia)}: faltaram ${hm(faltouMin)}. Lance no máximo isso.`);
+    }
+
     return comTenant(this.db, tenantId, async (tx) => {
-      const emp = (await tx.select({ horarioId: empregado.horarioContratualId }).from(empregado)
+      const emp = (await tx.select({ id: empregado.id }).from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!emp) throw new NotFoundException('Empregado não encontrado');
-
-      let minutos = minutosManual ?? null;
-      if (minutos == null) {
-        const h = emp.horarioId
-          ? (await tx.select({ dur: pontoHorarioContratual.durJornadaMin }).from(pontoHorarioContratual)
-              .where(eq(pontoHorarioContratual.id, emp.horarioId)).limit(1))[0]
-          : undefined;
-        minutos = h?.dur ?? 0;
-      }
-      if (minutos <= 0) {
-        throw new BadRequestException('Informe as horas da folga — este funcionário não tem jornada configurada.');
-      }
 
       // Não duplica: se já há folga nesse dia, não cria de novo.
       const jaTem = (await tx.select({ id: pontoAusencia.id }).from(pontoAusencia).where(and(
@@ -773,13 +793,13 @@ export class BancoService {
         eq(pontoAusencia.data, data), eq(pontoAusencia.tipo, 4))).limit(1))[0];
       if (jaTem) throw new BadRequestException('Já existe uma folga registrada nesse dia (do banco ou concedida em Ajustes).');
 
-      await tx.insert(pontoAusencia).values({ tenantId, empregadoId, tipo: 4, data, qtMinutos: minutos, origem: 'BANCO' });
+      await tx.insert(pontoAusencia).values({ tenantId, empregadoId, tipo: 4, data, qtMinutos: minutos, origem: parcial ? 'BANCO_PARCIAL' : 'BANCO' });
       const [mov] = await tx.insert(pontoBancoMov).values({
         tenantId, empregadoId, data, minutos: -minutos, tipo: 'DEBITO',
         descricao: 'Folga compensatória',
       }).returning();
       await reabrirCompetencia(tx as never, tenantId, empregadoId, competenciaDe(data));
-      return { data, minutos, movimento: mov };
+      return { data, minutos, parcial, jornadaDiaMin: jornadaDia, movimento: mov };
     });
   }
 }

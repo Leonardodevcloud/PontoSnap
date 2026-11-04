@@ -95,6 +95,15 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
     } else {
       const desvios = desviosDaJanela(pares, dia.janelaPrevista!);
       let { atraso, extra } = aplicarTolerancia(desvios, regras);
+      // Horas abonadas de parte do dia (declaração de comparecimento, saída
+      // antecipada paga com o banco): cobrem o atraso/saída antecipada medido
+      // pela janela — senão o abono só baixaria o esperado e o desvio ficaria.
+      const abonoParcial = dia.ausenciaAbonadaMin ?? 0;
+      if (abonoParcial > 0 && atraso > 0) {
+        const coberto = Math.min(atraso, abonoParcial);
+        atraso -= coberto;
+        obs.push(`${coberto}min de atraso/saída antecipada abonados (folga do banco ou declaração).`);
+      }
       if (regras.compensarAtrasoComExtra) {
         const net = extra - atraso;
         extra = Math.max(0, net);

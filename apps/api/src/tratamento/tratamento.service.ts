@@ -641,8 +641,11 @@ export class TratamentoService {
       const aus = await tx.select().from(pontoAusencia).where(and(
         eq(pontoAusencia.tenantId, tenantId), eq(pontoAusencia.empregadoId, empregadoId),
         gte(pontoAusencia.data, inicioQStr), lte(pontoAusencia.data, fimStr)));
+      // Folga do banco de PARTE do dia (saída antecipada): não vira descanso —
+      // só aquelas horas são abonadas (mais abaixo), o resto do dia é trabalho.
+      const parcialDoBanco = (a: { tipo: number; origem: string | null }) => a.tipo === 4 && a.origem === 'BANCO_PARCIAL';
       const descansoPorAusencia = new Set<string>(
-        aus.filter((a) => a.tipo === 1 || a.tipo === 4).map((a) => a.data));
+        aus.filter((a) => (a.tipo === 1 || a.tipo === 4) && !parcialDoBanco(a)).map((a) => a.data));
 
       // Atestados/declarações já analisados e abonados pelo RH.
       // minutos = null significa dia inteiro: abate a jornada contratada daquele dia.
@@ -662,6 +665,9 @@ export class TratamentoService {
         for (let dt = a.dataInicio; dt <= a.dataFim; dt = TratamentoService.somarDias(dt, 1)) {
           if (dt >= inicioQStr && dt <= fimStr) abonoDiaInteiro.add(dt);
         }
+      }
+      for (const a of aus) {
+        if (parcialDoBanco(a) && a.data >= inicioQStr && a.data <= fimStr) abonoPorData.set(a.data, (abonoPorData.get(a.data) ?? 0) + (a.qtMinutos ?? 0));
       }
       for (const d of docs) {
         for (let dt = d.dataInicio; dt <= d.dataFim; dt = TratamentoService.somarDias(dt, 1)) {

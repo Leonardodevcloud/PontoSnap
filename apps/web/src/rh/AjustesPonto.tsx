@@ -285,6 +285,14 @@ export default function AjustesPonto() {
 }
 
 interface EmpLite { id: string; nome: string; ativo: boolean }
+/** "2" → 120 · "1,5" → 90 · "1:30" → 90 · inválido → null */
+function lerHoras(t: string): number | null {
+  const v = t.trim();
+  const m = /^(\d{1,2}):([0-5]\d)$/.exec(v);
+  if (m) return Number(m[1]) * 60 + Number(m[2]);
+  const n = Number(v.replace(',', '.'));
+  return v && Number.isFinite(n) && n > 0 ? Math.round(n * 60) : null;
+}
 interface FolgaLancada { id: string; empregadoId: string; nome: string; data: string; motivo: string | null; feriadoRef: string | null; criadoEm: string }
 interface BatidaLite { id: string; dtMarcacao: string; nsr: number | null }
 
@@ -302,6 +310,10 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
   // Folga concedida: por feriado trabalhado (com a data dele) ou outro motivo.
   const [porFeriado, setPorFeriado] = useState(true);
   const [feriadoRef, setFeriadoRef] = useState('');
+  // Folga que desconta do banco: dia inteiro (vira folga) ou só algumas horas (saída antecipada).
+  const [doBanco, setDoBanco] = useState(false);
+  const [diaInteiro, setDiaInteiro] = useState(true);
+  const [horasFolga, setHorasFolga] = useState('');
   const [hora, setHora] = useState('');
   const [tpMarc, setTpMarc] = useState<'E' | 'S'>('E');
   const [dia, setDia] = useState<{ batidas: BatidaLite[]; pares: { entrada: string; saida: string }[]; esperadas: number }>({ batidas: [], pares: [], esperadas: 0 });
@@ -346,6 +358,20 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
 
   async function enviar() {
     if (!empregadoId) { setErro('Escolha o funcionário.'); return; }
+    if (tipo === 'FOLGA' && doBanco) {
+      const min = diaInteiro ? null : lerHoras(horasFolga);
+      if (!diaInteiro && (min == null || min <= 0)) { setErro('Informe as horas (ex.: 2 ou 1:30).'); return; }
+      setErro(null); setEnviando(true);
+      try {
+        const r = await api.post<{ minutos: number; parcial: boolean }>('/banco/folga', { empregadoId, data, ...(min != null ? { minutos: min } : {}) });
+        const nome = emps.find((e) => e.id === empregadoId)?.nome.split(' ')[0] ?? 'Funcionário';
+        const hh = `${Math.floor(r.minutos / 60)}h${r.minutos % 60 ? String(r.minutos % 60).padStart(2, '0') : ''}`;
+        onPronto(r.parcial
+          ? `${hh} de ${nome} em ${data.split('-').reverse().join('/')} saíram do banco de horas — o resto do dia segue normal.`
+          : `Folga de ${nome} em ${data.split('-').reverse().join('/')}: ${hh} saíram do banco de horas e o dia não conta como falta.`);
+      } catch (e) { setErro((e as Error).message); setEnviando(false); }
+      return;
+    }
     if (tipo === 'FOLGA') {
       if (porFeriado && !/^\d{4}-\d{2}-\d{2}$/.test(feriadoRef)) { setErro('Informe o dia do feriado que ele trabalhou.'); return; }
       if (!porFeriado && obs.trim().length < 5) { setErro('Escreva o motivo da folga — fica registrado na auditoria.'); return; }
@@ -439,15 +465,36 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
           <button className={`${css.optB} ${tipo === 'INCLUSAO' ? css.optOn : ''}`} onClick={() => setTipo('INCLUSAO')}>Incluir batida que faltou</button>
           <button className={`${css.optB} ${tipo === 'CORRECAO' ? css.optOn : ''}`} onClick={() => setTipo('CORRECAO')}>Corrigir horário</button>
           <button className={`${css.optB} ${tipo === 'DESCONSIDERAR' ? css.optOn : ''}`} onClick={() => setTipo('DESCONSIDERAR')}>Tirar batida a mais</button>
-          <button className={`${css.optB} ${tipo === 'FOLGA' ? css.optOn : ''}`} onClick={() => setTipo('FOLGA')}>Lançar folga (abona o dia)</button>
+          <button className={`${css.optB} ${tipo === 'FOLGA' ? css.optOn : ''}`} onClick={() => setTipo('FOLGA')}>Lançar folga</button>
         </div>
 
         {tipo === 'FOLGA' && (
           <>
-            <p className={css.folgaInfo}>
-              O dia vira folga: <b>não conta como falta</b> e <b>não mexe no banco de horas</b>. Para folga que desconta horas do banco, use Banco de horas › Folga compensatória.
-            </p>
-            {batidas.length > 0 && <p className={css.erroModal}>Este dia tem {batidas.length} {batidas.length === 1 ? 'batida' : 'batidas'}: ele trabalhou. Escolha o dia em que ele folgou.</p>}
+            <span className={css.lb}>E as horas?</span>
+            <div className={css.opts}>
+              <button className={`${css.optB} ${!doBanco ? css.optOn : ''}`} onClick={() => setDoBanco(false)}>Não mexe no banco (folga dada)</button>
+              <button className={`${css.optB} ${doBanco ? css.optOn : ''}`} onClick={() => setDoBanco(true)}>Desconta do banco de horas</button>
+            </div>
+            <p className={css.folgaInfo}>{doBanco
+              ? <>As horas <b>saem do banco de horas</b> e não viram falta nem desconto no salário. Serve para folga paga com o saldo (ex.: um sábado) e para <b>saída antecipada</b> ou chegada tarde autorizada.</>
+              : <>O dia vira folga: <b>não conta como falta</b> e <b>não mexe no banco de horas</b> (ex.: folga da convenção por feriado trabalhado). VR/VT do dia são abatidos.</>}</p>
+            {doBanco && (
+              <>
+                <div className={css.opts}>
+                  <button className={`${css.optB} ${diaInteiro ? css.optOn : ''}`} onClick={() => setDiaInteiro(true)}>Dia inteiro</button>
+                  <button className={`${css.optB} ${!diaInteiro ? css.optOn : ''}`} onClick={() => setDiaInteiro(false)}>Só algumas horas</button>
+                </div>
+                {diaInteiro
+                  ? <p className={css.semBat}>Sai do banco a jornada daquele dia pela escala (no sábado de meio turno, só as horas do sábado).</p>
+                  : <>
+                    <span className={css.lb}>Quantas horas saem do banco</span>
+                    <input className={css.inp} inputMode="decimal" placeholder="Ex.: 2 ou 1:30" value={horasFolga} onChange={(e) => setHorasFolga(e.target.value)} />
+                    <p className={css.semBat}>Ex.: saiu às 15h num dia que vai até 17h → 2. As horas que ele trabalhou continuam normais.</p>
+                  </>}
+              </>
+            )}
+            {batidas.length > 0 && !(doBanco && !diaInteiro) && <p className={css.erroModal}>Este dia tem {batidas.length} {batidas.length === 1 ? 'batida' : 'batidas'}: ele trabalhou. {doBanco ? 'Se ele saiu mais cedo, escolha "Só algumas horas".' : 'Escolha o dia em que ele folgou.'}</p>}
+            {!doBanco && <>
             <span className={css.lb}>Por quê</span>
             <div className={css.opts}>
               <button className={`${css.optB} ${porFeriado ? css.optOn : ''}`} onClick={() => setPorFeriado(true)}>Trabalhou em feriado</button>
@@ -459,6 +506,7 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
                 <input className={css.inp} type="date" value={feriadoRef} onChange={(e) => setFeriadoRef(e.target.value)} />
               </>
             )}
+            </>}
           </>
         )}
 
@@ -493,13 +541,13 @@ function ModalLancar({ empregadoIdInicial, dataInicial, onFechar, onPronto }: {
           </>
         )}
 
-        <span className={css.lb}>{tipo === 'FOLGA' && porFeriado ? 'Observação (opcional)' : 'Motivo'}</span>
+        {!(tipo === 'FOLGA' && doBanco) && <><span className={css.lb}>{tipo === 'FOLGA' && porFeriado ? 'Observação (opcional)' : 'Motivo'}</span>
         <textarea className={css.inp} rows={2} value={obs} onChange={(e) => setObs(e.target.value)}
-          placeholder={tipo === 'FOLGA' ? (porFeriado ? 'Ex.: folga da convenção pelo feriado de Finados.' : 'Ex.: folga de aniversário prevista na convenção.') : 'Ex.: batida duplicada confirmada com o funcionário.'} />
+          placeholder={tipo === 'FOLGA' ? (porFeriado ? 'Ex.: folga da convenção pelo feriado de Finados.' : 'Ex.: folga de aniversário prevista na convenção.') : 'Ex.: batida duplicada confirmada com o funcionário.'} /></>}
 
         {erro && <p className={css.erroModal}>{erro}</p>}
         <div className={css.acoes}>
-          <button className={css.ok2} onClick={enviar} disabled={enviando || (tipo === 'FOLGA' && batidas.length > 0)}>{enviando ? 'Lançando…' : tipo === 'FOLGA' ? 'Lançar folga' : 'Lançar'}</button>
+          <button className={css.ok2} onClick={enviar} disabled={enviando || (tipo === 'FOLGA' && batidas.length > 0 && !(doBanco && !diaInteiro))}>{enviando ? 'Lançando…' : tipo === 'FOLGA' ? (doBanco ? 'Tirar do banco' : 'Lançar folga') : 'Lançar'}</button>
           <button className={css.cancelar} onClick={onFechar}>Cancelar</button>
         </div>
       </div>

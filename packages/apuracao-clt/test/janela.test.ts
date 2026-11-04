@@ -32,6 +32,18 @@ describe('apuração por janela (confronto com a jornada prevista)', () => {
     expect(r.atrasoMin).toBe(30);
   });
 
+  it('saída antecipada com horas abonadas (folga do banco / declaração): sem atraso', () => {
+    const r = apurarDia(base(['08:00', '12:00', '13:00', '15:00'], { ausenciaAbonadaMin: 120 }), REGRAS_CLT_PADRAO);
+    expect(r.atrasoMin).toBe(0);
+    expect(r.extrasTotalMin).toBe(0);
+    expect(r.saldoMin).toBe(0);
+  });
+
+  it('abono menor que a saída antecipada: sobra só a diferença', () => {
+    const r = apurarDia(base(['08:00', '12:00', '13:00', '14:00'], { ausenciaAbonadaMin: 120 }), REGRAS_CLT_PADRAO);
+    expect(r.atrasoMin).toBe(60);
+  });
+
   it('hora extra após a janela sai a 50%', () => {
     const r = apurarDia(base(['08:00', '12:00', '13:00', '18:00']), REGRAS_CLT_PADRAO);
     expect(r.extras[0]).toMatchObject({ min: 60, adicionalPct: 50 });

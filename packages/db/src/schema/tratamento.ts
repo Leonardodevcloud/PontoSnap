@@ -69,7 +69,7 @@ export const pontoAusencia = pgTable('ponto_ausencia', {
    * a jornada); CONCEDIDA = folga dada pelo RH que só abona o dia (não mexe no
    * banco). Nulo = antigo, do banco.
    */
-  origem: varchar('origem', { length: 12 }),
+  origem: varchar('origem', { length: 16 }),
   motivo: varchar('motivo', { length: 200 }),
   /** Folga por feriado trabalhado: a data do feriado. */
   feriadoRef: date('feriado_ref'),

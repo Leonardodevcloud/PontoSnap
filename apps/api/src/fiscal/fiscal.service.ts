@@ -134,7 +134,8 @@ export class FiscalService {
         ausencias: [
           // Folga concedida sem feriado não tem código no AEJ (o código 4 é
           // "folga compensatória de feriado"): como abono, simplesmente não vai.
-          ...ausencias.filter((a) => !(a.origem === 'CONCEDIDA' && !a.feriadoRef)).map((a) => ({
+          // Folga do banco de parte do dia: o débito já vai como movimento de banco (tipo 3).
+          ...ausencias.filter((a) => !(a.origem === 'CONCEDIDA' && !a.feriadoRef) && a.origem !== 'BANCO_PARCIAL').map((a) => ({
             cpf: cpfPorId.get(a.empregadoId) ?? '', tipo: a.tipo, data: new Date(`${a.data}T12:00:00Z`),
             qtMinutos: a.qtMinutos, tipoMovBH: null,
           })),
