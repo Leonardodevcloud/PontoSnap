@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { brl, dataIsoBr, diaMes, type LinhaRh, type PainelRh, type UnidadeRh } from '../lib/prestador';
 import { normalizarChave } from '../lib/pix';
 import { Rosto } from './Prestadores';
@@ -62,10 +62,14 @@ export function Esteira({ d, tipo, onPasso }: { d: PainelRh; tipo: 'MEI' | 'MOTO
 type Item = { l: LinhaRh; u: UnidadeRh };
 
 /** Motoristas por semana: cada semana com o próximo passo dela. */
-export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPagarSemana, onLembrar, onPix, onAbrir, onAjustar }: {
+export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPagarSemana, onLembrar, onPix, onAbrir, onAjustar, abrirSemana }: {
   d: PainelRh; ocupado: boolean;
   onFecharEnviar: (semana: string) => void; onConferir: () => void; onPagarSemana: (semana: string) => void;
-  onLembrar: (ids: string[]) => void; onPix: (l: LinhaRh, u: UnidadeRh) => void; onAbrir: (id: string) => void; onAjustar: (l: LinhaRh) => void;
+  onLembrar: (ids: string[]) => void; onPix: (l: LinhaRh, u: UnidadeRh) => void; onAbrir: (id: string) => void;
+  /** Ajustar os dias de UMA semana (foco: motorista que pediu o ajuste). */
+  onAjustar: (semana: { inicio: string; fim: string }, foco?: string) => void;
+  /** Semana a manter aberta (a que acabou de ser ajustada ou enviada). */
+  abrirSemana?: string | null;
 }) {
   const mot = d.linhas.filter((l) => l.tipo === 'MOTORISTA');
   const semanas = d.semanas.filter((s) => s.motoristas > 0);
@@ -74,7 +78,8 @@ export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPa
   // Abre sozinha a semana que mais pede atenção (conferir > pronta para fechar).
   const inicial = semanas.find((s) => itensDe(s.inicio).some(({ u }) => u.situacao === 'CONFERIR'))?.inicio
     ?? semanas.find((s) => s.encerrada && !s.liberada)?.inicio ?? null;
-  const [aberta, setAberta] = useState<string | null>(inicial);
+  const [aberta, setAberta] = useState<string | null>(abrirSemana ?? inicial);
+  useEffect(() => { if (abrirSemana) setAberta(abrirSemana); }, [abrirSemana]);
 
   if (semanas.length === 0) return <div className={css.vazio}><b>Nenhuma semana com motorista em {d.rotulo}</b><p>Cadastre motoristas pelo botão "Adicionar prestador".</p></div>;
   return (
@@ -134,7 +139,7 @@ export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPa
                 </div>
                 <div className={v.semAcao}>
                   {pronta ? <>
-                    <button type="button" className={css.lk} onClick={() => setAberta(s.inicio)}>Ajustar dias</button>
+                    <button type="button" className={css.lk} onClick={() => { setAberta(s.inicio); onAjustar(s); }}>Ajustar dias</button>
                     <button type="button" className={css.btnPri} onClick={() => onFecharEnviar(s.inicio)}>Fechar e enviar</button>
                   </> : c.conf ? <button type="button" className={css.btnSec} onClick={onConferir}>Conferir {plural(c.conf, 'nota', 'notas')}</button>
                     : c.aprov ? <button type="button" className={css.btnSec} onClick={() => onPagarSemana(s.inicio)}>Pagar {c.aprov}</button>
@@ -163,7 +168,7 @@ export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPa
                             </td>
                             <td className={css.r}>
                               {u.dias ?? '—'}
-                              {!s.liberada && !d.fechado && !l.fechadoIndividual && <button type="button" className={v.ajustar} onClick={() => onAjustar(l)} title={`Ajustar os dias de ${l.nome}`}>ajustar</button>}
+                              {!s.liberada && !d.fechado && !l.fechadoIndividual && <button type="button" className={v.ajustar} onClick={() => onAjustar(s, l.id)} title={`Ajustar os dias de ${l.nome}`}>ajustar</button>}
                             </td>
                             <td className={`${css.r} ${css.mono}`}>{brl(nfDe(u))}</td>
                             <td className={`${css.r} ${css.mono}`}>{brl(u.valorCent)}{desc > 0 && <small className={v.subVal}>−{brl(desc)} débito</small>}</td>

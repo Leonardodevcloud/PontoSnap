@@ -801,7 +801,8 @@ export class PessoalService {
       const datas = d.diasDatas == null ? null : [...new Set(d.diasDatas)].sort();
       if (datas?.some((x) => !daSemana.includes(x))) throw new BadRequestException('Os dias marcados precisam ser desta semana e deste mês.');
       set.diasDatas = datas?.length ? datas : null;
-      if (datas?.length) set.dias = datas.length;
+      // Lista vazia = desmarcou todos os dias: não rodou na semana (antes ficava com o número antigo).
+      if (datas) set.dias = datas.length;
     } else if (d.dias !== undefined) set.diasDatas = null;
     if (d.valorPago !== undefined) set.valorPago = d.valorPago == null ? null : reais(centavos(d.valorPago));
     if (d.debitoAplicado !== undefined) {

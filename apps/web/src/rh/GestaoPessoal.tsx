@@ -20,6 +20,8 @@ import { ModalPessoa, type AbaModal } from '../components/ModalPessoa';
 import { FecharPessoa } from './FecharPessoa';
 import { esquecerMesPadrao } from '../lib/mesPadrao';
 import css from './GestaoPessoal.module.css';
+import { DiasChips } from './DiasChips';
+import { alternarDia, corpoDias, datasIniciais, diasPrevistos, listaDatas, quantidade, type BaseDiasMot } from '../lib/diasMotorista';
 
 /**
  * Gestão de Pessoal — fechamento do mês da empresa ativa.
@@ -119,6 +121,7 @@ export function GestaoPessoal() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [painel, setPainel] = useState<Painel>(null);
+  const [focoSemana, setFocoSemana] = useState<string | null>(null);
   const [dialogo, setDialogo] = useState<Dialogo>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [busca, setBusca] = useState('');
@@ -142,8 +145,8 @@ export function GestaoPessoal() {
     const alvo = params.get('abrir');
     if (!alvo || !dados) return;
     const [tipo, id] = alvo.split(':');
-    if (id && (tipo === 'MEI' || tipo === 'MOTORISTA')) abrir({ tipo: tipo === 'MEI' ? 'mei' : 'mot', id });
-    setParams((at) => { const n = new URLSearchParams(at); n.delete('abrir'); return n; }, { replace: true });
+    if (id && (tipo === 'MEI' || tipo === 'MOTORISTA')) { setFocoSemana(params.get('semana')); abrir({ tipo: tipo === 'MEI' ? 'mei' : 'mot', id }); }
+    setParams((at) => { const n = new URLSearchParams(at); n.delete('abrir'); n.delete('semana'); return n; }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dados]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t); }, [toast]);
@@ -197,6 +200,11 @@ export function GestaoPessoal() {
     setTimeout(() => gatilho.current?.focus?.(), 0);
   };
   const avisar = (msg: string, desfazer?: () => Promise<void>) => setToast({ msg, desfazer });
+  // Dias/notas do motorista editados e não salvos: fechar o painel pergunta antes de perder.
+  const sujo = useRef(false);
+  const marcarSujo = useCallback((x: boolean) => { sujo.current = x; }, []);
+  const [descartar, setDescartar] = useState(false);
+  const tentarFechar = () => { if (sujo.current) setDescartar(true); else fecharPainel(); };
 
   const empresas = [...new Set([...(dados?.mei ?? []), ...(dados?.motoristas ?? [])].map((x) => x.empresa).filter((x): x is string => !!x))].sort();
   if (novo === 'MEI' || novo === 'MOTORISTA') {
@@ -396,7 +404,7 @@ export function GestaoPessoal() {
       </>}
 
       {painel && d && (
-        <PainelLateral onFechar={fecharPainel} largo={!!(linhaClt || linhaMei || linhaMot)}
+        <PainelLateral onFechar={tentarFechar} largo={!!(linhaClt || linhaMei || linhaMot)}
           foto={linhaClt ? <Avatar id={linhaClt.empregadoId} nome={linhaClt.nome} tamanho={104} /> : (linhaMei ?? linhaMot) ? <Avatar id={(linhaMei ?? linhaMot)!.id} tipo="PRESTADOR" nome={(linhaMei ?? linhaMot)!.nome} tamanho={104} /> : undefined}
           chips={(linhaMei ?? linhaMot) ? <ChipsPrestador l={(linhaMei ?? linhaMot)!} mes={mes} fechado={fechado} /> : undefined}
           abas={(linhaMei || linhaMot) ? [{ id: 'lanc', rotulo: linhaMot ? 'Semanas e pagamento' : 'Lançamentos' }, { id: 'dados', rotulo: 'Dados e acesso' }] : undefined}
@@ -412,7 +420,7 @@ export function GestaoPessoal() {
           {linhaMei && <PainelMei key={linhaMei.id} aba={abaPainel} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas}
             onFecharPessoa={(motivo) => setFecharP({ tipo: 'MEI', id: linhaMei.id, motivo })} onReabrirPessoa={reabrirPessoa} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MEI', pessoaId: linhaMei.id, nome: linhaMei.nome })} />}
-          {linhaMot && <PainelMot key={linhaMot.id} aba={abaPainel} l={linhaMot} mes={mes} fechado={fechado} empresas={empresas}
+          {linhaMot && <PainelMot key={linhaMot.id} aba={abaPainel} l={linhaMot} mes={mes} fechado={fechado} empresas={empresas} onSujo={marcarSujo} focoSemana={focoSemana}
             onFecharPessoa={(motivo) => setFecharP({ tipo: 'MOTORISTA', id: linhaMot.id, motivo })} onReabrirPessoa={reabrirPessoa}
             onPagarSemana={(sm) => setPix(pixSemana(linhaMot, sm, d.debitos))}
             onDesfazerSemana={(sm) => { const a = pixSemana(linhaMot, sm, d.debitos); if (a.registro) registrarPagamento(a.registro, false, null); }} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMot.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Semanas de ${linhaMot.nome} salvas.`); }} onRecarregar={recarregar} onAviso={avisar}
@@ -421,6 +429,12 @@ export function GestaoPessoal() {
         </PainelLateral>
       )}
 
+      {descartar && (
+        <Dialogo titulo="Sair sem salvar?" confirmar="Sair sem salvar" perigo onCancelar={() => setDescartar(false)}
+          onConfirmar={() => { setDescartar(false); sujo.current = false; fecharPainel(); }}>
+          <p className={css.hint}>Os dias e notas que você mudou neste painel ainda não foram salvos. Para guardar, cancele e clique em "Salvar dias e notas".</p>
+        </Dialogo>
+      )}
       {fecharP && d && (() => {
         const l = fecharP.tipo === 'MEI' ? d.mei.find((m) => m.id === fecharP.id) : d.motoristas.find((m) => m.id === fecharP.id);
         return l ? <FecharPessoa pessoa={{ id: l.id, nome: l.nome, tipo: fecharP.tipo, empresa: l.empresa, avatarSemente: null }} mes={mes} motivoInicial={fecharP.motivo}
@@ -1310,29 +1324,43 @@ function PainelMei({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
   );
 }
 
-function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onContrato, onTirar, onRecarregar, onAviso, onPagarSemana, onDesfazerSemana, onFecharPessoa, onReabrirPessoa }: {
+function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onContrato, onTirar, onRecarregar, onAviso, onPagarSemana, onDesfazerSemana, onFecharPessoa, onReabrirPessoa, onSujo, focoSemana }: {
   l: PessoalLinhaMot; mes: string; fechado: boolean; empresas: string[]; aba: 'lanc' | 'dados'; onSalvo: () => Promise<void>; onContrato: () => Promise<void>; onTirar: () => void;
   onFecharPessoa: (motivo: 'DESLIGAMENTO' | 'ANTECIPADO') => void; onReabrirPessoa: (id: string, nome: string) => Promise<void>;
   onRecarregar: () => Promise<void>; onAviso: (m: string) => void;
   onPagarSemana: (s: PessoalSemanaMot) => void; onDesfazerSemana: (s: PessoalSemanaMot) => void;
+  /** Avisa a tela se há dias/notas editados e não salvos (para não perder ao fechar). */
+  onSujo?: (sujo: boolean) => void;
+  /** Semana que pediu o ajuste: rola até ela e destaca. */
+  focoSemana?: string | null;
 }) {
   const fi = l.fechadoIndividual;
   const fechado = fechadoMes || !!fi;
+  useEffect(() => {
+    if (!focoSemana) return;
+    const t = setTimeout(() => document.getElementById(`sem-${focoSemana}`)?.scrollIntoView({ block: 'center' }), 80);
+    return () => clearTimeout(t);
+  }, [focoSemana]);
   // Só dias, adicionais e NF são editados aqui; pagamento e débito vêm ao vivo de `l`.
-  const [ed, setEd] = useState(l.semanas.map((s) => ({ dias: s.dias, adicionalCent: s.adicionalCent, nfNumero: s.nfNumero ?? '', datas: s.diasDatas ?? [] })));
+  // `datas`: os dias marcados (já vêm os previstos); null = quantidade à mão, sem datas.
+  const inicial = () => l.semanas.map((s) => ({ dias: s.dias, adicionalCent: s.adicionalCent, nfNumero: s.nfNumero ?? '', datas: datasIniciais(s, l.baseDias) }));
+  const [ed, setEd] = useState(inicial);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const diaria = l.valorCent / Math.max(1, l.diasMes);
-  const up = (i: number, p: Partial<(typeof ed)[number]>) => setEd(ed.map((s, j) => (j === i ? { ...s, ...p } : s)));
-  const mudouDatas = (i: number) => ed[i]!.datas.join() !== (l.semanas[i]!.diasDatas ?? []).join();
-  const mudou = ed.some((e, i) => { const o = l.semanas[i]!; return e.dias !== o.dias || e.adicionalCent !== o.adicionalCent || e.nfNumero !== (o.nfNumero ?? '') || mudouDatas(i); });
-  // Marcar o dia: a quantidade acompanha. Mudar só a quantidade: as datas saem.
-  const marcarDia = (i: number, dia: string) => {
-    const atual = ed[i]!.datas;
-    const datas = (atual.includes(dia) ? atual.filter((x) => x !== dia) : [...atual, dia]).sort();
-    up(i, datas.length ? { datas, dias: datas.length } : { datas });
+  const up = (i: number, p: Partial<(typeof ed)[number]>) => setEd((at) => at.map((s, j) => (j === i ? { ...s, ...p } : s)));
+  const corpoDe = (i: number) => corpoDias(l.semanas[i]!, l.baseDias, ed[i]!.datas, ed[i]!.dias);
+  const mudouSem = (i: number) => { const e = ed[i]!, o = l.semanas[i]!; return !!corpoDe(i) || e.adicionalCent !== o.adicionalCent || e.nfNumero !== (o.nfNumero ?? ''); };
+  const mudou = ed.some((_, i) => mudouSem(i));
+  useEffect(() => { onSujo?.(mudou); }, [mudou, onSujo]);
+  // Marcar o dia: a quantidade acompanha. Mudar só a quantidade: as datas saem (ou voltam os previstos, se for o previsto).
+  const marcarDia = (i: number, dia: string) => { const datas = alternarDia(ed[i]!.datas, dia); up(i, { datas, dias: datas.length }); };
+  const mudarQtd = (i: number, n: number) => {
+    const s = l.semanas[i]!;
+    const prev = diasPrevistos(s, l.baseDias);
+    up(i, { dias: n, datas: n === s.diasAuto && prev.length === n ? prev : n === 0 ? [] : null });
   };
-  const total = Math.round(diaria * ed.reduce((a, s) => a + s.dias, 0)) + ed.reduce((a, s) => a + s.adicionalCent, 0);
+  const total = Math.round(diaria * ed.reduce((a, s) => a + quantidade(s.datas, s.dias), 0)) + ed.reduce((a, s) => a + s.adicionalCent, 0);
   const pago = pagoMot(l);
   const comDias = l.semanas.filter((s) => s.dias > 0);
   const nPagas = comDias.filter((s) => s.pago).length;
@@ -1341,15 +1369,16 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
     try {
       for (let i = 0; i < ed.length; i++) {
         const e = ed[i]!, o = l.semanas[i]!;
-        if (e.dias === o.dias && e.adicionalCent === o.adicionalCent && e.nfNumero === (o.nfNumero ?? '') && !mudouDatas(i)) continue;
+        if (!mudouSem(i)) continue;
         await api.put('/pessoal/lancamento', fechado || o.pago ? {
           pessoaTipo: 'MOTORISTA', pessoaId: l.id, competencia: mes, periodo: o.inicio, nfNumero: e.nfNumero,
         } : {
           pessoaTipo: 'MOTORISTA', pessoaId: l.id, competencia: mes, periodo: o.inicio,
           adicional: e.adicionalCent / 100, nfNumero: e.nfNumero,
-          ...(e.datas.length ? { diasDatas: e.datas } : { dias: e.dias === o.diasAuto ? null : e.dias }),
+          ...(corpoDe(i) ?? {}),
         });
       }
+      onSujo?.(false);
       await onSalvo();
     } catch (e) { setErro((e as Error).message); setSalvando(false); }
   }
@@ -1368,22 +1397,23 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
           const e = ed[i]!;
           const travada = s.pago || fechado;
           const futura = semanaFutura(s);
-          const valor = Math.round(diaria * e.dias) + e.adicionalCent - s.debitoAplicadoCent;
-          if (s.dias === 0 && e.dias === 0 && s.diasAuto === 0) return null;
+          const qtd = quantidade(e.datas, e.dias);
+          const valor = Math.round(diaria * qtd) + e.adicionalCent - s.debitoAplicadoCent;
+          if (s.dias === 0 && qtd === 0 && s.diasAuto === 0) return null;
           return (
-            <section key={s.inicio} className={`${css.semana} ${s.pago ? css.semanaPaga : ''}`}>
+            <section key={s.inicio} id={`sem-${s.inicio}`} className={`${css.semana} ${s.pago ? css.semanaPaga : ''} ${s.inicio === focoSemana ? css.semanaFoco : ''}`}>
               <div className={css.semTopo}>
                 <b>{fmtDia(s.inicio)} a {fmtDia(s.fim)}</b>
                 {s.pago ? <span className={`${vt.pill} ${vt.pillOk}`}>paga</span> : futura ? <span className={`${vt.pill} ${vt.pillMute}`}>em andamento</span> : <span className={`${vt.pill} ${vt.pillWarn}`}>a pagar</span>}
                 <strong className={css.semValor}>{brl(valor)}</strong>
               </div>
               <div className={css.grade2}>
-                <CampoNum id={`d-${i}`} rotulo={`Dias (previsto ${s.diasAuto})`} max={7} valor={e.dias} onChange={(n) => up(i, { dias: n, datas: [] })} disabled={travada} />
+                <CampoNum id={`d-${i}`} rotulo={`Dias (previsto ${s.diasAuto})`} max={7} valor={qtd} onChange={(n) => mudarQtd(i, n)} disabled={travada} />
                 <CampoReais id={`a-${i}`} rotulo="Adicionais" valorCent={e.adicionalCent} onChange={(c) => up(i, { adicionalCent: c })} disabled={travada} />
               </div>
-              {(s.diasPossiveis?.length ?? 0) > 0 && <DiasSemana s={s} datas={e.datas} disabled={travada} onMarcar={(dia) => marcarDia(i, dia)} />}
+              {(s.diasPossiveis?.length ?? 0) > 0 && <DiasSemana s={s} base={l.baseDias} datas={e.datas} disabled={travada} onMarcar={(dia) => marcarDia(i, dia)} />}
               {s.debitoAplicadoCent > 0 && <p className={css.formula}>Inclui débito descontado nesta semana: {brl(-s.debitoAplicadoCent)}.</p>}
-              {e.dias > 0 && <NotaDiscreta id={`n-${i}`} numero={e.nfNumero} onNumero={(v) => up(i, { nfNumero: v })} temArquivo={!!s.nfArquivo}
+              {qtd > 0 && <NotaDiscreta id={`n-${i}`} numero={e.nfNumero} onNumero={(v) => up(i, { nfNumero: v })} temArquivo={!!s.nfArquivo}
                 anexo={<AnexoNf discreto pessoaTipo="MOTORISTA" pessoaId={l.id} mes={mes} periodo={s.inicio} nome={`${l.nome} · semana ${fmtDia(s.inicio)}`}
                   arquivo={s.nfArquivo} onMudou={onRecarregar} onAviso={onAviso} />} />}
               <div className={css.semAcoes}>
@@ -1391,7 +1421,7 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
                   ? <><span className={css.hint}>Pago <b className={css.mono}>{brl(pagoSemana(s))}</b>{s.pagoEm ? ` em ${fmtPagoEm(s.pagoEm)}` : ''}</span>
                     <button type="button" className={css.link} onClick={() => onDesfazerSemana(s)}>Desfazer</button></>
                   : futura ? <span className={css.hint}>A semana termina em {fmtDia(s.fim)}.</span>
-                  : e.dias > 0 && <Botao variante="coral" className={css.btnPequeno} disabled={mudou} title={mudou ? 'Salve os dias e notas antes de pagar' : undefined}
+                  : qtd > 0 && <Botao variante="coral" className={css.btnPequeno} disabled={mudou} title={mudou ? 'Salve os dias e notas antes de pagar' : undefined}
                     onClick={() => onPagarSemana(s)}>Pagar semana · {brl(valor)}</Botao>}
               </div>
             </section>
@@ -1416,34 +1446,25 @@ function PainelMot({ l, mes, fechado: fechadoMes, empresas, aba, onSalvo, onCont
           </div>
           <span className={css.rodQuebra} aria-hidden="true" />
           <AcoesFechamento fechadoMes={fechadoMes} fi={fi} pago={l.semanas.some((s) => s.pago)} nome={l.nome} onFecharPessoa={onFecharPessoa} onReabrir={onReabrirPessoa} />
-          {mudou && <Botao variante="ghost" className={css.btnSec} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar dias e notas'}</Botao>}
+          {mudou && <Botao variante="coral" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar dias e notas'}</Botao>}
         </div>
       </div>}
     </>
   );
 }
 
-const SEM_CURTO = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 /** Quais dias da semana o motorista trabalhou: vão na descrição da nota ("13/10 e 16/10"). */
-function DiasSemana({ s, datas, disabled, onMarcar }: { s: PessoalSemanaMot; datas: string[]; disabled: boolean; onMarcar: (dia: string) => void }) {
-  const lista = s.diasPossiveis ?? [];
+function DiasSemana({ s, base, datas, disabled, onMarcar }: { s: PessoalSemanaMot; base: BaseDiasMot; datas: string[] | null; disabled: boolean; onMarcar: (dia: string) => void }) {
   const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
   return (
     <div className={css.diasTrab}>
-      <span className={css.diasTrabRot} id={`dt-${s.inicio}`}>Dias trabalhados{datas.length ? ` · ${datas.length}` : ''}</span>
-      <div className={css.diasTrabChips} role="group" aria-labelledby={`dt-${s.inicio}`}>
-        {lista.map((d) => {
-          const on = datas.includes(d);
-          return (
-            <button key={d} type="button" className={`${css.diaChip} ${on ? css.diaChipOn : ''}`} aria-pressed={on} disabled={disabled} onClick={() => onMarcar(d)}>
-              <b>{d.slice(8, 10)}</b><small>{SEM_CURTO[new Date(`${d}T12:00:00Z`).getUTCDay()]}</small>
-            </button>
-          );
-        })}
-      </div>
-      <small className={css.formula}>{datas.length
-        ? <>Na nota: <b>({datas.length === 1 ? dm(datas[0]!) : `${datas.slice(0, -1).map(dm).join(', ')} e ${dm(datas[datas.length - 1]!)}`})</b>. Marcar os dias já preenche a quantidade.</>
-        : <>Opcional: marque os dias para a descrição da nota sair com as datas. Sem marcar, vai o período ({dm(s.inicio)} a {dm(s.fim)}).</>}</small>
+      <span className={css.diasTrabRot}>Dias trabalhados{datas ? ` · ${datas.length}` : ''}</span>
+      <DiasChips dias={s.diasPossiveis ?? []} marcadas={datas} previstos={diasPrevistos(s, base)} disabled={disabled} rotulo={`Dias trabalhados de ${dm(s.inicio)} a ${dm(s.fim)}`} onMarcar={onMarcar} />
+      <small className={css.formula}>{datas === null
+        ? <>Quantidade ajustada à mão, sem datas: a nota sai com o período ({dm(s.inicio)} a {dm(s.fim)}). Marque os dias para a nota sair com as datas.</>
+        : datas.length
+          ? <>Na nota: <b>({listaDatas(datas)})</b>. Desmarque o dia que ele não rodou.</>
+          : <>Nenhum dia marcado: não rodou nesta semana.</>}</small>
     </div>
   );
 }

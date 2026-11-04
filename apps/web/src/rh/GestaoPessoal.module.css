@@ -329,6 +329,7 @@ label.pixItem:hover{ background:var(--cream); }
 .rodapeTab{ margin:0; padding:10px 16px; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:12.5px; color:var(--ash); }
 
 /* ---------- motorista por semana ---------- */
+.semanaFoco{ outline:2px solid var(--coral-acao); outline-offset:2px; }
 .semana{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:12px 14px; display:flex; flex-direction:column; gap:10px; flex:none; }
 .semanaPaga{ border-color:rgba(42,27,0,.35); }
 .semTopo{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -439,16 +440,6 @@ label.pixItem:hover{ background:var(--cream); }
 /* Dias trabalhados da semana do motorista (vão na descrição da nota) */
 .diasTrab{ display:flex; flex-direction:column; gap:6px; }
 .diasTrabRot{ font-size:12px; color:var(--ash); font-weight:600; }
-.diasTrabChips{ display:flex; gap:6px; flex-wrap:wrap; }
-.diaChip{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:4px 6px; border-radius:10px; border:1px solid rgba(var(--ink-rgb),.2); background:var(--white); color:var(--ink); cursor:pointer; font:inherit; line-height:1.1; }
-.diaChip b{ font-size:14px; font-weight:600; }
-.diaChip small{ font-size:12px; color:var(--ash); }
-.diaChip:hover:not(:disabled){ background:var(--cream); }
-.diaChip:disabled{ opacity:.5; cursor:not-allowed; }
-.diaChip:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
-.diaChipOn{ background:var(--coral-acao); border-color:var(--coral-acao); color:var(--on-coral); }
-.diaChipOn small{ color:inherit; opacity:.85; }
-.diaChipOn:hover:not(:disabled){ background:var(--coral-acao-hover); }
 
 /* Abas com ponto de pendência + um aviso por vez */
 .abaPonto{ width:7px; height:7px; border-radius:50%; background:var(--aviso-text); display:inline-block; }

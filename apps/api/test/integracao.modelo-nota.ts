@@ -88,6 +88,11 @@ async function main() {
   await pes.salvarLancamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: joao.id, competencia: COMP, periodo: SEM, dias: 3 });
   snap = await pes.competencia(t.id, COMP);
   ok(snap.motoristas.find((m) => m.id === joao.id)!.semanas.find((s) => s.inicio === SEM)!.diasDatas == null, 'só a quantidade: sem datas');
+  // Desmarcar todos os dias = não rodou (não fica com o número antigo).
+  await pes.salvarLancamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: joao.id, competencia: COMP, periodo: SEM, diasDatas: [] });
+  snap = await pes.competencia(t.id, COMP);
+  ok(snap.motoristas.find((m) => m.id === joao.id)!.semanas.find((s) => s.inicio === SEM)!.dias === 0, 'nenhum dia marcado: semana com 0 dias');
+  await pes.salvarLancamento(t.id, { pessoaTipo: 'MOTORISTA', pessoaId: joao.id, competencia: COMP, periodo: SEM, dias: 3 });
 
   // ── liberar congela o pedido ──
   await pes.fechar(t.id, COMP);

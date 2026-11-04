@@ -1,0 +1,17 @@
+.corpo{ display:flex; flex-direction:column; gap:12px; }
+.linha{ display:grid; grid-template-columns:minmax(150px, 1fr) auto auto; grid-template-areas:'quem chips total' 'nota nota nota'; gap:6px 14px; align-items:center; padding:10px 12px; border-radius:12px; background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); }
+.quem{ grid-area:quem; display:flex; gap:10px; align-items:center; min-width:0; }
+.quem span{ display:flex; flex-direction:column; min-width:0; }
+.quem b{ font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.quem small{ font-size:12px; color:var(--ash); }
+.linha > div[role='group']{ grid-area:chips; }
+.total{ grid-area:total; display:flex; flex-direction:column; align-items:flex-end; min-width:80px; }
+.total b{ font-size:15px; }
+.total small{ font-size:12.5px; color:var(--ash); font-variant-numeric:tabular-nums; }
+.nota{ grid-area:nota; font-size:12.5px; color:var(--ash); }
+.foco{ outline:2px solid var(--coral-acao); outline-offset:1px; }
+.mudou{ border-color:var(--coral-acao); }
+.sair{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:0; padding:10px 12px; border-radius:12px; background:rgba(var(--ink-rgb),.06); font-size:14px; }
+@media (max-width:760px){
+  .linha{ grid-template-columns:1fr auto; grid-template-areas:'quem total' 'chips chips' 'nota nota'; }
+}

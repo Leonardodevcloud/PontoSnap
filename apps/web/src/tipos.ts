@@ -770,6 +770,8 @@ export interface PessoalSemanaMot {
   debitoAplicadoCent: number; valorPagoCent: number | null; pagoEm: string | null;
   /** Dias da semana dentro do mês e os marcados como trabalhados (vão na descrição da nota). */
   diasPossiveis?: string[]; diasDatas?: string[] | null;
+  /** Feriados da semana que valem para a cidade da pessoa (não entram no previsto). */
+  feriados?: string[];
 }
 export interface PessoalLinhaMot {
   /** Cidade de trabalho própria (feriados); null = a da empresa. */

@@ -12,6 +12,7 @@ import { Modal } from '../components/Modal';
 import { ModalPessoa } from '../components/ModalPessoa';
 import { Icone } from '../components/Icone';
 import { FecharPessoa } from './FecharPessoa';
+import { AjustarSemana } from './AjustarSemana';
 import { CidadeTrabalho } from '../components/CidadeTrabalho';
 import { Explica } from '../components/Explica';
 import { Esteira, Pagamentos, SemanasMotoristas, type PassoEsteira } from './PrestadoresVisoes';
@@ -130,7 +131,9 @@ export function Prestadores() {
     else if (p === 'CONFERIR') navegar('/rh/prestadores/conferir');
     else mudar({ ver: 'pagamentos', por: null, semana: null });
   }
-  const ajustar = (l: LinhaRh) => navegar(`/rh/pessoal?mes=${mes}&aba=prestadores&abrir=${l.tipo}:${l.id}&de=prestadores`);
+  // Ajustar dias: na própria semana, sem sair de Prestadores. A semana ajustada fica aberta depois.
+  const [ajuste, setAjuste] = useState<{ inicio: string; fim: string; foco: string | null } | null>(null);
+  const [semanaAberta, setSemanaAberta] = useState<string | null>(null);
   const ir = (m: string) => { const p = new URLSearchParams(params); p.set('mes', m); p.delete('liberar'); setParams(p, { replace: true }); };
 
   const linhas = useMemo(() => {
@@ -247,7 +250,8 @@ export function Prestadores() {
           onFecharEnviar={(semana) => setLiberar({ tipo: 'MOTORISTA', semana })}
           onConferir={() => navegar('/rh/prestadores/conferir')}
           onPagarSemana={(semana) => mudar({ ver: 'pagamentos', semana, por: null })}
-          onLembrar={(ids) => lembrar(ids)} onPix={(l, u) => setPix({ l, u })} onAbrir={setAberto} onAjustar={ajustar} />
+          onLembrar={(ids) => lembrar(ids)} onPix={(l, u) => setPix({ l, u })} onAbrir={setAberto} abrirSemana={semanaAberta}
+          onAjustar={(s, foco) => setAjuste({ inicio: s.inicio, fim: s.fim, foco: foco ?? null })} />
       )}
 
       {d && (ver === 'mei' || (ver === 'motoristas' && porPessoa)) && <>
@@ -332,7 +336,9 @@ export function Prestadores() {
       })()}
 
       {liberar && d && <ModalLiberar d={d} tipoInicial={liberar.tipo} semanaInicial={liberar.semana} onFechar={() => setLiberar(null)}
-        onLiberado={async (m) => { setLiberar(null); avisar(m); await carregar(); }} />}
+        onLiberado={async (m, semanas) => { setLiberar(null); if (semanas?.length === 1) setSemanaAberta(semanas[0]!); avisar(m); await carregar(); }} />}
+      {ajuste && <AjustarSemana mes={mes} inicio={ajuste.inicio} fim={ajuste.fim} foco={ajuste.foco} onFechar={() => setAjuste(null)}
+        onSalvo={async (m) => { setSemanaAberta(ajuste.inicio); setAjuste(null); avisar(m); await carregar(); }} />}
       {pix && <PixPrestador mes={mes} tipo={pix.l.tipo} id={pix.l.id} semana={pix.u.tipo === 'MOTORISTA' ? pix.u.periodo : undefined}
         onFechar={() => setPix(null)} onPago={async (m) => { setPix(null); avisar(m); await carregar(); }} />}
       {convidar && d && <ModalConvites ids={convidar} linhas={d.linhas} onFechar={() => { setConvidar(null); void carregar(); }} />}
@@ -592,10 +598,13 @@ function ResumoPessoa({ l, d }: { l: LinhaRh; d: PainelRh }) {
 }
 
 /** Fechar e liberar: MEI (mês fechado) ou semana do motorista, com prazo, aviso e confirmação do valor. */
-function ModalLiberar({ d, tipoInicial, semanaInicial, onFechar, onLiberado }: { d: PainelRh; tipoInicial?: 'MEI' | 'MOTORISTA'; semanaInicial?: string; onFechar: () => void; onLiberado: (m: string) => Promise<void> }) {
+function ModalLiberar({ d, tipoInicial, semanaInicial, onFechar, onLiberado }: { d: PainelRh; tipoInicial?: 'MEI' | 'MOTORISTA'; semanaInicial?: string; onFechar: () => void; onLiberado: (m: string, semanas?: string[]) => Promise<void> }) {
   const semanasLib = d.semanas.filter((s) => s.motoristas > 0);
+  // Veio do botão de UMA semana: fecha só ela (sem trocar para MEI nem marcar outras).
+  const soSemana = semanaInicial ? semanasLib.find((s) => s.inicio === semanaInicial) ?? null : null;
   const [tipo, setTipo] = useState<'MEI' | 'MOTORISTA'>(tipoInicial ?? (semanaInicial ? 'MOTORISTA' : d.fechado && d.totais.mei > 0 ? 'MEI' : 'MOTORISTA'));
-  const [semanas, setSemanas] = useState<Set<string>>(new Set(semanaInicial ? [semanaInicial] : semanasLib.filter((s) => s.encerrada && !s.liberada).map((s) => s.inicio)));
+  // Sem semana escolhida (esteira): começa só com a semana pendente mais antiga — nunca o mês inteiro.
+  const [semanas, setSemanas] = useState<Set<string>>(new Set(semanaInicial ? [semanaInicial] : semanasLib.filter((s) => s.encerrada && !s.liberada).slice(0, 1).map((s) => s.inicio)));
   const [prazo, setPrazo] = useState(proxDiaUtil(d.hoje, tipo === 'MEI' ? 3 : 2));
   const [avisar, setAvisar] = useState(true);
   const [confirmar, setConfirmar] = useState(false);
@@ -616,22 +625,30 @@ function ModalLiberar({ d, tipoInicial, semanaInicial, onFechar, onLiberado }: {
       const r = await api.post<{ liberadas: number; alteradas: number; mantidas: number; notificados: number; semAcesso: number }>('/portal/rh/liberar', {
         competencia: d.competencia, tipo, semanas: tipo === 'MOTORISTA' ? [...semanas] : undefined, prazo: prazo || null, pedirConfirmacao: confirmar, avisar,
       });
-      await onLiberado(`Liberado: ${r.liberadas} ${r.liberadas === 1 ? 'nota nova' : 'notas novas'}${r.alteradas ? `, ${r.alteradas} com valor corrigido` : ''}${r.mantidas ? `, ${r.mantidas} sem mudança` : ''}. ${r.notificados} ${r.notificados === 1 ? 'aviso' : 'avisos'} no celular.`);
+      await onLiberado(`${tipo === 'MOTORISTA' ? `Semana${semanas.size > 1 ? 's' : ''} ${[...semanas].sort().map(diaMes).join(', ')} · ` : ''}Liberado: ${r.liberadas} ${r.liberadas === 1 ? 'nota nova' : 'notas novas'}${r.alteradas ? `, ${r.alteradas} com valor corrigido` : ''}${r.mantidas ? `, ${r.mantidas} sem mudança` : ''}. ${r.notificados} ${r.notificados === 1 ? 'aviso' : 'avisos'} no celular.`, tipo === 'MOTORISTA' ? [...semanas] : undefined);
     } catch (e) { setErro((e as Error).message); setEnviando(false); }
   }
 
   return (
-    <Modal titulo={`Fechar e enviar · ${d.rotulo.split('/')[0]!.toLowerCase()}`} onFechar={onFechar}>
+    <Modal titulo={soSemana ? `Fechar e enviar · semana ${diaMes(soSemana.inicio)} a ${diaMes(soSemana.fim)}` : tipo === 'MOTORISTA' ? 'Fechar e enviar · semanas dos motoristas' : `Fechar e enviar · ${d.rotulo.split('/')[0]!.toLowerCase()}`} onFechar={onFechar}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p className={css.hint}>Congela o valor e manda para o app: cada prestador vê o resumo dele e o valor exato da nota.{' '}
-          <Explica>O valor é o retrato do fechamento: se precisar corrigir, reabra o mês, corrija e libere de novo — o prestador recebe aviso de que o valor mudou.</Explica></p>
-        <div className={css.seg} role="group" aria-label="O que liberar">
+        <p className={css.hint}>{tipo === 'MOTORISTA'
+          ? <>Fecha <b>só {semanas.size === 1 ? 'esta semana' : `estas ${semanas.size} semanas`}</b> e manda o valor para o app de cada motorista. As outras semanas e o mês continuam abertos.{' '}
+            <Explica>Se precisar corrigir depois, ajuste os dias da semana e envie de novo: o motorista recebe aviso de que o valor mudou.</Explica></>
+          : <>Congela o valor e manda para o app: cada prestador vê o resumo dele e o valor exato da nota.{' '}
+            <Explica>O valor é o retrato do fechamento: se precisar corrigir, reabra o mês, corrija e libere de novo — o prestador recebe aviso de que o valor mudou.</Explica></>}</p>
+        {soSemana && (
+          <div className={css.resumoF}>
+            <div><small>Semana</small><b>{diaMes(soSemana.inicio)} a {diaMes(soSemana.fim)}</b><small>{soSemana.liberada ? 'já enviada: envia de novo só se o valor mudou' : soSemana.encerrada ? 'terminou' : 'ainda não terminou'}</small></div>
+          </div>
+        )}
+        {!soSemana && <div className={css.seg} role="group" aria-label="O que liberar">
           <button type="button" aria-pressed={tipo === 'MEI'} onClick={() => { setTipo('MEI'); setPrazo(proxDiaUtil(d.hoje, 3)); }}>MEI · mês</button>
           <button type="button" aria-pressed={tipo === 'MOTORISTA'} onClick={() => { setTipo('MOTORISTA'); setPrazo(proxDiaUtil(d.hoje, 2)); }}>Motoristas · semana</button>
-        </div>
+        </div>}
         {tipo === 'MEI' && d.meiLiberado && <p className={css.hint}><b>Já liberado.</b> Liberar de novo atualiza prazo e confirmação; só quem teve o valor alterado (mês reaberto e corrigido) recebe aviso.</p>}
         {tipo === 'MEI' && !d.fechado && <p className={css.erro}>Feche {d.rotulo} na Folha CLT antes de liberar os MEI.</p>}
-        {tipo === 'MOTORISTA' && (
+        {tipo === 'MOTORISTA' && !soSemana && (
           <div className={css.semList}>
             {semanasLib.length === 0 && <p className={css.hint}>Nenhuma semana com motorista neste mês.</p>}
             {semanasLib.map((s) => (
