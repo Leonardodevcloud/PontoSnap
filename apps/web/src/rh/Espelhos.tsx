@@ -268,10 +268,17 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
     return a ? ROTULO_AFAST[a.tipo] : null;
   };
   const dias = useMemo(() => (r?.dias ?? []).filter((d) => d.data <= hoje).reverse(), [r, hoje]);
+  // Feriado/domingo trabalhado é verba própria (não é "hora extra" de dia comum): card e etiqueta próprios.
+  const DF = 'extra em domingo/feriado';
+  const dfDoDia = (d: { extras: { motivo: string; min: number }[] }) => d.extras.filter((e) => e.motivo === DF).reduce((a, e) => a + e.min, 0);
+  const df = (r?.dias ?? []).reduce((t, d) => t + dfDoDia(d), 0);
+  const dfPago = !ap?.banco ? df : ((ap?.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0);
+  const dfNaFolha = df > 0 && dfPago >= df;
   // Caixinhas e conta com os MESMOS números (a conta deixa de fora o dia em aberto).
   const k = ap?.conta
     ? { trabalhado: ap.conta.trabalhadoMin, previsto: ap.conta.previstoMin, extras: ap.conta.sobrouMin, atrasos: ap.conta.faltouMin }
     : { trabalhado: r?.totalTrabalhadoMin ?? 0, previsto: r?.totalContratadoMin ?? 0, extras: r?.totalExtrasMin ?? 0, atrasos: r?.totalAtrasoMin ?? 0 };
+  const comuns = Math.max(0, k.extras - df);
   const horasDoDia = (d: ResultadoDiaCLT) => {
     if (d.marcacoes.length === 0) return null;
     return d.marcacoes.map((m) => fmtHora(m)).join(' · ');
@@ -294,21 +301,18 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
       {r && (
         <div className={ap?.banco ? css.dois : css.um}>
           <div>
-            <div className={`${vt.kpis} ${css.kpis5}`}>
+            <div className={`${vt.kpis} ${df > 0 ? css.kpis6 : css.kpis5}`}>
               <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(k.trabalhado)}</div></div>
               <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(k.previsto)}</div>{ap?.conta && <div className={vt.kpiS}>até {ap.conta.ate.slice(8, 10)}/{ap.conta.ate.slice(5, 7)}</div>}</div>
-              {(() => {
-                // Feriado/domingo trabalhado é verba própria: sai do card de Extras e aparece com o nome dele.
-                const df = (r.dias ?? []).reduce((t, d) => t + d.extras.filter((e) => e.motivo === 'extra em domingo/feriado').reduce((a, e) => a + e.min, 0), 0);
-                const dfPago = !ap?.banco ? df : ((ap?.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0);
-                const comuns = Math.max(0, k.extras - df);
-                return (
-                  <div className={`${vt.kpi} ${comuns > 0 || df > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{comuns > 0 ? `+${minutosParaHhMm(comuns)}` : '—'}</div>
-                    {comuns > 0 && <div className={vt.kpiS}>{ap?.banco ? 'vão para o banco' : 'pagas na folha'}</div>}
-                    {df > 0 && <div className={vt.kpiS}><b>Feriado/domingo trabalhado {minutosParaHhMm(df)}</b> · {dfPago >= df ? 'pago na folha' : dfPago > 0 ? `${minutosParaHhMm(dfPago)} na folha, resto no banco` : 'vai para o banco'}</div>}
-                  </div>
-                );
-              })()}
+              {/* Extras: só as horas a mais de dia comum. Feriado/domingo trabalhado tem card próprio. */}
+              <div className={`${vt.kpi} ${comuns > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{comuns > 0 ? `+${minutosParaHhMm(comuns)}` : '—'}</div>
+                {comuns > 0 && <div className={vt.kpiS}>{ap?.banco ? 'vão para o banco' : 'pagas na folha'}</div>}
+              </div>
+              {df > 0 && (
+                <div className={vt.kpi}><div className={vt.kpiK}>Feriado/domingo trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(df)}</div>
+                  <div className={vt.kpiS}>{dfNaFolha ? 'pago na folha (100%) · fora do banco' : dfPago > 0 ? `${minutosParaHhMm(dfPago)} na folha, resto no banco` : 'vai para o banco (regra do perfil)'}</div>
+                </div>
+              )}
               <div className={`${vt.kpi} ${k.atrasos > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{k.atrasos > 0 ? `−${minutosParaHhMm(k.atrasos)}` : '—'}</div>
                 {k.atrasos > 0 && <div className={vt.kpiS}>{ap?.conta?.destino.destinoAtraso === 'BANCO' ? 'abatem do banco' : ap?.conta?.destino.destinoAtraso === 'TOLERA' ? 'tolerados' : 'descontados na folha'}</div>}</div>
               <div className={`${vt.kpi} ${r.totalFaltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '—'}</div>
@@ -340,6 +344,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                       {(() => {
                         // No máximo uma etiqueta por dia, a mais grave; o resto vai no title.
                         const tags: [string, string, string?][] = [];
+                        if (dfDoDia(d) > 0) tags.push([dfNaFolha ? 'feriado trabalhado · pago na folha' : 'feriado/domingo trabalhado', vt.pillOk, dfNaFolha ? 'Pago na folha a 100%. Não é hora extra e não entra no banco.' : undefined]);
                         if (faltou) tags.push(['falta', vt.pillErr]);
                         if (d.paresIncompletos) tags.push(['faltou bater', vt.pillErr]);
                         if (d.atrasoMin > 0) tags.push([`atraso ${minutosParaHhMm(d.atrasoMin)}`, vt.pillErr]);
@@ -354,8 +359,8 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                           </span>
                         );
                       })()}
-                      <span className={`${css.dS} ${d.saldoMin > 0 ? vt.pos : d.saldoMin < 0 ? vt.neg : ''}`}>
-                        {d.paresIncompletos || d.marcacoes.length === 0 ? '' : sem ? minutosParaHhMm(d.minutosTrabalhados) : comSinal(d.saldoMin)}
+                      <span className={`${css.dS} ${dfNaFolha && dfDoDia(d) > 0 ? '' : d.saldoMin > 0 ? vt.pos : d.saldoMin < 0 ? vt.neg : ''}`}>
+                        {d.paresIncompletos || d.marcacoes.length === 0 ? '' : sem || (dfNaFolha && dfDoDia(d) > 0) ? minutosParaHhMm(d.minutosTrabalhados) : comSinal(d.saldoMin)}
                       </span>
                     </button>
                     </Fragment>

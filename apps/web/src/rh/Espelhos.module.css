@@ -129,7 +129,8 @@
 .lk:hover{ text-decoration:underline; }
 .um{ max-width:880px; }
 .kpis5{ grid-template-columns:repeat(5, minmax(0,1fr)) !important; }
-@media (max-width:640px){ .kpis5{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; } }
+.kpis6{ grid-template-columns:repeat(6, minmax(0,1fr)) !important; }
+@media (max-width:640px){ .kpis5, .kpis6{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; } }
 
 /* Situação do dia no resumo */
 .tagFalta, .tagFolga{ margin-left:8px; font-size:12px; font-weight:600; padding:2px 8px; border-radius:var(--r-pill); vertical-align:middle; }
