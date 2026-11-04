@@ -281,11 +281,11 @@
 .senhaBox{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.15); border-left:3px solid var(--coral-acao); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
 
 /* Composição do valor do prestador */
-.comp{ align-self:stretch; width:100%; box-sizing:border-box; text-align:left; margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--cream); display:flex; flex-direction:column; gap:4px; }
-.compTit{ font-size:12px; font-weight:600; color:var(--ash); margin-bottom:2px; }
-.compSub{ font-size:12px; font-weight:600; color:var(--ash); margin-top:6px; }
-.compLin{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; width:100%; }
-.compLin > span:first-child{ flex:1; min-width:0; }
-.compLin > span:last-child{ white-space:nowrap; }
-.compMenos{ color:var(--erro-text); }
-.compTotal{ font-weight:700; border-top:1px solid rgba(var(--ink-rgb),.12); padding-top:4px; margin-top:2px; }
+.compo{ align-self:stretch; width:100%; box-sizing:border-box; text-align:left; margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--cream); display:flex; flex-direction:column; gap:4px; }
+.compoTit{ font-size:12px; font-weight:600; color:var(--ash); margin-bottom:2px; }
+.compoSub{ font-size:12px; font-weight:600; color:var(--ash); margin-top:6px; }
+.compoLin{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; width:100%; }
+.compoLin > span:first-child{ flex:1; min-width:0; }
+.compoLin > span:last-child{ white-space:nowrap; }
+.compoMenos{ color:var(--erro-text); }
+.compoTotal{ font-weight:700; border-top:1px solid rgba(var(--ink-rgb),.12); padding-top:4px; margin-top:2px; }

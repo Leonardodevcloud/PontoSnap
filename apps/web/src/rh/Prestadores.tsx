@@ -687,17 +687,17 @@ function Composicao({ linhas, nfCent, aPagarCent, congelado }: { linhas: LinhaDe
   const noPagamento = linhas.filter(foraDaNota);
   const sinal = (l: LinhaDetalhe) => (l.tipo === 'MENOS' ? '−' : l.tipo === 'MAIS' ? '+' : '');
   const Linha = ({ l }: { l: LinhaDetalhe }) => (
-    <div className={`${css.compLin} ${l.tipo === 'MENOS' ? css.compMenos : ''}`}><span>{l.rotulo}</span><span className={css.mono}>{sinal(l)} {brl(l.valorCent)}</span></div>
+    <div className={`${css.compoLin} ${l.tipo === 'MENOS' ? css.compoMenos : ''}`}><span>{l.rotulo}</span><span className={css.mono}>{sinal(l)} {brl(l.valorCent)}</span></div>
   );
   return (
-    <div className={css.comp}>
-      <div className={css.compTit}>Como chegou nesse valor{congelado ? '' : ' (prévia — ainda não enviada)'}</div>
+    <div className={css.compo}>
+      <div className={css.compoTit}>Como chegou nesse valor{congelado ? '' : ' (prévia — ainda não enviada)'}</div>
       {naNota.map((l, i) => <Linha key={`n${i}`} l={l} />)}
-      <div className={`${css.compLin} ${css.compTotal}`}><span>Valor da nota</span><span className={css.mono}>{brl(nfCent)}</span></div>
+      <div className={`${css.compoLin} ${css.compoTotal}`}><span>Valor da nota</span><span className={css.mono}>{brl(nfCent)}</span></div>
       {noPagamento.length > 0 && <>
-        <div className={css.compSub}>Sai só do pagamento (não entra na nota)</div>
+        <div className={css.compoSub}>Sai só do pagamento (não entra na nota)</div>
         {noPagamento.map((l, i) => <Linha key={`p${i}`} l={l} />)}
-        <div className={`${css.compLin} ${css.compTotal}`}><span>A pagar</span><span className={css.mono}>{brl(aPagarCent)}</span></div>
+        <div className={`${css.compoLin} ${css.compoTotal}`}><span>A pagar</span><span className={css.mono}>{brl(aPagarCent)}</span></div>
       </>}
     </div>
   );

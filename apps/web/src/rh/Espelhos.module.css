@@ -136,4 +136,4 @@
 .tagFalta{ background:var(--erro-bg); color:var(--erro-text); }
 .tagFolga{ background:rgba(var(--ink-rgb),.08); color:var(--ink); }
 
-.aviso{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 12px; }
+.avisoOk{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 12px; }

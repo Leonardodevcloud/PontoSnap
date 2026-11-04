@@ -103,7 +103,7 @@ export function Espelhos() {
       </div>
 
       {erro && <p className={css.erro}>{erro}</p>}
-      {aviso && <p className={css.aviso} role="status">{aviso}</p>}
+      {aviso && <p className={css.avisoOk} role="status">{aviso}</p>}
 
       {visao === 'todos' && <Todos mes={mes} emps={emps} onAbrir={(id) => ir({ emp: id })} onErro={setErro} />}
       {visao === 'um' && !dia && empregadoId && (
