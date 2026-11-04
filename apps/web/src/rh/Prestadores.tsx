@@ -308,7 +308,7 @@ export function Prestadores() {
               <tr>
                 <th style={{ width: 36 }}><input type="checkbox" className={css.chk} aria-label="Selecionar todos" checked={todasMarcadas}
                   onChange={() => setSel(todasMarcadas ? new Set() : new Set(linhas.map((l) => l.id)))} /></th>
-                <th>Prestador</th><th className={css.r} title="O que o prestador recebe (já com débitos e meta paga descontados). A nota fiscal sai pelo bruto.">A pagar</th><th>Nota</th><th>App</th><th>Pagamento</th><th />
+                <th>Prestador</th><th className={css.r} title="O que o prestador recebe (já com débitos e meta paga descontados). A nota fiscal sai pelo bruto.">A pagar</th><th>Nota</th><th>Pagamento</th><th />
               </tr>
             </thead>
             <tbody>
@@ -370,22 +370,27 @@ function Linha({ l, marcado, ocupado, onMarcar, onAbrir, onLembrar, onConvidar, 
       <td>
         <button type="button" className={`${css.linhaBtn} ${css.pes}`} onClick={onAbrir}>
           <Rosto id={l.id} semente={l.avatarSemente} />
-          <span className={css.pesTxt}><b title={l.nome}>{l.nome}</b><small title={fiTexto ? `${sub} · ${fiDica}` : sub}>{sub}{fiTexto ? ` · ${fiTexto}` : ''}</small></span>
+          <span className={css.pesTxt}><b title={l.nome}>{l.nome}</b><small title={fiTexto ? `${sub} · ${fiDica}` : sub}>{sub}{fiTexto ? ` · ${fiTexto}` : ''}{/* App só aparece quando há problema; ativo não ocupa espaço */}{acesso.tom !== 'ok' && <span className={css.txtProb} title={acesso.dica}> · {acesso.texto}</span>}</small></span>
         </button>
       </td>
       <td className={`${css.r} ${css.mono}`} title={mot ? `${l.unidades.length} ${l.unidades.length === 1 ? 'semana' : 'semanas'}` : undefined}>{brl(l.valorCent)}</td>
       <td title={dicaNota}>
-        {tomSit === 'ok' || tomSit === 'cz'
-          ? <span className={css.txtMudo}>{ROTULO_SITUACAO[l.situacao]}</span>
-          : <TagSituacao s={l.situacao} atrasada={l.atrasada} />}
+        {/* Aprovada (pelo RH na conferência ou nota que o próprio RH subiu): um selo só, verde. */}
+        {tomSit === 'ok'
+          ? <span className={`${css.tag} ${css['t-ok']}`} title={l.situacao === 'RH' ? 'Nota lançada pelo RH — vale como aprovada' : undefined}>✓ aprovada</span>
+          : tomSit === 'cz'
+            ? <span className={css.txtMudo}>{ROTULO_SITUACAO[l.situacao]}</span>
+            : <TagSituacao s={l.situacao} atrasada={l.atrasada} />}
         {mot && l.unidades.length > 1 && (
           <span className={css.semanas} aria-label={l.unidades.map((u) => `${u.rotulo}: ${ROTULO_SITUACAO[u.situacao]}`).join('; ')}>
             {l.unidades.map((u) => <i key={u.periodo} className={css[TOM_SITUACAO[u.situacao] === 'cz' ? '' : TOM_SITUACAO[u.situacao]]} title={`${u.rotulo}: ${ROTULO_SITUACAO[u.situacao]}`} />)}
           </span>
         )}
       </td>
-      <td><span className={acesso.tom === 'ok' ? css.txtMudo : css.txtProb} title={acesso.dica}>{acesso.texto}</span></td>
-      <td className={`${css.mono} ${css.txtMudo}`}>{l.pago ? `pago ${dataIsoBr(ultimaPaga)}` : l.pagoCent ? `${brl(l.pagoCent)} pago` : '—'}</td>
+      <td>{l.pago
+        ? <span className={`${css.tag} ${css.tagPago}`}>✓ Pago {dataIsoBr(ultimaPaga)}</span>
+        : l.pagoCent ? <span className={`${css.tag} ${css['t-av']}`} title="Parte das semanas/notas já foi paga">{brl(l.pagoCent)} pago · parcial</span>
+        : <span className={css.txtMudo}>—</span>}</td>
       <td className={css.r}>
         {l.situacao === 'CONFERIR' ? <button type="button" className={css.btnTxt} onClick={onConferir}>Conferir</button>
           : l.situacao === 'CONTESTOU' ? <button type="button" className={css.btnTxt} onClick={onAbrir}>Responder</button>

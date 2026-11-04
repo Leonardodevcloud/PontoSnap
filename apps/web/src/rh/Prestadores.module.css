@@ -289,3 +289,7 @@
 .compoLin > span:last-child{ white-space:nowrap; }
 .compoMenos{ color:var(--erro-text); }
 .compoTotal{ font-weight:700; border-top:1px solid rgba(var(--ink-rgb),.12); padding-top:4px; margin-top:2px; }
+
+/* Lista: cabeçalho de coluna numérica alinhado com os valores; selo de pago */
+.tabela th.r{ text-align:right; }
+.tagPago{ background:var(--ok-text); color:var(--white); font-weight:700; }
