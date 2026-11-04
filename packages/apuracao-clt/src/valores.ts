@@ -38,6 +38,8 @@ export interface DestinoValores {
    * intervalo/interjornada é sempre paga — não é jornada, não vai pro banco.
    */
   extrasNoBanco?: boolean;
+  /** Com banco: a extra de domingo/feriado é paga mesmo assim (não vai pro banco). */
+  domingoFeriadoPago?: boolean;
   /** Falta vira desconto em R$ só com destinação DESCONTA (banco/abono não descontam). */
   descontaFaltas?: boolean;
   /** Atraso vira desconto em R$ só com destinação DESCONTA (banco/tolera não descontam). */
@@ -67,7 +69,7 @@ export function valorizarPeriodo(
     pagasPorAdicional = {};
     for (const d of r.dias) {
       for (const e of d.extras) {
-        if (ehIndenizacao(e.motivo)) {
+        if (ehIndenizacao(e.motivo) || (dest.domingoFeriadoPago && e.motivo === 'extra em domingo/feriado')) {
           const k = String(e.adicionalPct);
           pagasPorAdicional[k] = (pagasPorAdicional[k] ?? 0) + e.min;
         } else {

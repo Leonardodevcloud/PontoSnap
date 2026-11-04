@@ -51,6 +51,8 @@ type CfgBanco = {
   ativo: boolean; tipoAcordo: TipoAcordo; prazoMeses: number | null;
   destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso;
   formaCalculo: FormaCalculo; negativoMes: NegativoMes;
+  /** Horas de domingo/feriado pagas na folha (não entram no banco). */
+  domingoFeriadoPago?: boolean;
 };
 
 /** Soma meses a uma competência YYYY-MM. */
@@ -253,6 +255,7 @@ export class BancoService {
     const destinacaoAtrasos = itens.destinacao?.destinacaoAtrasos ?? 'BANCO';
     const formaCalculo = banco?.formaCalculo ?? 'BANCO_HORAS';
     const negativoMes: NegativoMes = banco?.negativoMes === 'CARREGA' ? 'CARREGA' : 'DESCONTA';
+    const domingoFeriadoPago = banco?.domingoFeriado === 'PAGA';
     if (banco && banco.bancoModo !== 'HERDA') {
       const ativo = banco.bancoModo === 'ATIVO';
       const tipo = (banco.bancoTipoAcordo as TipoAcordo) ?? (empresa.tipoAcordo === 'NENHUM' ? 'INDIVIDUAL' : empresa.tipoAcordo);
@@ -260,10 +263,10 @@ export class BancoService {
         ativo,
         tipoAcordo: ativo ? tipo : 'NENHUM',
         prazoMeses: ativo ? (banco.bancoPrazoMeses ?? empresa.prazoMeses ?? PRAZO_PADRAO[tipo] ?? null) : null,
-        destinacaoFaltas, destinacaoAtrasos, formaCalculo, negativoMes,
+        destinacaoFaltas, destinacaoAtrasos, formaCalculo, negativoMes, domingoFeriadoPago,
       };
     }
-    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo, negativoMes }; // HERDA
+    return { ...empresa, destinacaoFaltas, destinacaoAtrasos, formaCalculo, negativoMes, domingoFeriadoPago }; // HERDA
   }
 
   /** Competências já fechadas COM acerto (regra compensa no mês). */
@@ -409,13 +412,13 @@ export class BancoService {
   /** Movimentos que a apuração de uma competência geraria, segundo a regra do funcionário. */
   private async movimentosDaCompetencia(
     tenantId: string, empregadoId: string, competencia: string,
-    cfg: { destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso },
+    cfg: { destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso; domingoFeriadoPago?: boolean },
   ) {
     const inicio = `${competencia}-01`;
     const fim = ultimoDiaDe(competencia);
     // Os feriados (da região do funcionário) a apuração já busca sozinha.
     const ap = await this.tratamento.apurarPeriodoCLT(tenantId, empregadoId, inicio, fim);
-    const opc = { destinacaoFaltas: cfg.destinacaoFaltas, destinacaoAtrasos: cfg.destinacaoAtrasos, bancoAtivo: true };
+    const opc = { destinacaoFaltas: cfg.destinacaoFaltas, destinacaoAtrasos: cfg.destinacaoAtrasos, bancoAtivo: true, domingoFeriadoPago: cfg.domingoFeriadoPago };
     return ap.resultado.dias.flatMap((d) =>
       movimentosBancoDoDia(d, opc).map((mv) => ({
         tenantId, empregadoId, data: d.data, minutos: mv.minutos,

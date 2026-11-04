@@ -9,7 +9,7 @@ interface Config {
   tolerancia?: { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number } | null;
   noturno?: { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number } | null;
   jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
-  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA' } | null;
+  banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA'; domingoFeriado?: 'BANCO' | 'PAGA' } | null;
   destinacao?: { destinacaoFaltas: 'DESCONTA' | 'BANCO' | 'ABONA'; destinacaoAtrasos: 'DESCONTA' | 'BANCO' | 'TOLERA' } | null;
   /** Tipo de jornada. Nulo = segue a escala (escalas antigas marcadas como flexíveis). */
   contrato?: { tipoJornada: 'FIXO' | 'CONTRATO_HORAS' } | null;
@@ -294,6 +294,28 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
             )}
           </div>
         )}
+        {(cfg.banco && cfg.banco.bancoModo !== 'HERDA' ? cfg.banco.bancoModo === 'ATIVO' : !!empresa?.ativo) && (() => {
+          // Vale também com "Igual à empresa": guarda só esta escolha no perfil.
+          const atual = cfg.banco?.domingoFeriado ?? 'BANCO';
+          const base = cfg.banco ?? { bancoModo: 'HERDA' as const, bancoTipoAcordo: null, bancoPrazoMeses: null, formaCalculo: 'BANCO_HORAS' as const };
+          return (
+            <div className={css.opSub} style={{ marginTop: 12 }}>
+              <div className={css.opSubLb} id="lb-dom-fer">Horas trabalhadas em domingo e feriado</div>
+              <div className={css.pills} role="radiogroup" aria-labelledby="lb-dom-fer">
+                {([['BANCO', 'Vão para o banco'], ['PAGA', 'Pagas na folha']] as const).map(([k, t]) => (
+                  <button key={k} type="button" role="radio" aria-checked={atual === k}
+                    className={`${css.pill} ${atual === k ? css.pillOn : ''}`}
+                    onClick={() => setBloco('banco', { ...base, domingoFeriado: k })}>{t}</button>
+                ))}
+              </div>
+              <p className={css.exp} style={{ marginTop: 8 }}>
+                {atual === 'PAGA'
+                  ? 'Trabalhou 8h no feriado → 8h pagas na folha com o adicional de domingo/feriado (100% pela CLT) e nada entra no banco. Use quando a convenção manda pagar o feriado trabalhado. A folga da convenção, se houver, é lançada em Ajustes › Lançar folga › "Não mexe no banco".'
+                  : 'Trabalhou 8h no feriado → +8h no banco, como as outras horas a mais (nada é pago agora).'}
+              </p>
+            </div>
+          );
+        })()}
         {(() => {
           const ativo = cfg.banco && cfg.banco.bancoModo !== 'HERDA' ? cfg.banco.bancoModo === 'ATIVO' : !!empresa?.ativo;
           const forma = cfg.banco && cfg.banco.bancoModo === 'ATIVO' ? cfg.banco.formaCalculo : 'BANCO_HORAS';

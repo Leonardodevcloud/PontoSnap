@@ -8,12 +8,19 @@ export interface OpcoesDestinacao {
   destinacaoAtrasos: DestinoAtraso;
   /** Banco efetivamente ativo pro funcionário. Se não, "BANCO" vira "DESCONTA". */
   bancoAtivo: boolean;
+  /** Horas de domingo/feriado são pagas na folha (não vão pro banco). */
+  domingoFeriadoPago?: boolean;
 }
+
+export const MOTIVO_DOMINGO_FERIADO = 'extra em domingo/feriado';
+/** Minutos do dia que são extra de domingo/feriado (pagos na folha quando a regra manda). */
+export const minDomingoFeriado = (dia: ResultadoDia) =>
+  dia.extras.filter((e) => e.motivo === MOTIVO_DOMINGO_FERIADO).reduce((a, e) => a + e.min, 0);
 
 export interface ResumoDestinacao {
   falta: { min: number; destino: DestinoFalta };
   atraso: { min: number; destino: DestinoAtraso };
-  extra: { min: number; destino: 'BANCO' | 'PAGA' };
+  extra: { min: number; destino: 'BANCO' | 'PAGA'; /** Com banco: horas de domingo/feriado pagas na folha mesmo assim. */ domingoFeriadoPagoMin?: number };
 }
 
 /** BANCO só vale se o banco estiver ativo; senão, o valor é sinalizado como desconto. */
@@ -26,7 +33,10 @@ export function resumirDestinacao(r: ResultadoPeriodo, o: OpcoesDestinacao): Res
   return {
     falta: { min: r.totalFaltaMin, destino: efetivo(o.destinacaoFaltas, o.bancoAtivo) },
     atraso: { min: r.totalAtrasoMin, destino: efetivo(o.destinacaoAtrasos, o.bancoAtivo) },
-    extra: { min: r.totalExtrasMin, destino: o.bancoAtivo ? 'BANCO' : 'PAGA' },
+    extra: (() => {
+      const df = o.bancoAtivo && o.domingoFeriadoPago ? r.dias.reduce((a, d) => a + minDomingoFeriado(d), 0) : 0;
+      return { min: r.totalExtrasMin - df, destino: o.bancoAtivo ? 'BANCO' as const : 'PAGA' as const, ...(df > 0 ? { domingoFeriadoPagoMin: df } : {}) };
+    })(),
   };
 }
 
@@ -45,8 +55,10 @@ export function movimentosBancoDoDia(dia: ResultadoDia, o: OpcoesDestinacao): Mo
   // até o dia ser tratado/terminar.
   if (dia.pendente || dia.paresIncompletos) return [];
   const movs: MovDia[] = [];
+  // Domingo/feriado pago na folha: essas horas não entram no banco.
+  const credito = dia.saldoMin > 0 ? dia.saldoMin - (o.domingoFeriadoPago ? Math.min(dia.saldoMin, minDomingoFeriado(dia)) : 0) : 0;
   if (dia.saldoMin > 0) {
-    movs.push({ minutos: dia.saldoMin, tipo: 'CREDITO', descricao: 'Hora extra' });
+    if (credito > 0) movs.push({ minutos: credito, tipo: 'CREDITO', descricao: 'Hora extra' });
   } else if (dia.saldoMin < 0 && dia.faltaMin === 0 && efetivo(o.destinacaoAtrasos, o.bancoAtivo) === 'BANCO') {
     movs.push({ minutos: dia.saldoMin, tipo: 'DEBITO', descricao: 'Atraso ou saída antecipada' });
   }

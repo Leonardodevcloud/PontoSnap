@@ -6,7 +6,13 @@ export type ConfigNoturno = { noturnoAdicionalPct: number; noturnoReduzida: bool
 export type ConfigJornada = { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number };
 export type ConfigBanco = { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
   /** Só no INTRA_MES: mês que fecha devendo desconta na folha (padrão) ou passa pro seguinte. */
-  negativoMes?: 'DESCONTA' | 'CARREGA' };
+  negativoMes?: 'DESCONTA' | 'CARREGA';
+  /**
+   * Horas trabalhadas em domingo/feriado: BANCO (padrão, como as outras extras)
+   * ou PAGA (vão para a folha com o adicional de domingo/feriado e não entram no
+   * banco — quando a convenção manda pagar o feriado trabalhado).
+   */
+  domingoFeriado?: 'BANCO' | 'PAGA' };
 /**
  * Tipo de jornada (perfil). CONTRATO_HORAS = sem horário fixo: vale só a carga
  * do dia da escala. Nulo = segue o que a escala diz (legado: escala "flexível").

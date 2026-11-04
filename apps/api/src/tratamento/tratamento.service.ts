@@ -885,10 +885,12 @@ export class TratamentoService {
         })),
       ];
 
+      // Convenção que paga o feriado trabalhado: essas horas vão pra folha, não pro banco.
+      const domingoFeriadoPago = itens.banco?.domingoFeriado === 'PAGA';
       const destinacao = resumirDestinacao(resultado, {
         destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
         destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
-        bancoAtivo,
+        bancoAtivo, domingoFeriadoPago,
       });
 
       // R$ desta folha segue a destinação: com banco, a extra vira crédito (não
@@ -904,7 +906,7 @@ export class TratamentoService {
       let valores: ResultadoValores | null = null;
       if (salarios.length) {
         valores = valorizarComSalarios(resultado, salarios, 220, regras, {
-          extrasNoBanco: bancoAtivo,
+          extrasNoBanco: bancoAtivo, domingoFeriadoPago,
           descontaFaltas: destinacao.falta.destino === 'DESCONTA',
           descontaAtrasos: destinacao.atraso.destino === 'DESCONTA',
         });
@@ -955,7 +957,7 @@ export class TratamentoService {
         /** A conta do mês por extenso (previsto, faltas, sobrou, faltou, abatido, para onde vai). */
         conta: montarContaMes(resultado.dias, {
           destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA', destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
-          bancoAtivo, formaCalculo: banco?.formaCalculo ?? null,
+          bancoAtivo, formaCalculo: banco?.formaCalculo ?? null, domingoFeriadoPago,
         }, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10)),
         /** Acerto do banco que compensa no mês, em R$ (já somado em valores.liquidoProventosCentavos). */
         acertoBanco,
@@ -1024,6 +1026,7 @@ export class TratamentoService {
       destinacaoFaltas: itens.destinacao?.destinacaoFaltas ?? 'DESCONTA',
       destinacaoAtrasos: itens.destinacao?.destinacaoAtrasos ?? 'BANCO',
       bancoAtivo: true,
+      domingoFeriadoPago: itens.banco?.domingoFeriado === 'PAGA',
     } as const;
     const apuradoMin = resultado.dias.flatMap((d) => movimentosBancoDoDia(d, opc)).reduce((s, m) => s + m.minutos, 0);
 

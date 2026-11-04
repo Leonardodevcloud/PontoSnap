@@ -1,5 +1,5 @@
 import type { ResultadoDia } from '@ponto/apuracao-clt';
-import { movimentosBancoDoDia, type DestinoAtraso, type DestinoFalta } from './destinacao';
+import { minDomingoFeriado, movimentosBancoDoDia, type DestinoAtraso, type DestinoFalta } from './destinacao';
 
 /**
  * A conta do mês, por extenso — o que o RH e o funcionário veem para não
@@ -12,6 +12,8 @@ import { movimentosBancoDoDia, type DestinoAtraso, type DestinoFalta } from './d
 export interface OpcoesConta {
   destinacaoFaltas: DestinoFalta; destinacaoAtrasos: DestinoAtraso;
   bancoAtivo: boolean; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES' | null;
+  /** Horas de domingo/feriado pagas na folha (não vão pro banco). */
+  domingoFeriadoPago?: boolean;
 }
 export type DestinoDia = 'BANCO' | 'PAGA' | 'FOLHA' | 'TOLERADO' | 'FALTA' | 'PENDENTE' | 'SEMANA' | 'ZERO';
 export interface DiaConta {
@@ -55,7 +57,7 @@ export interface ContaMes {
 }
 
 export function montarContaMes(diasRes: ResultadoDia[], o: OpcoesConta, hoje: string): ContaMes {
-  const dest = { destinacaoFaltas: o.destinacaoFaltas, destinacaoAtrasos: o.destinacaoAtrasos, bancoAtivo: o.bancoAtivo };
+  const dest = { destinacaoFaltas: o.destinacaoFaltas, destinacaoAtrasos: o.destinacaoAtrasos, bancoAtivo: o.bancoAtivo, domingoFeriadoPago: o.domingoFeriadoPago };
   const atrasoEf: DestinoAtraso = o.destinacaoAtrasos === 'BANCO' && !o.bancoAtivo ? 'DESCONTA' : o.destinacaoAtrasos;
   const faltaEf: DestinoFalta = o.destinacaoFaltas === 'BANCO' && !o.bancoAtivo ? 'DESCONTA' : o.destinacaoFaltas;
   const c: ContaMes = {
@@ -101,6 +103,7 @@ export function montarContaMes(diasRes: ResultadoDia[], o: OpcoesConta, hoje: st
     if (o.bancoAtivo) {
       const movs = movimentosBancoDoDia(d, dest);
       c.destino.paraBancoMin += movs.reduce((s, m) => s + m.minutos, 0);
+      if (o.domingoFeriadoPago && d.saldoMin > 0) c.destino.extraPagaMin += Math.min(d.saldoMin, minDomingoFeriado(d));
     } else if (d.saldoMin > 0) c.destino.extraPagaMin += d.saldoMin;
     if (d.saldoMin < 0 && falta === 0) {
       if (atrasoEf === 'DESCONTA') c.destino.atrasoFolhaMin += -d.saldoMin;
