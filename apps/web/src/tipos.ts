@@ -693,7 +693,7 @@ export interface ResumoBanco {
 export type PessoaTipo = 'CLT' | 'MEI' | 'MOTORISTA';
 export type VtTipo = 'NENHUM' | 'DIA' | 'FIXO';
 export type BaseDias = 'SEG_SAB' | 'SEG_SEX';
-export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
+export type MotivoNaoUso = 'feriado' | 'falta' | 'folga' | 'afastamento';
 
 export interface PessoalLinhaClt {
   empregadoId: string; nome: string; matricula: string | null; admissao: string | null;

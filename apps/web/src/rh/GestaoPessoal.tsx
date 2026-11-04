@@ -49,7 +49,7 @@ const somarMes = (c: string, n: number) => {
 const numeroBr = lerReais;
 const reaisTxt = (c: number) => (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ROT_TIPO: Record<PessoaTipo, string> = { CLT: 'CLT', MEI: 'MEI', MOTORISTA: 'Motorista' };
-const ROT_MOTIVO: Record<string, string> = { feriado: 'feriado', falta: 'falta', afastamento: 'férias/atestado/folga' };
+const ROT_MOTIVO: Record<string, string> = { feriado: 'feriado', falta: 'falta', folga: 'folga', afastamento: 'férias/atestado/folga' };
 /** "VR R$ 25,00/dia · VT R$ 11,80/dia" */
 const resumoBen = (c: { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number }) => {
   const p: string[] = [];

@@ -382,6 +382,7 @@ export class PessoalService {
       let heMin = 0, heNoBancoMin = 0, proventosCent = 0, descontosCent = 0, indenizacaoMin = 0, indenizacaoCent = 0;
       let bancoAcertoMin = 0, bancoAcertoCent = 0, bancoPassaMin = 0;
       let faltasDias: string[] = [];
+      let folgasDias: string[] = [];
       try {
         const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim);
         diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala; jornadaMes = ap.jornadaEscala;
@@ -392,6 +393,7 @@ export class PessoalService {
         indenizacaoMin = ap.resultado.dias.reduce((t, d) => t + d.extras.filter((x) => x.motivo.startsWith('indenização')).reduce((a, x) => a + x.min, 0), 0);
         heMin = Math.max(0, ap.resultado.totalExtrasMin - indenizacaoMin);
         faltasDias = ap.resultado.dias.filter((d) => d.faltaMin > 0 && d.minutosTrabalhados === 0).map((d) => d.data);
+        folgasDias = ap.afastamentos.filter((a) => a.tipo === 'FOLGA').map((a) => a.dataInicio);
         if (ap.valores) {
           heNoBancoMin = ap.valores.extrasNoBancoMin;
           indenizacaoCent = ap.valores.indenizacaoCentavos;
@@ -437,7 +439,7 @@ export class PessoalService {
         vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, diasProxVr: diasProxVrLista.length, pagos, pagosVr: pagosVr ?? undefined,
         diasProxVt: diasProxVtLista.length, pagosVt: pagosVt ?? undefined,
-        previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados: feriadosPara(e),
+        previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados: feriadosPara(e), folgas: new Set(folgasDias),
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
 

@@ -129,6 +129,8 @@ export interface EntradaBeneficio {
   /** Faltas (dia inteiro) do mês apurado, vindas do ponto. */
   faltas: Set<string>;
   feriados: Set<string>;
+  /** Folgas concedidas pelo RH (Ajustes): o dia não foi trabalhado, o VR/VT pago volta. */
+  folgas?: Set<string>;
   /**
    * Valores que valiam quando o mês apurado foi pago. O acerto devolve o que
    * foi pago, não o valor novo — se o VR subiu, o dia não usado volta pelo
@@ -142,7 +144,7 @@ export interface EntradaBeneficio {
   cestaLiberada?: boolean;
 }
 
-export type MotivoNaoUso = 'feriado' | 'falta' | 'afastamento';
+export type MotivoNaoUso = 'feriado' | 'falta' | 'folga' | 'afastamento';
 
 export type StatusCesta = 'PAGA' | 'PERDIDA_FALTA' | 'CARENCIA' | 'SEM_CESTA';
 
@@ -182,7 +184,7 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
     .filter((d) => !e.previstosMes.has(d) || e.faltas.has(d))
     .map((data) => ({
       data,
-      motivo: (e.feriados.has(data) ? 'feriado' : e.faltas.has(data) ? 'falta' : 'afastamento') as MotivoNaoUso,
+      motivo: (e.feriados.has(data) ? 'feriado' : e.faltas.has(data) ? 'falta' : e.folgas?.has(data) ? 'folga' : 'afastamento') as MotivoNaoUso,
     }));
 
   const pg = e.pagoCom ?? { vrDiaCent: e.vrDiaCent, vtTipo: e.vtTipo, vtValorCent: e.vtValorCent };

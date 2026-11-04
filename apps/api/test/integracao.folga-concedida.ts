@@ -9,6 +9,8 @@ import { TratamentoService } from '../src/tratamento/tratamento.service';
 import { AjusteService } from '../src/ajuste/ajuste.service';
 import { FolgaService } from '../src/ajuste/folga.service';
 import { FiscalService } from '../src/fiscal/fiscal.service';
+import { PessoalService } from '../src/pessoal/pessoal.service';
+import { CriptoService } from '../src/common/cripto.service';
 
 /**
  * Folga concedida (Ajustes): trabalhou no feriado, ganha uma folga.
@@ -77,6 +79,16 @@ async function main() {
   const linhas07 = aej.split(/\r?\n/).filter((l) => l.startsWith('07|'));
   ok(linhas07.length === 1 && /^07\|[^|]*\|4\|2026-10-14\|/.test(linhas07[0]!), `AEJ: folga do feriado trabalhado vai como código 4, na data certa (${linhas07[0]})`);
   ok(!aej.includes('2026-10-16'), 'AEJ: folga sem feriado não vai (não tem código no AEJ)');
+
+  // VR/VT: o dia da folga é abatido (pago antecipado e não usado), com o motivo "folga".
+  const pes = new PessoalService(db, trat, new CriptoService());
+  await pes.salvarConfigClt(t.id, emp.id, { cargo: 'Auxiliar', vrDia: 25, cestaMensal: 0, vtTipo: 'DIA', vtValor: 10, chavePix: null, vigenteDesde: '2026-10' });
+  const out = (await pes.competencia(t.id, '2026-10')).clt.find((c) => c.empregadoId === emp.id)!;
+  const nu = out.beneficios.naoUsados.find((x) => x.data === DIA);
+  ok(nu?.motivo === 'folga', `VR/VT: 14/10 entra no abatimento como "folga" (${nu?.motivo})`);
+  ok(!out.beneficios.naoUsados.some((x) => x.data === '2026-10-12'.replace('12', '13')), 'VR/VT: dia trabalhado (13/10) não é abatido');
+  const so14 = out.beneficios.naoUsados.filter((x) => x.data === DIA).length;
+  ok(so14 === 1 && out.beneficios.acertoVrCent >= 2500 && out.beneficios.acertoVtCent >= 1000, `VR/VT: abate R$ 25 de VR e R$ 10 de VT pela folga (VR ${out.beneficios.acertoVrCent / 100}, VT ${out.beneficios.acertoVtCent / 100})`);
 
   // Removeu: o dia volta a ser falta.
   await folgas.remover(t.id, f.id);
