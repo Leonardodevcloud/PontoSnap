@@ -359,9 +359,15 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                           </span>
                         );
                       })()}
-                      <span className={`${css.dS} ${dfNaFolha && dfDoDia(d) > 0 ? '' : d.saldoMin > 0 ? vt.pos : d.saldoMin < 0 ? vt.neg : ''}`}>
-                        {d.paresIncompletos || d.marcacoes.length === 0 ? '' : sem || (dfNaFolha && dfDoDia(d) > 0) ? minutosParaHhMm(d.minutosTrabalhados) : comSinal(d.saldoMin)}
-                      </span>
+                      {(() => {
+                        // Sem redundância: se a etiqueta já diz tudo (feriado pago na folha, ou o atraso é o próprio saldo), não repete o número.
+                        const dizTudo = (dfNaFolha && dfDoDia(d) > 0) || (!sem && d.saldoMin < 0 && d.atrasoMin === -d.saldoMin && !faltou && !d.paresIncompletos);
+                        return (
+                          <span className={`${css.dS} ${d.saldoMin > 0 ? vt.pos : d.saldoMin < 0 ? vt.neg : ''}`}>
+                            {dizTudo || d.paresIncompletos || d.marcacoes.length === 0 ? '' : sem ? minutosParaHhMm(d.minutosTrabalhados) : comSinal(d.saldoMin)}
+                          </span>
+                        );
+                      })()}
                     </button>
                     </Fragment>
                   );
