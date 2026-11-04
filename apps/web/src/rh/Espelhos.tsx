@@ -297,12 +297,18 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
             <div className={`${vt.kpis} ${css.kpis5}`}>
               <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(k.trabalhado)}</div></div>
               <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(k.previsto)}</div>{ap?.conta && <div className={vt.kpiS}>até {ap.conta.ate.slice(8, 10)}/{ap.conta.ate.slice(5, 7)}</div>}</div>
-              <div className={`${vt.kpi} ${k.extras > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{k.extras > 0 ? `+${minutosParaHhMm(k.extras)}` : '—'}</div>
-                {k.extras > 0 && <div className={vt.kpiS}>{(() => {
-                  const df = (ap?.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0;
-                  if (!ap?.banco) return 'pagas na folha';
-                  return df <= 0 ? 'vão para o banco' : df >= k.extras ? 'domingo/feriado · pagas na folha' : `${minutosParaHhMm(df)} de domingo/feriado na folha · resto no banco`;
-                })()}</div>}</div>
+              {(() => {
+                // Feriado/domingo trabalhado é verba própria: sai do card de Extras e aparece com o nome dele.
+                const df = (r.dias ?? []).reduce((t, d) => t + d.extras.filter((e) => e.motivo === 'extra em domingo/feriado').reduce((a, e) => a + e.min, 0), 0);
+                const dfPago = !ap?.banco ? df : ((ap?.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0);
+                const comuns = Math.max(0, k.extras - df);
+                return (
+                  <div className={`${vt.kpi} ${comuns > 0 || df > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{comuns > 0 ? `+${minutosParaHhMm(comuns)}` : '—'}</div>
+                    {comuns > 0 && <div className={vt.kpiS}>{ap?.banco ? 'vão para o banco' : 'pagas na folha'}</div>}
+                    {df > 0 && <div className={vt.kpiS}><b>Feriado/domingo trabalhado {minutosParaHhMm(df)}</b> · {dfPago >= df ? 'pago na folha' : dfPago > 0 ? `${minutosParaHhMm(dfPago)} na folha, resto no banco` : 'vai para o banco'}</div>}
+                  </div>
+                );
+              })()}
               <div className={`${vt.kpi} ${k.atrasos > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{k.atrasos > 0 ? `−${minutosParaHhMm(k.atrasos)}` : '—'}</div>
                 {k.atrasos > 0 && <div className={vt.kpiS}>{ap?.conta?.destino.destinoAtraso === 'BANCO' ? 'abatem do banco' : ap?.conta?.destino.destinoAtraso === 'TOLERA' ? 'tolerados' : 'descontados na folha'}</div>}</div>
               <div className={`${vt.kpi} ${r.totalFaltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '—'}</div>
@@ -481,7 +487,7 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
               <div className={css.metric}><span className={css.mL}>Trabalhado</span><span className={css.mV}>{minutosParaHhMm(r.minutosTrabalhados)}</span></div>
               <div className={css.metric}><span className={css.mL}>Contratado</span><span className={css.mVsub}>{minutosParaHhMm(r.minutosContratados)}</span></div>
               <div className={css.metric}>
-                <span className={css.mL}>Saldo</span>
+                <span className={css.mL}>{esp.situacao === 'Feriado' && r.saldoMinutos > 0 ? 'Feriado trabalhado' : /dom/.test(diaSemanaCurto(data)) && r.saldoMinutos > 0 && r.minutosContratados === 0 ? 'Domingo trabalhado' : 'Saldo'}</span>
                 <span className={`${css.mV} ${r.saldoMinutos >= 0 ? css.pos : css.neg}`}>{r.saldoMinutos > 0 ? '+' : ''}{minutosParaHhMm(r.saldoMinutos)}</span>
               </div>
               {esp.destinoExtra && (

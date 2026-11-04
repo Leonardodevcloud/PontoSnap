@@ -372,7 +372,7 @@ export function ApuracaoCLT() {
                   <span className={css.mono}>
                     {d.extras.length
                       ? d.extras.map((e, i) => (
-                          <span key={i} className={css.extraItem}>{minutosParaHhMm(e.min)} <em>+{e.adicionalPct}%</em></span>
+                          <span key={i} className={css.extraItem}>{minutosParaHhMm(e.min)} <em>{e.motivo === 'extra em domingo/feriado' ? `${rotuloDF(d.data, ap?.feriados)} ` : ''}+{e.adicionalPct}%</em></span>
                         ))
                       : d.saldoMin > 0
                         ? <span className={css.extraItem} title="Contrato de horas: acima da carga vira crédito no banco, sem adicional">+{minutosParaHhMm(d.saldoMin)} <em>crédito</em></span>
@@ -577,7 +577,7 @@ function GavetaDia({ data, dia, batidas, esperadas, pares, nome, empregadoId, on
             <div className={css.gGrade}>
               <Caixa k="trabalhado" v={dia.minutosTrabalhados ? minutosParaHhMm(dia.minutosTrabalhados) : '—'} />
               <Caixa k="contratado" v={dia.minutosContratados ? minutosParaHhMm(dia.minutosContratados) : '—'} />
-              {dia.extras.map((e, i) => <Caixa key={i} k={`extra +${e.adicionalPct}%`} v={minutosParaHhMm(e.min)} bom />)}
+              {dia.extras.map((e, i) => <Caixa key={i} k={e.motivo === 'extra em domingo/feriado' ? `${rotuloDF(data)} trabalhado +${e.adicionalPct}%` : `extra +${e.adicionalPct}%`} v={minutosParaHhMm(e.min)} bom />)}
               {dia.minutosNoturnosLegais > 0 && <Caixa k="noturno" v={minutosParaHhMm(dia.minutosNoturnosLegais)} />}
               {dia.atrasoMin > 0 && <Caixa k="atraso" v={minutosParaHhMm(dia.atrasoMin)} ruim />}
               {dia.faltaMin > 0 && <Caixa k="falta" v={minutosParaHhMm(dia.faltaMin)} ruim />}
@@ -612,6 +612,11 @@ function GavetaDia({ data, dia, batidas, esperadas, pares, nome, empregadoId, on
       </aside>
     </>
   );
+}
+
+/** Domingo ou feriado trabalhado é verba própria — não "hora extra". */
+function rotuloDF(data: string, feriados?: string[]) {
+  return new Date(`${data}T12:00:00Z`).getUTCDay() === 0 && !(feriados ?? []).includes(data) ? 'domingo' : 'feriado';
 }
 
 function Caixa({ k, v, bom, ruim }: { k: string; v: string; bom?: boolean; ruim?: boolean }) {

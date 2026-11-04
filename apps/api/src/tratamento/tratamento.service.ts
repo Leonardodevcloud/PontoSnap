@@ -1192,7 +1192,13 @@ export class TratamentoService {
       const realizada = d.marcacoes.length ? this.paresDe(d.marcacoes.map((m) => hora(m))) : '';
 
       const eventos: string[] = [];
-      if (d.ehDescansoDia && d.minutosTrabalhados > 0) eventos.push('Trabalho em descanso');
+      // Domingo/feriado trabalhado é verba própria (não "hora extra"): diz o nome e pra onde vai.
+      const dfMin = d.extras.filter((e) => e.motivo === 'extra em domingo/feriado').reduce((a, e) => a + e.min, 0);
+      if (dfMin > 0) {
+        const nomeDF = diaSemana(d.data) === 0 && !(ap.feriados ?? []).includes(d.data) ? 'Domingo trabalhado' : 'Feriado trabalhado';
+        const vaiPraFolha = ap.destinacao?.extra.destino === 'PAGA' || (ap.destinacao?.extra.domingoFeriadoPagoMin ?? 0) > 0;
+        eventos.push(`${nomeDF} ${hhmm(dfMin)}${vaiPraFolha ? ' · pago na folha' : ' · vai para o banco'}`);
+      } else if (d.ehDescansoDia && d.minutosTrabalhados > 0) eventos.push('Trabalho em descanso');
       const afast = afastPorDia.get(d.data);
       if (afast) eventos.push(afast === 'FERIAS' ? 'Férias' : afast === 'ATESTADO' ? 'Atestado' : afast === 'FOLGA' ? 'Folga concedida' : afast);
       if (orig.some((b) => b.origem === 'INCLUIDA')) eventos.push('Batida incluída (ajuste)');

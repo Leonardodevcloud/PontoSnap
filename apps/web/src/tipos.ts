@@ -196,6 +196,8 @@ export interface ValoresApuracao {
 }
 
 export interface ApuracaoResp {
+  /** Datas de feriado do período (os da cidade do funcionário). */
+  feriados?: string[];
   nome: string;
   matricula: string | null;
   inicio: string;
@@ -720,6 +722,8 @@ export interface PessoalLinhaClt {
   diasMes: number; valorDiaMesCent: number; valorDia30Cent: number; valorHoraCent: number;
   /** Hora extra (sem indenização) e quanto dela foi pro banco de horas. */
   heMin: number; heNoBancoMin: number;
+  /** Domingo/feriado trabalhado pago na folha (verba própria; contido em heMin). */
+  feriadoTrabMin?: number; feriadoTrabCent?: number;
   /** Banco que compensa no mês: horas acertadas (> 0 pagas, < 0 descontadas), valor (já em proventos/descontos) e devendo que passou. */
   bancoAcertoMin?: number; bancoAcertoCent?: number; bancoPassaMin?: number;
   /** Indenização de intervalo/interjornada (Art. 71 §4º): sempre paga, não é hora extra. */

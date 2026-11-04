@@ -65,8 +65,10 @@ const resumoBen = (c: { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vt
  * §4º — paga sempre, não é hora extra e não vai pro banco).
  */
 function textoExtras(l: PessoalLinhaClt): { valor: string | null; detalhe: string; soBanco: boolean } {
-  const pagasMin = Math.max(0, l.heMin - l.heNoBancoMin);
+  const fer = l.feriadoTrabMin ?? 0;
+  const pagasMin = Math.max(0, l.heMin - l.heNoBancoMin - fer);
   const partes: string[] = [];
+  if (fer > 0) partes.push(`${minutosParaHhMm(fer)} feriado/domingo trabalhado`);
   if (pagasMin > 0) partes.push(`${minutosParaHhMm(pagasMin)} extra paga`);
   const acerto = l.bancoAcertoMin ?? 0;
   if (l.heNoBancoMin > 0 && acerto <= 0) partes.push(`${minutosParaHhMm(l.heNoBancoMin)} no banco`);
@@ -1006,7 +1008,16 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
 
         <section className={css.bloco}>
           <span className={css.lb}>Do ponto</span>
-          <Linha2 k="Horas extras" v={l.heMin === 0 && !(l.bancoAcertoMin! > 0) ? '—' : l.heNoBancoMin >= l.heMin && !(l.bancoAcertoMin! > 0) ? `${minutosParaHhMm(l.heMin)} · no banco` : brl(Math.max(0, l.proventosCent - l.indenizacaoCent))} />
+          {(l.feriadoTrabMin ?? 0) > 0 && <Linha2 k={`Feriado/domingo trabalhado · ${minutosParaHhMm(l.feriadoTrabMin!)} (100%)`} v={brl(l.feriadoTrabCent ?? 0)} />}
+          {(() => {
+            // Hora extra comum: sem o feriado/domingo trabalhado, que é verba própria (linha acima).
+            const fer = l.feriadoTrabMin ?? 0, ferCent = l.feriadoTrabCent ?? 0;
+            const heMin = Math.max(0, l.heMin - fer);
+            const v = heMin === 0 && !(l.bancoAcertoMin! > 0) ? '—'
+              : l.heNoBancoMin >= heMin && !(l.bancoAcertoMin! > 0) ? `${minutosParaHhMm(heMin)} · no banco`
+              : brl(Math.max(0, l.proventosCent - l.indenizacaoCent - ferCent));
+            return fer > 0 && v === '—' ? null : <Linha2 k="Horas extras" v={v} />;
+          })()}
           {l.heNoBancoMin > 0 && !l.bancoAcertoMin && !l.bancoPassaMin && <p className={css.formula}>{minutosParaHhMm(l.heNoBancoMin)} foram pro banco de horas — não são pagas nesta folha.</p>}
           {(l.bancoAcertoMin ?? 0) > 0 && <>
             <Linha2 k="Sobra do banco paga como extra" v={brl(l.bancoAcertoCent ?? 0)} />

@@ -42,6 +42,11 @@ export interface LinhaClt {
   /** Hora extra de verdade (sem indenização), e quanto dela foi pro banco. */
   heMin: number; heNoBancoMin: number;
   /**
+   * Domingo/feriado trabalhado PAGO na folha (verba própria, não "hora extra"):
+   * minutos e valor estimado (já dentro de proventosCent). Está contido em heMin.
+   */
+  feriadoTrabMin?: number; feriadoTrabCent?: number;
+  /**
    * Banco que compensa no mês: horas acertadas no fechamento (> 0 pagas como
    * extra, < 0 descontadas) e o valor delas — já dentro de proventos/descontos.
    * Opcional porque fechamentos antigos não têm.
@@ -383,6 +388,7 @@ export class PessoalService {
       let bancoAcertoMin = 0, bancoAcertoCent = 0, bancoPassaMin = 0;
       let faltasDias: string[] = [];
       let folgasDias: string[] = [];
+      let feriadoTrabMin = 0, feriadoTrabPesoMin = 0;
       try {
         const ap = await this.trat.apurarPeriodoCLT(tenantId, e.id, inicio, fim);
         diasUteis = ap.diasUteis; diasPrevistos = ap.diasPrevistos; diasEscala = ap.diasEscala; jornadaMes = ap.jornadaEscala;
@@ -394,6 +400,12 @@ export class PessoalService {
         heMin = Math.max(0, ap.resultado.totalExtrasMin - indenizacaoMin);
         faltasDias = ap.resultado.dias.filter((d) => d.faltaMin > 0 && d.minutosTrabalhados === 0).map((d) => d.data);
         folgasDias = ap.afastamentos.filter((a) => a.tipo === 'FOLGA').map((a) => a.dataInicio);
+        // Pago na folha: sem banco, tudo; com banco, só se a regra manda pagar domingo/feriado.
+        const dfTotal = ap.resultado.dias.reduce((t, d) => t + d.extras.filter((x) => x.motivo === 'extra em domingo/feriado').reduce((a, x) => a + x.min, 0), 0);
+        feriadoTrabMin = ap.destinacao.extra.destino === 'PAGA' ? dfTotal : (ap.destinacao.extra.domingoFeriadoPagoMin ?? 0);
+        // Minutos já com o adicional (100% → vale 2x), na proporção do que é pago.
+        const dfPeso = ap.resultado.dias.reduce((t, d) => t + d.extras.filter((x) => x.motivo === 'extra em domingo/feriado').reduce((a, x) => a + x.min * (1 + x.adicionalPct / 100), 0), 0);
+        feriadoTrabPesoMin = dfTotal > 0 ? dfPeso * (feriadoTrabMin / dfTotal) : 0;
         if (ap.valores) {
           heNoBancoMin = ap.valores.extrasNoBancoMin;
           indenizacaoCent = ap.valores.indenizacaoCentavos;
@@ -458,6 +470,7 @@ export class PessoalService {
         valorDia30Cent: Math.round(salarioFimMesCent / 30),
         valorHoraCent: Math.round(salarioFimMesCent / 220),
         heMin, heNoBancoMin, bancoAcertoMin, bancoAcertoCent, bancoPassaMin, indenizacaoMin, indenizacaoCent, proventosCent, faltasDias, descontosCent, debitosCent,
+        feriadoTrabMin, feriadoTrabCent: Math.round((feriadoTrabPesoMin / 60) * (salarioFimMesCent / 220)),
         beneficios: {
           ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, diasProxVt: diasProxVtLista.length, diasProxVtLista, pagosEstimado: !pagosSnap,
           cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null,
