@@ -116,6 +116,8 @@ export interface EspelhoResp {
   /** Como o dia contou na apuração do mês: Falta, Folga, Feriado, Férias, Afastamento (null = dia normal). */
   situacao?: string | null;
   observacoes?: string[];
+  /** Para onde vão as horas a mais do dia (pela regra do funcionário). */
+  destinoExtra?: { tipo: 'FOLHA' | 'BANCO' | 'MISTO'; folhaMin: number; bancoMin: number } | null;
 }
 
 export interface ExtraClassificada { min: number; adicionalPct: number; motivo: string; }

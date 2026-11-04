@@ -298,7 +298,11 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
               <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(k.trabalhado)}</div></div>
               <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(k.previsto)}</div>{ap?.conta && <div className={vt.kpiS}>até {ap.conta.ate.slice(8, 10)}/{ap.conta.ate.slice(5, 7)}</div>}</div>
               <div className={`${vt.kpi} ${k.extras > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{k.extras > 0 ? `+${minutosParaHhMm(k.extras)}` : '—'}</div>
-                {k.extras > 0 && <div className={vt.kpiS}>{ap?.banco ? 'vão para o banco' : 'pagas na folha'}</div>}</div>
+                {k.extras > 0 && <div className={vt.kpiS}>{(() => {
+                  const df = (ap?.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0;
+                  if (!ap?.banco) return 'pagas na folha';
+                  return df <= 0 ? 'vão para o banco' : df >= k.extras ? 'domingo/feriado · pagas na folha' : `${minutosParaHhMm(df)} de domingo/feriado na folha · resto no banco`;
+                })()}</div>}</div>
               <div className={`${vt.kpi} ${k.atrasos > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{k.atrasos > 0 ? `−${minutosParaHhMm(k.atrasos)}` : '—'}</div>
                 {k.atrasos > 0 && <div className={vt.kpiS}>{ap?.conta?.destino.destinoAtraso === 'BANCO' ? 'abatem do banco' : ap?.conta?.destino.destinoAtraso === 'TOLERA' ? 'tolerados' : 'descontados na folha'}</div>}</div>
               <div className={`${vt.kpi} ${r.totalFaltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '—'}</div>
@@ -480,6 +484,15 @@ function DiaFuncionario({ data, empregadoId, nome, mes, onTodos, onMes, onErro }
                 <span className={css.mL}>Saldo</span>
                 <span className={`${css.mV} ${r.saldoMinutos >= 0 ? css.pos : css.neg}`}>{r.saldoMinutos > 0 ? '+' : ''}{minutosParaHhMm(r.saldoMinutos)}</span>
               </div>
+              {esp.destinoExtra && (
+                <div className={css.metric}>
+                  <span className={css.mL}>Para onde vai</span>
+                  <span className={css.mVsub}>{esp.destinoExtra.tipo === 'FOLHA'
+                    ? `Pago na folha${esp.situacao === 'Feriado' || /dom/.test(diaSemanaCurto(data)) ? ' (100%)' : ''}`
+                    : esp.destinoExtra.tipo === 'BANCO' ? 'Banco de horas'
+                    : `${minutosParaHhMm(esp.destinoExtra.folhaMin)} na folha · ${minutosParaHhMm(esp.destinoExtra.bancoMin)} no banco`}</span>
+                </div>
+              )}
               <div className={css.metric}><span className={css.mL}>Noturno (22h–05h)</span><span className={css.mVsub}>{minutosParaHhMm(r.minutosNoturnos)}</span></div>
               <div className={css.disclaimer}>
                 {r.paresIncompletos

@@ -302,6 +302,20 @@ export class TratamentoService {
       },
       situacao,
       observacoes: d.observacoes,
+      /**
+       * Para onde vão as horas a mais do dia, pela regra do funcionário:
+       * FOLHA (pagas; inclui domingo/feriado com "Pagas na folha"), BANCO, ou
+       * MISTO (parte paga, parte no banco). Null = sem hora a mais.
+       */
+      destinoExtra: (() => {
+        const ex = ap.destinacao.extra;
+        const pagoDF = ex.domingoFeriadoPagoMin ?? 0;
+        if (d.saldoMin <= 0) return null;
+        if (ex.destino === 'PAGA') return { tipo: 'FOLHA' as const, folhaMin: d.saldoMin, bancoMin: 0 };
+        if (pagoDF >= d.saldoMin) return { tipo: 'FOLHA' as const, folhaMin: d.saldoMin, bancoMin: 0 };
+        if (pagoDF > 0) return { tipo: 'MISTO' as const, folhaMin: pagoDF, bancoMin: d.saldoMin - pagoDF };
+        return { tipo: 'BANCO' as const, folhaMin: 0, bancoMin: d.saldoMin };
+      })(),
     };
   }
 
