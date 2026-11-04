@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { pontoDocumento, empregado, usuario, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
+import { reabrirIntervalo } from '../banco/fechamento';
 import { CriptoService } from '../common/cripto.service';
 import { EmailService } from '../email/email.service';
 import { emailAtestadoRecebido } from '../email/templates';
@@ -132,6 +133,8 @@ export class DocumentoService {
         analisadoPor: p.abonar ? analistaId : null,
         analisadoEm: p.abonar ? new Date() : null,
       }).returning(CAMPOS);
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+      if (p.abonar) await reabrirIntervalo(tx as never, tenantId, p.empregadoId, p.dataInicio, p.dataFim);
       return doc;
     });
   }
@@ -198,6 +201,8 @@ export class DocumentoService {
         motivoRecusa: p.status === 'RECUSADO' ? p.motivoRecusa!.trim() : null,
         analisadoEm: new Date(), analisadoPor: usuarioId,
       }).where(eq(pontoDocumento.id, id)).returning(CAMPOS);
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+      if (doc) await reabrirIntervalo(tx as never, tenantId, doc.empregadoId, doc.dataInicio, doc.dataFim);
       return doc;
     });
   }

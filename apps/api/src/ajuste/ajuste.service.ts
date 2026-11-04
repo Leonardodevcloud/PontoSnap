@@ -4,6 +4,7 @@ import { pontoAjuste, empregado, pontoMarcacao, pontoRep, pontoHorarioContratual
 import { inicioDoDia, fimDoDia } from '@ponto/rep-core';
 import { ajustesAprovados } from '../tratamento/ajustes';
 import { DB } from '../database/database.module';
+import { reabrirIntervalo } from '../banco/fechamento';
 import { EmailService } from '../email/email.service';
 import { emailAjusteDecidido } from '../email/templates';
 import { PushService } from '../notificacao/push.service';
@@ -107,6 +108,8 @@ export class AjusteService {
           status: statusFinal, decididoPor,
           decididoEm: origem === 'RH' ? new Date() : null,
         }).returning();
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+        if (origem === 'RH') await reabrirIntervalo(tx as never, tenantId, dto.empregadoId, dto.data, dto.data);
         return a;
       }
 
@@ -120,6 +123,8 @@ export class AjusteService {
         decididoPor: origem === 'RH' ? 'RH' : null,
         decididoEm: origem === 'RH' ? new Date() : null,
       }).returning();
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+      if (origem === 'RH') await reabrirIntervalo(tx as never, tenantId, dto.empregadoId, dto.data, dto.data);
       return a;
     });
   }
@@ -170,6 +175,8 @@ export class AjusteService {
         motivoDecisao: motivo?.trim() ?? null,
         decididoPor: quem.slice(0, 160), decididoEm: new Date(),
       }).where(and(eq(pontoAjuste.id, id), eq(pontoAjuste.tenantId, tenantId))).returning();
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+      if (aprovar) await reabrirIntervalo(tx as never, tenantId, atual.empregadoId, atual.data, atual.data);
 
       // Notificar o funcionário via push (fire-and-forget)
       if (a) {
@@ -251,6 +258,7 @@ export class AjusteService {
         status: 'REVOGADO', motivoDecisao: `Revogado por ${quem}`, decididoEm: new Date(),
       }).where(eq(pontoAjuste.id, id));
 
+      await reabrirIntervalo(tx as never, tenantId, aj.empregadoId, aj.data, aj.data);
       // Se era parte de uma CORRECAO (par com mesma observação "Correção:..."),
       // revoga o par inteiro
       if (aj.observacao?.startsWith('Correção:')) {

@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { and, asc, eq, gte, lte, ne } from 'drizzle-orm';
 import { pontoAfastamento, empregado, comTenant, type Db } from '@ponto/db';
 import { DB } from '../database/database.module';
+import { reabrirIntervalo } from '../banco/fechamento';
 
 export const TIPOS = ['FERIAS', 'INSS', 'MATERNIDADE', 'PATERNIDADE', 'SUSPENSAO', 'OUTRO'] as const;
 export type TipoAfastamento = (typeof TIPOS)[number];
@@ -50,6 +51,8 @@ export class AfastamentoService {
         observacao: p.observacao?.trim() || null,
         criadoPor: usuarioId,
       }).returning();
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+      await reabrirIntervalo(tx as never, tenantId, p.empregadoId, p.dataInicio, p.dataFim);
       return a;
     });
   }
@@ -79,6 +82,8 @@ export class AfastamentoService {
       const [a] = await tx.delete(pontoAfastamento).where(and(
         eq(pontoAfastamento.id, id), eq(pontoAfastamento.tenantId, tenantId))).returning();
       if (!a) throw new NotFoundException('Afastamento não encontrado');
+      // Mexeu no ponto de um mês cujo banco já fechou: reabre, e a próxima consulta (ou o cron) refaz o saldo.
+      await reabrirIntervalo(tx as never, tenantId, a.empregadoId, a.dataInicio, a.dataFim);
       return { removido: true };
     });
   }
