@@ -168,6 +168,9 @@ export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPa
                             </td>
                             <td className={css.r}>
                               {u.dias ?? '—'}
+                              {u.dias != null && u.diasAuto != null && u.dias !== u.diasAuto && (
+                                <small className={v.ajustado} title={`A escala prevê ${u.diasAuto} ${u.diasAuto === 1 ? 'dia' : 'dias'} nesta semana. Alguém salvou ${u.dias} à mão. Clique em "ajustar" para conferir.`}>previsto {u.diasAuto}</small>
+                              )}
                               {!s.liberada && !d.fechado && !l.fechadoIndividual && <button type="button" className={v.ajustar} onClick={() => onAjustar(s, l.id)} title={`Ajustar os dias de ${l.nome}`}>ajustar</button>}
                             </td>
                             <td className={`${css.r} ${css.mono}`}>{brl(nfDe(u))}</td>

@@ -116,7 +116,9 @@ export function statusParaPrestador(n: Nota): { texto: string; tom: 'ok' | 'av' 
 
 export type StatusAcesso = 'ATIVO' | 'CONVIDADO' | 'SEM' | 'BLOQUEADO' | 'CONVITE_VENCIDO';
 export interface UnidadeRh {
-  periodo: string; rotulo: string; valorCent: number; nfCent?: number | null; dias?: number | null; situacao: Situacao; atrasada: boolean; pago: boolean;
+  periodo: string; rotulo: string; valorCent: number; nfCent?: number | null; dias?: number | null;
+  /** Motorista: dias previstos pela escala (seg–sáb / seg–sex, sem feriado). Diferente de `dias` = ajustado à mão. */
+  diasAuto?: number | null; situacao: Situacao; atrasada: boolean; pago: boolean;
   valorPagoCent: number | null; pagoEm: string | null; nota: Nota | null;
   nf: { numero: string | null; arquivo: (ArquivoNf & { pessoaId: string; competencia: string; periodo: string }) | null }; tipo: 'MEI' | 'MOTORISTA';
 }
