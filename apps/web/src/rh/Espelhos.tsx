@@ -5,7 +5,7 @@ import { fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/
 import { salvarBlob } from '../lib/download';
 import { Botao } from '../components/Botao';
 import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, ResultadoDiaCLT, TipoDiaFora } from '../tipos';
-import { TabelaCompetencia } from './TabelaCompetencia';
+import { TabelaCompetencia, dfFolhaMin } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
 import { ContaMes } from '../components/ContaMes';
@@ -33,8 +33,6 @@ const rotuloMes = (comp: string) => new Date(`${comp}-01T12:00:00-0300`).toLocal
 const diaSemanaCurto = (iso: string) => ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(`${iso}T12:00:00-0300`).getUTCDay()];
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
-// Feriado/domingo trabalhado pago na folha (100%) é verba própria — fora de "Extras".
-const dfFolhaDe = (l: { destinacao?: { extra?: { domingoFeriadoPagoMin?: number } } }) => l.destinacao?.extra?.domingoFeriadoPagoMin ?? 0;
 const ROTULO_AFAST: Record<TipoDiaFora, string> = {
   FERIAS: 'Férias', INSS: 'Afastamento (INSS)', MATERNIDADE: 'Licença-maternidade',
   PATERNIDADE: 'Licença-paternidade', SUSPENSAO: 'Suspensão', OUTRO: 'Afastamento', FOLGA: 'Folga',
@@ -201,7 +199,7 @@ function Todos({ mes, emps, onAbrir, onErro }: { mes: string; emps: Empregado[];
               {t.contratadoMesMin != null && t.contratadoMesMin !== t.contratadoMin
                 ? <>de {minutosParaHhMm(t.contratadoMin)} previstas até hoje · {minutosParaHhMm(t.contratadoMesMin)} no mês</>
                 : <>de {minutosParaHhMm(t.contratadoMin)} previstas no mês</>}</div></div>
-            <div className={`${vt.kpi} ${vt.kpiPeach}`}><div className={vt.kpiK}>Extras no mês</div><div className={vt.kpiV}>+{minutosParaHhMm(Math.max(0, t.extrasMin - rel.linhas.reduce((a, l) => a + dfFolhaDe(l), 0)))}</div><div className={vt.kpiS}>hora extra · feriado pago à parte</div></div>
+            <div className={`${vt.kpi} ${vt.kpiPeach}`}><div className={vt.kpiK}>Extras no mês</div><div className={vt.kpiV}>+{minutosParaHhMm(Math.max(0, t.extrasMin - rel.linhas.reduce((a, l) => a + dfFolhaMin(l), 0)))}</div><div className={vt.kpiS}>hora extra · feriado pago à parte</div></div>
             <div className={`${vt.kpi} ${t.atrasoMin + t.faltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos e faltas</div><div className={vt.kpiV}>−{minutosParaHhMm(t.atrasoMin + t.faltaMin)}</div><div className={vt.kpiS}>{rel.linhas.filter((l) => l.atrasoMin + l.faltaMin > 0).length} funcionário{rel.linhas.filter((l) => l.atrasoMin + l.faltaMin > 0).length === 1 ? '' : 's'}</div></div>
             {t.comBanco > 0 && <div className={`${vt.kpi} ${vt.kpiInk}`}><div className={vt.kpiK}>Banco · acumulado</div><div className={vt.kpiV}>{comSinal(t.bancoAcumuladoMin)}</div><div className={vt.kpiS}>saldo de {t.comBanco} com banco, até hoje</div></div>}
             <div className={vt.kpi}><div className={vt.kpiK}>Assinaturas</div><div className={vt.kpiV}>{t.assinadas} / {rel.linhas.length}</div><div className={vt.kpiS}>espelho de {rotuloMes(mes).split(' de ')[0]} assinado</div></div>

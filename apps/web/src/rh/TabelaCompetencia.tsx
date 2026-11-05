@@ -19,7 +19,10 @@ const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosPar
 const hhOuTraco = (m: number) => (m > 0 ? minutosParaHhMm(m) : '—');
 // Domingo/feriado trabalhado pago na folha (100%) é verba própria: sai da coluna "Extras"
 // do espelho (igual ao PDF). A visão de apuração mostra Extra 50%/100% à parte e não mexe.
-const dfFolhaMin = (l: LinhaCompetencia) => (l.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0;
+// Minutos de domingo/feriado pagos na folha (verba 100%, fora de "Extras"), igual ao PDF:
+// sem banco (destino PAGA) é todo o extra 100%; com banco, só o desviado pra folha.
+export const dfFolhaMin = (l: LinhaCompetencia) =>
+  l.destinacao?.extra?.destino === 'PAGA' ? l.extra100Min : (l.destinacao?.extra?.domingoFeriadoPagoMin ?? 0);
 const extrasEspelho = (l: LinhaCompetencia) => Math.max(0, l.extrasMin - dfFolhaMin(l));
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const ROTULO_AFAST: Record<string, string> = {
