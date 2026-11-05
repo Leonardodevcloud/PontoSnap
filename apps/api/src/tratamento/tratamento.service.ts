@@ -1243,13 +1243,9 @@ export class TratamentoService {
     const indenizMin = r.dias.reduce((a, d) => a + d.penalidadeIntervaloMin + d.penalidadeInterjornadaMin, 0);
     // Horas extras do mês (coluna Positivas): tudo que passou, menos o feriado pago à parte.
     const extrasMesMin = Math.max(0, r.totalExtrasMin - feriadoAParteMin);
-    // Feriado trabalhado é pago à parte (verba 100%): fica FORA do trabalhado e da
-    // diferença, para a "diferença" ser a extra real (folha ou banco).
-    const trabalhadoForaFeriadoMin = r.totalTrabalhadoMin - feriadoAParteMin;
-    const diferencaMin = trabalhadoForaFeriadoMin - r.totalContratadoMin;
-    const saldoForaMin = r.saldoPeriodoMin - feriadoAParteMin;
-    // Tolerância da Súmula 366 absorvida no mês = (trabalhado fora feriado − previsto) − saldo.
-    const toleranciaMin = diferencaMin - saldoForaMin;
+    // Hora extra "produtiva" = o que passou, sem o feriado (verba à parte 100%) e
+    // sem a indenização de intervalo (verba própria +50%, mostrada à parte).
+    const horaExtraMin = Math.max(0, extrasMesMin - indenizMin);
 
     return {
       empresa: rep0?.razaoSocial ?? t0?.razaoSocial ?? '',
@@ -1262,16 +1258,12 @@ export class TratamentoService {
         trabalhado: hhmm(r.totalTrabalhadoMin),
         horasNormaisEsperadas: hhmm(r.totalContratadoMin),
         saldoBanco: r.bancoDeHorasMin > 0 ? hhmm(r.bancoDeHorasMin) : undefined,
-        // Fechamento / reconciliação (0 vira undefined — some do rodapé)
-        trabalhadoForaFeriado: feriadoAParteMin > 0 ? hhmm(trabalhadoForaFeriadoMin) : undefined,
-        diferenca: hhmm(diferencaMin),
-        extrasMes: extrasMesMin > 0 ? hhmm(extrasMesMin) : undefined,
+        // Fechamento — só o que importa: as verbas reais (0 vira undefined)
+        horaExtra: horaExtraMin > 0 ? hhmm(horaExtraMin) : undefined,
+        indenizacoes: indenizMin > 0 ? hhmm(indenizMin) : undefined,
         feriadoTrabalhado: feriadoAParteMin > 0 ? hhmm(feriadoAParteMin) : undefined,
         atrasos: r.totalAtrasoMin > 0 ? hhmm(r.totalAtrasoMin) : undefined,
         faltas: r.totalFaltaMin > 0 ? hhmm(r.totalFaltaMin) : undefined,
-        indenizacoes: indenizMin > 0 ? hhmm(indenizMin) : undefined,
-        saldoLiquido: hhmm(saldoForaMin),
-        toleranciaSumula366: toleranciaMin !== 0 ? hhmm(toleranciaMin) : undefined,
       },
     };
   }

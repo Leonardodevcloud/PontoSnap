@@ -8,7 +8,6 @@ import type { ApuracaoResp, Empregado, EspelhoResp, RelatorioCompetencia, Result
 import { TabelaCompetencia, dfFolhaMin } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
-import { ContaMes } from '../components/ContaMes';
 import { Fechamento } from '../components/Fechamento';
 import { RaioX } from './RaioX';
 import { Explica } from '../components/Explica';
@@ -291,6 +290,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
         <Link to={`/rh/apuracao?emp=${empregadoId}&mes=${mes}`} className={css.lk}>Apuração CLT</Link>
         {ap?.banco && <Link to="/rh/banco" className={css.lk}>Extrato do banco</Link>}
         <Link to="/rh/ajustes" className={css.lk}>Ajustes</Link>
+        <button type="button" className={css.lk} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }} onClick={() => setRaio(true)}>Regras de cálculo</button>
         <Botao variante="coral" className={vt.btn} onClick={baixarEspelho} disabled={baixando}>{baixando ? 'Gerando…' : 'Espelho (PDF)'}</Botao>
       </div>
 
@@ -300,15 +300,14 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
         <div className={ap?.banco ? css.dois : css.um}>
           <div>
             <Fechamento d={{
-              trabalhadoMin: r.totalTrabalhadoMin,
-              previstoMin: r.totalContratadoMin,
               extrasTotalMin: r.totalExtrasMin,
               atrasoMin: r.totalAtrasoMin,
               faltaMin: r.totalFaltaMin,
-              saldoMin: r.saldoPeriodoMin,
               feriadoAParteMin: !ap?.banco ? df : dfPago,
               indenizMin: indenizMes,
               banco: !!ap?.banco,
+              atrasoDestino: ap?.conta?.destino.destinoAtraso,
+              faltaDestino: ap?.conta?.falta.destino,
             }} />
 
             <div className={css.card}>
@@ -366,8 +365,6 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                 })}
               </div>
             </div>
-            {/* A conta do mês vem depois dos dias: primeiro o que aconteceu, depois a soma. */}
-            {ap?.conta && <div style={{ marginTop: 14 }}><ContaMes conta={ap.conta} mes={rotuloMes(mes).split(' de ')[0]!} quem="rh" atual={mes === mesAtual()} aoVerRegras={() => setRaio(true)} /></div>}
           </div>
 
           <div>
