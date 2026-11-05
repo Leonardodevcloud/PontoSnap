@@ -27,7 +27,10 @@ interface ItemMenu {
 interface GrupoMenu { titulo: string | null; itens: ItemMenu[] }
 
 const GRUPOS: GrupoMenu[] = [
-  { titulo: null, itens: [{ to: '/rh', rotulo: 'Início', icone: 'inicio', fim: true, badge: 'TOTAL' }] },
+  { titulo: null, itens: [
+    { to: '/rh', rotulo: 'Início', icone: 'inicio', fim: true, badge: 'TOTAL' },
+    { to: '/rh/argos', rotulo: 'Argos', icone: 'ajuda' },
+  ] },
   {
     titulo: 'Dia a dia',
     itens: [
@@ -78,7 +81,7 @@ const SECOES: { rotas: { to: string; rotulo: string }[] }[] = [
 
 /** Nome da tela atual (vira o h1 da página para leitor de tela e aba do navegador). */
 const NOMES: Record<string, string> = {
-  '/rh': 'Início', '/rh/espelhos': 'Ponto do mês · Espelhos', '/rh/apuracao': 'Ponto do mês · Apuração CLT',
+  '/rh': 'Início', '/rh/argos': 'Argos', '/rh/espelhos': 'Ponto do mês · Espelhos', '/rh/apuracao': 'Ponto do mês · Apuração CLT',
   '/rh/batidas-faltando': 'Batidas faltando', '/rh/ajustes': 'Pedidos · Ajustes de ponto', '/rh/atestados': 'Pedidos · Atestados',
   '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e pagamentos · Folha CLT', '/rh/debitos': 'Folha e pagamentos · Débitos', '/rh/prestadores': 'Folha e pagamentos · Prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
   '/rh/relatorios': 'Relatórios', '/rh/fiscal': 'Arquivos fiscais', '/rh/funcionarios': 'Funcionários', '/rh/comunicacao': 'Comunicação interna', '/rh/comunicacao/novo': 'Novo comunicado', '/rh/escalas': 'Escalas',
