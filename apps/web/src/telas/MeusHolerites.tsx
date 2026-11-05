@@ -6,14 +6,14 @@ import css from './MeusHolerites.module.css';
 
 interface MeuHolerite {
   id: string; competencia: string; arquivoNome: string; arquivoBytes: number;
-  liquidoCentavos: number | null; enviadoEm: string;
+  liquidoCentavos: number | null; brutoCentavos?: number | null; enviadoEm: string;
 }
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const mesBonito = (c: string) => `${MESES[Number(c.slice(5, 7)) - 1] ?? c} de ${c.slice(0, 4)}`;
 const reais = (c: number | null) => c == null ? '' : `R$ ${(c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
-/** Holerites (recibos de pagamento) que o RH entregou ao funcionário, por competência. */
+/** Contracheques (recibos de pagamento) que o RH entregou ao funcionário, por competência. */
 export function MeusHolerites() {
   const [lista, setLista] = useState<MeuHolerite[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -29,23 +29,23 @@ export function MeusHolerites() {
     setBaixando(h.id); setErro(null);
     try {
       const blob = await api.baixar(`/holerites/${h.id}/arquivo`);
-      salvarBlob(blob, `holerite_${h.competencia}.pdf`);
+      salvarBlob(blob, `contracheque_${h.competencia}.pdf`);
     } catch (e) { setErro((e as Error).message); }
     finally { setBaixando(null); }
   }
 
   return (
     <div className={`appshell ${css.pagina}`}>
-      <h1 className={css.h}>Holerites <Explica lado="dir">Seus recibos de pagamento, por mês. Toque em Baixar para abrir ou salvar o PDF.</Explica></h1>
+      <h1 className={css.h}>Contracheques <Explica lado="dir">Seus recibos de pagamento, por mês. Toque em Baixar para abrir ou salvar o PDF.</Explica></h1>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {!lista && !erro && <div className={css.sk} aria-busy="true"><i /><i /><i /></div>}
-      {lista && lista.length === 0 && <p className={css.vazio}>Nenhum holerite ainda. Quando o RH enviar seu recibo de pagamento, ele aparece aqui.</p>}
+      {lista && lista.length === 0 && <p className={css.vazio}>Nenhum contracheque ainda. Quando o RH enviar seu recibo de pagamento, ele aparece aqui.</p>}
 
       {lista?.map((h) => (
         <div key={h.id} className={css.card}>
           <span className={css.ic} aria-hidden="true">PDF</span>
           <div className={css.corpo}>
-            <b>Holerite · {mesBonito(h.competencia)}</b>
+            <b>Contracheque · {mesBonito(h.competencia)}</b>
             <small>{h.liquidoCentavos != null ? `líquido ${reais(h.liquidoCentavos)}` : 'recibo de pagamento'}</small>
           </div>
           <button type="button" className={css.baixar} onClick={() => baixar(h)} disabled={baixando === h.id}>

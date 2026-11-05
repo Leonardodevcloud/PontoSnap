@@ -72,7 +72,7 @@ function previaMei(valorCent: number, diasMes: number, l: { heMin: number; falta
   return { heCent, feriadosCent, faltasCent, brutoCent, abat, liquidoCent: brutoCent - abat };
 }
 
-type Painel = { tipo: 'clt' | 'mei' | 'mot'; id: string } | { tipo: 'debito'; editar?: PessoalDebito } | { tipo: 'padrao' } | null;
+type Painel = { tipo: 'clt' | 'mei' | 'mot'; id: string; modo?: 'detalhe' | 'config' } | { tipo: 'debito'; editar?: PessoalDebito } | { tipo: 'padrao' } | null;
 type Dialogo =
   | { tipo: 'tirar'; pessoaTipo: PessoaTipo; pessoaId: string; nome: string }
   | { tipo: 'fechar' }
@@ -116,6 +116,11 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
   const [pix, setPix] = useState<PixAlvo | null>(null);
   // Holerites do mês (bruto/líquido/pagamento), por empregadoId — ligados à Folha CLT.
   const [holerites, setHolerites] = useState<Map<string, HoleriteMes>>(new Map());
+  // Pagamento em lote (sequência de Pix): fila de empregadoIds a pagar, e o total inicial.
+  const [loteFila, setLoteFila] = useState<string[]>([]);
+  const [loteTotal, setLoteTotal] = useState(0);
+  // Enviar contracheque de uma pessoa só (quando não veio no PDF da contabilidade).
+  const [importarAlvo, setImportarAlvo] = useState<{ id: string; nome: string } | null>(null);
   const [comoAberto, setComoAberto] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<'' | 'MEI' | 'MOTORISTA'>('');
   const ultimaAba = useRef<Aba>('folha');
@@ -178,7 +183,7 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
     } catch (e) { win?.close(); setErro((e as Error).message); }
   }
 
-  /** Pagamento do líquido do holerite: muda a tela na hora e grava em segundo plano. */
+  /** Pagamento do líquido do contracheque: muda a tela na hora e grava em segundo plano. */
   function registrarPagamentoHolerite(r: Extract<PixRegistro, { pessoaTipo: 'CLT' }>, pago: boolean, valorCent: number | null) {
     const antes = holerites.get(r.pessoaId);
     setHolerites((m) => {
@@ -191,8 +196,31 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
         setHolerites((m) => { const n = new Map(m); if (antes) n.set(r.pessoaId, antes); return n; });
         setErro(`Não deu pra salvar o pagamento de ${r.nome}: ${(e as Error).message}`);
       });
-    avisar(pago ? `${r.nome}: holerite pago ${brl(valorCent ?? 0)} às ${fmtHoraCurta(new Date().toISOString())}.` : `${r.nome}: pagamento do holerite desfeito.`);
+    avisar(pago ? `${r.nome}: contracheque pago ${brl(valorCent ?? 0)} às ${fmtHoraCurta(new Date().toISOString())}.` : `${r.nome}: pagamento do contracheque desfeito.`);
+    if (pago && loteFila.includes(r.pessoaId)) avancarLote(r.pessoaId);
   }
+
+  /** "Pagar todos": fila dos pendentes com contracheque e chave Pix; abre o 1º. */
+  function iniciarLote() {
+    if (!d) return;
+    const ids = d.clt.filter((l) => {
+      const h = holerites.get(l.empregadoId);
+      return h && h.liquidoCentavos != null && !h.pagoEm && normalizarChave(l.config.chavePix ?? '');
+    }).map((l) => l.empregadoId);
+    if (!ids.length) { avisar('Ninguém pendente com contracheque e chave Pix válida neste mês.'); return; }
+    setLoteFila(ids); setLoteTotal(ids.length);
+    const l = d.clt.find((x) => x.empregadoId === ids[0])!;
+    setPix(pixClt(l, d.debitos, holerites.get(ids[0]!)));
+  }
+  /** Avança a fila do lote (pago ou pulado): abre o próximo ou encerra. */
+  function avancarLote(atualId: string) {
+    const resto = loteFila.filter((id) => id !== atualId);
+    setLoteFila(resto);
+    if (!resto.length || !d) { setPix(null); setLoteTotal(0); if (!resto.length && loteTotal) avisar('Pagamento em lote concluído.'); return; }
+    const prox = d.clt.find((x) => x.empregadoId === resto[0]);
+    setPix(prox ? pixClt(prox, d.debitos, holerites.get(resto[0]!)) : null);
+  }
+  function fecharLote() { setLoteFila([]); setLoteTotal(0); setPix(null); }
 
   function registrarPagamento(r: PixRegistro, pago: boolean, valorCent: number | null, debitoCent?: number) {
     if (r.pessoaTipo === 'CLT') { registrarPagamentoHolerite(r, pago, valorCent); return; }
@@ -345,8 +373,11 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             ? <span className={`${css.chip} ${css.chipOk}`} title={`Fechado em ${new Date(d.fechadoEm!).toLocaleDateString('pt-BR')}`}>fechado em {new Date(d.fechadoEm!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
             : <span className={`${css.chip} ${css.chipAberto}`}>em aberto</span>)}
           <span className={css.esp} />
+          {!soDebitos && visao === 'fech' && d && d.clt.some((l) => { const h = holerites.get(l.empregadoId); return h && h.liquidoCentavos != null && !h.pagoEm && normalizarChave(l.config.chavePix ?? ''); }) && (
+            <Botao variante="coral" className={css.btnSec} onClick={iniciarLote}>Pagar todos</Botao>
+          )}
           {!soDebitos && visao === 'fech' && (
-            <Botao variante="ghost" className={css.btnSec} onClick={() => setImportarHol(true)}>Importar holerites</Botao>
+            <Botao variante="ghost" className={css.btnSec} onClick={() => setImportarHol(true)}>Importar contracheques</Botao>
           )}
           {!soDebitos && fechado && d && (d.mei.length > 0 || d.motoristas.length > 0) && (
             <Botao variante="ghost" className={css.btnSec} onClick={() => navegarRota(`/rh/prestadores?mes=${mes}&liberar=1`)}>Liberar para os prestadores</Botao>
@@ -355,7 +386,8 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
             : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}
         </div>
-        {importarHol && <ImportarHolerites aoFechar={(enviou) => { setImportarHol(false); if (enviou) void recarregar(); }} />}
+        {(importarHol || importarAlvo) && <ImportarHolerites alvo={importarAlvo ?? undefined}
+          aoFechar={(enviou) => { setImportarHol(false); setImportarAlvo(null); if (enviou) void recarregar(); }} />}
         {fechado && <p className={css.fechadoLinha}>Os números de {mesCurto(mes)} são o retrato do fechamento e não mudam mais. Nota fiscal e pagamento ainda podem ser registrados.</p>}
 
         {!soDebitos && <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
@@ -405,8 +437,11 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
 
       {carregando && !d && <p className={css.carregando}>Calculando {mesLongo(mes)}…</p>}
 
-      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} debitos={d.debitos} holerites={holerites} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} onPix={setPix} onVerHolerite={verHolerite} />}
-      {d && aba === 'beneficios' && <TabelaBeneficios linhas={filtra(d.clt)} d={d} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} />}
+      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} debitos={d.debitos} holerites={holerites}
+        onAbrir={(id, el) => abrir({ tipo: 'clt', id, modo: 'detalhe' }, el)} onPix={setPix} onVerHolerite={verHolerite}
+        onDesfazerPago={(l, h) => registrarPagamentoHolerite({ pessoaTipo: 'CLT', pessoaId: l.empregadoId, nome: l.nome, holeriteId: h.id, pago: false, valorPagoCent: null, pagoEm: null }, false, null)}
+        onSubir={(l) => setImportarAlvo({ id: l.empregadoId, nome: l.nome })} />}
+      {d && aba === 'beneficios' && <TabelaBeneficios linhas={filtra(d.clt)} d={d} onAbrir={(id, el) => abrir({ tipo: 'clt', id, modo: 'config' }, el)} />}
       {d && aba === 'prestadores' && <TabelaPrestadores mei={filtroTipo === 'MOTORISTA' ? [] : filtra(d.mei)} mot={filtroTipo === 'MEI' ? [] : filtra(d.motoristas)} debitos={d.debitos}
         filtrado={!!filtroTipo || !!busca} onNovo={fechado ? undefined : () => ir({ novo: filtroTipo === 'MOTORISTA' ? 'MOTORISTA' : 'MEI' })}
         onAbrir={(tipo, id, el) => abrir({ tipo: tipo === 'MEI' ? 'mei' : 'mot', id }, el)} onPix={setPix}
@@ -448,10 +483,15 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             : linhaMot ? ['Motorista', linhaMot.empresa, linhaMot.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex', mesLongo(mes)].filter(Boolean).join(' · ')
             : painel.tipo === 'padrao' ? 'Vale para todos os CLT sem valor próprio' : painel.tipo === 'debito' && painel.editar ? `${painel.editar.nome} · ${ROT_TIPO[painel.editar.pessoaTipo]}` : `Parcelado ou fixo mensal · a partir de ${mesCurto(mes)}`}>
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
-          {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} holerite={holerites.get(linhaClt.empregadoId)}
-            onSalvo={recarregar} onAviso={avisar} onVerHolerite={verHolerite}
-            onPix={() => setPix(pixClt(linhaClt, d.debitos, holerites.get(linhaClt.empregadoId)))}
-            onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
+          {linhaClt && painel.tipo === 'clt' && painel.modo === 'detalhe'
+            ? <PainelCltDetalhe l={linhaClt} d={d} mes={mes} holerite={holerites.get(linhaClt.empregadoId)}
+                onVerHolerite={verHolerite} onSubir={() => setImportarAlvo({ id: linhaClt.empregadoId, nome: linhaClt.nome })}
+                onIrConfig={() => { ir({ aba: 'beneficios' }); setPainel({ tipo: 'clt', id: linhaClt.empregadoId, modo: 'config' }); }}
+                onPix={() => setPix(pixClt(linhaClt, d.debitos, holerites.get(linhaClt.empregadoId)))}
+                onDesfazerPago={(h) => registrarPagamentoHolerite({ pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome, holeriteId: h.id, pago: false, valorPagoCent: null, pagoEm: null }, false, null)} />
+            : linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado}
+                onSalvo={recarregar} onAviso={avisar}
+                onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
           {linhaMei && <PainelMei key={linhaMei.id} aba={abaPainel} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas}
             onFecharPessoa={(motivo) => setFecharP({ tipo: 'MEI', id: linhaMei.id, motivo })} onReabrirPessoa={reabrirPessoa} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'MEI', pessoaId: linhaMei.id, nome: linhaMei.nome })} />}
@@ -506,8 +546,11 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
         </Dialogo>
       )}
 
-      {pix && d && <ModalPix key={`${pix.nome}`} alvo={atualizarAlvo(pix, d, holerites)} mes={mes} onFechar={() => setPix(null)}
-        onRegistrar={(r, pago, valor, deb) => registrarPagamento(r, pago, valor, deb)} onVerHolerite={verHolerite} />}
+      {pix && d && <ModalPix key={`${pix.nome}`} alvo={atualizarAlvo(pix, d, holerites)} mes={mes}
+        onFechar={() => { if (loteFila.length) fecharLote(); else setPix(null); }}
+        onRegistrar={(r, pago, valor, deb) => registrarPagamento(r, pago, valor, deb)} onVerHolerite={verHolerite}
+        lote={loteFila.length > 0 && pix.origem.tipo === 'CLT' && loteFila.includes(pix.origem.id)
+          ? { pos: loteTotal - loteFila.length + 1, total: loteTotal, onPular: () => avancarLote(pix.origem.id) } : undefined} />}
       {verNf && <VisualizarNf arquivo={verNf.arquivo} titulo={verNf.titulo} onFechar={() => setVerNf(null)}
         onBaixar={async () => { try { salvarBlob(await api.baixar(`/pessoal/nf/${verNf.arquivo.id}`), verNf.arquivo.nome); } catch (e) { setErro((e as Error).message); } }} />}
 
@@ -534,7 +577,11 @@ function Linha({ onAbrir, children, rotulo }: { onAbrir: (el: HTMLElement) => vo
 }
 const Vazio = ({ cols, children }: { cols: number; children: ReactNode }) => <tr><td colSpan={cols} className={vt.vazio}>{children}</td></tr>;
 
-function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite }: { linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; holerites: Map<string, HoleriteMes>; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void; onVerHolerite: (id: string) => void }) {
+function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite, onDesfazerPago, onSubir }: {
+  linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; holerites: Map<string, HoleriteMes>;
+  onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void; onVerHolerite: (id: string) => void;
+  onDesfazerPago: (l: PessoalLinhaClt, h: HoleriteMes) => void; onSubir: (l: PessoalLinhaClt) => void;
+}) {
   const t = linhas.reduce((a, l) => {
     const h = holerites.get(l.empregadoId);
     return {
@@ -543,43 +590,54 @@ function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite
       db: a.db + l.debitosCent, li: a.li + (h?.liquidoCentavos ?? 0),
     };
   }, { br: 0, vr: 0, vt: 0, db: 0, li: 0 });
+  const pagaveis = linhas.filter((l) => { const h = holerites.get(l.empregadoId); return h && h.liquidoCentavos != null; });
+  const pagos = pagaveis.filter((l) => holerites.get(l.empregadoId)!.pagoEm).length;
   // Coluna Cliente só aparece se alguém tem cliente.
   const comCliente = linhas.some((l) => l.cliente);
-  const cols = comCliente ? 9 : 8;
+  const cols = comCliente ? 10 : 9;
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
       <thead><tr><th>Colaborador</th>{comCliente && <th>Cliente</th>}
-        <th className={vt.n} title="Total de Proventos do holerite da contabilidade">Bruto</th>
+        <th className={vt.n} title="Total de Proventos do contracheque da contabilidade">Bruto</th>
         <th className={vt.n} title="Vale-refeição/alimentação da carga do próximo mês">VR</th>
         <th className={vt.n} title="Vale-transporte / combustível da carga do próximo mês">VT</th>
         <th className={vt.n}>Débitos</th>
-        <th className={vt.n} title="Líquido a Receber do holerite — é o que o Pix paga. VR/VT e débitos são pagos por fora.">Líquido a pagar</th>
-        <th className={vt.n}>Holerite</th><th aria-label="Abrir" /></tr></thead>
+        <th className={vt.n} title="Líquido a Receber do contracheque — é o que o Pix paga. VR/VT e débitos são pagos por fora.">Líquido a pagar</th>
+        <th className={vt.n}>Pagamento</th>
+        <th className={vt.n}>Contracheque</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={cols}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
         {linhas.map((l) => {
           const h = holerites.get(l.empregadoId);
           const alerta = l.salarioCent == null ? 'sem salário' : l.erro ? 'sem escala' : null;
+          const pixOk = !!normalizarChave(l.config.chavePix ?? '');
           return (
             <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeLinha}><span className={css.nomeTxt} title={l.nome}>{l.nome}</span><BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos, h))} /></span>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeTxt} title={l.nome}>{l.nome}</span>
                 {alerta ? <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro ?? undefined}>{alerta}</span> : <small>{l.config.cargo ?? 'CLT'}</small>}</td>
               {comCliente && <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>}
               <td className={vt.n}>{h?.brutoCentavos != null ? brl(h.brutoCentavos) : <span className={css.mute}>—</span>}</td>
               <td className={vt.n}>{l.beneficios.vrProxCent ? brl(l.beneficios.vrProxCent) : <span className={css.mute}>—</span>}</td>
               <td className={vt.n} title={l.config.vtTipo === 'FIXO' ? 'Combustível · valor fixo' : undefined}>{l.config.vtTipo === 'NENHUM' ? <span className={css.mute}>—</span> : brl(l.beneficios.vtProxCent)}</td>
               <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : <span className={css.mute}>—</span>}</td>
-              <td className={`${vt.n} ${css.forte}`} title={h?.pagoEm ? `Pago${h.valorPagoCentavos != null ? ` ${brl(h.valorPagoCentavos)}` : ''} em ${fmtPagoEm(h.pagoEm)}` : undefined}>
-                {h?.liquidoCentavos != null ? <>{brl(h.liquidoCentavos)}{h.pagoEm && <small className={`${css.sub} ${vt.pos}`}>pago</small>}</> : <span className={css.mute}>—</span>}</td>
-              <td className={vt.n}>{h
-                ? <button type="button" className={css.link} onClick={(e) => { e.stopPropagation(); onVerHolerite(h.id); }} onKeyDown={(e) => e.stopPropagation()}>Ver</button>
-                : <span className={css.mute} title="Nenhum holerite importado para este mês">não enviado</span>}</td>
+              <td className={`${vt.n} ${css.forte}`}>{h?.liquidoCentavos != null ? brl(h.liquidoCentavos) : <span className={css.mute}>—</span>}</td>
+              <td className={vt.n} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                {!h || h.liquidoCentavos == null ? <span className={css.mute}>—</span>
+                  : h.pagoEm
+                    ? <span className={css.pagoLin}><span className={css.pagoOk}>Pago</span><small className={css.sub}>{fmtPagoEm(h.pagoEm)}</small><button type="button" className={css.desfazer} onClick={() => onDesfazerPago(l, h)}>desfazer</button></span>
+                    : pixOk
+                      ? <button type="button" className={css.pagarBtn} onClick={() => onPix(pixClt(l, debitos, h))}>Pagar</button>
+                      : <span className={css.mute} title="Sem chave Pix válida no cadastro (edite em Benefícios)">sem chave Pix</span>}</td>
+              <td className={vt.n} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{h
+                ? <button type="button" className={css.link} onClick={() => onVerHolerite(h.id)}>Ver</button>
+                : <button type="button" className={css.link} onClick={() => onSubir(l)}>subir contracheque</button>}</td>
             </Linha>
           );
         })}
       </tbody>
       {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td>{comCliente && <td />}<td className={vt.n}>{brl(t.br)}</td><td className={vt.n}>{brl(t.vr)}</td>
-        <td className={vt.n}>{brl(t.vt)}</td><td className={vt.n}>{t.db ? brl(-t.db) : '—'}</td><td className={vt.n}>{brl(t.li)}</td><td /><td /></tr></tfoot>}
+        <td className={vt.n}>{brl(t.vt)}</td><td className={vt.n}>{t.db ? brl(-t.db) : '—'}</td><td className={vt.n}>{brl(t.li)}</td>
+        <td className={vt.n}><small className={css.sub}>{pagos} de {pagaveis.length} pagos</small></td><td /><td /></tr></tfoot>}
     </table></div></div>
   );
 }
@@ -994,10 +1052,66 @@ function PainelPadrao({ d, onSalvo }: { d: PessoalCompetencia; onSalvo: (msg: st
   );
 }
 
-function PainelClt({ l, d, mes, fechado, holerite, onSalvo, onAviso, onTirar, onVerHolerite, onPix }: {
-  l: PessoalLinhaClt; d: PessoalCompetencia; mes: string; fechado: boolean; holerite?: HoleriteMes;
+/**
+ * Tela limpa ao clicar no funcionário (aba Salários): só o detalhamento do que
+ * ele recebe (contracheque + benefícios) e o pagamento. A configuração fica na
+ * aba Benefícios.
+ */
+function PainelCltDetalhe({ l, d, mes, holerite, onVerHolerite, onSubir, onIrConfig, onPix, onDesfazerPago }: {
+  l: PessoalLinhaClt; d: PessoalCompetencia; mes: string; holerite?: HoleriteMes;
+  onVerHolerite: (id: string) => void; onSubir: () => void; onIrConfig: () => void; onPix: () => void; onDesfazerPago: (h: HoleriteMes) => void;
+}) {
+  const b = l.beneficios;
+  const pixOk = !!normalizarChave(l.config.chavePix ?? '');
+  const descontoCent = holerite?.brutoCentavos != null && holerite.liquidoCentavos != null ? holerite.brutoCentavos - holerite.liquidoCentavos : null;
+  return (
+    <div className={css.pCorpo}>
+      {holerite ? (
+        <section className={css.bloco}>
+          <span className={css.lb}>Contracheque de {mesLongo(mes)}</span>
+          <Linha2 cls={css.grande} k="Líquido a pagar" v={holerite.liquidoCentavos != null ? brl(holerite.liquidoCentavos) : '—'} />
+          {holerite.pagoEm
+            ? <p className={css.formula}>Pago{holerite.valorPagoCentavos != null ? ` ${brl(holerite.valorPagoCentavos)}` : ''} em {fmtPagoEm(holerite.pagoEm)}. <button type="button" className={css.link} onClick={() => onDesfazerPago(holerite)}>desfazer</button></p>
+            : <p className={css.formula}>Pago por Pix pela chave do cadastro. VR/VT e débitos são pagos por fora.</p>}
+          <div className={css.grade2}>
+            <Botao variante="ghost" onClick={() => onVerHolerite(holerite.id)}>Ver contracheque (PDF)</Botao>
+            <Botao variante="coral" disabled={!pixOk || holerite.liquidoCentavos == null} onClick={onPix}>{holerite.pagoEm ? 'Pix · atualizar' : 'Pagar via Pix'}</Botao>
+          </div>
+          {!pixOk && <p className={css.formula}>Sem chave Pix válida no cadastro. <button type="button" className={css.link} onClick={onIrConfig}>Cadastrar em Benefícios</button>.</p>}
+        </section>
+      ) : (
+        <section className={css.bloco}>
+          <span className={css.lb}>Contracheque de {mesLongo(mes)}</span>
+          <p className={css.formula}>Ainda não importado para esta pessoa.</p>
+          <Botao variante="coral" onClick={onSubir}>Subir contracheque</Botao>
+        </section>
+      )}
+
+      {holerite && (
+        <section className={css.bloco}>
+          <span className={css.lb}>Do contracheque</span>
+          {holerite.brutoCentavos != null && <Linha2 k="Total de Proventos (bruto)" v={brl(holerite.brutoCentavos)} />}
+          {descontoCent != null && descontoCent > 0 && <Linha2 k="Descontos (INSS, IRRF, etc.)" v={brl(-descontoCent)} cls={css.neg} />}
+          <Linha2 cls={css.total} k="Líquido a Receber" v={holerite.liquidoCentavos != null ? brl(holerite.liquidoCentavos) : '—'} />
+          <p className={css.formula}>Valores lidos do PDF da contabilidade. <button type="button" className={css.link} onClick={() => onVerHolerite(holerite.id)}>Ver o contracheque</button> para o detalhe por verba.</p>
+        </section>
+      )}
+
+      <section className={css.bloco}>
+        <span className={css.lb}>Benefícios · carga de {mesCurto(d.proxima)} · pagos por fora</span>
+        <Linha2 k="VR/VA" v={b.vrProxCent ? brl(b.vrProxCent) : '—'} />
+        <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível' : 'VT'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
+        <Linha2 k="Débitos do mês" v={l.debitosCent ? brl(-l.debitosCent) : '—'} cls={l.debitosCent ? css.neg : ''} />
+      </section>
+
+      <p className={css.formula}>Para ajustar benefícios, chave Pix, cargo ou cliente, use a <button type="button" className={css.link} onClick={onIrConfig}>aba Benefícios</button>.</p>
+    </div>
+  );
+}
+
+function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
+  l: PessoalLinhaClt; d: PessoalCompetencia; mes: string; fechado: boolean;
   onSalvo: () => Promise<void>; onAviso: (m: string) => void; onTirar: () => void;
-  onVerHolerite: (id: string) => void; onPix: () => void;
 }) {
   const inicial = () => ({
     modo: (l.config.origem === 'PROPRIO' ? 'PROPRIO' : 'PADRAO') as 'PADRAO' | 'PROPRIO',
@@ -1029,26 +1143,6 @@ function PainelClt({ l, d, mes, fechado, holerite, onSalvo, onAviso, onTirar, on
     <>
       <div className={css.pCorpo}>
         {l.erro && <p className={css.alerta}>Sem números do ponto: {l.erro}. Confira a escala em Funcionários.</p>}
-
-        <section className={css.bloco}>
-          <span className={css.lb}>Holerite de {mesLongo(mes)}</span>
-          {holerite ? <>
-            {holerite.brutoCentavos != null && <Linha2 k="Bruto (Total de Proventos)" v={brl(holerite.brutoCentavos)} />}
-            <Linha2 k={`VR/VA · carga de ${mesCurto(d.proxima)}`} v={b.vrProxCent ? brl(b.vrProxCent) : '—'} />
-            <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível' : 'VT'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
-            <Linha2 k="Débitos" v={l.debitosCent ? brl(-l.debitosCent) : '—'} cls={l.debitosCent ? css.neg : ''} />
-            <Linha2 cls={css.total} k="Líquido a pagar (holerite)" v={holerite.liquidoCentavos != null ? brl(holerite.liquidoCentavos) : '—'} />
-            <p className={css.formula}>O Pix paga o <b>líquido do holerite</b>. VR/VT e débitos são pagos por fora.</p>
-            {holerite.pagoEm && <p className={css.formula}>Pago{holerite.valorPagoCentavos != null ? ` ${brl(holerite.valorPagoCentavos)}` : ''} em {fmtPagoEm(holerite.pagoEm)}.</p>}
-            <div className={css.grade2}>
-              <Botao variante="ghost" onClick={() => onVerHolerite(holerite.id)}>Ver holerite (PDF)</Botao>
-              <Botao variante="coral" disabled={!normalizarChave(l.config.chavePix ?? '') || holerite.liquidoCentavos == null} onClick={onPix}>
-                {holerite.pagoEm ? 'Pix · atualizar pagamento' : 'Pagar via Pix'}</Botao>
-            </div>
-            {!normalizarChave(l.config.chavePix ?? '') && <p className={css.formula}>Sem chave Pix válida no cadastro — preencha abaixo para liberar o pagamento.</p>}
-          </> : <p className={css.formula}>Nenhum holerite importado para {mesLongo(mes)}. Importe na Folha CLT → "Importar holerites". Enquanto isso, os valores abaixo são a prévia do ponto.</p>}
-        </section>
-
         <section className={css.bloco}>
           <span className={css.lb}>Valor do dia em {mesCurto(mes)}</span>
           <Linha2 cls={css.grande} k={`${l.diasMes} dias de trabalho`} v={l.salarioCent == null ? 'sem salário' : brl(l.valorDiaMesCent)} />
@@ -1922,9 +2016,10 @@ function BotaoPix({ nome, chave, onPix }: { nome: string; chave: string | null; 
   );
 }
 
-function ModalPix({ alvo, mes, onFechar, onRegistrar, onVerHolerite }: {
+function ModalPix({ alvo, mes, onFechar, onRegistrar, onVerHolerite, lote }: {
   alvo: PixAlvo; mes: string; onFechar: () => void; onRegistrar: (r: PixRegistro, pago: boolean, valorCent: number | null, debitoCent?: number) => void;
   onVerHolerite?: (id: string) => void;
+  lote?: { pos: number; total: number; onPular: () => void };
 }) {
   const [usarDebito, setUsarDebito] = useState(!!alvo.debitoOpcional?.sugerido);
   const norm = normalizarChave(alvo.chave)!;
@@ -1963,9 +2058,11 @@ function ModalPix({ alvo, mes, onFechar, onRegistrar, onVerHolerite }: {
     <div className={css.dFundo} data-dialogo onClick={onFechar}>
       <div className={`${css.dialogo} ${css.pixModal}`} role="dialog" aria-modal="true" aria-labelledby="pix-titulo" onClick={(e) => e.stopPropagation()}>
         <div className={css.pixTopo}>
-          <div><h3 id="pix-titulo">Pagar {alvo.nome}</h3>
+          <div>
+            {lote && <span className={css.chip} style={{ marginBottom: 6, display: 'inline-block' }}>Pagamento {lote.pos} de {lote.total}</span>}
+            <h3 id="pix-titulo">Pagar {alvo.nome}</h3>
             <p className={css.hint}>{alvo.subtitulo ? `${alvo.subtitulo} · ` : ''}Pix ({ROT_CHAVE[norm.tipo]}) <b className={css.mono}>{norm.tipo === 'CPF' || norm.tipo === 'CNPJ' ? mascaraDoc(norm.chave) : norm.chave}</b>{alvo.subtitulo ? '' : ` · ${mesLongo(mes)}`}</p>
-            {alvo.holeriteId && onVerHolerite && <button type="button" className={css.link} onClick={() => onVerHolerite(alvo.holeriteId!)}>Ver holerite (PDF) ↗</button>}</div>
+            {alvo.holeriteId && onVerHolerite && <button type="button" className={css.link} onClick={() => onVerHolerite(alvo.holeriteId!)}>Ver contracheque (PDF)</button>}</div>
           <button ref={fechar} className={css.pX} onClick={onFechar} aria-label="Fechar">✕</button>
         </div>
         {r?.pago && (
@@ -2024,10 +2121,11 @@ function ModalPix({ alvo, mes, onFechar, onRegistrar, onVerHolerite }: {
         </div>
         <p className={css.formula}>Confira o nome do recebedor no app do banco antes de confirmar.</p>
         <div className={css.dAcoes}>
-          <button className={css.btnTexto} onClick={onFechar}>Fechar</button>
-          <button type="button" className={css.btnContornoNeutro} onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar código'}</button>
+          {lote ? <button className={css.btnTexto} onClick={lote.onPular}>Pular</button>
+                : <button className={css.btnTexto} onClick={onFechar}>Fechar</button>}
+          <button type="button" className={css.btnContornoNeutro} onClick={copiar}>{copiado ? 'Copiado' : 'Copiar código'}</button>
           {r && <Botao variante="coral" className={css.btnPri} disabled={valor <= 0}
-            onClick={() => { onRegistrar(r, true, valor, alvo.debitoOpcional ? debOpc : undefined); onFechar(); }}>{r.pago ? `Atualizar para ${brl(valor)}` : `Registrar pagamento de ${brl(valor)}`}</Botao>}
+            onClick={() => { onRegistrar(r, true, valor, alvo.debitoOpcional ? debOpc : undefined); if (!lote) onFechar(); }}>{r.pago ? `Atualizar para ${brl(valor)}` : lote ? `Pagar e próximo · ${brl(valor)}` : `Registrar pagamento de ${brl(valor)}`}</Botao>}
         </div>
       </div>
     </div>

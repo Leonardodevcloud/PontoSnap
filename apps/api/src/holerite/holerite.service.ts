@@ -161,8 +161,8 @@ export class HoleriteService {
       if (!usuarioId) return;
       const [ano, mes] = competencia.split('-');
       await this.push.enviarParaEmpregado(tenantId, empregadoId, usuarioId, 'sempre', {
-        titulo: 'Holerite disponível',
-        corpo: `Seu holerite de ${mes}/${ano} já está no app.`,
+        titulo: 'Contracheque disponível',
+        corpo: `Seu contracheque de ${mes}/${ano} já está no app.`,
         url: '/holerites', tag: `holerite-${competencia}`,
       });
     } catch { /* push é best-effort */ }

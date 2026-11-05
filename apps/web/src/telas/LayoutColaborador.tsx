@@ -94,7 +94,7 @@ export function LayoutColaborador() {
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/espelho'); }}>Meu espelho</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/escala'); }}>Minha escala</button>
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/atestados'); }}>Atestados</button>
-                <button role="menuitem" onClick={() => { setMenu(false); navegar('/holerites'); }}>Holerites</button>
+                <button role="menuitem" onClick={() => { setMenu(false); navegar('/holerites'); }}>Contracheques</button>
                 {docs.total > 0 && <button role="menuitem" onClick={() => { setMenu(false); navegar('/documentos'); }}>Documentos{docs.pendentes ? ` (${docs.pendentes} para assinar)` : ''}</button>}
                 <button role="menuitem" onClick={() => { setMenu(false); navegar('/avisos'); }}>Avisos do RH{avisos?.naoLidos ? ` (${avisos.naoLidos})` : ''}</button>
                 {temBanco && (

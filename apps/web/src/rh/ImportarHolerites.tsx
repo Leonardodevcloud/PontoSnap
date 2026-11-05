@@ -26,7 +26,7 @@ const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
   r.readAsDataURL(file);
 });
 
-export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) => void }) {
+export function ImportarHolerites({ aoFechar, alvo }: { aoFechar: (enviou: boolean) => void; alvo?: { id: string; nome: string } }) {
   const [arquivoBase64, setArquivoBase64] = useState('');
   const [arquivoNome, setArquivoNome] = useState('');
   const [previa, setPrevia] = useState<Previa | null>(null);
@@ -49,6 +49,8 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
       setPrevia(p);
       const init: Record<number, string> = {};
       p.itens.forEach((it, i) => { init[i] = it.status === 'NAO_ENCONTRADO' ? '' : (it.empregadoId ?? ''); });
+      // Upload individual: manda tudo pra pessoa escolhida (o PDF é só dela).
+      if (alvo) p.itens.forEach((_, i) => { init[i] = alvo.id; });
       setOverrides(init);
     } catch (e) { setErro((e as Error).message); setPrevia(null); }
     finally { setCarregando(false); }
@@ -83,8 +85,8 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
       <div className={css.card} onClick={(e) => e.stopPropagation()}>
         <div className={css.head}>
           <div>
-            <h1>Importar holerites</h1>
-            <div className={css.sub}>A contabilidade manda tudo junto — o PontoSnap recorta por página e entrega o certo pra cada um.</div>
+            <h1>{alvo ? `Enviar contracheque de ${alvo.nome}` : 'Importar contracheques'}</h1>
+            <div className={css.sub}>{alvo ? 'Escolha o PDF do contracheque desta pessoa — vai só pra ela.' : 'A contabilidade manda tudo junto — o PontoSnap recorta por página e entrega o certo pra cada um.'}</div>
           </div>
           <button className={css.fechar} onClick={() => aoFechar(feito != null)} aria-label="Fechar">×</button>
         </div>
@@ -96,16 +98,15 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
 
         {feito != null ? (
           <div className={css.feito}>
-            <div className={css.big}>✅</div>
-            <h2>{feito} holerite{feito === 1 ? '' : 's'} enviado{feito === 1 ? '' : 's'}</h2>
-            <p>Cada funcionário recebeu o aviso e já pode ver na aba Holerites.</p>
+            <h2>{feito} contracheque{feito === 1 ? '' : 's'} enviado{feito === 1 ? '' : 's'}</h2>
+            <p>Cada funcionário recebeu o aviso e já pode ver na aba Contracheques.</p>
             <div className={css.acoes} style={{ justifyContent: 'center', marginTop: 16 }}>
               <button className={css.btn} onClick={() => aoFechar(true)}>Fechar</button>
             </div>
           </div>
         ) : !previa ? (
           <div className={css.drop} onClick={() => inputRef.current?.click()}>
-            {carregando ? <b>Lendo o PDF…</b> : <><b>Clique para escolher o PDF</b> da folha<div className={css.hint}>Um arquivo com todos os holerites juntos (como a contabilidade manda)</div></>}
+            {carregando ? <b>Lendo o PDF…</b> : <><b>Clique para escolher o PDF</b> {alvo ? 'do contracheque' : 'da folha'}<div className={css.hint}>{alvo ? 'Só o contracheque desta pessoa' : 'Um arquivo com todos os contracheques juntos (como a contabilidade manda)'}</div></>}
           </div>
         ) : (
           <>
@@ -113,7 +114,7 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
               <div className={css.ic}>PDF</div>
               <div>
                 <div className={css.nm}>{arquivoNome}</div>
-                <div className={css.dt}>{previa.totalPaginas} páginas · {previa.itens.length} holerites · competência {mesBonito(previa.competencia) || '— não detectada —'}</div>
+                <div className={css.dt}>{previa.totalPaginas} páginas · {previa.itens.length} contracheque{previa.itens.length === 1 ? '' : 's'} · competência {mesBonito(previa.competencia) || '— não detectada —'}</div>
               </div>
               <button className={css.troca} onClick={() => { setPrevia(null); setArquivoBase64(''); }}>Trocar arquivo</button>
             </div>
@@ -121,10 +122,10 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
             <div className={css.stats}>
               <div className={css.ok}><div className={css.n}>{aEnviar.length}</div><div className={css.l}>prontos pra enviar</div></div>
               <div className={css.er}><div className={css.n}>{naoEnc}</div><div className={css.l}>não encontrados</div></div>
-              <div className={css.av}><div className={css.n}>{previa.semHolerite.length}</div><div className={css.l}>sem holerite no PDF</div></div>
+              <div className={css.av}><div className={css.n}>{previa.semHolerite.length}</div><div className={css.l}>sem contracheque no PDF</div></div>
             </div>
 
-            <div className={css.secTit}>Holerites do arquivo ({previa.itens.length})</div>
+            <div className={css.secTit}>Contracheques do arquivo ({previa.itens.length})</div>
             <div className={css.lista}>
               {previa.itens.map((it, i) => {
                 const incluido = !!overrides[i];
@@ -159,7 +160,7 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
 
             {previa.semHolerite.length > 0 && (
               <div className={css.semfol}>
-                <b>{previa.semHolerite.length} funcionário(s) da folha sem holerite neste arquivo:</b> {previa.semHolerite.map((e) => e.nome).join(', ')}. Se vierem em outro PDF, é só importar de novo.
+                <b>{previa.semHolerite.length} funcionário(s) da folha sem contracheque neste arquivo:</b> {previa.semHolerite.map((e) => e.nome).join(', ')}. Dá pra subir o de cada um pela Folha CLT.
               </div>
             )}
 
@@ -168,7 +169,7 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
               <div className={css.acoes}>
                 <button className={`${css.btn} ${css.ghost}`} onClick={() => aoFechar(false)}>Cancelar</button>
                 <button className={css.btn} disabled={enviando || aEnviar.length === 0 || !previa.competencia} onClick={confirmar}>
-                  {enviando ? 'Enviando…' : `Enviar ${aEnviar.length} holerite${aEnviar.length === 1 ? '' : 's'}`}
+                  {enviando ? 'Enviando…' : `Enviar ${aEnviar.length} contracheque${aEnviar.length === 1 ? '' : 's'}`}
                 </button>
               </div>
             </div>
