@@ -40,9 +40,7 @@ const GRUPOS: GrupoMenu[] = [
     titulo: 'Fechamento do mês',
     itens: [
       { to: '/rh/banco', rotulo: 'Banco de horas', icone: 'relogio' },
-      { to: '/rh/pessoal', rotulo: 'Folha CLT', icone: 'dinheiro' },
-      { to: '/rh/debitos', rotulo: 'Débitos', icone: 'recibo' },
-      { to: '/rh/prestadores', rotulo: 'Prestadores', icone: 'check', tambem: ['/rh/prestadores/conferir', '/rh/prestadores/modelos'] },
+      { to: '/rh/pessoal', rotulo: 'Folha e pagamentos', icone: 'dinheiro', tambem: ['/rh/debitos', '/rh/prestadores', '/rh/prestadores/conferir', '/rh/prestadores/modelos'] },
       { to: '/rh/documentos', rotulo: 'Assinaturas', icone: 'lapis' },
       { to: '/rh/relatorios', rotulo: 'Relatórios e arquivos', icone: 'documento', tambem: ['/rh/fiscal'] },
     ],
@@ -51,7 +49,6 @@ const GRUPOS: GrupoMenu[] = [
     titulo: 'Pessoas',
     itens: [
       { to: '/rh/funcionarios', rotulo: 'Funcionários', icone: 'pessoas' },
-      { to: '/rh/transferencias', rotulo: 'Transferências', icone: 'grade' },
       { to: '/rh/comunicacao', rotulo: 'Comunicação interna', icone: 'megafone' },
       { to: '/rh/escalas', rotulo: 'Escalas', icone: 'grade' },
       { to: '/rh/regras', rotulo: 'Regras de cálculo', icone: 'ajustes' },
@@ -60,6 +57,7 @@ const GRUPOS: GrupoMenu[] = [
 ];
 
 const CONFIG: ItemMenu[] = [
+  { to: '/rh/transferencias', rotulo: 'Transferências de empresa', icone: 'grade' },
   { to: '/rh/feriados', rotulo: 'Feriados', icone: 'calendario' },
   { to: '/rh/local', rotulo: 'Local e cerca', icone: 'inicio' },
   { to: '/rh/dispositivos', rotulo: 'Quiosques', icone: 'grade' },
@@ -73,6 +71,7 @@ const CONFIG: ItemMenu[] = [
 /** Telas que dividem um item do menu: abas no topo. */
 const SECOES: { rotas: { to: string; rotulo: string }[] }[] = [
   { rotas: [{ to: '/rh/espelhos', rotulo: 'Espelhos' }, { to: '/rh/apuracao', rotulo: 'Apuração CLT' }] },
+  { rotas: [{ to: '/rh/pessoal', rotulo: 'Folha CLT' }, { to: '/rh/debitos', rotulo: 'Débitos' }, { to: '/rh/prestadores', rotulo: 'Prestadores' }] },
   { rotas: [{ to: '/rh/ajustes', rotulo: 'Ajustes de ponto' }, { to: '/rh/atestados', rotulo: 'Atestados' }] },
   { rotas: [{ to: '/rh/relatorios', rotulo: 'Relatórios' }, { to: '/rh/fiscal', rotulo: 'Arquivos fiscais' }] },
 ];
@@ -81,9 +80,9 @@ const SECOES: { rotas: { to: string; rotulo: string }[] }[] = [
 const NOMES: Record<string, string> = {
   '/rh': 'Início', '/rh/espelhos': 'Ponto do mês · Espelhos', '/rh/apuracao': 'Ponto do mês · Apuração CLT',
   '/rh/batidas-faltando': 'Batidas faltando', '/rh/ajustes': 'Pedidos · Ajustes de ponto', '/rh/atestados': 'Pedidos · Atestados',
-  '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha CLT', '/rh/debitos': 'Débitos', '/rh/prestadores': 'Prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
+  '/rh/afastamentos': 'Férias e afastamentos', '/rh/banco': 'Banco de horas', '/rh/pessoal': 'Folha e pagamentos · Folha CLT', '/rh/debitos': 'Folha e pagamentos · Débitos', '/rh/prestadores': 'Folha e pagamentos · Prestadores', '/rh/prestadores/conferir': 'Conferir notas', '/rh/prestadores/modelos': 'Modelos de nota',
   '/rh/relatorios': 'Relatórios', '/rh/fiscal': 'Arquivos fiscais', '/rh/funcionarios': 'Funcionários', '/rh/comunicacao': 'Comunicação interna', '/rh/comunicacao/novo': 'Novo comunicado', '/rh/escalas': 'Escalas',
-  '/rh/regras': 'Regras de cálculo', '/rh/feriados': 'Feriados', '/rh/local': 'Local e cerca', '/rh/dispositivos': 'Quiosques',
+  '/rh/regras': 'Regras de cálculo', '/rh/transferencias': 'Transferências de empresa', '/rh/feriados': 'Feriados', '/rh/local': 'Local e cerca', '/rh/dispositivos': 'Quiosques',
   '/rh/auditoria': 'Auditoria', '/rh/usuarios': 'Usuários', '/rh/notificacoes': 'Notificações do app', '/rh/assinatura': 'Plano e cobrança',
   '/rh/documentos': 'Assinaturas', '/rh/integracoes': 'Integrações',
   '/rh/ajuda': 'Central de Ajuda', '/rh/ajuda/assistente': 'Assistente de configuração',
@@ -343,7 +342,7 @@ export function LayoutRH() {
           <div className={css.abas} role="tablist" aria-label="Seção">
             {secao.rotas.map((r) => (
               <Link key={r.to} role="tab" aria-selected={rota.pathname === r.to}
-                to={{ pathname: r.to, search: r.to === '/rh/espelhos' || r.to === '/rh/apuracao' ? rota.search : '' }}
+                to={{ pathname: r.to, search: ['/rh/espelhos', '/rh/apuracao', '/rh/pessoal', '/rh/debitos', '/rh/prestadores'].includes(r.to) ? rota.search : '' }}
                 className={`${css.aba} ${rota.pathname === r.to ? css.abaOn : ''}`}>{r.rotulo}</Link>
             ))}
             <span id="explica-secao" key={rota.pathname} className={css.explicaSecao} />
