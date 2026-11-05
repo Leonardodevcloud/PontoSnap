@@ -50,7 +50,11 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
   // penalidade de intervalo por faixa (Art. 71: >6h→60min; 4–6h→15min)
   let penIntervalo = 0;
   const faixa = [...regras.intervalo.faixas].sort((a, b) => b.acimaMin - a.acimaMin).find((f) => trabalhado > f.acimaMin);
-  if (!pendente && regras.intervalo.penalidade && faixa && pares.length > 0 && intervalo < faixa.minimoMin) {
+  // O intervalo intrajornada (Art. 71) é da JORNADA CONTRATADA. Trabalho em dia
+  // de descanso (sábado/domingo/feriado) é hora extra avulsa — normalmente meio
+  // turno corrido, sem pausa prevista —, então não gera indenização de intervalo.
+  // Nos dias úteis a regra vale cheia, inclusive em bloco único (Art. 71 §1º).
+  if (!pendente && !descanso && regras.intervalo.penalidade && faixa && pares.length > 0 && intervalo < faixa.minimoMin) {
     const suprimido = faixa.minimoMin - intervalo;
     // Tolerância de intervalo (de minimis): supressões de poucos minutos — um
     // retorno antecipado pontual — não geram indenização. Acima da tolerância,
