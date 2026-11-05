@@ -1,0 +1,875 @@
+{
+  "empregado": [
+    {
+      "id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "cpf": "08891026514",
+      "matricula": "003",
+      "horario_contratual_id": "ebe05ce1-b8a0-402b-ba0c-f342ad17dcd4",
+      "perfil_regra_id": "f8bd9aef-ca38-4354-a8cc-473da269e134",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d"
+    }
+  ],
+  "marcacoes": [
+    {
+      "nsr": "713",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-01T10:50:18.412Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "723",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-01T15:31:48.640Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "734",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-01T20:13:23.614Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "747",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-02T16:05:30.607Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "751",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-02T17:05:07.424Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "767",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-02T20:30:53.677Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "778",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-03T15:16:14.130Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "782",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-05T11:05:46.421Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "786",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-05T15:02:57.761Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "790",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-05T15:54:46.284Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "801",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-05T20:02:23.669Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "808",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-06T11:01:17.845Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "813",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-06T15:08:14.667Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "828",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-06T20:25:07.611Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "839",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-07T15:00:57.997Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "854",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-07T20:42:48.275Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "863",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-08T15:01:55.155Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "868",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-08T16:00:58.527Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "897",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-09T11:04:06.946Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "909",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-09T15:01:13.747Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "934",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-09T20:29:34.807Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "939",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-10T11:04:09.031Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "945",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-13T10:54:17.798Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "957",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-13T15:05:19.685Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "964",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-13T16:01:52.704Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "976",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-13T20:25:17.832Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "982",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-14T10:53:31.599Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "987",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-14T15:18:57.985Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "994",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-14T16:17:50.455Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1015",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-14T20:19:24.409Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1037",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-15T10:47:29.098Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1044",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-15T15:07:04.328Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1048",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-15T16:05:27.873Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1067",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-15T20:01:34.927Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1075",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-16T10:50:19.603Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1080",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-16T15:04:40.473Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1093",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-16T21:03:46.768Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1097",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-17T11:00:19.497Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1106",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-19T11:08:27.319Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1107",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-19T15:00:07.092Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1110",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-19T16:10:30.194Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1116",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-19T21:04:51.117Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1118",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-20T10:57:10.440Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1126",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-20T14:59:21.339Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1133",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-20T16:10:05.716Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1142",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-20T20:50:10.433Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1147",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-21T10:55:39.487Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1152",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-21T15:07:05.076Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1160",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-21T16:18:20.680Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1169",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-21T21:02:00.241Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1174",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-22T10:59:45.995Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1182",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-22T15:01:10.141Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1189",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-22T16:12:17.847Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1207",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-22T21:04:12.784Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1214",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-23T11:06:10.348Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1232",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-23T21:06:58.275Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1247",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-26T13:28:17.033Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1249",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-26T15:02:18.864Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1255",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-26T16:12:18.913Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1263",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-26T21:00:35.892Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1270",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-27T10:53:28.992Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1278",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-27T15:00:29.668Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1284",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-27T16:12:07.093Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1294",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-27T20:58:25.771Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1302",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-28T11:05:12.455Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1307",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-28T15:38:41.866Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1312",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-28T16:41:46.971Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1319",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-28T21:05:11.880Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1325",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-29T11:02:22.373Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1328",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-29T15:02:52.890Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1330",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-29T16:12:08.020Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1346",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-30T11:06:55.442Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1348",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-30T14:58:42.998Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1358",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-30T21:03:51.756Z",
+      "tipo_registro": "7"
+    },
+    {
+      "nsr": "1365",
+      "cpf": "08891026514",
+      "dt_marcacao": "2026-10-31T14:54:46.050Z",
+      "tipo_registro": "7"
+    }
+  ],
+  "ajustes": [
+    {
+      "id": "b1f485d7-78c9-4641-9bac-f314866db6cb",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-01T00:00:00.000Z",
+      "dt_marcacao": "2026-10-01T16:31:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Sem Internet",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-02T21:27:08.545Z",
+      "criado_em": "2026-10-01T17:58:47.808Z"
+    },
+    {
+      "id": "9130000e-a2f4-4689-8691-6c72181a72ac",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-02T00:00:00.000Z",
+      "dt_marcacao": "2026-10-02T11:05:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Esquci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-02T21:27:06.864Z",
+      "criado_em": "2026-10-02T11:13:23.093Z"
+    },
+    {
+      "id": "763cc88f-b690-4800-88dc-ceafb794e2f9",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "DESCONSIDERAR",
+      "data": "2026-10-03T00:00:00.000Z",
+      "dt_marcacao": null,
+      "tp_marc": null,
+      "marcacao_id": "d00de5c4-e572-43b6-a773-d5767efc43cc",
+      "observacao": "Ta errado",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-09T20:44:53.163Z",
+      "criado_em": "2026-10-08T18:27:11.957Z"
+    },
+    {
+      "id": "5d14a7db-13b9-43e6-ad5c-83726fb22f97",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-03T00:00:00.000Z",
+      "dt_marcacao": "2026-10-03T15:00:00.000Z",
+      "tp_marc": "S",
+      "marcacao_id": null,
+      "observacao": "****alakdh",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-06T16:47:21.593Z",
+      "criado_em": "2026-10-06T16:44:52.726Z"
+    },
+    {
+      "id": "c3aa422e-2ce4-44f2-85ce-a5c45197d3ca",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-03T00:00:00.000Z",
+      "dt_marcacao": "2026-10-03T11:00:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Vim pra base e esqueci denbater",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-06T16:47:29.298Z",
+      "criado_em": "2026-10-06T16:44:29.468Z"
+    },
+    {
+      "id": "cad29cdb-df1e-435b-85ce-816004088a2d",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-06T00:00:00.000Z",
+      "dt_marcacao": "2026-10-06T16:08:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Retorno",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-06T16:47:20.155Z",
+      "criado_em": "2026-10-06T16:45:21.567Z"
+    },
+    {
+      "id": "155caeda-63bb-44a1-b8be-00b1b3ee3c12",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-07T00:00:00.000Z",
+      "dt_marcacao": "2026-10-07T11:00:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Esqueci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-07T22:00:09.268Z",
+      "criado_em": "2026-10-07T11:03:44.379Z"
+    },
+    {
+      "id": "1c21c194-f521-4f5b-a2ff-cb044aacfee6",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-07T00:00:00.000Z",
+      "dt_marcacao": "2026-10-07T15:50:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Situação emergencial",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-07T22:00:05.041Z",
+      "criado_em": "2026-10-07T17:59:35.939Z"
+    },
+    {
+      "id": "a105d0b7-14c4-459e-acd0-7747a57497a3",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-08T00:00:00.000Z",
+      "dt_marcacao": "2026-10-08T20:00:00.000Z",
+      "tp_marc": "S",
+      "marcacao_id": null,
+      "observacao": "Esqueci de bater",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-09T20:44:55.444Z",
+      "criado_em": "2026-10-09T16:19:00.518Z"
+    },
+    {
+      "id": "b4a1f25d-ce8d-4871-ad27-b54be769e941",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-08T00:00:00.000Z",
+      "dt_marcacao": "2026-10-08T11:00:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Fui pra casa do chefe buscar a moto",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-09T20:44:53.800Z",
+      "criado_em": "2026-10-08T11:21:52.780Z"
+    },
+    {
+      "id": "668d683b-be3f-4bb5-9b84-18d3af8e1a92",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-09T00:00:00.000Z",
+      "dt_marcacao": "2026-10-09T16:01:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Fui fazer outras coisas e esqueci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-09T20:44:55.905Z",
+      "criado_em": "2026-10-09T16:19:31.903Z"
+    },
+    {
+      "id": "a0e4b681-b37b-4cab-95b7-54a22910039c",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-10T00:00:00.000Z",
+      "dt_marcacao": "2026-10-10T15:00:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Esqueci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-13T11:58:57.330Z",
+      "criado_em": "2026-10-13T10:54:43.360Z"
+    },
+    {
+      "id": "f9f669b2-0eeb-44da-babc-295f0d376701",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-16T00:00:00.000Z",
+      "dt_marcacao": "2026-10-16T16:16:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Ajuste na escala",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-16T20:19:37.993Z",
+      "criado_em": "2026-10-16T18:40:02.211Z"
+    },
+    {
+      "id": "877621b6-2961-49ee-bbfb-69aedcca8a10",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-17T00:00:00.000Z",
+      "dt_marcacao": "2026-10-17T13:00:00.000Z",
+      "tp_marc": "S",
+      "marcacao_id": null,
+      "observacao": "Novo ajuste c Gabrel",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-20T21:11:09.886Z",
+      "criado_em": "2026-10-19T12:01:23.614Z"
+    },
+    {
+      "id": "09b512a2-93e4-489e-aed8-214fa1ed10fe",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-23T00:00:00.000Z",
+      "dt_marcacao": "2026-10-23T16:12:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Esqueci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-26T21:49:05.628Z",
+      "criado_em": "2026-10-23T21:05:13.374Z"
+    },
+    {
+      "id": "c69b2e20-0e8a-42d9-87e4-4d5e2f4b50b2",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-23T00:00:00.000Z",
+      "dt_marcacao": "2026-10-23T15:00:00.000Z",
+      "tp_marc": "S",
+      "marcacao_id": null,
+      "observacao": "Esqueci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-26T21:49:04.377Z",
+      "criado_em": "2026-10-23T21:04:57.713Z"
+    },
+    {
+      "id": "f7706318-ad5f-4b33-a300-d240817f6a6a",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-29T00:00:00.000Z",
+      "dt_marcacao": "2026-10-29T22:00:00.000Z",
+      "tp_marc": "S",
+      "marcacao_id": null,
+      "observacao": "Reunião",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-11-03T13:00:59.696Z",
+      "criado_em": "2026-10-31T11:19:28.347Z"
+    },
+    {
+      "id": "1df0c2ee-c415-498c-9c6b-712e3f1d6872",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-30T00:00:00.000Z",
+      "dt_marcacao": "2026-10-30T16:05:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Esqueci",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-10-30T21:40:01.368Z",
+      "criado_em": "2026-10-30T16:13:56.303Z"
+    },
+    {
+      "id": "9ed2a941-bf3f-4b98-9893-8980d3a472c2",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "empregado_id": "9d995b3e-3671-4288-910b-d5e28bf096e2",
+      "tipo": "INCLUSAO",
+      "data": "2026-10-31T00:00:00.000Z",
+      "dt_marcacao": "2026-10-31T12:00:00.000Z",
+      "tp_marc": "E",
+      "marcacao_id": null,
+      "observacao": "Urgência na operação",
+      "status": "APROVADO",
+      "origem": "FUNCIONARIO",
+      "motivo_decisao": null,
+      "decidido_por": "adm2@tutts.com.br",
+      "decidido_em": "2026-11-03T13:00:56.917Z",
+      "criado_em": "2026-10-31T14:30:38.726Z"
+    }
+  ],
+  "ausencias": [],
+  "horario": [
+    {
+      "id": "ebe05ce1-b8a0-402b-ba0c-f342ad17dcd4",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "codigo": "5x2",
+      "dur_jornada_min": 528,
+      "pares": [
+        {
+          "saida": "1200",
+          "entrada": "0800"
+        },
+        {
+          "saida": "1800",
+          "entrada": "1312"
+        }
+      ],
+      "criado_em": "2026-08-27T14:20:46.761Z",
+      "dias_semana": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "regime": "normal",
+      "jornada_por_dia": null,
+      "flexivel": false,
+      "compensa_semana": false
+    }
+  ],
+  "perfil": [
+    {
+      "id": "f8bd9aef-ca38-4354-a8cc-473da269e134",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "nome": "João",
+      "config": {
+        "banco": {
+          "bancoModo": "INATIVO",
+          "formaCalculo": "BANCO_HORAS",
+          "bancoPrazoMeses": 6,
+          "bancoTipoAcordo": "INDIVIDUAL"
+        },
+        "extra": {
+          "extraDiaUtilPct": 70,
+          "extraLimiteDiarioMin": 120,
+          "extraDomingoFeriadoPct": 100
+        },
+        "jornada": null,
+        "contrato": {
+          "tipoJornada": "FIXO"
+        }
+      },
+      "padrao": false,
+      "cct_sindicato": "CCT dos Comerciários",
+      "cct_vigencia": null,
+      "cct_registro_mte": null,
+      "cct_pdf_nome": null,
+      "cct_pdf_base64": null,
+      "criado_em": "2026-08-27T19:41:45.868Z"
+    }
+  ],
+  "feriados": [
+    {
+      "id": "a6af837b-548f-4e8d-bbb8-fd4f01847bbd",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "data": "2026-10-12T00:00:00.000Z",
+      "nome": "Nossa Senhora  Aparecida",
+      "tipo": "nacional",
+      "criado_em": "2026-10-08T20:10:22.602Z",
+      "uf": null,
+      "municipio": null,
+      "municipio_nome": null
+    },
+    {
+      "id": "4dbbfa3a-584b-445e-b67e-bf4cae0e3a9a",
+      "tenant_id": "8e7c95fc-7899-4576-9ced-524fd2c83e1d",
+      "data": "2026-10-19T00:00:00.000Z",
+      "nome": "Dia dos Comerciários",
+      "tipo": "municipal",
+      "criado_em": "2026-10-20T21:09:04.932Z",
+      "uf": "BA",
+      "municipio": 2927408,
+      "municipio_nome": "Salvador"
+    }
+  ]
+}

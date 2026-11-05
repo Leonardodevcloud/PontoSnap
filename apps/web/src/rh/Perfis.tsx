@@ -6,7 +6,7 @@ import css from './Perfis.module.css';
 
 interface Config {
   extra?: { extraDiaUtilPct: number; extraDomingoFeriadoPct: number; extraLimiteDiarioMin: number } | null;
-  tolerancia?: { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number } | null;
+  tolerancia?: { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number; toleranciaIntervaloMin?: number } | null;
   noturno?: { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number } | null;
   jornada?: { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number } | null;
   banco?: { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES'; negativoMes?: 'DESCONTA' | 'CARREGA'; domingoFeriado?: 'BANCO' | 'PAGA' } | null;
@@ -204,15 +204,21 @@ function Editor({ inicial, onFechar, onSalvo }: { inicial: PerfilLista | null; o
         )}
       </Secao>
 
-      <Secao titulo="Tolerância de atraso"
+      <Secao titulo="Tolerância de atraso e intervalo"
         ligado={!!cfg.tolerancia}
-        aoLigar={(on) => setBloco('tolerancia', on ? { toleranciaDiariaMin: 10, toleranciaPorMarcacaoMin: 5 } : null)}
-        explicacao="Pequenos atrasos ou saídas adiantadas que não são descontados. A CLT permite até 10 minutos por dia, sendo no máximo 5 de cada vez.">
+        aoLigar={(on) => setBloco('tolerancia', on ? { toleranciaDiariaMin: 10, toleranciaPorMarcacaoMin: 5, toleranciaIntervaloMin: 0 } : null)}
+        explicacao="Pequenos atrasos ou saídas adiantadas que não são descontados. A CLT permite até 10 minutos por dia, sendo no máximo 5 de cada vez. A tolerância de intervalo perdoa o retorno do almoço poucos minutos antes, sem gerar indenização (Art. 71 §4º).">
         {cfg.tolerancia && (
-          <div className={css.dupla}>
-            <Num rot="Perdoado por dia (min)" v={cfg.tolerancia.toleranciaDiariaMin} on={(n) => setBloco('tolerancia', { ...cfg.tolerancia!, toleranciaDiariaMin: n })} />
-            <Num rot="Perdoado por marcação (min)" v={cfg.tolerancia.toleranciaPorMarcacaoMin} on={(n) => setBloco('tolerancia', { ...cfg.tolerancia!, toleranciaPorMarcacaoMin: n })} />
-          </div>
+          <>
+            <div className={css.dupla}>
+              <Num rot="Perdoado por dia (min)" v={cfg.tolerancia.toleranciaDiariaMin} on={(n) => setBloco('tolerancia', { ...cfg.tolerancia!, toleranciaDiariaMin: n })} />
+              <Num rot="Perdoado por marcação (min)" v={cfg.tolerancia.toleranciaPorMarcacaoMin} on={(n) => setBloco('tolerancia', { ...cfg.tolerancia!, toleranciaPorMarcacaoMin: n })} />
+            </div>
+            <div className={css.dupla}>
+              <Num rot="Intervalo curto perdoado (min)" v={cfg.tolerancia.toleranciaIntervaloMin ?? 0} on={(n) => setBloco('tolerancia', { ...cfg.tolerancia!, toleranciaIntervaloMin: n })} />
+              <p style={{ fontSize: 12, color: 'var(--ash)', alignSelf: 'center', margin: 0 }}>Supressão de intervalo até este limite não gera indenização. Acima dele, o período suprimido é indenizado integral (+50%). Pode ser reduzido a 30 min via CCT.</p>
+            </div>
+          </>
         )}
       </Secao>
 

@@ -9,6 +9,7 @@ import { TabelaCompetencia, dfFolhaMin } from './TabelaCompetencia';
 import { PorQue, type PedidoExplicacao } from './PorQue';
 import { VisorPdf } from '../components/VisorPdf';
 import { ContaMes } from '../components/ContaMes';
+import { Fechamento } from '../components/Fechamento';
 import { RaioX } from './RaioX';
 import { Explica } from '../components/Explica';
 import { ExplicaSecao } from '../components/ExplicaSecao';
@@ -274,11 +275,8 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
   const df = (r?.dias ?? []).reduce((t, d) => t + dfDoDia(d), 0);
   const dfPago = !ap?.banco ? df : ((ap?.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0);
   const dfNaFolha = df > 0 && dfPago >= df;
-  // Caixinhas e conta com os MESMOS números (a conta deixa de fora o dia em aberto).
-  const k = ap?.conta
-    ? { trabalhado: ap.conta.trabalhadoMin, previsto: ap.conta.previstoMin, extras: ap.conta.sobrouMin, atrasos: ap.conta.faltouMin }
-    : { trabalhado: r?.totalTrabalhadoMin ?? 0, previsto: r?.totalContratadoMin ?? 0, extras: r?.totalExtrasMin ?? 0, atrasos: r?.totalAtrasoMin ?? 0 };
-  const comuns = Math.max(0, k.extras - df);
+  // Indenização de intervalo/interjornada do mês (verba +50%, fora do saldo).
+  const indenizMes = (r?.dias ?? []).reduce((a, d) => a + (d.penalidadeIntervaloMin || 0) + (d.penalidadeInterjornadaMin || 0), 0);
   const horasDoDia = (d: ResultadoDiaCLT) => {
     if (d.marcacoes.length === 0) return null;
     return d.marcacoes.map((m) => fmtHora(m)).join(' · ');
@@ -301,23 +299,17 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
       {r && (
         <div className={ap?.banco ? css.dois : css.um}>
           <div>
-            <div className={`${vt.kpis} ${df > 0 ? css.kpis6 : css.kpis5}`}>
-              <div className={vt.kpi}><div className={vt.kpiK}>Trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(k.trabalhado)}</div></div>
-              <div className={vt.kpi}><div className={vt.kpiK}>Previsto</div><div className={vt.kpiV}>{minutosParaHhMm(k.previsto)}</div>{ap?.conta && <div className={vt.kpiS}>até {ap.conta.ate.slice(8, 10)}/{ap.conta.ate.slice(5, 7)}</div>}</div>
-              {/* Extras: só as horas a mais de dia comum. Feriado/domingo trabalhado tem card próprio. */}
-              <div className={`${vt.kpi} ${comuns > 0 ? vt.kpiPeach : ''}`}><div className={vt.kpiK}>Extras</div><div className={vt.kpiV}>{comuns > 0 ? `+${minutosParaHhMm(comuns)}` : '—'}</div>
-                {comuns > 0 && <div className={vt.kpiS}>{ap?.banco ? 'vão para o banco' : 'pagas na folha'}</div>}
-              </div>
-              {df > 0 && (
-                <div className={vt.kpi}><div className={vt.kpiK}>Feriado/domingo trabalhado</div><div className={vt.kpiV}>{minutosParaHhMm(df)}</div>
-                  <div className={vt.kpiS}>{dfNaFolha ? 'pago na folha (100%) · fora do banco' : dfPago > 0 ? `${minutosParaHhMm(dfPago)} na folha, resto no banco` : 'vai para o banco (regra do perfil)'}</div>
-                </div>
-              )}
-              <div className={`${vt.kpi} ${k.atrasos > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Atrasos</div><div className={vt.kpiV}>{k.atrasos > 0 ? `−${minutosParaHhMm(k.atrasos)}` : '—'}</div>
-                {k.atrasos > 0 && <div className={vt.kpiS}>{ap?.conta?.destino.destinoAtraso === 'BANCO' ? 'abatem do banco' : ap?.conta?.destino.destinoAtraso === 'TOLERA' ? 'tolerados' : 'descontados na folha'}</div>}</div>
-              <div className={`${vt.kpi} ${r.totalFaltaMin > 0 ? vt.kpiAlerta : ''}`}><div className={vt.kpiK}>Faltas</div><div className={vt.kpiV}>{r.totalFaltaMin > 0 ? minutosParaHhMm(r.totalFaltaMin) : '—'}</div>
-                {r.totalFaltaMin > 0 && ap?.conta && <div className={vt.kpiS}>{ap.conta.falta.dias.length} {ap.conta.falta.dias.length === 1 ? 'dia' : 'dias'} · {ap.conta.falta.destino === 'DESCONTA' ? 'na folha' : ap.conta.falta.destino === 'BANCO' ? 'no banco' : 'abonadas'}</div>}</div>
-            </div>
+            <Fechamento d={{
+              trabalhadoMin: r.totalTrabalhadoMin,
+              previstoMin: r.totalContratadoMin,
+              extrasTotalMin: r.totalExtrasMin,
+              atrasoMin: r.totalAtrasoMin,
+              faltaMin: r.totalFaltaMin,
+              saldoMin: r.saldoPeriodoMin,
+              feriadoAParteMin: !ap?.banco ? df : dfPago,
+              indenizMin: indenizMes,
+              banco: !!ap?.banco,
+            }} />
 
             <div className={css.card}>
               <h3>Dias do mês</h3>

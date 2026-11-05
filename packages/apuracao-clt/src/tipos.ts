@@ -24,6 +24,12 @@ export interface RegrasApuracao {
   intervalo: {
     penalidade: boolean; // Art. 71 §4º — indeniza o suprimido +50%
     faixas: Array<{ acimaMin: number; minimoMin: number }>; // ex.: >6h→60min; 4–6h→15min
+    /**
+     * Tolerância de intervalo (de minimis). Supressão do intervalo até este
+     * limite (ex.: retorno 1–2min antes) NÃO gera indenização. Acima dele, o
+     * período suprimido é indenizado integral. 0 = sem tolerância (padrão CLT).
+     */
+    toleranciaMin?: number;
   };
   /** Interjornada mínima entre o fim de um dia e o início do próximo (Art. 66). */
   interjornadaMinimaMin: number; // 660 (11h)

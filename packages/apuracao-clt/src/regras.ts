@@ -9,7 +9,7 @@ export const REGRAS_CLT_PADRAO: RegrasApuracao = {
   toleranciaPorMarcacaoMin: 5,
   noturno: { reduzida: true, inicioMin: 22 * 60, fimMin: 5 * 60, adicionalPct: 20, prorrogacao: true },
   extra: { diaUtilPct: 50, domingoFeriadoPct: 100, limiteDiarioMin: 120 },
-  intervalo: { penalidade: true, faixas: [{ acimaMin: 360, minimoMin: 60 }, { acimaMin: 240, minimoMin: 15 }] },
+  intervalo: { penalidade: true, faixas: [{ acimaMin: 360, minimoMin: 60 }, { acimaMin: 240, minimoMin: 15 }], toleranciaMin: 0 },
   interjornadaMinimaMin: 11 * 60,
   bancoDeHoras: false,
   compensarAtrasoComExtra: true,

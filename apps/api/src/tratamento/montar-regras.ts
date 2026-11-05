@@ -1,7 +1,9 @@
 import { REGRAS_CLT_PADRAO, type RegrasApuracao } from '@ponto/apuracao-clt';
 
 export type ConfigExtra = { extraDiaUtilPct: number; extraDomingoFeriadoPct: number; extraLimiteDiarioMin: number };
-export type ConfigTolerancia = { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number };
+export type ConfigTolerancia = { toleranciaDiariaMin: number; toleranciaPorMarcacaoMin: number;
+  /** Supressão de intervalo até este limite não indeniza (Art. 71 §4º, de minimis). */
+  toleranciaIntervaloMin?: number };
 export type ConfigNoturno = { noturnoAdicionalPct: number; noturnoReduzida: boolean; noturnoInicioMin: number; noturnoFimMin: number };
 export type ConfigJornada = { jornadaSemanalMin: number; interjornadaMinimaMin: number; intervaloMaior6hMin: number };
 export type ConfigBanco = { bancoModo: 'HERDA' | 'ATIVO' | 'INATIVO'; bancoTipoAcordo: 'INDIVIDUAL' | 'COLETIVO' | null; bancoPrazoMeses: number | null; formaCalculo: 'BANCO_HORAS' | 'INTRA_MES';
@@ -56,9 +58,13 @@ export function montarRegrasApuracao(it: ItensResolvidos): RegrasApuracao {
     extra: it.extra
       ? { diaUtilPct: it.extra.extraDiaUtilPct, domingoFeriadoPct: it.extra.extraDomingoFeriadoPct, limiteDiarioMin: it.extra.extraLimiteDiarioMin }
       : base.extra,
-    intervalo: it.jornada
-      ? { ...base.intervalo, faixas: [{ acimaMin: 360, minimoMin: it.jornada.intervaloMaior6hMin }, { acimaMin: 240, minimoMin: 15 }] }
-      : base.intervalo,
+    intervalo: {
+      ...base.intervalo,
+      faixas: it.jornada
+        ? [{ acimaMin: 360, minimoMin: it.jornada.intervaloMaior6hMin }, { acimaMin: 240, minimoMin: 15 }]
+        : base.intervalo.faixas,
+      toleranciaMin: it.tolerancia?.toleranciaIntervaloMin ?? base.intervalo.toleranciaMin,
+    },
     interjornadaMinimaMin: it.jornada?.interjornadaMinimaMin ?? base.interjornadaMinimaMin,
     jornadaSemanalMin: it.jornada?.jornadaSemanalMin ?? base.jornadaSemanalMin,
   };

@@ -51,8 +51,16 @@ export function apurarDia(dia: EntradaDia, regras: RegrasApuracao): ResultadoDia
   let penIntervalo = 0;
   const faixa = [...regras.intervalo.faixas].sort((a, b) => b.acimaMin - a.acimaMin).find((f) => trabalhado > f.acimaMin);
   if (!pendente && regras.intervalo.penalidade && faixa && pares.length > 0 && intervalo < faixa.minimoMin) {
-    penIntervalo = faixa.minimoMin - intervalo;
-    obs.push(`Intervalo insuficiente (${intervalo}min de ${faixa.minimoMin}): ${penIntervalo}min indenizáveis +50% (Art. 71 §4º).`);
+    const suprimido = faixa.minimoMin - intervalo;
+    // Tolerância de intervalo (de minimis): supressões de poucos minutos — um
+    // retorno antecipado pontual — não geram indenização. Acima da tolerância,
+    // o período suprimido é indenizado INTEGRAL (o Art. 71 §4º paga o período
+    // suprimido, não o que excede a tolerância).
+    const tol = regras.intervalo.toleranciaMin ?? 0;
+    if (suprimido > tol) {
+      penIntervalo = suprimido;
+      obs.push(`Intervalo insuficiente (${intervalo}min de ${faixa.minimoMin}): ${penIntervalo}min indenizáveis +50% (Art. 71 §4º).`);
+    }
   }
 
   // interjornada (Art. 66) — não se aplica ao regime 12x36 (Art. 59-A)

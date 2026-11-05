@@ -1231,6 +1231,22 @@ export class TratamentoService {
       } satisfies LinhaEspelho;
     });
 
+    // ---- Fechamento do mês (reconciliação) ----
+    // Soma por natureza, para o rodapé do espelho fechar com o que o motor apurou.
+    // Feriado/domingo trabalhado pago na folha é verba própria (100%), fora de "horas extras".
+    const feriadoAParteMin = r.dias.reduce((acc, d) => {
+      const dfMin = d.extras.filter((e) => e.motivo === 'extra em domingo/feriado').reduce((a, e) => a + e.min, 0);
+      const naFolha = dfMin > 0 && (ap.destinacao?.extra.destino === 'PAGA' || (ap.destinacao?.extra.domingoFeriadoPagoMin ?? 0) > 0);
+      return acc + (naFolha ? dfMin : 0);
+    }, 0);
+    // Indenização de intervalo/interjornada (+50%): verba própria, não é saldo nem "trabalhado − previsto".
+    const indenizMin = r.dias.reduce((a, d) => a + d.penalidadeIntervaloMin + d.penalidadeInterjornadaMin, 0);
+    // Horas extras do mês (coluna Positivas): tudo que passou, menos o feriado pago à parte.
+    const extrasMesMin = Math.max(0, r.totalExtrasMin - feriadoAParteMin);
+    const diferencaMin = r.totalTrabalhadoMin - r.totalContratadoMin;
+    // Tolerância da Súmula 366 absorvida no mês = (trabalhado − previsto) − saldo líquido.
+    const toleranciaMin = diferencaMin - r.saldoPeriodoMin;
+
     return {
       empresa: rep0?.razaoSocial ?? t0?.razaoSocial ?? '',
       cnpj: t0?.cnpj ?? '',
@@ -1242,6 +1258,15 @@ export class TratamentoService {
         trabalhado: hhmm(r.totalTrabalhadoMin),
         horasNormaisEsperadas: hhmm(r.totalContratadoMin),
         saldoBanco: r.bancoDeHorasMin > 0 ? hhmm(r.bancoDeHorasMin) : undefined,
+        // Fechamento / reconciliação (0 vira undefined — some do rodapé)
+        diferenca: hhmm(diferencaMin),
+        extrasMes: extrasMesMin > 0 ? hhmm(extrasMesMin) : undefined,
+        feriadoTrabalhado: feriadoAParteMin > 0 ? hhmm(feriadoAParteMin) : undefined,
+        atrasos: r.totalAtrasoMin > 0 ? hhmm(r.totalAtrasoMin) : undefined,
+        faltas: r.totalFaltaMin > 0 ? hhmm(r.totalFaltaMin) : undefined,
+        indenizacoes: indenizMin > 0 ? hhmm(indenizMin) : undefined,
+        saldoLiquido: hhmm(r.saldoPeriodoMin),
+        toleranciaSumula366: toleranciaMin !== 0 ? hhmm(toleranciaMin) : undefined,
       },
     };
   }

@@ -50,6 +50,25 @@ export interface DadosEspelho {
     bancoSaldoAnterior?: string;
     bancoSaldoMes?: string;
     bancoSaldoAcumulado?: string;
+    /**
+     * Fechamento do mês (reconciliação). Campos ausentes/0 não são impressos.
+     *   diferenca          = trabalhado − previsto
+     *   extrasMes          = horas extras do mês (sem o feriado pago à parte)
+     *   feriadoTrabalhado  = feriado/domingo 100% pago na folha (verba própria)
+     *   atrasos            = atrasos e saídas antecipadas
+     *   faltas             = faltas de dia inteiro
+     *   indenizacoes       = intervalo/interjornada +50% (verba, fora do saldo)
+     *   saldoLiquido       = extras produtivas − atrasos (sem indenização)
+     *   toleranciaSumula366= (trabalhado − previsto) − saldo líquido
+     */
+    diferenca?: string;
+    extrasMes?: string;
+    feriadoTrabalhado?: string;
+    atrasos?: string;
+    faltas?: string;
+    indenizacoes?: string;
+    saldoLiquido?: string;
+    toleranciaSumula366?: string;
   };
   /** Concordância eletrônica do funcionário — imprime o carimbo de assinatura digital. */
   assinaturaEletronica?: {
@@ -297,27 +316,54 @@ export async function gerarEspelhoPontoPdfComCampos(d: DadosEspelho): Promise<{ 
     y += h;
   }
 
-  // ---- Totais ----
-  y += 8;
-  if (y > doc.page.height - 110) { doc.addPage({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } }); y = 40; }
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(TINTA);
-  doc.text('Totais do período', 34, y);
-  doc.font('Helvetica').fontSize(8).fillColor(CINZA);
-  const tot = [
-    `Total trabalhado: ${d.totais.trabalhado}`,
-    `Horas normais esperadas: ${d.totais.horasNormaisEsperadas}`,
-    d.totais.diurno ? `Horas diurnas: ${d.totais.diurno}` : '',
-    d.totais.saldoBanco ? `Saldo do banco: ${d.totais.saldoBanco}` : '',
-  ].filter(Boolean).join('       ');
-  doc.text(tot, 34, y + 13, { width: larguraUtil });
+  // ---- Fechamento do mês (reconciliação) ----
+  y += 10;
+  // altura do bloco: título + 3 faixas (+ banco, se houver)
+  const alturaFech = 86 + (d.totais.bancoSaldoAcumulado != null ? 14 : 0);
+  if (y + alturaFech > doc.page.height - 70) { doc.addPage({ size: 'A4', layout: 'landscape', margins: { top: 34, bottom: 40, left: 34, right: 34 } }); y = 40; }
+
+  const T = d.totais;
+  doc.save().roundedRect(34, y, larguraUtil, alturaFech - 6, 6).lineWidth(0.6).strokeColor(LINHA).stroke().restore();
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(TINTA).text('Fechamento do mês', 44, y + 8);
+
+  // Faixa 1 — números-chave (célula rotulada)
+  const celula = (x: number, w: number, rot: string, val: string, cor = TINTA) => {
+    doc.font('Helvetica').fontSize(6.5).fillColor(CINZA).text(rot.toUpperCase(), x, y + 24, { width: w });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(cor).text(val, x, y + 33, { width: w });
+  };
+  const col = larguraUtil / 3;
+  celula(44, col - 20, 'Horas trabalhadas', T.trabalhado);
+  celula(44 + col, col - 20, 'Horas previstas', T.horasNormaisEsperadas);
+  celula(44 + col * 2, col - 20, 'Diferença (trab. - prev.)', T.diferenca ?? '0h00', CORAL);
+
+  // Faixa 2 — composição por natureza
+  doc.moveTo(44, y + 52).lineTo(34 + larguraUtil - 10, y + 52).strokeColor(LINHA).lineWidth(0.4).stroke();
+  const comp = [
+    T.extrasMes ? `Horas extras: ${T.extrasMes}` : '',
+    T.feriadoTrabalhado ? `Feriado trabalhado (100%, pago à parte): ${T.feriadoTrabalhado}` : '',
+    T.indenizacoes ? `Indenização de intervalo (+50%): ${T.indenizacoes}` : '',
+    T.atrasos ? `Atrasos/saídas antecipadas: ${T.atrasos}` : '',
+    T.faltas ? `Faltas: ${T.faltas}` : '',
+  ].filter(Boolean).join('      ');
+  doc.font('Helvetica').fontSize(7.5).fillColor(TINTA).text(comp, 44, y + 58, { width: larguraUtil - 20 });
+
+  // Faixa 3 — reconciliação em uma linha
+  const recon = [
+    `Saldo líquido: ${T.saldoLiquido ?? '0h00'}`,
+    T.toleranciaSumula366 ? `Tolerância (Súmula 366): ${T.toleranciaSumula366}` : '',
+    'Feriado trabalhado é verba própria 100%, não entra em horas extras. Indenização de intervalo é verba +50%, fora do saldo.',
+  ].filter(Boolean).join('   ·   ');
+  doc.font('Helvetica-Oblique').fontSize(6.5).fillColor(CINZA).text(recon, 44, y + 72, { width: larguraUtil - 20 });
+
+  y += alturaFech;
   if (d.totais.bancoSaldoAcumulado != null) {
     const banco = [
       `Banco de horas — saldo anterior: ${d.totais.bancoSaldoAnterior ?? '0h00'}`,
       `este mês: ${d.totais.bancoSaldoMes ?? '0h00'}`,
       `acumulado: ${d.totais.bancoSaldoAcumulado}`,
     ].join('       ');
-    doc.text(banco, 34, y + 24, { width: larguraUtil });
-    y += 11;
+    doc.font('Helvetica').fontSize(8).fillColor(CINZA).text(banco, 44, y, { width: larguraUtil });
+    y += 14;
   }
 
   // ---- Concordância + assinaturas ----
