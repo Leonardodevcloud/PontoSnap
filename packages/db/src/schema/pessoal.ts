@@ -74,6 +74,8 @@ export const pessoalPrestador = pgTable('pessoal_prestador', {
   trabalhoUf: char('trabalho_uf', { length: 2 }),
   trabalhoMunicipio: integer('trabalho_municipio'),
   trabalhoMunicipioNome: varchar('trabalho_municipio_nome', { length: 80 }),
+  /** Transferência de empresa (migration 0068): aponta pro prestador anterior na origem. */
+  prestadorAnteriorId: uuid('prestador_anterior_id'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('idx_pessoal_prestador_tenant').on(t.tenantId, t.tipo)]);
 

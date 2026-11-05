@@ -477,6 +477,13 @@
       "when": 1785440000000,
       "tag": "0067_holerite_pagamento",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1785450000000,
+      "tag": "0068_transferencia_empresa",
+      "breakpoints": true
     }
   ]
 }

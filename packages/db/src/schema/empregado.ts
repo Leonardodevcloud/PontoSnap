@@ -33,6 +33,12 @@ export const empregado = pgTable('empregado', {
   trabalhoUf: char('trabalho_uf', { length: 2 }),
   trabalhoMunicipio: integer('trabalho_municipio'),
   trabalhoMunicipioNome: varchar('trabalho_municipio_nome', { length: 80 }),
+  /** Transferência de empresa (migration 0068): saída da origem. */
+  dataSaida: date('data_saida'),
+  /** TRANSFERENCIA | DESLIGAMENTO */
+  motivoSaida: varchar('motivo_saida', { length: 20 }),
+  /** Registro de origem numa transferência entre CNPJs (aponta pro empregado anterior). */
+  empregadoAnteriorId: uuid('empregado_anterior_id'),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique('uq_empregado_cpf').on(t.tenantId, t.cpf),

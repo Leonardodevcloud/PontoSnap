@@ -51,6 +51,7 @@ const GRUPOS: GrupoMenu[] = [
     titulo: 'Pessoas',
     itens: [
       { to: '/rh/funcionarios', rotulo: 'Funcionários', icone: 'pessoas' },
+      { to: '/rh/transferencias', rotulo: 'Transferências', icone: 'grade' },
       { to: '/rh/comunicacao', rotulo: 'Comunicação interna', icone: 'megafone' },
       { to: '/rh/escalas', rotulo: 'Escalas', icone: 'grade' },
       { to: '/rh/regras', rotulo: 'Regras de cálculo', icone: 'ajustes' },
