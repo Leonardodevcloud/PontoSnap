@@ -1,0 +1,16 @@
+.pagina { padding-bottom: 32px; }
+.h { font-size: 22px; font-weight: 600; margin: 4px 0 14px; }
+.erro { color: var(--erro-text); font-size: 14px; margin: 8px 0; }
+.vazio { color: var(--ash); font-size: 14px; margin-top: 20px; line-height: 1.5; }
+
+.card { display: flex; align-items: center; gap: 12px; background: var(--white); border: 1px solid var(--row-border); border-radius: var(--r-md); padding: 14px 16px; margin-bottom: 10px; }
+.ic { width: 40px; height: 40px; border-radius: 10px; background: var(--peach); color: var(--coral-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex: none; }
+.corpo { flex: 1; min-width: 0; }
+.corpo b { font-size: 15px; font-weight: 600; display: block; }
+.corpo small { font-size: 12.5px; color: var(--ash); }
+.baixar { border: 0; background: var(--coral); color: #fff; font-family: inherit; font-size: 14px; font-weight: 600; border-radius: var(--r-pill); padding: 9px 16px; cursor: pointer; flex: none; }
+.baixar:disabled { opacity: .5; }
+
+.sk { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.sk i { height: 68px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--field-bg), var(--row-border), var(--field-bg)); background-size: 200% 100%; animation: sk 1.2s infinite; }
+@keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

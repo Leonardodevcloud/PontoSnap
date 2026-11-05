@@ -15,6 +15,7 @@ export * from './marcacao';
 export * from './tratamento';
 export * from './banco';
 export * from './documento';
+export * from './holerite';
 export * from './afastamento';
 export * from './auditoria';
 export * from './tokenSenha';

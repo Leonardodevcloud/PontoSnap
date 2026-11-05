@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AcessoPrestador, BlocoConvite } from './AcessoPrestador';
+import { ImportarHolerites } from './ImportarHolerites';
 import { CidadeTrabalho } from '../components/CidadeTrabalho';
 import type { ConviteGerado } from '../lib/prestador';
 import { api } from '../lib/api';
@@ -213,6 +214,7 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
   const sujo = useRef(false);
   const marcarSujo = useCallback((x: boolean) => { sujo.current = x; }, []);
   const [descartar, setDescartar] = useState(false);
+  const [importarHol, setImportarHol] = useState(false);
   const tentarFechar = () => { if (sujo.current) setDescartar(true); else fecharPainel(); };
 
   const empresas = [...new Set([...(dados?.mei ?? []), ...(dados?.motoristas ?? [])].map((x) => x.empresa).filter((x): x is string => !!x))].sort();
@@ -324,6 +326,9 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             ? <span className={`${css.chip} ${css.chipOk}`} title={`Fechado em ${new Date(d.fechadoEm!).toLocaleDateString('pt-BR')}`}>fechado em {new Date(d.fechadoEm!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
             : <span className={`${css.chip} ${css.chipAberto}`}>em aberto</span>)}
           <span className={css.esp} />
+          {!soDebitos && visao === 'fech' && (
+            <Botao variante="ghost" className={css.btnSec} onClick={() => setImportarHol(true)}>Importar holerites</Botao>
+          )}
           {!soDebitos && fechado && d && (d.mei.length > 0 || d.motoristas.length > 0) && (
             <Botao variante="ghost" className={css.btnSec} onClick={() => navegarRota(`/rh/prestadores?mes=${mes}&liberar=1`)}>Liberar para os prestadores</Botao>
           )}
@@ -331,6 +336,7 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
             : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}
         </div>
+        {importarHol && <ImportarHolerites aoFechar={() => setImportarHol(false)} />}
         {fechado && <p className={css.fechadoLinha}>Os números de {mesCurto(mes)} são o retrato do fechamento e não mudam mais. Nota fiscal e pagamento ainda podem ser registrados.</p>}
 
         {!soDebitos && <div className={css.abas} role="tablist" aria-label="Seções do fechamento">

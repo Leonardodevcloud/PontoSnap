@@ -56,6 +56,7 @@ import { ComMesPadrao } from './lib/mesPadrao';
 import { DocsAssinatura } from './rh/DocsAssinatura';
 import { Integracoes } from './rh/Integracoes';
 import { MeusDocumentos } from './telas/MeusDocumentos';
+import { MeusHolerites } from './telas/MeusHolerites';
 import { CentralAjuda } from './rh/ajuda/CentralAjuda';
 import { ArtigoPagina } from './rh/ajuda/ArtigoPagina';
 import { Assistente } from './rh/ajuda/Assistente';
@@ -140,6 +141,7 @@ export function App() {
         <Route path="avisos/:id" element={<Aviso />} />
         <Route path="documentos" element={<MeusDocumentos />} />
         <Route path="documentos/:id" element={<MeusDocumentos />} />
+        <Route path="holerites" element={<MeusHolerites />} />
       </Route>
       )}
 
