@@ -122,7 +122,12 @@ export function Prestadores() {
   const avisar = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 5000); };
   const ver: Ver = verParam === 'mei' || verParam === 'pagamentos' || verParam === 'motoristas' ? verParam
     : d && d.totais.motoristas === 0 && d.totais.mei > 0 ? 'mei' : 'motoristas';
-  const tipo: '' | 'MEI' | 'MOTORISTA' = ver === 'mei' ? 'MEI' : ver === 'motoristas' ? 'MOTORISTA' : '';
+  // Tipo "base" (Motoristas ou MEI) fica lembrado na URL para a aba Pagamentos respeitar o tipo ativo.
+  const tpParam = params.get('tp');
+  const tipoBase: 'MEI' | 'MOTORISTA' = tpParam === 'mei' ? 'MEI' : tpParam === 'motoristas' ? 'MOTORISTA'
+    : ver === 'mei' ? 'MEI' : ver === 'motoristas' ? 'MOTORISTA'
+    : d && d.totais.motoristas === 0 && d.totais.mei > 0 ? 'MEI' : 'MOTORISTA';
+  const tipo: '' | 'MEI' | 'MOTORISTA' = ver === 'mei' ? 'MEI' : ver === 'motoristas' ? 'MOTORISTA' : tipoBase;
   const doTipo = (l: LinhaRh) => !tipo || l.tipo === tipo;
   function irPasso(p: PassoEsteira) {
     if (p === 'FECHAR') {
@@ -188,15 +193,6 @@ export function Prestadores() {
           <Explica>MEI (por mês) e motoristas (por semana), na ordem do trabalho: fechar e enviar o valor para o app → o prestador manda a nota → o RH confere e aprova → o financeiro paga. Aprovar a nota é o que libera o pagamento. Lembrete automático às 9h para quem ainda não mandou a nota, até 7 dias depois do prazo.</Explica>
         </div>
         <div className={css.acoes}>
-          <div className={css.seg} role="group" aria-label="Visão">
-            {([['motoristas', 'Motoristas · semanal', t?.motoristas], ['mei', 'MEI · mensal', t?.mei],
-              ['pagamentos', 'Pagamentos', d ? d.linhas.flatMap((l) => l.unidades).filter((u) => !u.pago && (u.situacao === 'APROVADA' || u.situacao === 'RH')).length : undefined]] as [Ver, string, number | undefined][])
-              .map(([k, r, n]) => (
-                <button key={k} type="button" aria-pressed={ver === k} onClick={() => { mudar({ ver: k, semana: null }); setFiltro('TODOS'); setSel(new Set()); }}>
-                  {r}{n != null && <span className={css.segN}>{n}</span>}
-                </button>
-              ))}
-          </div>
           <span className={css.comp}>
             <button type="button" aria-label="Mês anterior" onClick={() => ir(somarMes(mes, -1))}>‹</button>
             <input type="month" aria-label="Competência" value={mes} onChange={(e) => e.target.value && ir(e.target.value)} />
@@ -205,17 +201,32 @@ export function Prestadores() {
           <button type="button" className={css.btnSec} onClick={() => navegar(`/rh/pessoal?mes=${mes}&novo=${tipo === 'MEI' ? 'MEI' : 'MOTORISTA'}`)}>Adicionar prestador</button>
         </div>
       </div>
-      <div className={css.subAcoes}>
-        <span className={css.txtMudo}>{d ? `${d.rotulo} · ${d.fechado ? `folha fechada em ${dataIsoBr(d.fechadoEm)}` : 'folha em aberto'}` : 'Carregando…'}</span>
+      <p className={css.statusMes}>{d ? `${d.rotulo} · ${d.fechado ? `folha fechada em ${dataIsoBr(d.fechadoEm)}` : 'folha em aberto'}` : 'Carregando…'}</p>
+      <div className={css.barraAbas}>
+        <div className={css.seg} role="group" aria-label="Visão">
+          {([['motoristas', 'Motoristas · semanal', t?.motoristas], ['mei', 'MEI · mensal', t?.mei],
+            ['pagamentos', 'Pagamentos', d ? d.linhas.flatMap((l) => l.unidades).filter((u) => !u.pago && (u.situacao === 'APROVADA' || u.situacao === 'RH')).length : undefined]] as [Ver, string, number | undefined][])
+            .map(([k, r, n]) => (
+              <button key={k} type="button" aria-pressed={ver === k}
+                onClick={() => { mudar(k === 'pagamentos' ? { ver: k, semana: null } : { ver: k, tp: k, semana: null }); setFiltro('TODOS'); setSel(new Set()); }}>
+                {r}{n != null && <span className={css.segN}>{n}</span>}
+              </button>
+            ))}
+        </div>
         <span className={css.esp} />
-        <Link className={css.lk} to="/rh/prestadores/modelos" title={semModelo && aviso !== 'MODELO' ? `${semModelo} sem modelo de nota` : undefined}>
-          Modelos de nota{semModelo > 0 && aviso !== 'MODELO' ? ` · ${semModelo} sem` : ''}
-        </Link>
-        <button type="button" className={css.lk} onClick={() => setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id))} disabled={!d || !t?.semAcesso}
-          title={t?.semAcesso ? `${t.semAcesso} sem acesso ao app` : 'Todos já têm acesso'}>
-          Dar acesso ao app{t?.semAcesso ? ` · ${t.semAcesso} sem` : ''}
-        </button>
         <button type="button" className={css.lk} disabled={!d || ocupado} onClick={() => zip()}>Baixar notas (ZIP)</button>
+        <details className={css.mais}>
+          <summary className={css.maisBtn}>Mais opções</summary>
+          <div className={css.maisMenu} role="menu">
+            <Link className={css.maisItem} role="menuitem" to="/rh/prestadores/modelos">
+              Modelos de nota{semModelo > 0 && aviso !== 'MODELO' ? ` · ${semModelo} sem` : ''}
+            </Link>
+            <button type="button" className={css.maisItem} role="menuitem" disabled={!d || !t?.semAcesso}
+              onClick={(e) => { (e.currentTarget.closest('details') as HTMLDetailsElement).open = false; setConvidar((d?.linhas ?? []).filter((l) => l.acesso.status !== 'ATIVO').map((l) => l.id)); }}>
+              Dar acesso ao app{t?.semAcesso ? ` · ${t.semAcesso} sem` : ''}
+            </button>
+          </div>
+        </details>
       </div>
       {erro && <p className={css.erro} role="alert">{erro}</p>}
       {msg && <p className={css.okMsg} role="status">{msg}</p>}
@@ -228,12 +239,12 @@ export function Prestadores() {
         </p>
       )}
 
-      {d && ver !== 'pagamentos' && <Esteira d={d} tipo={tipo === 'MEI' ? 'MEI' : 'MOTORISTA'} onPasso={irPasso} />}
+      {d && <Esteira d={d} tipo={tipoBase} onPasso={irPasso} />}
 
       {!d && !erro && <div className={css.vazio}><p>Carregando…</p></div>}
 
       {d && ver === 'pagamentos' && (
-        <Pagamentos d={d} ocupado={ocupado} semana={semanaPag} onLimparSemana={() => mudar({ semana: null })}
+        <Pagamentos d={d} ocupado={ocupado} semana={semanaPag} tipo={tipoBase} onLimparSemana={() => mudar({ semana: null })}
           onPagar={pagar} onPix={(l, u) => setPix({ l, u })} onAbrir={setAberto} onConferir={() => navegar('/rh/prestadores/conferir')} />
       )}
 

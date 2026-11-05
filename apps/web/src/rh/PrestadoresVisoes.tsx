@@ -72,13 +72,12 @@ export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPa
   abrirSemana?: string | null;
 }) {
   const mot = d.linhas.filter((l) => l.tipo === 'MOTORISTA');
-  const semanas = d.semanas.filter((s) => s.motoristas > 0);
+  // Semanas do fim do mês para o começo: a mais recente no topo.
+  const semanas = d.semanas.filter((s) => s.motoristas > 0).slice().sort((a, b) => b.inicio.localeCompare(a.inicio));
   const itensDe = (inicio: string): Item[] => mot.flatMap((l) => l.unidades.filter((u) => u.periodo === inicio).map((u) => ({ l, u })))
     .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR'));
-  // Abre sozinha a semana que mais pede atenção (conferir > pronta para fechar).
-  const inicial = semanas.find((s) => itensDe(s.inicio).some(({ u }) => u.situacao === 'CONFERIR'))?.inicio
-    ?? semanas.find((s) => s.encerrada && !s.liberada)?.inicio ?? null;
-  const [aberta, setAberta] = useState<string | null>(abrirSemana ?? inicial);
+  // Todas as semanas começam fechadas; só reabre a que acabou de ser ajustada ou enviada.
+  const [aberta, setAberta] = useState<string | null>(abrirSemana ?? null);
   useEffect(() => { if (abrirSemana) setAberta(abrirSemana); }, [abrirSemana]);
 
   if (semanas.length === 0) return <div className={css.vazio}><b>Nenhuma semana com motorista em {d.rotulo}</b><p>Cadastre motoristas pelo botão "Adicionar prestador".</p></div>;
@@ -216,11 +215,13 @@ export function SemanasMotoristas({ d, ocupado, onFecharEnviar, onConferir, onPa
  * Pagamentos (o financeiro): só o que foi aprovado (= autorizado a pagar),
  * MEI e motorista juntos, com a chave Pix e o QR. Marca vários como pagos.
  */
-export function Pagamentos({ d, ocupado, semana, onLimparSemana, onPagar, onPix, onAbrir, onConferir }: {
-  d: PainelRh; ocupado: boolean; semana: string | null; onLimparSemana: () => void;
+export function Pagamentos({ d, ocupado, semana, tipo, onLimparSemana, onPagar, onPix, onAbrir, onConferir }: {
+  d: PainelRh; ocupado: boolean; semana: string | null; tipo: '' | 'MEI' | 'MOTORISTA'; onLimparSemana: () => void;
   onPagar: (notaIds: string[]) => void; onPix: (l: LinhaRh, u: UnidadeRh) => void; onAbrir: (id: string) => void; onConferir: () => void;
 }) {
-  const todos = useMemo(() => d.linhas.flatMap((l) => l.unidades.map((u) => ({ l, u }))), [d]);
+  // Respeita o tipo ativo (Motoristas ou MEI) escolhido nas abas.
+  const todos = useMemo(() => d.linhas.filter((l) => !tipo || l.tipo === tipo).flatMap((l) => l.unidades.map((u) => ({ l, u }))), [d, tipo]);
+  const rotTipo = tipo === 'MEI' ? ' · MEI' : tipo === 'MOTORISTA' ? ' · motoristas' : '';
   const itens = todos.filter(({ u }) => autorizada(u) && (!semana || u.periodo === semana))
     .sort((a, b) => (a.u.nota?.conferidaEm ?? '9').localeCompare(b.u.nota?.conferidaEm ?? '9') || a.l.nome.localeCompare(b.l.nome, 'pt-BR'));
   const naoLib = todos.filter(({ u }) => !u.pago && (u.situacao === 'CONFERIR' || u.situacao === 'CONTESTOU'));
@@ -248,7 +249,7 @@ export function Pagamentos({ d, ocupado, semana, onLimparSemana, onPagar, onPix,
         </button>
       </div>
 
-      <div className={v.secT}><h3>Aprovadas · para pagar</h3><span>{plural(itens.length, 'pagamento', 'pagamentos')} · {brl(total)}</span><span className={css.esp} /><span className={css.txtMudo}>aprovação mais antiga primeiro</span></div>
+      <div className={v.secT}><h3>Aprovadas · para pagar{rotTipo}</h3><span>{plural(itens.length, 'pagamento', 'pagamentos')} · {brl(total)}</span><span className={css.esp} /><span className={css.txtMudo}>aprovação mais antiga primeiro</span></div>
       {itens.length === 0 ? (
         <div className={css.vazio}><b>Nada esperando pagamento</b><p>{naoLib.length ? `${plural(naoLib.length, 'nota chegou', 'notas chegaram')} e ${naoLib.length === 1 ? 'espera' : 'esperam'} a conferência do RH.` : 'Quando o RH aprovar uma nota, ela aparece aqui.'}</p></div>
       ) : (

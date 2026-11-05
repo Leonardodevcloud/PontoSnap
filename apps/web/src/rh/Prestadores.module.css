@@ -293,3 +293,22 @@
 /* Lista: cabeçalho de coluna numérica alinhado com os valores; selo de pago */
 .tabela th.r{ text-align:right; }
 .tagPago{ background:var(--ok-text); color:var(--white); font-weight:500; }
+
+/* Status do mês (abaixo do título) + barra de abas com ações recolhidas */
+.statusMes{ margin:6px 0 0; color:var(--ash); font-size:14px; }
+.barraAbas{ display:flex; align-items:center; gap:10px 12px; flex-wrap:wrap; margin-top:16px; }
+.barraAbas .seg button{ font-size:14px; padding:7px 14px; display:inline-flex; align-items:center; gap:7px; }
+.barraAbas .seg button:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+
+/* "Mais opções" — menu nativo via <details> */
+.mais{ position:relative; }
+.mais > summary{ list-style:none; display:inline-block; }
+.mais > summary::-webkit-details-marker{ display:none; }
+.maisBtn{ cursor:pointer; background:none; border:0; padding:6px 10px; font:inherit; font-size:14px; font-weight:500; color:var(--coral-dark); border-radius:8px; white-space:nowrap; }
+.maisBtn::after{ content:' \25BE'; font-size:11px; }
+.maisBtn:hover{ text-decoration:underline; }
+.mais[open] > .maisBtn{ background:var(--thead-bg); text-decoration:none; }
+.maisMenu{ position:absolute; right:0; top:calc(100% + 6px); z-index:30; min-width:220px; background:var(--white); border:1px solid rgba(var(--ink-rgb),.14); border-radius:12px; box-shadow:0 10px 30px rgba(var(--ink-rgb),.14); padding:6px; display:flex; flex-direction:column; }
+.maisItem{ text-align:left; background:none; border:0; padding:9px 12px; border-radius:8px; font:inherit; font-size:14px; color:var(--ink); cursor:pointer; text-decoration:none; white-space:nowrap; }
+.maisItem:hover:not(:disabled){ background:var(--thead-bg); }
+.maisItem:disabled{ opacity:.45; cursor:not-allowed; }
