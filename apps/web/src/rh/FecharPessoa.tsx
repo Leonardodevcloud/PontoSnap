@@ -80,7 +80,7 @@ export function FecharPessoa({ pessoa, mes, motivoInicial = 'DESLIGAMENTO', temA
     <ModalPessoa aberto onFechar={onFechar} compacto largura={940}
       foto={<Rosto id={pessoa.id} semente={pessoa.avatarSemente} tamanho={64} />}
       titulo={pessoa.nome}
-      meta={<><span className={css.passo}>Fechar só esta pessoa · {nomeMes(mes)}</span> · {mei ? 'MEI' : 'Motorista'}{pessoa.empresa ? ` · ${pessoa.empresa}` : ''}</>}
+      meta={<><span className={css.passo}>Fechar o mês dessa pessoa · {nomeMes(mes)}</span> · {mei ? 'MEI' : 'Motorista'}{pessoa.empresa ? ` · ${pessoa.empresa}` : ''}</>}
       rodape={<>
         <button type="button" className={css.btn2} onClick={onFechar}>Cancelar</button>
         <span className={css.esp} />
