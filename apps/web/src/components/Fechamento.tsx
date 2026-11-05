@@ -30,19 +30,25 @@ const hhmm = (m: number) => minutosParaHhMm(Math.abs(m));
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${hhmm(m)}`;
 
 export function Fechamento({ d }: { d: DadosFechamento }) {
-  const diferenca = d.trabalhadoMin - d.previstoMin;
-  const tolerancia = diferenca - d.saldoMin;
+  // O feriado trabalhado é pago à parte (verba própria 100%) — não entra na conta
+  // de trabalhado × previsto. Tiramos ele do trabalhado e do saldo para a
+  // "diferença" ser a EXTRA REAL (a que vai pra folha ou pro banco).
+  const feri = d.feriadoAParteMin;
+  const trabFora = d.trabalhadoMin - feri;
+  const diferenca = trabFora - d.previstoMin;
+  const saldoFora = d.saldoMin - feri;
+  const tolerancia = diferenca - saldoFora;
   // Horas extras do mês = tudo que passou, menos o feriado pago à parte (coluna Positivas do espelho).
-  const extrasMes = Math.max(0, d.extrasTotalMin - d.feriadoAParteMin);
+  const extrasMes = Math.max(0, d.extrasTotalMin - feri);
   // Hora extra "produtiva" (sem a indenização, que é verba à parte).
   const extraProd = Math.max(0, extrasMes - d.indenizMin);
 
   return (
     <section className={css.card} aria-label="Fechamento do mês">
       <div className={css.topo}>
-        <div><div className={css.rot}>Horas trabalhadas</div><div className={css.val}>{hhmm(d.trabalhadoMin)}</div></div>
+        <div><div className={css.rot}>Horas trabalhadas</div><div className={css.val}>{hhmm(trabFora)}</div>{feri > 0 && <div className={css.op}>fora o feriado ({hhmm(feri)} à parte)</div>}</div>
         <div><div className={css.rot}>Horas previstas</div><div className={css.val}>{hhmm(d.previstoMin)}</div></div>
-        <div className={css.destaque}><div className={css.rot}>Diferença</div><div className={css.val}>{comSinal(diferenca)}</div><div className={css.op}>trabalhado − previsto</div></div>
+        <div className={css.destaque}><div className={css.rot}>Diferença</div><div className={css.val}>{comSinal(diferenca)}</div><div className={css.op}>{feri > 0 ? 'a extra real (fora feriado)' : 'trabalhado − previsto'}</div></div>
       </div>
 
       <div className={`${css.secao} ${css.pos}`}>
@@ -84,14 +90,15 @@ export function Fechamento({ d }: { d: DadosFechamento }) {
 
       <div className={css.recon}>
         <div className={css.reconH}>Como os números se encaixam</div>
-        <div className={css.eq}><span className={css.q}>Saldo líquido (extras produtivas + feriado − atrasos)</span><span className={css.r}>{comSinal(d.saldoMin)}</span></div>
+        <div className={css.eq}><span className={css.q}>Saldo líquido (extras produtivas − atrasos)</span><span className={css.r}>{comSinal(saldoFora)}</span></div>
         {tolerancia !== 0 && (
           <div className={css.eq}><span className={css.q}>Tolerância Súmula 366 absorvida</span><span className={css.r}>{comSinal(tolerancia)}</span></div>
         )}
-        <div className={css.eq}><span className={css.q}><b>Trabalhado − previsto</b></span><span className={css.r}><b>{comSinal(diferenca)}</b></span></div>
+        <div className={css.eq}><span className={css.q}><b>{feri > 0 ? 'Diferença (fora feriado)' : 'Trabalhado − previsto'}</b></span><span className={css.r}><b>{comSinal(diferenca)}</b></span></div>
         <div className={css.nota}>
-          O feriado trabalhado é verba própria 100% (pago à parte na folha), por isso sai de "horas extras".
-          A indenização de intervalo é verba +50% e não entra no saldo. A tolerância da Súmula 366 (5min por batida, teto 10min/dia) absorve pequenos desvios — por isso "trabalhado − previsto" não é igual a "extras − atrasos" na conta simples.
+          {feri > 0 && <>O feriado trabalhado ({hhmm(feri)}) é verba própria 100%, paga à parte na folha — por isso fica fora do trabalhado e desta diferença. </>}
+          {d.indenizMin > 0 && <>A indenização de intervalo é verba +50% e não entra no saldo. </>}
+          A tolerância da Súmula 366 (5min por batida, teto 10min/dia) absorve pequenos desvios.
         </div>
       </div>
     </section>

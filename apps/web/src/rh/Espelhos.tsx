@@ -340,7 +340,7 @@ function MesFuncionario({ mes, empregadoId, nome, onVoltar, onDia, onErro }: {
                         if (faltou) tags.push(['falta', vt.pillErr]);
                         if (d.paresIncompletos) tags.push(['faltou bater', vt.pillErr]);
                         if (d.atrasoMin > 0) tags.push([`atraso ${minutosParaHhMm(d.atrasoMin)}`, vt.pillErr]);
-                        if (d.penalidadeIntervaloMin > 0) tags.push(['intervalo curto', vt.pillWarn]);
+                        if (d.penalidadeIntervaloMin > 0 && !d.ehDescansoDia) tags.push(['intervalo curto', vt.pillWarn]);
                         if (d.violacaoInterjornada) tags.push(['descanso < 11h', vt.pillWarn]);
                         if (compensado) tags.push([sem!.estado === 'FECHADA' ? 'compensado na semana' : 'semana em aberto', vt.pillMute, 'Dia sem batida coberto pelas horas da semana']);
                         if (sem?.estado === 'PROXIMO_MES' && !compensado && d.marcacoes.length > 0) tags.push(['fecha no mês seguinte', vt.pillMute]);

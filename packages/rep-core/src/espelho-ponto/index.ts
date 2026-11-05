@@ -62,6 +62,8 @@ export interface DadosEspelho {
      *   toleranciaSumula366= (trabalhado − previsto) − saldo líquido
      */
     diferenca?: string;
+    /** Horas trabalhadas sem o feriado pago à parte (base da diferença). */
+    trabalhadoForaFeriado?: string;
     extrasMes?: string;
     feriadoTrabalhado?: string;
     atrasos?: string;
@@ -332,9 +334,9 @@ export async function gerarEspelhoPontoPdfComCampos(d: DadosEspelho): Promise<{ 
     doc.font('Helvetica-Bold').fontSize(11).fillColor(cor).text(val, x, y + 33, { width: w });
   };
   const col = larguraUtil / 3;
-  celula(44, col - 20, 'Horas trabalhadas', T.trabalhado);
+  celula(44, col - 20, T.trabalhadoForaFeriado ? 'Horas trab. (fora feriado)' : 'Horas trabalhadas', T.trabalhadoForaFeriado ?? T.trabalhado);
   celula(44 + col, col - 20, 'Horas previstas', T.horasNormaisEsperadas);
-  celula(44 + col * 2, col - 20, 'Diferença (trab. - prev.)', T.diferenca ?? '0h00', CORAL);
+  celula(44 + col * 2, col - 20, 'Diferença (a extra real)', T.diferenca ?? '0h00', CORAL);
 
   // Faixa 2 — composição por natureza
   doc.moveTo(44, y + 52).lineTo(34 + larguraUtil - 10, y + 52).strokeColor(LINHA).lineWidth(0.4).stroke();
