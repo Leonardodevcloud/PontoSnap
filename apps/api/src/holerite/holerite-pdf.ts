@@ -21,19 +21,28 @@ export interface HoleriteBloco {
   nome: string | null;     // como veio no PDF
   competencia: string | null; // AAAA-MM
   liquidoCentavos: number | null;
+  brutoCentavos: number | null;
 }
+
+const centavos = (s: string | null | undefined) =>
+  s ? Math.round(parseFloat(s.replace(/\./g, '').replace(',', '.')) * 100) : null;
 
 function parsePagina(t: string, pagina: number) {
   const cpf = t.match(/(\d{3}\.\d{3}\.\d{3}-\d{2})/)?.[1] ?? null;
   const nome = t.match(/Empregado\s*\n?\s*(?:\d{4,6}\s+)?([A-ZÀ-Ú][A-ZÀ-Ú'.\s]{4,70}?)\s*(?:\n|Cargo|CPF)/)?.[1] ?? null;
   const comp = t.match(/Compet[êe]ncia\s*\n?\s*([A-Za-zçÇ]+)\s+de\s+(\d{4})/i);
   const liq = t.match(/L[íi]quido a Receber\s*\n?\s*([\d.]+,\d{2})/i)?.[1] ?? null;
+  // Bruto = "Total de Proventos". No PDF os dois rótulos (Proventos/Descontos)
+  // vêm juntos e os valores na linha seguinte (proventos primeiro).
+  const bruto = t.match(/Total de Proventos\s+Total de Descontos\s*\n?\s*([\d.]+,\d{2})/i)?.[1]
+    ?? t.match(/Total de Proventos[\s\S]{0,80}?([\d.]+,\d{2})/i)?.[1] ?? null;
   return {
     pagina,
     cpf: cpf ? soDigitos(cpf) : null,
     nome: nome ? nome.trim().replace(/\s+/g, ' ') : null,
     competencia: comp ? `${comp[2] ?? ''}-${MESES[normalizarNome(comp[1] ?? '').toLowerCase()] ?? '01'}` : null,
-    liquidoCentavos: liq ? Math.round(parseFloat(liq.replace(/\./g, '').replace(',', '.')) * 100) : null,
+    liquidoCentavos: centavos(liq),
+    brutoCentavos: centavos(bruto),
   };
 }
 
@@ -47,8 +56,14 @@ export async function lerHolerites(buf: Buffer): Promise<{ competencia: string |
   for (const p of paginas) {
     const ult = blocos[blocos.length - 1];
     // mesmo CPF em páginas seguidas = mesma pessoa (via/contravia, holerite de 2 páginas…)
-    if (ult && p.cpf && ult.cpf === p.cpf) { ult.paginas.push(p.pagina); continue; }
-    blocos.push({ paginas: [p.pagina], cpf: p.cpf, nome: p.nome, competencia: p.competencia, liquidoCentavos: p.liquidoCentavos });
+    if (ult && p.cpf && ult.cpf === p.cpf) {
+      ult.paginas.push(p.pagina);
+      // valores do holerite ficam na última página do bloco (totais)
+      if (p.liquidoCentavos != null) ult.liquidoCentavos = p.liquidoCentavos;
+      if (p.brutoCentavos != null) ult.brutoCentavos = p.brutoCentavos;
+      continue;
+    }
+    blocos.push({ paginas: [p.pagina], cpf: p.cpf, nome: p.nome, competencia: p.competencia, liquidoCentavos: p.liquidoCentavos, brutoCentavos: p.brutoCentavos });
   }
   const competencia = paginas.find((p) => p.competencia)?.competencia ?? null;
   return { competencia, totalPaginas: totalPages, blocos };

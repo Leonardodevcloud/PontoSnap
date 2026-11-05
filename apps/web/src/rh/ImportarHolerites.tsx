@@ -4,7 +4,7 @@ import css from './ImportarHolerites.module.css';
 
 type Status = 'CPF' | 'NOME' | 'NAO_ENCONTRADO';
 interface ItemPrevia {
-  paginas: number[]; cpf: string | null; nomePdf: string | null; liquidoCentavos: number | null;
+  paginas: number[]; cpf: string | null; nomePdf: string | null; liquidoCentavos: number | null; brutoCentavos: number | null;
   status: Status; empregadoId?: string; tenantId?: string; nomeCadastro?: string; empresa?: string;
 }
 interface Previa {
@@ -68,7 +68,7 @@ export function ImportarHolerites({ aoFechar }: { aoFechar: (enviou: boolean) =>
       const itens = previa.itens
         .map((it, i) => ({ it, emp: overrides[i] }))
         .filter((x) => x.emp)
-        .map((x) => ({ paginas: x.it.paginas, empregadoId: x.emp!, tenantId: tenantDe[x.emp!]!, liquidoCentavos: x.it.liquidoCentavos }));
+        .map((x) => ({ paginas: x.it.paginas, empregadoId: x.emp!, tenantId: tenantDe[x.emp!]!, liquidoCentavos: x.it.liquidoCentavos, brutoCentavos: x.it.brutoCentavos }));
       const r = await api.post<{ enviados: number }>('/holerites/confirmar', { arquivoBase64, competencia: previa.competencia, itens });
       setFeito(r.enviados);
     } catch (e) { setErro((e as Error).message); }

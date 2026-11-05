@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Get, Header, Param, Post, StreamableFile, UseGuards,
+  BadRequestException, Body, Controller, Get, Header, Param, Post, Put, Query, StreamableFile, UseGuards,
 } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { HoleriteService } from './holerite.service';
@@ -12,8 +12,9 @@ import type { PayloadAcesso } from '../auth/token';
 interface ImportarDto { arquivoBase64: string }
 interface ConfirmarDto {
   arquivoBase64: string; competencia: string;
-  itens: Array<{ paginas: number[]; empregadoId: string; tenantId: string; liquidoCentavos?: number | null }>;
+  itens: Array<{ paginas: number[]; empregadoId: string; tenantId: string; liquidoCentavos?: number | null; brutoCentavos?: number | null }>;
 }
+interface PagamentoDto { pago: boolean; valorPago?: number | null }
 
 @Controller('holerites')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,6 +45,21 @@ export class HoleriteController {
   async meus(@UsuarioAtual() u: PayloadAcesso) {
     const t = this.tenant(u);
     return this.holerites.meus(t, await this.holerites.empregadoDoUsuario(u.sub, t));
+  }
+
+  /** Mapa de bruto/líquido/pagamento do mês, para a Folha CLT. */
+  @Get('competencia')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  competencia(@UsuarioAtual() u: PayloadAcesso, @Query('comp') comp: string) {
+    return this.holerites.competencia(this.tenant(u), comp);
+  }
+
+  /** RH marca/desfaz o pagamento do líquido do holerite. */
+  @Put(':id/pagamento')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  pagamento(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: PagamentoDto) {
+    const valorCent = dto.valorPago != null ? Math.round(dto.valorPago * 100) : null;
+    return this.holerites.pagar(this.tenant(u), id, u.sub, !!dto.pago, valorCent);
   }
 
   /** Baixa o PDF. RH do cliente ou o dono. */

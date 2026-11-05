@@ -13,7 +13,7 @@ import { brCodePix, normalizarChave } from '../lib/pix';
 import { Botao } from '../components/Botao';
 import type {
   BaseDias, PessoaTipo, PessoalCompetencia, PessoalSemanaMot, PessoalDebito, PessoalHistorico, PessoalPessoaHistorico, PessoalNfArquivo, PessoalPagamentoMes, PessoalLinhaClt, PessoalLinhaMei, PessoalLinhaMot, PessoalPadrao, PessoalPessoa, VtTipo,
-  FechadoIndividual,
+  FechadoIndividual, HoleriteMes,
 } from '../tipos';
 import vt from './VisaoTodos.module.css';
 import { Avatar } from '../components/Avatar';
@@ -60,24 +60,6 @@ const resumoBen = (c: { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vt
   if (c.vtTipo === 'FIXO') p.push(`combustível ${brl(c.vtValorCent)}/mês`);
   return p.length ? p.join(' · ') : 'sem benefício';
 };
-/**
- * O que veio do ponto em R$, separado por natureza: hora extra paga, hora
- * extra que foi pro banco (não é paga) e indenização de intervalo (Art. 71
- * §4º — paga sempre, não é hora extra e não vai pro banco).
- */
-function textoExtras(l: PessoalLinhaClt): { valor: string | null; detalhe: string; soBanco: boolean } {
-  const fer = l.feriadoTrabMin ?? 0;
-  const pagasMin = Math.max(0, l.heMin - l.heNoBancoMin - fer);
-  const partes: string[] = [];
-  if (fer > 0) partes.push(`${minutosParaHhMm(fer)} feriado/domingo trabalhado`);
-  if (pagasMin > 0) partes.push(`${minutosParaHhMm(pagasMin)} extra paga`);
-  const acerto = l.bancoAcertoMin ?? 0;
-  if (l.heNoBancoMin > 0 && acerto <= 0) partes.push(`${minutosParaHhMm(l.heNoBancoMin)} no banco`);
-  if (acerto > 0) partes.push(`${minutosParaHhMm(acerto)} sobra do banco`);
-  if (l.indenizacaoCent > 0) partes.push(`intervalo ${brl(l.indenizacaoCent)}`);
-  return { valor: l.proventosCent > 0 ? brl(l.proventosCent) : null, detalhe: partes.join(' · '), soBanco: l.proventosCent === 0 && l.heNoBancoMin > 0 && acerto <= 0 };
-}
-
 /** Mesma conta do servidor (calcularMei), pra prévia ao vivo no painel. */
 function previaMei(valorCent: number, diasMes: number, l: { heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean }, debitosCent: number) {
   const dias = Math.max(1, diasMes);
@@ -132,6 +114,8 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
   const [toast, setToast] = useState<Toast>(null);
   const [busca, setBusca] = useState('');
   const [pix, setPix] = useState<PixAlvo | null>(null);
+  // Holerites do mês (bruto/líquido/pagamento), por empregadoId — ligados à Folha CLT.
+  const [holerites, setHolerites] = useState<Map<string, HoleriteMes>>(new Map());
   const [comoAberto, setComoAberto] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<'' | 'MEI' | 'MOTORISTA'>('');
   const ultimaAba = useRef<Aba>('folha');
@@ -141,7 +125,14 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
 
   const recarregar = useCallback(async () => {
     setCarregando(true); setErro(null);
-    try { setDados(await api.get<PessoalCompetencia>(`/pessoal/competencia?comp=${mes}`)); }
+    try {
+      const [dd, hol] = await Promise.all([
+        api.get<PessoalCompetencia>(`/pessoal/competencia?comp=${mes}`),
+        api.get<HoleriteMes[]>(`/holerites/competencia?comp=${mes}`).catch(() => [] as HoleriteMes[]),
+      ]);
+      setDados(dd);
+      setHolerites(new Map(hol.map((h) => [h.empregadoId, h])));
+    }
     catch (e) { setErro((e as Error).message); setDados(null); }
     finally { setCarregando(false); }
   }, [mes]);
@@ -176,7 +167,35 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
       }),
     }));
   }
+  /** Abre o PDF do holerite numa aba nova (busca com auth e serve como blob). */
+  async function verHolerite(id: string) {
+    const win = window.open('', '_blank');
+    try {
+      const blob = await api.baixar(`/holerites/${id}/arquivo`);
+      const url = URL.createObjectURL(blob);
+      if (win) win.location.href = url; else window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) { win?.close(); setErro((e as Error).message); }
+  }
+
+  /** Pagamento do líquido do holerite: muda a tela na hora e grava em segundo plano. */
+  function registrarPagamentoHolerite(r: Extract<PixRegistro, { pessoaTipo: 'CLT' }>, pago: boolean, valorCent: number | null) {
+    const antes = holerites.get(r.pessoaId);
+    setHolerites((m) => {
+      const n = new Map(m); const h = n.get(r.pessoaId);
+      if (h) n.set(r.pessoaId, { ...h, pagoEm: pago ? new Date().toISOString() : null, valorPagoCentavos: pago ? valorCent : null });
+      return n;
+    });
+    api.put(`/holerites/${r.holeriteId}/pagamento`, { pago, valorPago: pago && valorCent != null ? valorCent / 100 : null })
+      .catch((e) => {
+        setHolerites((m) => { const n = new Map(m); if (antes) n.set(r.pessoaId, antes); return n; });
+        setErro(`Não deu pra salvar o pagamento de ${r.nome}: ${(e as Error).message}`);
+      });
+    avisar(pago ? `${r.nome}: holerite pago ${brl(valorCent ?? 0)} às ${fmtHoraCurta(new Date().toISOString())}.` : `${r.nome}: pagamento do holerite desfeito.`);
+  }
+
   function registrarPagamento(r: PixRegistro, pago: boolean, valorCent: number | null, debitoCent?: number) {
+    if (r.pessoaTipo === 'CLT') { registrarPagamentoHolerite(r, pago, valorCent); return; }
     const antes = { pago: r.pago, valorPagoCent: r.valorPagoCent, pagoEm: r.pagoEm };
     const debAntes = r.debitoAplicadoCent;
     // Desfazer a semana devolve o débito que foi descontado nela para "pendente".
@@ -336,7 +355,7 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             ? (sessao?.perfil === 'ADMIN_CLIENTE' && <Botao variante="ghost" className={css.btnSec} onClick={reabrir}>Reabrir {mesCurto(mes)}</Botao>)
             : <Botao variante="coral" className={css.btnPri} disabled={!d} onClick={() => setDialogo({ tipo: 'fechar' })}>Fechar {mesCurto(mes)}</Botao>}
         </div>
-        {importarHol && <ImportarHolerites aoFechar={() => setImportarHol(false)} />}
+        {importarHol && <ImportarHolerites aoFechar={(enviou) => { setImportarHol(false); if (enviou) void recarregar(); }} />}
         {fechado && <p className={css.fechadoLinha}>Os números de {mesCurto(mes)} são o retrato do fechamento e não mudam mais. Nota fiscal e pagamento ainda podem ser registrados.</p>}
 
         {!soDebitos && <div className={css.abas} role="tablist" aria-label="Seções do fechamento">
@@ -386,7 +405,7 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
 
       {carregando && !d && <p className={css.carregando}>Calculando {mesLongo(mes)}…</p>}
 
-      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} debitos={d.debitos} mes={mes} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} onPix={setPix} />}
+      {d && aba === 'folha' && <TabelaFolha linhas={filtra(d.clt)} debitos={d.debitos} holerites={holerites} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} onPix={setPix} onVerHolerite={verHolerite} />}
       {d && aba === 'beneficios' && <TabelaBeneficios linhas={filtra(d.clt)} d={d} onAbrir={(id, el) => abrir({ tipo: 'clt', id }, el)} />}
       {d && aba === 'prestadores' && <TabelaPrestadores mei={filtroTipo === 'MOTORISTA' ? [] : filtra(d.mei)} mot={filtroTipo === 'MEI' ? [] : filtra(d.motoristas)} debitos={d.debitos}
         filtrado={!!filtroTipo || !!busca} onNovo={fechado ? undefined : () => ir({ novo: filtroTipo === 'MOTORISTA' ? 'MOTORISTA' : 'MEI' })}
@@ -429,7 +448,9 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
             : linhaMot ? ['Motorista', linhaMot.empresa, linhaMot.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex', mesLongo(mes)].filter(Boolean).join(' · ')
             : painel.tipo === 'padrao' ? 'Vale para todos os CLT sem valor próprio' : painel.tipo === 'debito' && painel.editar ? `${painel.editar.nome} · ${ROT_TIPO[painel.editar.pessoaTipo]}` : `Parcelado ou fixo mensal · a partir de ${mesCurto(mes)}`}>
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
-          {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} onSalvo={recarregar} onAviso={avisar}
+          {linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado} holerite={holerites.get(linhaClt.empregadoId)}
+            onSalvo={recarregar} onAviso={avisar} onVerHolerite={verHolerite}
+            onPix={() => setPix(pixClt(linhaClt, d.debitos, holerites.get(linhaClt.empregadoId)))}
             onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
           {linhaMei && <PainelMei key={linhaMei.id} aba={abaPainel} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas}
             onFecharPessoa={(motivo) => setFecharP({ tipo: 'MEI', id: linhaMei.id, motivo })} onReabrirPessoa={reabrirPessoa} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
@@ -485,8 +506,8 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
         </Dialogo>
       )}
 
-      {pix && d && <ModalPix key={`${pix.nome}`} alvo={atualizarAlvo(pix, d)} mes={mes} onFechar={() => setPix(null)}
-        onRegistrar={(r, pago, valor, deb) => registrarPagamento(r, pago, valor, deb)} />}
+      {pix && d && <ModalPix key={`${pix.nome}`} alvo={atualizarAlvo(pix, d, holerites)} mes={mes} onFechar={() => setPix(null)}
+        onRegistrar={(r, pago, valor, deb) => registrarPagamento(r, pago, valor, deb)} onVerHolerite={verHolerite} />}
       {verNf && <VisualizarNf arquivo={verNf.arquivo} titulo={verNf.titulo} onFechar={() => setVerNf(null)}
         onBaixar={async () => { try { salvarBlob(await api.baixar(`/pessoal/nf/${verNf.arquivo.id}`), verNf.arquivo.nome); } catch (e) { setErro((e as Error).message); } }} />}
 
@@ -513,42 +534,52 @@ function Linha({ onAbrir, children, rotulo }: { onAbrir: (el: HTMLElement) => vo
 }
 const Vazio = ({ cols, children }: { cols: number; children: ReactNode }) => <tr><td colSpan={cols} className={vt.vazio}>{children}</td></tr>;
 
-function TabelaFolha({ linhas, debitos, mes, onAbrir, onPix }: { linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; mes: string; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void }) {
-  const t = linhas.reduce((a, l) => ({ sal: a.sal + (l.salarioCent ?? 0), pr: a.pr + l.proventosCent, de: a.de + l.descontosCent, db: a.db + l.debitosCent, li: a.li + l.liquidoSalarioCent, br: a.br + l.custoBrutoCent }), { sal: 0, pr: 0, de: 0, db: 0, li: 0, br: 0 });
+function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite }: { linhas: PessoalLinhaClt[]; debitos: PessoalDebito[]; holerites: Map<string, HoleriteMes>; onAbrir: (id: string, el: HTMLElement) => void; onPix: (a: PixAlvo) => void; onVerHolerite: (id: string) => void }) {
+  const t = linhas.reduce((a, l) => {
+    const h = holerites.get(l.empregadoId);
+    return {
+      br: a.br + (h?.brutoCentavos ?? 0), vr: a.vr + l.beneficios.vrProxCent,
+      vt: a.vt + (l.config.vtTipo === 'NENHUM' ? 0 : l.beneficios.vtProxCent),
+      db: a.db + l.debitosCent, li: a.li + (h?.liquidoCentavos ?? 0),
+    };
+  }, { br: 0, vr: 0, vt: 0, db: 0, li: 0 });
   // Coluna Cliente só aparece se alguém tem cliente.
   const comCliente = linhas.some((l) => l.cliente);
   const cols = comCliente ? 9 : 8;
   return (
     <div className={vt.tab}><div className={vt.scroll}><table className={`${vt.table} ${css.compacta}`}>
-      <thead><tr><th>Colaborador</th>{comCliente && <th>Cliente</th>}<th className={vt.n}>Salário</th>
-        <th className={vt.n} title="Hora extra paga + indenização de intervalo. Hora extra de quem tem banco vai pro banco e não entra em R$.">Extras</th><th className={vt.n}>Faltas e atrasos</th><th className={vt.n}>Débitos</th><th className={vt.n} title="Simulação a partir do ponto, sem INSS, IRRF e encargos. O valor real vem da contabilidade.">Líquido (prévia)</th>
-        <th className={vt.n} title="Salário − descontos + extras + benefícios, sem tirar débitos">Custo bruto</th><th aria-label="Abrir" /></tr></thead>
+      <thead><tr><th>Colaborador</th>{comCliente && <th>Cliente</th>}
+        <th className={vt.n} title="Total de Proventos do holerite da contabilidade">Bruto</th>
+        <th className={vt.n} title="Vale-refeição/alimentação da carga do próximo mês">VR</th>
+        <th className={vt.n} title="Vale-transporte / combustível da carga do próximo mês">VT</th>
+        <th className={vt.n}>Débitos</th>
+        <th className={vt.n} title="Líquido a Receber do holerite — é o que o Pix paga. VR/VT e débitos são pagos por fora.">Líquido a pagar</th>
+        <th className={vt.n}>Holerite</th><th aria-label="Abrir" /></tr></thead>
       <tbody>
         {linhas.length === 0 && <Vazio cols={cols}>Nenhum funcionário ativo no ponto. Cadastre em <Link to="/rh/funcionarios">Funcionários</Link>.</Vazio>}
         {linhas.map((l) => {
-          // No máximo um alerta por linha.
+          const h = holerites.get(l.empregadoId);
           const alerta = l.salarioCent == null ? 'sem salário' : l.erro ? 'sem escala' : null;
-          const x = textoExtras(l);
           return (
             <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
-              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeLinha}><span className={css.nomeTxt} title={l.nome}>{l.nome}</span><BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos))} /></span>
+              <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeLinha}><span className={css.nomeTxt} title={l.nome}>{l.nome}</span><BotaoPix nome={l.nome} chave={l.config.chavePix} onPix={() => onPix(pixClt(l, debitos, h))} /></span>
                 {alerta ? <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro ?? undefined}>{alerta}</span> : <small>{l.config.cargo ?? 'CLT'}</small>}</td>
               {comCliente && <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>}
-              <td className={vt.n} title={l.diasMes ? `${brl(l.valorDiaMesCent)} por dia (÷ ${l.diasMes} dias de ${mesCurto(mes)})${l.salarioPartes.length > 1 ? ' · proporcional: ' + l.salarioPartes.map((p) => `${brl(p.salarioCent)} de ${fmtDia(p.desde)} a ${fmtDia(p.ate)}`).join(' · ') : ''}` : undefined}>
-                {l.salarioCent == null ? '—' : brl(l.salarioCent)}{l.salarioPartes.length > 1 && <small className={css.sub}>proporcional</small>}</td>
-              <td className={vt.n} title={x.valor ? x.detalhe : undefined}>{x.valor ? <span className={vt.pos}>{x.valor}</span>
-                : x.soBanco ? <span className={css.mute} title="Foram pro banco de horas: não são pagas nesta folha">{minutosParaHhMm(l.heNoBancoMin)} no banco</span> : '—'}</td>
-              <td className={vt.n} title={l.descontosCent > 0 ? (l.faltasDias.length ? `${l.faltasDias.length} falta${l.faltasDias.length > 1 ? 's' : ''} no ponto` : 'atrasos no ponto') : undefined}>
-                {l.descontosCent > 0 ? <span className={vt.neg}>{brl(-l.descontosCent)}</span> : '—'}</td>
-              <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : '—'}</td>
-              <td className={`${vt.n} ${css.forte}`}>{brl(l.liquidoSalarioCent)}</td>
-              <td className={vt.n}>{brl(l.custoBrutoCent)}</td>
+              <td className={vt.n}>{h?.brutoCentavos != null ? brl(h.brutoCentavos) : <span className={css.mute}>—</span>}</td>
+              <td className={vt.n}>{l.beneficios.vrProxCent ? brl(l.beneficios.vrProxCent) : <span className={css.mute}>—</span>}</td>
+              <td className={vt.n} title={l.config.vtTipo === 'FIXO' ? 'Combustível · valor fixo' : undefined}>{l.config.vtTipo === 'NENHUM' ? <span className={css.mute}>—</span> : brl(l.beneficios.vtProxCent)}</td>
+              <td className={vt.n}>{l.debitosCent ? <span className={vt.neg}>{brl(-l.debitosCent)}</span> : <span className={css.mute}>—</span>}</td>
+              <td className={`${vt.n} ${css.forte}`} title={h?.pagoEm ? `Pago${h.valorPagoCentavos != null ? ` ${brl(h.valorPagoCentavos)}` : ''} em ${fmtPagoEm(h.pagoEm)}` : undefined}>
+                {h?.liquidoCentavos != null ? <>{brl(h.liquidoCentavos)}{h.pagoEm && <small className={`${css.sub} ${vt.pos}`}>pago</small>}</> : <span className={css.mute}>—</span>}</td>
+              <td className={vt.n}>{h
+                ? <button type="button" className={css.link} onClick={(e) => { e.stopPropagation(); onVerHolerite(h.id); }} onKeyDown={(e) => e.stopPropagation()}>Ver</button>
+                : <span className={css.mute} title="Nenhum holerite importado para este mês">não enviado</span>}</td>
             </Linha>
           );
         })}
       </tbody>
-      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td>{comCliente && <td />}<td className={vt.n}>{brl(t.sal)}</td><td className={vt.n}>{brl(t.pr)}</td>
-        <td className={vt.n}>{brl(-t.de)}</td><td className={vt.n}>{brl(-t.db)}</td><td className={vt.n}>{brl(t.li)}</td><td className={vt.n}>{brl(t.br)}</td><td /></tr></tfoot>}
+      {linhas.length > 0 && <tfoot><tr className={vt.tot}><td>Total · {linhas.length}</td>{comCliente && <td />}<td className={vt.n}>{brl(t.br)}</td><td className={vt.n}>{brl(t.vr)}</td>
+        <td className={vt.n}>{brl(t.vt)}</td><td className={vt.n}>{t.db ? brl(-t.db) : '—'}</td><td className={vt.n}>{brl(t.li)}</td><td /><td /></tr></tfoot>}
     </table></div></div>
   );
 }
@@ -963,8 +994,10 @@ function PainelPadrao({ d, onSalvo }: { d: PessoalCompetencia; onSalvo: (msg: st
   );
 }
 
-function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
-  l: PessoalLinhaClt; d: PessoalCompetencia; mes: string; fechado: boolean; onSalvo: () => Promise<void>; onAviso: (m: string) => void; onTirar: () => void;
+function PainelClt({ l, d, mes, fechado, holerite, onSalvo, onAviso, onTirar, onVerHolerite, onPix }: {
+  l: PessoalLinhaClt; d: PessoalCompetencia; mes: string; fechado: boolean; holerite?: HoleriteMes;
+  onSalvo: () => Promise<void>; onAviso: (m: string) => void; onTirar: () => void;
+  onVerHolerite: (id: string) => void; onPix: () => void;
 }) {
   const inicial = () => ({
     modo: (l.config.origem === 'PROPRIO' ? 'PROPRIO' : 'PADRAO') as 'PADRAO' | 'PROPRIO',
@@ -996,6 +1029,26 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
     <>
       <div className={css.pCorpo}>
         {l.erro && <p className={css.alerta}>Sem números do ponto: {l.erro}. Confira a escala em Funcionários.</p>}
+
+        <section className={css.bloco}>
+          <span className={css.lb}>Holerite de {mesLongo(mes)}</span>
+          {holerite ? <>
+            {holerite.brutoCentavos != null && <Linha2 k="Bruto (Total de Proventos)" v={brl(holerite.brutoCentavos)} />}
+            <Linha2 k={`VR/VA · carga de ${mesCurto(d.proxima)}`} v={b.vrProxCent ? brl(b.vrProxCent) : '—'} />
+            <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível' : 'VT'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
+            <Linha2 k="Débitos" v={l.debitosCent ? brl(-l.debitosCent) : '—'} cls={l.debitosCent ? css.neg : ''} />
+            <Linha2 cls={css.total} k="Líquido a pagar (holerite)" v={holerite.liquidoCentavos != null ? brl(holerite.liquidoCentavos) : '—'} />
+            <p className={css.formula}>O Pix paga o <b>líquido do holerite</b>. VR/VT e débitos são pagos por fora.</p>
+            {holerite.pagoEm && <p className={css.formula}>Pago{holerite.valorPagoCentavos != null ? ` ${brl(holerite.valorPagoCentavos)}` : ''} em {fmtPagoEm(holerite.pagoEm)}.</p>}
+            <div className={css.grade2}>
+              <Botao variante="ghost" onClick={() => onVerHolerite(holerite.id)}>Ver holerite (PDF)</Botao>
+              <Botao variante="coral" disabled={!normalizarChave(l.config.chavePix ?? '') || holerite.liquidoCentavos == null} onClick={onPix}>
+                {holerite.pagoEm ? 'Pix · atualizar pagamento' : 'Pagar via Pix'}</Botao>
+            </div>
+            {!normalizarChave(l.config.chavePix ?? '') && <p className={css.formula}>Sem chave Pix válida no cadastro — preencha abaixo para liberar o pagamento.</p>}
+          </> : <p className={css.formula}>Nenhum holerite importado para {mesLongo(mes)}. Importe na Folha CLT → "Importar holerites". Enquanto isso, os valores abaixo são a prévia do ponto.</p>}
+        </section>
+
         <section className={css.bloco}>
           <span className={css.lb}>Valor do dia em {mesCurto(mes)}</span>
           <Linha2 cls={css.grande} k={`${l.diasMes} dias de trabalho`} v={l.salarioCent == null ? 'sem salário' : brl(l.valorDiaMesCent)} />
@@ -1761,12 +1814,15 @@ function FormPrestador({ tipoInicial, mes, empresas, onVoltar, onCriado }: { tip
 /** O que pode entrar no Pix (marcável) e o que sempre desconta. */
 type PixItem = { id: string; rotulo: string; detalhe?: string; cent: number; marcado: boolean; bloqueio?: string };
 type PixAbatimento = { rotulo: string; detalhe?: string; cent: number };
-/** Pagamento que dá pra registrar (MEI e motorista; CLT é prévia, sem registro). */
-/** Pagamento registrável. Motorista: `periodo` = semana paga (início YYYY-MM-DD). */
-type PixRegistro = { pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; nome: string; semanas: string[]; periodo?: string; debitoAplicadoCent?: number } & PessoalPagamentoMes;
+/** Pagamento registrável. Motorista: `periodo` = semana paga; CLT: `holeriteId` = holerite pago. */
+type PixRegistro =
+  | ({ pessoaTipo: 'MEI' | 'MOTORISTA'; pessoaId: string; nome: string; semanas: string[]; periodo?: string; debitoAplicadoCent?: number } & PessoalPagamentoMes)
+  | ({ pessoaTipo: 'CLT'; pessoaId: string; nome: string; holeriteId: string } & PessoalPagamentoMes);
 type PixAlvo = {
   origem: { tipo: 'CLT' | 'MEI' | 'MOTORISTA'; id: string; semana?: string };
   nome: string; chave: string; itens: PixItem[]; abatimentos: PixAbatimento[]; registro: PixRegistro | null; previa?: boolean;
+  /** CLT com holerite importado: abre o PDF a partir do modal de pagamento. */
+  holeriteId?: string;
   /** Motorista: título da semana e o débito pendente do mês que pode ser descontado nesta semana. */
   subtitulo?: string; debitoOpcional?: { cent: number; detalhe: string; sugerido: boolean };
 };
@@ -1821,7 +1877,18 @@ function pixSemana(l: PessoalLinhaMot, s: PessoalSemanaMot, debitos: PessoalDebi
       pago: s.pago, valorPagoCent: s.valorPagoCent, pagoEm: s.pagoEm },
   };
 }
-function pixClt(l: PessoalLinhaClt, debitos: PessoalDebito[]): PixAlvo {
+function pixClt(l: PessoalLinhaClt, debitos: PessoalDebito[], holerite?: HoleriteMes): PixAlvo {
+  // Com holerite importado, o Pix paga o LÍQUIDO do holerite (valor real da
+  // contabilidade) — VR/VT e débitos são pagos por fora, não entram aqui.
+  if (holerite && holerite.liquidoCentavos != null) {
+    return {
+      origem: { tipo: 'CLT', id: l.empregadoId }, nome: l.nome, chave: l.config.chavePix ?? '', holeriteId: holerite.id,
+      itens: [{ id: 'liq', rotulo: 'Líquido do holerite', detalhe: holerite.brutoCentavos != null ? `bruto ${brl(holerite.brutoCentavos)}` : undefined, cent: holerite.liquidoCentavos, marcado: true }],
+      abatimentos: [], previa: false,
+      registro: { pessoaTipo: 'CLT', pessoaId: l.empregadoId, nome: l.nome, holeriteId: holerite.id, pago: !!holerite.pagoEm, valorPagoCent: holerite.valorPagoCentavos, pagoEm: holerite.pagoEm },
+    };
+  }
+  // Sem holerite ainda: cai na prévia do ponto (claramente marcada como prévia).
   const itens: PixItem[] = [{ id: 'sal', rotulo: 'Salário do mês', detalhe: l.salarioPartes.length > 1 ? 'proporcional (mudou no mês)' : undefined, cent: l.salarioCent ?? 0, marcado: true }];
   if (l.proventosCent) itens.push({ id: 'ext', rotulo: 'Extras e intervalo', detalhe: 'pagos nesta folha', cent: l.proventosCent, marcado: true });
   const abatimentos: PixAbatimento[] = [];
@@ -1830,13 +1897,13 @@ function pixClt(l: PessoalLinhaClt, debitos: PessoalDebito[]): PixAlvo {
   return { origem: { tipo: 'CLT', id: l.empregadoId }, nome: l.nome, chave: l.config.chavePix ?? '', itens, abatimentos, registro: null, previa: true };
 }
 /** Refaz o alvo com os dados mais novos (ex.: depois de registrar o pagamento). */
-function atualizarAlvo(a: PixAlvo, d: PessoalCompetencia): PixAlvo {
+function atualizarAlvo(a: PixAlvo, d: PessoalCompetencia, holerites: Map<string, HoleriteMes>): PixAlvo {
   if (a.origem.tipo === 'MEI') { const l = d.mei.find((x) => x.id === a.origem.id); return l ? pixMei(l, d.debitos) : a; }
   if (a.origem.tipo === 'MOTORISTA') {
     const l = d.motoristas.find((x) => x.id === a.origem.id); const sm = l?.semanas.find((x) => x.inicio === a.origem.semana);
     return l && sm ? pixSemana(l, sm, d.debitos) : a;
   }
-  const l = d.clt.find((x) => x.empregadoId === a.origem.id); return l ? pixClt(l, d.debitos) : a;
+  const l = d.clt.find((x) => x.empregadoId === a.origem.id); return l ? pixClt(l, d.debitos, holerites.get(a.origem.id)) : a;
 }
 
 const ROT_CHAVE = { CPF: 'CPF', CNPJ: 'CNPJ', TELEFONE: 'celular', EMAIL: 'e-mail', ALEATORIA: 'chave aleatória' } as const;
@@ -1855,8 +1922,9 @@ function BotaoPix({ nome, chave, onPix }: { nome: string; chave: string | null; 
   );
 }
 
-function ModalPix({ alvo, mes, onFechar, onRegistrar }: {
+function ModalPix({ alvo, mes, onFechar, onRegistrar, onVerHolerite }: {
   alvo: PixAlvo; mes: string; onFechar: () => void; onRegistrar: (r: PixRegistro, pago: boolean, valorCent: number | null, debitoCent?: number) => void;
+  onVerHolerite?: (id: string) => void;
 }) {
   const [usarDebito, setUsarDebito] = useState(!!alvo.debitoOpcional?.sugerido);
   const norm = normalizarChave(alvo.chave)!;
@@ -1896,7 +1964,8 @@ function ModalPix({ alvo, mes, onFechar, onRegistrar }: {
       <div className={`${css.dialogo} ${css.pixModal}`} role="dialog" aria-modal="true" aria-labelledby="pix-titulo" onClick={(e) => e.stopPropagation()}>
         <div className={css.pixTopo}>
           <div><h3 id="pix-titulo">Pagar {alvo.nome}</h3>
-            <p className={css.hint}>{alvo.subtitulo ? `${alvo.subtitulo} · ` : ''}Pix ({ROT_CHAVE[norm.tipo]}) <b className={css.mono}>{norm.tipo === 'CPF' || norm.tipo === 'CNPJ' ? mascaraDoc(norm.chave) : norm.chave}</b>{alvo.subtitulo ? '' : ` · ${mesLongo(mes)}`}</p></div>
+            <p className={css.hint}>{alvo.subtitulo ? `${alvo.subtitulo} · ` : ''}Pix ({ROT_CHAVE[norm.tipo]}) <b className={css.mono}>{norm.tipo === 'CPF' || norm.tipo === 'CNPJ' ? mascaraDoc(norm.chave) : norm.chave}</b>{alvo.subtitulo ? '' : ` · ${mesLongo(mes)}`}</p>
+            {alvo.holeriteId && onVerHolerite && <button type="button" className={css.link} onClick={() => onVerHolerite(alvo.holeriteId!)}>Ver holerite (PDF) ↗</button>}</div>
           <button ref={fechar} className={css.pX} onClick={onFechar} aria-label="Fechar">✕</button>
         </div>
         {r?.pago && (
@@ -2609,6 +2678,7 @@ export function PixPrestador({ mes, tipo, id, semana, onFechar, onPago }: {
     </Dialogo>;
   }
   return <ModalPix alvo={alvo} mes={mes} onFechar={onFechar} onRegistrar={async (r, pago, valorCent, debitoCent) => {
+    if (r.pessoaTipo === 'CLT') return; // este fluxo é só prestador (MEI/motorista)
     try {
       await api.put('/pessoal/pagamento', {
         pessoaTipo: r.pessoaTipo, pessoaId: r.pessoaId, competencia: mes, semanas: r.semanas, periodo: r.periodo,

@@ -16,6 +16,7 @@ export interface BlocoPrevia {
   cpf: string | null;
   nomePdf: string | null;
   liquidoCentavos: number | null;
+  brutoCentavos: number | null;
   status: StatusMatch;
   empregadoId?: string;
   tenantId?: string;
@@ -27,7 +28,9 @@ export interface BlocoPrevia {
 const CAMPOS = {
   id: pontoHolerite.id, empregadoId: pontoHolerite.empregadoId, competencia: pontoHolerite.competencia,
   arquivoNome: pontoHolerite.arquivoNome, arquivoBytes: pontoHolerite.arquivoBytes,
-  liquidoCentavos: pontoHolerite.liquidoCentavos, enviadoEm: pontoHolerite.enviadoEm,
+  liquidoCentavos: pontoHolerite.liquidoCentavos, brutoCentavos: pontoHolerite.brutoCentavos,
+  pagoEm: pontoHolerite.pagoEm, valorPagoCentavos: pontoHolerite.valorPagoCentavos,
+  enviadoEm: pontoHolerite.enviadoEm,
 };
 
 @Injectable()
@@ -95,7 +98,7 @@ export class HoleriteService {
       if (alvo && usados.has(alvo.id)) { alvo = undefined; status = 'NAO_ENCONTRADO'; }
       if (alvo) usados.add(alvo.id);
       return {
-        paginas: b.paginas, cpf: b.cpf, nomePdf: b.nome, liquidoCentavos: b.liquidoCentavos, status,
+        paginas: b.paginas, cpf: b.cpf, nomePdf: b.nome, liquidoCentavos: b.liquidoCentavos, brutoCentavos: b.brutoCentavos, status,
         ...(alvo && { empregadoId: alvo.id, tenantId: alvo.tenantId, nomeCadastro: alvo.nome, empresa: alvo.razao }),
       };
     });
@@ -114,7 +117,7 @@ export class HoleriteService {
    */
   async confirmar(tenantAtual: string, usuarioId: string, p: {
     arquivoBase64: string; competencia: string;
-    itens: Array<{ paginas: number[]; empregadoId: string; tenantId: string; liquidoCentavos?: number | null }>;
+    itens: Array<{ paginas: number[]; empregadoId: string; tenantId: string; liquidoCentavos?: number | null; brutoCentavos?: number | null }>;
   }) {
     if (!/^\d{4}-\d{2}$/.test(p.competencia)) throw new BadRequestException('Competência inválida (use AAAA-MM)');
     const buf = this.pdfDoBase64(p.arquivoBase64);
@@ -131,12 +134,15 @@ export class HoleriteService {
         tx.insert(pontoHolerite).values({
           tenantId: item.tenantId, empregadoId: item.empregadoId, competencia: p.competencia,
           arquivo: cifrado, arquivoNome: `holerite-${p.competencia}.pdf`, arquivoBytes: bytes.length,
-          liquidoCentavos: item.liquidoCentavos ?? null, enviadoPor: usuarioId,
+          liquidoCentavos: item.liquidoCentavos ?? null, brutoCentavos: item.brutoCentavos ?? null, enviadoPor: usuarioId,
         }).onConflictDoUpdate({
           target: [pontoHolerite.tenantId, pontoHolerite.empregadoId, pontoHolerite.competencia],
           set: {
             arquivo: cifrado, arquivoNome: `holerite-${p.competencia}.pdf`, arquivoBytes: bytes.length,
-            liquidoCentavos: item.liquidoCentavos ?? null, enviadoEm: new Date(), enviadoPor: usuarioId,
+            liquidoCentavos: item.liquidoCentavos ?? null, brutoCentavos: item.brutoCentavos ?? null,
+            // reimportar substitui o arquivo e zera o pagamento anterior (holerite trocou)
+            pagoEm: null, pagoPor: null, valorPagoCentavos: null,
+            enviadoEm: new Date(), enviadoPor: usuarioId,
           },
         }));
       enviados++;
@@ -168,6 +174,36 @@ export class HoleriteService {
       tx.select(CAMPOS).from(pontoHolerite)
         .where(and(eq(pontoHolerite.tenantId, tenantId), eq(pontoHolerite.empregadoId, empregadoId)))
         .orderBy(desc(pontoHolerite.competencia)));
+  }
+
+  /**
+   * Mapa dos holerites de um mês (sem arquivo) para a Folha CLT: bruto, líquido
+   * e pagamento, por empregado. Só a empresa atual (a folha é por tenant).
+   */
+  async competencia(tenantId: string, comp: string) {
+    if (!/^\d{4}-\d{2}$/.test(comp)) throw new BadRequestException('Competência inválida (use AAAA-MM)');
+    return comTenant(this.db, tenantId, (tx) =>
+      tx.select({
+        id: pontoHolerite.id, empregadoId: pontoHolerite.empregadoId,
+        brutoCentavos: pontoHolerite.brutoCentavos, liquidoCentavos: pontoHolerite.liquidoCentavos,
+        pagoEm: pontoHolerite.pagoEm, valorPagoCentavos: pontoHolerite.valorPagoCentavos,
+      }).from(pontoHolerite)
+        .where(and(eq(pontoHolerite.tenantId, tenantId), eq(pontoHolerite.competencia, comp))));
+  }
+
+  /** RH marca (ou desfaz) o pagamento do líquido do holerite. */
+  async pagar(tenantId: string, id: string, usuarioId: string, pago: boolean, valorPagoCent: number | null) {
+    return comTenant(this.db, tenantId, async (tx) => {
+      const h = (await tx.select({ id: pontoHolerite.id }).from(pontoHolerite)
+        .where(and(eq(pontoHolerite.id, id), eq(pontoHolerite.tenantId, tenantId))).limit(1))[0];
+      if (!h) throw new NotFoundException('Holerite não encontrado');
+      const dados = pago
+        ? { pagoEm: new Date(), pagoPor: usuarioId, valorPagoCentavos: valorPagoCent ?? null }
+        : { pagoEm: null, pagoPor: null, valorPagoCentavos: null };
+      await tx.update(pontoHolerite).set(dados)
+        .where(and(eq(pontoHolerite.id, id), eq(pontoHolerite.tenantId, tenantId)));
+      return { pago, pagoEm: dados.pagoEm ? dados.pagoEm.toISOString() : null, valorPagoCentavos: dados.valorPagoCentavos };
+    });
   }
 
   /** Baixa o PDF. Só o RH do cliente e o dono. */

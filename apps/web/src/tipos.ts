@@ -823,6 +823,12 @@ export interface PessoalCompetencia {
   padroes: PessoalPadrao[];
 }
 export interface PessoalPadrao { vigenteDesde: string; vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number }
+/** Holerite do mês (recibo da contabilidade) ligado à Folha CLT, por empregado. */
+export interface HoleriteMes {
+  empregadoId: string; id: string;
+  brutoCentavos: number | null; liquidoCentavos: number | null;
+  pagoEm: string | null; valorPagoCentavos: number | null;
+}
 export interface PessoalPessoa { pessoaTipo: PessoaTipo; pessoaId: string; nome: string }
 
 /** Histórico de uma pessoa na Gestão de pessoal (um item por mês, mais recente primeiro). */

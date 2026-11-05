@@ -30,8 +30,14 @@ export const pontoHolerite = pgTable('ponto_holerite', {
   arquivoBytes: integer('arquivo_bytes').notNull(),
   /** Líquido a receber lido do holerite, em centavos. Só exibição; nulo se não leu. */
   liquidoCentavos: integer('liquido_centavos'),
+  /** Total de Proventos (bruto) lido do holerite, em centavos. Só exibição; nulo se não leu. */
+  brutoCentavos: integer('bruto_centavos'),
   enviadoEm: timestamp('enviado_em', { withTimezone: true }).notNull().defaultNow(),
   enviadoPor: uuid('enviado_por').references(() => usuario.id),
+  /** Pagamento do líquido via Pix (RH marca pago). Nulo = ainda não pago. */
+  pagoEm: timestamp('pago_em', { withTimezone: true }),
+  pagoPor: uuid('pago_por').references(() => usuario.id),
+  valorPagoCentavos: integer('valor_pago_centavos'),
 }, (t) => ({
   uq: unique('uq_holerite_comp').on(t.tenantId, t.empregadoId, t.competencia),
   porEmpregado: index('idx_holerite_empregado').on(t.tenantId, t.empregadoId, t.competencia),
