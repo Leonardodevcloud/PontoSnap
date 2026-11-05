@@ -12,5 +12,16 @@
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5,
     "numReplicas": 1
-  }
+  },
+  "watchPatterns": [
+    "apps/api/**",
+    "packages/**",
+    "Dockerfile",
+    "railway.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    "tsconfig.base.json",
+    "tsconfig.build.json",
+    "turbo.json"
+  ]
 }

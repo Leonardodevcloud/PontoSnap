@@ -1,3 +1,7 @@
+// Build de produção (pnpm build:api) compila apps/api + todos os packages/*.
+// Para o Railway reconstruir quando o motor (packages/*) muda, ver watchPatterns
+// em railway.json — sem isso, commits só de packages ficam como "No changes to
+// watched files" e não sobem.
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
