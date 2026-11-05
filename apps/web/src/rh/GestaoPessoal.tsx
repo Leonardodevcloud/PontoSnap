@@ -1124,7 +1124,6 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
   useEffect(() => { setF(inicial()); }, [l.config]);
   const ini = inicial();
   const mudou = JSON.stringify({ ...f, vig: '' }) !== JSON.stringify({ ...ini, vig: '' });
-  const b = l.beneficios;
   async function salvar() {
     setSalvando(true); setErro(null);
     try {
@@ -1143,73 +1142,10 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
     <>
       <div className={css.pCorpo}>
         {l.erro && <p className={css.alerta}>Sem números do ponto: {l.erro}. Confira a escala em Funcionários.</p>}
-        <section className={css.bloco}>
-          <span className={css.lb}>Valor do dia em {mesCurto(mes)}</span>
-          <Linha2 cls={css.grande} k={`${l.diasMes} dias de trabalho`} v={l.salarioCent == null ? 'sem salário' : brl(l.valorDiaMesCent)} />
-          <p className={css.formula}>{l.salarioCent == null ? 'Sem salário no cadastro.' : `${brl(l.salarioCent)} ÷ ${l.diasMes} (dias da escala neste mês, sem os feriados cadastrados)`}</p>
-          {l.salarioPartes.length > 1 && (
-            <div className={css.historico}>
-              <span className={css.lb}>Salário mudou neste mês — proporcional</span>
-              {l.salarioPartes.map((p) => (
-                <Linha2 key={p.desde} k={<span className={css.mute}>{fmtDia(p.desde)} a {fmtDia(p.ate)} · {brl(p.salarioCent)}</span>} v={brl(p.valorCent)} />
-              ))}
-              <p className={css.formula}>Base de 30 dias. Extras e faltas de cada dia usam o salário daquele dia.</p>
-            </div>
-          )}
-          <Linha2 k={<span className={css.mute}>Base do desconto de falta (÷ 30)</span>} v={brl(l.valorDia30Cent)} />
-          <Linha2 k={<span className={css.mute}>Valor-hora (÷ 220)</span>} v={brl(l.valorHoraCent)} />
-          <Link className={css.link} to="/rh/funcionarios">O salário vem de Funcionários — editar lá</Link>
-        </section>
+        <p className={css.formula}>Só a configuração desta pessoa. Os valores que ela recebe (contracheque, prévia, benefícios carregados) ficam no detalhamento, na aba Salários.</p>
 
         <section className={css.bloco}>
-          <span className={css.lb}>Do ponto</span>
-          {(l.feriadoTrabMin ?? 0) > 0 && <Linha2 k={`Feriado/domingo trabalhado · ${minutosParaHhMm(l.feriadoTrabMin!)} (100%)`} v={brl(l.feriadoTrabCent ?? 0)} />}
-          {(() => {
-            // Hora extra comum: sem o feriado/domingo trabalhado, que é verba própria (linha acima).
-            const fer = l.feriadoTrabMin ?? 0, ferCent = l.feriadoTrabCent ?? 0;
-            const heMin = Math.max(0, l.heMin - fer);
-            const v = heMin === 0 && !(l.bancoAcertoMin! > 0) ? '—'
-              : l.heNoBancoMin >= heMin && !(l.bancoAcertoMin! > 0) ? `${minutosParaHhMm(heMin)} · no banco`
-              : brl(Math.max(0, l.proventosCent - l.indenizacaoCent - ferCent));
-            return fer > 0 && v === '—' ? null : <Linha2 k="Horas extras" v={v} />;
-          })()}
-          {l.heNoBancoMin > 0 && !l.bancoAcertoMin && !l.bancoPassaMin && <p className={css.formula}>{minutosParaHhMm(l.heNoBancoMin)} foram pro banco de horas — não são pagas nesta folha.</p>}
-          {(l.bancoAcertoMin ?? 0) > 0 && <>
-            <Linha2 k="Sobra do banco paga como extra" v={brl(l.bancoAcertoCent ?? 0)} />
-            <p className={css.formula}>Banco que compensa no mês: extras e atrasos se compensaram e sobraram {minutosParaHhMm(l.bancoAcertoMin!)}, pagas com adicional e reflexo no DSR (já dentro de “Horas extras”).</p>
-          </>}
-          {(l.bancoAcertoMin ?? 0) < 0 && <>
-            <Linha2 k="Banco fechou devendo" v={brl(l.bancoAcertoCent ?? 0)} cls={css.neg} />
-            <p className={css.formula}>Faltaram {minutosParaHhMm(-l.bancoAcertoMin!)} no mês: descontadas pela hora, sem adicional (já dentro de “Descontos”).</p>
-          </>}
-          {(l.bancoPassaMin ?? 0) < 0 && <p className={css.formula}>Fechou devendo {minutosParaHhMm(-l.bancoPassaMin!)}: pela regra do perfil, passa para o mês seguinte (não desconta agora).</p>}
-          {l.indenizacaoCent > 0 && <>
-            <Linha2 k="Indenização de intervalo (Art. 71)" v={brl(l.indenizacaoCent)} />
-            <p className={css.formula}>{minutosParaHhMm(l.indenizacaoMin)} de almoço abaixo do mínimo legal, pagos com 50%. Não é hora extra: é indenização obrigatória e não pode ir pro banco. Os dias aparecem com "intervalo curto" na apuração.</p>
-          </>}
-          <Linha2 k="Faltas" v={l.faltasDias.length ? l.faltasDias.map(fmtDia).join(', ') : '—'} cls={l.faltasDias.length ? css.neg : ''} />
-          <Linha2 k="Descontos (falta, atraso, DSR)" v={l.descontosCent ? brl(-l.descontosCent) : '—'} cls={l.descontosCent ? css.neg : ''} />
-          <Link className={css.link} to={`/rh/apuracao?emp=${l.empregadoId}&mes=${mes}`}>Abrir apuração do ponto</Link>
-        </section>
-
-        <section className={css.bloco}>
-          <span className={css.lb}>Benefícios · carga de {mesCurto(d.proxima)}</span>
-          <Linha2 k={`VR/VA · ${b.diasProxVr ?? b.diasProx} dias`} v={brl(b.vrProxCent)} />
-          {b.diasProxVr != null && b.diasProxVr !== b.diasProx && <p className={css.formula}>{b.diasProx - b.diasProxVr} sábado{b.diasProx - b.diasProxVr > 1 ? 's' : ''} de meio turno: recebe VT, mas não VR/VA.</p>}
-          <Linha2 k={`Cesta básica de ${mesCurto(mes)}`} v={<StatusCesta l={l} />} />
-          {b.cestaStatus === 'PERDIDA_FALTA' && <p className={css.formula}>Faltou em {l.faltasDias.map(fmtDia).join(', ')} — com falta no mês a cesta não é paga.</p>}
-          <Linha2 k={l.config.vtTipo === 'FIXO' ? 'Combustível · fixo mensal' : l.config.vtTipo === 'DIA' ? `VT · ${b.diasProxVt ?? b.diasProx} dias` : 'Transporte'} v={l.config.vtTipo === 'NENHUM' ? '—' : brl(b.vtProxCent)} />
-          {l.config.vtTipo === 'DIA' && b.diasProxVt != null && b.diasProxVt !== b.diasProx && <p className={css.formula}>{b.diasProx - b.diasProxVt} dia{b.diasProx - b.diasProxVt > 1 ? 's' : ''} em home office ({nomesDias(l.config.vtSemDias ?? [])}): sem VT.</p>}
-          <Linha2 k={`Acerto de ${mesCurto(mes)}`} v={b.acertoCent ? brl(-b.acertoCent) : '—'} cls={b.acertoCent ? css.neg : ''} />
-          {b.naoUsados.length > 0 && <p className={css.formula}>{b.naoUsados.map((x) => `${fmtDia(x.data)} ${ROT_MOTIVO[x.motivo]}`).join(' · ')} — {b.acertoCent
-            ? `devolvido pelo valor que foi pago em ${mesCurto(mes)}`
-            : `nenhum valor registrado como pago em ${mesCurto(mes)}, nada a devolver`}</p>}
-          {b.pagosEstimado && <p className={css.formula}>Dias pagos em {mesCurto(mes)} estimados pela escala (mês anterior não fechado no sistema).</p>}
-          <Linha2 cls={css.total} k="A carregar" v={brl(b.cargaCent)} />
-        </section>
-
-        <section className={css.bloco}>
-          <span className={css.lb}>Valores de benefício</span>
+          <span className={css.lb}>Benefícios</span>
           <p className={css.formula}>Hoje: {l.config.origem === 'PROPRIO' ? 'valor próprio' : l.config.origem === 'PADRAO' ? 'padrão da empresa' : 'sem benefício'}{l.config.vigenteDesde ? ` desde ${mesLongo(l.config.vigenteDesde)}` : ''} · {resumoBen(l.config)}</p>
           <Alternar<'PADRAO' | 'PROPRIO'> rotulo="De onde vem o valor" valor={f.modo} disabled={fechado} onChange={(v) => setF({ ...f, modo: v })}
             opcoes={[['PADRAO', d.padrao ? 'Padrão da empresa' : 'Padrão da empresa (não definido)'], ['PROPRIO', 'Valor próprio']]} />
@@ -1239,15 +1175,6 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
         <ClienteClt l={l} clientes={[...new Set(d.clt.map((x) => x.cliente).filter((x): x is string => !!x))].sort()} onSalvo={onSalvo} onAviso={onAviso} />
         <Admissao l={l} onSalvo={onSalvo} onAviso={onAviso} />
         <InicioCesta l={l} fechado={fechado} onSalvo={onSalvo} onAviso={onAviso} />
-
-        <section className={css.bloco}>
-          <span className={css.lb}>Resumo</span>
-          <Linha2 k="Líquido do salário (prévia)" v={brl(l.liquidoSalarioCent)} />
-          <Linha2 k="Débitos descontados" v={l.debitosCent ? brl(-l.debitosCent) : '—'} />
-          <Linha2 cls={css.total} k="Custo bruto da empresa" v={brl(l.custoBrutoCent)} />
-          <p className={css.formula}>O custo bruto não tira débitos nem acertos: esse dinheiro já tinha saído antes.</p>
-          <p className={css.formula}><b>Prévia:</b> sem INSS, IRRF e encargos. O valor real de pagamento é o que a contabilidade informar.</p>
-        </section>
 
         <Observacao pessoaTipo="CLT" pessoaId={l.empregadoId} mes={mes} inicial={l.observacao} disabled={fechado} />
         {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}

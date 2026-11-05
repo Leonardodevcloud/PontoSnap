@@ -12,5 +12,6 @@ import { AssinaturaMeusController, AssinaturaRhController, AutentiqueWebhookCont
   imports: [AuthModule, TratamentoModule, NotificacaoModule],
   controllers: [AssinaturaMeusController, AssinaturaRhController, AutentiqueWebhookController],
   providers: [AssinaturaService, AssinaturaCronService, CriptoService],
+  exports: [AssinaturaService],
 })
 export class AssinaturaModule {}

@@ -4,6 +4,7 @@ import { pontoHolerite, empregado, usuario, usuarioTenant, tenant, comTenant, co
 import { DB } from '../database/database.module';
 import { CriptoService } from '../common/cripto.service';
 import { PushService } from '../notificacao/push.service';
+import { AssinaturaService } from '../assinatura/assinatura.service';
 import { lerHolerites, recortar, normalizarNome } from './holerite-pdf';
 
 /** 11 MB cobre um PDF de centenas de holerites e cabe no limite de body (16mb) já em base64. */
@@ -39,6 +40,7 @@ export class HoleriteService {
     @Inject(DB) private readonly db: Db,
     private readonly cripto: CriptoService,
     private readonly push: PushService,
+    private readonly assinaturas: AssinaturaService,
   ) {}
 
   async empregadoDoUsuario(usuarioId: string, tenantId: string): Promise<string> {
@@ -147,8 +149,23 @@ export class HoleriteService {
         }));
       enviados++;
       void this.avisar(item.tenantId, item.empregadoId, p.competencia);
+      // Alimenta as Assinaturas (Autentique): o contracheque vira documento pra
+      // assinar, sem subir o PDF de novo lá. Best-effort e sequencial — nunca
+      // derruba a importação; pula quem já tem o contracheque assinado.
+      await this.alimentarAssinatura(item.tenantId, item.empregadoId, p.competencia, bytes);
     }
     return { enviados };
+  }
+
+  /** Cria/atualiza o documento de contracheque nas Assinaturas. Best-effort. */
+  private async alimentarAssinatura(tenantId: string, empregadoId: string, competencia: string, bytes: Buffer) {
+    try {
+      await this.assinaturas.salvarContracheque(tenantId, {
+        competencia, empregadoId, bytes, arquivoNome: `contracheque-${competencia}.pdf`,
+      });
+    } catch {
+      // já assinado (não sobrescreve) ou Autentique indisponível: segue a importação
+    }
   }
 
   /** Aviso no app (push), best-effort — nunca derruba o envio. */

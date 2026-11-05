@@ -193,7 +193,7 @@ export function DocsAssinatura() {
           <div className={css.titulo}>
             <h2>Assinaturas</h2>
             <Explica>
-              Espelho de ponto (gerado com as batidas, assim que o mês termina; não depende da Folha) e contracheque (PDF da contabilidade) de cada funcionário, enviados para assinar pela Autentique.
+              Espelho de ponto (gerado com as batidas, assim que o mês termina; não depende da Folha) e contracheque (vem automático da Folha CLT quando você importa) de cada funcionário, enviados para assinar pela Autentique.
               Cada arquivo vira um documento na Autentique (até 2 por funcionário). O status atualiza sozinho quando a pessoa visualiza, assina ou recusa
               {pend ? `; ${pend} ${pend === 1 ? 'documento aguarda' : 'documentos aguardam'} assinatura` : ''}.
               {t ? ` ${t.semEmail ? `${t.semEmail} sem e-mail vão pelo WhatsApp ou pelo app.` : 'Todos recebem por e-mail.'}` : ''}
@@ -208,12 +208,14 @@ export function DocsAssinatura() {
             <button type="button" aria-label="Próximo mês" onClick={() => ir(somarMes(mes, 1))} disabled={mes >= mesHoje()}>›</button>
           </span>
           {d?.integracao.conectado && <button type="button" className={cssP.btnTxt} onClick={atualizarStatus} disabled={atualizando}>{atualizando ? 'Atualizando…' : 'Atualizar status'}</button>}
-          <button type="button" className={cssP.btnSec} onClick={() => setLote(true)} disabled={!d}><Icone nome="documento" tamanho={16} /> Subir contracheques</button>
+          <button type="button" className={cssP.btnSec} onClick={() => setLote(true)} disabled={!d} title="Reserva: no dia a dia o contracheque vem automático da Folha CLT"><Icone nome="documento" tamanho={16} /> Subir contracheques</button>
           <button type="button" className={cssP.btnPri} disabled={!d?.integracao.conectado || prontos.length === 0} onClick={() => setEnviar(prontos)}>
             Enviar para assinar{prontos.length ? ` (${prontos.length})` : ''}
           </button>
         </div>
       </div>
+
+      <p className={css.nota}>O contracheque entra <b>automático</b>: assim que você importa na Folha CLT, ele vira o documento aqui, pronto pra enviar. Quem ainda não tem, suba o dele na Folha CLT. "Subir contracheques" continua como reserva.</p>
 
       {erro && <p className={cssP.erro} role="alert">{erro}</p>}
       {msg && <p className={cssP.okMsg} role="status">{msg}</p>}
