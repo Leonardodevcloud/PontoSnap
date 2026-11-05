@@ -31,7 +31,7 @@
   font-size: 22px;
 }
 .corpo { flex: 1; min-width: 0; }
-.tit { font-weight:600; font-size: 15px; color: var(--ink); }
+.tit { font-weight:400; font-size: 15px; color: var(--ink); }
 .desc { font-size: 13px; color: var(--ash); line-height: 1.5; margin-top: 4px; }
 .acoes { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
 .btn { padding: 10px 20px; border: none; border-radius: 100px; background:var(--coral-acao); color:var(--on-coral); font-weight:500; font-size: 14px; cursor: pointer;

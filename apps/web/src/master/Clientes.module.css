@@ -3,7 +3,7 @@
 .tit{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; min-width:0; }
 .contagem{ color:var(--ash); font-size:14px; }
 .add{ width:auto; }
-.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; margin:0 0 14px; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:400; margin:0 0 14px; }
 
 .table{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); overflow:visible; }
 .row{ display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1.1fr) minmax(0,1.3fr) minmax(0,.8fr) minmax(0,.7fr) 40px; align-items:center; gap:14px; padding:14px 20px; border-top:1px solid rgba(var(--ink-rgb),.1); }
@@ -11,7 +11,7 @@
 .thead{ background:var(--thead-bg); }
 .thead span{ font-size:12px; color:var(--ash); }
 .vazio{ padding:22px 20px; color:var(--ash); font-size:14.5px; }
-.rz{ font-weight:600; font-size:15px; }
+.rz{ font-weight:400; font-size:15px; }
 .mono{ font-size:13px; }
 .muted{ color:var(--ash); font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tagInativo{ display:inline-block; font-size:12px; font-weight:500; padding:2px 8px; border-radius:var(--r-pill); background:var(--thead-bg); color:var(--ash); }
@@ -43,13 +43,13 @@
 .caminhos{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:16px; }
 .cam{ border:2px solid rgba(var(--ink-rgb),.12); background:var(--cream); border-radius:14px; padding:12px 13px; cursor:pointer; text-align:left; font:inherit; }
 .camOn{ border-color:var(--coral); background:var(--peach); }
-.camT{ display:block; font-size:13.5px; font-weight:600; color:var(--ink); margin-bottom:3px; }
+.camT{ display:block; font-size:13.5px; font-weight:400; color:var(--ink); margin-bottom:3px; }
 .camD{ display:block; font-size:11.5px; color:var(--ash); line-height:1.4; }
-.eSenha{ font-size:18px; font-weight:600; color:var(--coral-dark); margin-top:3px; }
+.eSenha{ font-size:18px; font-weight:400; color:var(--coral-dark); margin-top:3px; }
 @media (max-width: 560px){ .caminhos{ grid-template-columns:1fr; } }
 
 .okMsg{ background:var(--ok-bg); color:var(--ok-text); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; margin-bottom:14px; line-height:1.5; }
 
-.rzBtn{ background:none; border:0; padding:0; font:inherit; font-weight:600; font-size:15px; color:inherit; text-align:left; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; max-width:100%; }
+.rzBtn{ background:none; border:0; padding:0; font:inherit; font-weight:400; font-size:15px; color:inherit; text-align:left; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; max-width:100%; }
 .rzBtn:hover{ text-decoration:underline; }
 .rzBtn:focus-visible{ outline:3px solid var(--coral); outline-offset:2px; border-radius:4px; }

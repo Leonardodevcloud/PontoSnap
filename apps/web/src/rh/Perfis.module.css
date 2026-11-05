@@ -20,7 +20,7 @@
 .perfil{ display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:16px; padding:12px 18px; border-top:1px solid rgba(var(--ink-rgb),.08); }
 .perfil:first-child{ border-top:none; }
 .perfilTxt{ min-width:0; display:flex; flex-direction:column; gap:2px; }
-.perfilNome{ font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px; min-width:0; }
+.perfilNome{ font-weight:400; font-size:14px; display:flex; align-items:center; gap:8px; min-width:0; }
 .nomeTxt{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; min-width:0; }
 .tagProb{ flex:none; font-size:12px; font-weight:500; background:var(--aviso-bg); color:var(--aviso-text); padding:2px 8px; border-radius:6px; white-space:nowrap; }
 .resumo{ font-size:12.5px; color:var(--ash); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; cursor:help; }
@@ -29,7 +29,7 @@
 
 .campo{ display:block; margin-bottom:13px; }
 .campo:last-child{ margin-bottom:0; }
-.lb{ display:block; font-size:12.5px; font-weight:600; margin:0 0 4px; }
+.lb{ display:block; font-size:12.5px; font-weight:500; margin:0 0 4px; }
 .inp{ width:100%; background:var(--cream); border:1.5px solid rgba(var(--ink-rgb),.12); border-radius:10px; padding:9px 11px; font:inherit; font-size:14px; color:var(--ink); }
 .inp:focus{ outline:none; border-color:var(--coral); }
 .dupla{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; padding-top:14px; border-top:1px dashed rgba(var(--ink-rgb),.12); }
@@ -39,11 +39,11 @@
 .check input{ width:17px; height:17px; accent-color:var(--coral); }
 
 .secaoTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:12px; }
-.secaoTit{ font-weight:600; font-size:16px; margin:0 0 3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.secaoTit{ font-weight:400; font-size:16px; margin:0 0 3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .exp{ font-size:12.5px; color:var(--ash); margin:0; line-height:1.5; max-width:64ch; }
 .opcional{ font-size:12.5px; font-weight:400; color:var(--ash); }
 
-.toggle{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--ash); white-space:nowrap; cursor:pointer; background:var(--cream); border-radius:999px; padding:6px 12px; }
+.toggle{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:400; color:var(--ash); white-space:nowrap; cursor:pointer; background:var(--cream); border-radius:999px; padding:6px 12px; }
 .toggle input{ accent-color:var(--coral); }
 
 /* Segmented control: CLT vs Personalizado. O lado aceso mostra o estado. */
@@ -55,7 +55,7 @@
 .segOnCustom{ background:var(--ink); color:#fff; }
 .segOnCustom:hover{ color:#fff; }
 
-.arquivo{ display:block; text-align:center; border:1.5px dashed rgba(var(--ink-rgb),.22); border-radius:12px; padding:13px; font-size:12.5px; font-weight:600; color:var(--ash); cursor:pointer; margin-top:6px; }
+.arquivo{ display:block; text-align:center; border:1.5px dashed rgba(var(--ink-rgb),.22); border-radius:12px; padding:13px; font-size:12.5px; font-weight:400; color:var(--ash); cursor:pointer; margin-top:6px; }
 .arquivo:hover{ border-color:var(--coral); color:var(--coral-d); }
 
 .acoes{ display:flex; gap:10px; margin-top:6px; }

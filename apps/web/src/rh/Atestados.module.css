@@ -15,9 +15,9 @@
   border-radius:var(--r-md); padding:16px; margin-bottom:11px;
 }
 .revTop{ display:flex; justify-content:space-between; gap:12px; margin-bottom:11px; }
-.revN{ font-family:var(--ff-display); font-size:16px; font-weight:600; }
+.revN{ font-family:var(--ff-display); font-size:16px; font-weight:400; }
 .revD{ font-size:12px; color:var(--ash); margin-top:2px; }
-.st{ font-size:12px; font-weight:600; padding:3px 9px; border-radius:var(--r-pill); white-space:nowrap; height:fit-content;
+.st{ font-size:12px; font-weight:400; padding:3px 9px; border-radius:var(--r-pill); white-space:nowrap; height:fit-content;
 }
 .stTxt{ font-size:12.5px; color:var(--ash); white-space:nowrap; }
 .stRECUSADO{ background:var(--erro-bg); color:var(--erro-text); }
@@ -54,7 +54,7 @@
 .vazio{ color:var(--ash); font-size:14px; padding:16px 0; }
 .erro{
   background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
-  padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
+  padding:10px 14px; font-size:14px; font-weight:400; margin-bottom:12px;
 }
 .lgpd{
   margin-top:20px; background:var(--cream); border-left:3px solid var(--coral);

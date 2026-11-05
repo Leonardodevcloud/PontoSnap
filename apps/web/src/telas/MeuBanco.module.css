@@ -24,7 +24,7 @@
   display:flex; justify-content:space-between; align-items:center;
   padding:10px 0; border-top:1px solid rgba(var(--ink-rgb),.09);
 }
-.extE{ font-size:13.5px; font-weight:600; }
+.extE{ font-size:13.5px; font-weight:400; }
 .extD{ font-size:12px; color:var(--ash); margin-top:1px; }
 .extV{ font-size:13.5px; font-weight:500; }
 .pos{ color:var(--ink); }
@@ -41,7 +41,7 @@
 .vazio{ color:var(--ash); font-size:14px; padding:16px 0; text-align:center; }
 .erro{
   background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
-  padding:10px 14px; font-size:13.5px; font-weight:600;
+  padding:10px 14px; font-size:13.5px; font-weight:400;
 }
 
 .soma{ margin-top:10px; display:flex; flex-direction:column; gap:0; font-size:13px; }
@@ -49,5 +49,5 @@
 .soma span{ display:inline-flex; align-items:center; gap:6px; color:var(--ash); }
 .somaTot span{ color:var(--ink); }
 .soma b{ }
-.somaTot{ font-weight:600; }
+.somaTot{ font-weight:400; }
 

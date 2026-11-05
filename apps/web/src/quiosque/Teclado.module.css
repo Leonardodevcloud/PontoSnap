@@ -2,7 +2,7 @@
 .key{ height:78px; border-radius:20px; background:var(--white); border:2px solid rgba(var(--ink-rgb),.1); font-family:var(--ff-display); font-weight:600; font-size:30px; color:var(--ink); cursor:pointer; transition:transform .06s ease, background .12s ease;
 }
 .key:active{ transform:scale(.95); background:var(--peach); }
-.key.small{ font-family:var(--ff-body); font-weight:600; font-size:16px; color:var(--ash); }
+.key.small{ font-family:var(--ff-body); font-weight:400; font-size:16px; color:var(--ash); }
 .key.go{ background:var(--coral-acao); color:var(--on-coral); border-color:var(--coral); font-size:18px; }
 .key.go:disabled{ opacity:.5; cursor:not-allowed; }
 .key.go:active:not(:disabled){ background:var(--coral-dark); }

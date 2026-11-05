@@ -11,7 +11,7 @@
 .sel{ display:flex; flex-direction:column; gap:6px; }
 .lb{ font-size:12px; color:var(--coral-dark); }
 .sel select, .sel input{ padding:10px 12px; border:1px solid rgba(var(--ink-rgb),.18); border-radius:12px; font:inherit; background:var(--white); min-width:220px; }
-.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:600; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:11px 14px; font-size:14px; font-weight:400; }
 .carregando{ color:var(--ash); font-size:12.5px; }
 
 .cards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-bottom:24px; }
@@ -25,10 +25,10 @@
 .linha:first-child{ border-top:none; }
 .thead{ background:var(--thead-bg); }
 .thead span{ font-size:12px; color:var(--ash); }
-.data{ font-weight:600; }
+.data{ font-weight:400; }
 .data em{ font-style:normal; color:var(--ash); font-weight:400; font-size:12.5px; margin-left:4px; }
 .mono{ font-size:12.5px; }
-.faltaTxt{ color:var(--erro-text); font-weight:600; }
+.faltaTxt{ color:var(--erro-text); font-weight:400; }
 .diaVazio{ opacity:.5; }
 .viol{ box-shadow:inset 3px 0 0 var(--erro-text); }
 .sinais{ display:flex; gap:5px; flex-wrap:wrap; align-content:center; }
@@ -46,7 +46,7 @@
 .vLinha:first-child{ border-top:none; }
 .vLinha strong{ font-size:14px; }
 .vForte{ border-top:2px solid var(--ink); margin-top:4px; padding-top:12px; }
-.vForte span{ font-weight:600; }
+.vForte span{ font-weight:400; }
 .vForte strong{ font-size:16px; }
 .vDesc{ color:var(--erro-text); }
 
@@ -56,7 +56,7 @@
 
 /* Destinação de faltas e atrasos */
 .destinacao{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:14px; padding:16px 18px; margin:6px 0 18px; }
-.destinacao h3{ font-family:var(--ff-display); font-weight:600; font-size:16px; margin:0; }
+.destinacao h3{ font-family:var(--ff-display); font-weight:500; font-size:16px; margin:0; }
 .secH{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
 .secLink{ margin-left:auto; color:var(--coral-dark); font-weight:500; font-size:14px; text-decoration:none; }
 .secLink:hover{ text-decoration:underline; }
@@ -64,7 +64,7 @@
 .tagProb{ font-size:12px; padding:2px 8px; border-radius:6px; background:var(--erro-bg); color:var(--erro-text); }
 .destLinha{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(var(--ink-rgb),.06); font-size:14px; }
 .destLinha:last-of-type{ border-bottom:none; }
-.destTotal{ font-weight:600; border-top:1px solid rgba(var(--ink-rgb),.14) !important; margin-top:4px; padding-top:12px; }
+.destTotal{ font-weight:400; border-top:1px solid rgba(var(--ink-rgb),.14) !important; margin-top:4px; padding-top:12px; }
 .destTotal .mono{ font-size:16px; }
 .neg{ color:var(--erro-text); }
 .destAviso{ display:flex; align-items:center; gap:4px 10px; flex-wrap:wrap; margin:12px 0 0; font-size:14px; color:var(--aviso-text); }
@@ -78,7 +78,7 @@
 .fundoGaveta{ position:fixed; inset:0; background:rgba(var(--ink-rgb),.18); z-index:50; }
 .gaveta{ position:fixed; top:0; right:0; bottom:0; width:min(420px, 92vw); background:var(--white); border-left:1px solid rgba(var(--ink-rgb),.12); box-shadow:-12px 0 30px rgba(var(--ink-rgb),.1); padding:22px 24px; overflow-y:auto; z-index:60; }
 .gTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:16px; }
-.gData{ font-family:var(--ff-display); font-weight:600; font-size:18px; margin:0; text-transform:capitalize; }
+.gData{ font-family:var(--ff-display); font-weight:400; font-size:18px; margin:0; text-transform:capitalize; }
 .gSub{ color:var(--ash); font-size:12.5px; margin:3px 0 0; }
 .gX{ background:none; border:none; font-size:18px; color:var(--ash); cursor:pointer; line-height:1; padding:2px 6px; }
 .gSecLb{ display:block; font-size:12px; color:var(--coral-dark); margin:0 0 10px; }
@@ -87,8 +87,8 @@
 .gDotE{ background:var(--coral); }
 .gDotS{ background:var(--ink); }
 .gDotOff{ background:var(--ash); opacity:.4; }
-.gBatNome{ flex:1; font-size:14px; font-weight:600; }
-.gBatHora{ font-size:14px; font-weight:600; }
+.gBatNome{ flex:1; font-size:14px; font-weight:400; }
+.gBatHora{ font-size:14px; font-weight:400; }
 .gRiscado{ text-decoration:line-through; opacity:.55; }
 .gTagAj{ font-size:12px; background:var(--lime); color:var(--sobre-lime); padding:2px 6px; border-radius:5px; }
 .gTagDesc{ font-size:12px; background:var(--erro-bg); color:var(--erro-text); padding:2px 6px; border-radius:5px; }
@@ -98,13 +98,13 @@
 .gGrade{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
 .gBox{ background:var(--cream); border-radius:10px; padding:9px 11px; }
 .gBoxL{ display:block; font-size:12px; color:var(--ash); }
-.gBoxV{ font-size:16px; font-weight:600; }
+.gBoxV{ font-size:16px; font-weight:400; }
 .gBom{ color:var(--ok-text); }
 .gRuim{ color:var(--coral-dark); }
 .gSinais{ display:flex; gap:6px; flex-wrap:wrap; }
 .gAcoes{ display:flex; gap:8px; margin-top:20px; flex-wrap:wrap; }
-.gBtn{ background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:none; }
-.gBtn2{ background:transparent; color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:none; }
+.gBtn{ background:var(--ink); color:var(--cream); border:none; border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:400; cursor:pointer; text-decoration:none; }
+.gBtn2{ background:transparent; color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:var(--r-pill); padding:9px 15px; font-size:12.5px; font-weight:400; cursor:pointer; text-decoration:none; }
 
 .acoesPdf{ display:flex; gap:9px; flex-wrap:wrap; justify-content:flex-end; }
 
@@ -112,17 +112,17 @@
 .loteOverlay { position: fixed; inset: 0; background: rgba(var(--ink-rgb),.35); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
 .loteModal { background:var(--white); border-radius: 18px; max-width: 460px; width: 100%; max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(var(--ink-rgb),.25); }
 .loteHead { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; background: var(--cream); border-bottom: 1px solid rgba(var(--ink-rgb),.08); }
-.loteHead h3 { font-family: var(--ff-display); font-weight:600; font-size:18px; margin: 0; color: var(--ink); }
+.loteHead h3 { font-family: var(--ff-display); font-weight:500; font-size:18px; margin: 0; color: var(--ink); }
 .loteX { border: none; background: none; font-size:16px; cursor: pointer; color: var(--ash); }
 .loteBody { padding: 18px 22px 22px; overflow-y: auto; }
-.loteLb { display: block; font-size:12px; color: var(--coral-d); font-weight:600; margin-bottom: 8px; }
+.loteLb { display: block; font-size:12px; color: var(--coral-d); font-weight:400; margin-bottom: 8px; }
 .lotecampos { display: flex; gap: 12px; }
 .lotecampos label { display: flex; flex-direction: column; gap: 4px; font-size:12.5px; color: var(--ash); flex: 1; }
 .lotecampos input { padding: 9px 11px; border: 1.5px solid rgba(var(--ink-rgb),.15); border-radius: 9px; font-size:14px; }
-.loteAtalho { margin-top: 8px; font-size:12.5px; font-weight:600; background: var(--cream); border: 1px solid rgba(var(--ink-rgb),.12); border-radius: 20px; padding: 5px 12px; cursor: pointer; color: var(--ink); }
+.loteAtalho { margin-top: 8px; font-size:12.5px; font-weight:400; background: var(--cream); border: 1px solid rgba(var(--ink-rgb),.12); border-radius: 20px; padding: 5px 12px; cursor: pointer; color: var(--ink); }
 .loteCheck { display: flex; align-items: center; gap: 8px; font-size:14px; color: var(--ink); padding: 5px 0; cursor: pointer; }
 .loteFuncH { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px; }
-.loteLink { background: none; border: none; color: var(--coral-d); font-weight:600; font-size: 12.5px; cursor: pointer; }
+.loteLink { background: none; border: none; color: var(--coral-d); font-weight:400; font-size: 12.5px; cursor: pointer; }
 .loteLista { border: 1px solid rgba(var(--ink-rgb),.1); border-radius: 12px; max-height: 200px; overflow-y: auto; }
 .loteFunc { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--row-border); font-size:14px; cursor: pointer; }
 .loteFunc:last-child { border-bottom: none; }

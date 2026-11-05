@@ -57,16 +57,16 @@
   padding:9px 0; border-top:1px solid rgba(var(--ink-rgb),.08); font-size:14px;
 }
 .extD{ font-size:12.5px; color:var(--ash); }
-.extE{ font-weight:600; }
+.extE{ font-weight:400; }
 .extV{ font-weight:500; }
 .neg{ color:var(--erro-text); }
 
 .vazio{ color:var(--ash); font-size:14px; padding:10px 0; }
 .erro{
   background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
-  padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
+  padding:10px 14px; font-size:14px; font-weight:400; margin-bottom:12px;
 }
-.ok{ background:rgba(255,178,62,.4); color:var(--ink); border-radius:var(--r-md); padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
+.ok{ background:rgba(255,178,62,.4); color:var(--ink); border-radius:var(--r-md); padding:10px 14px; font-size:14px; font-weight:400; margin-bottom:12px;
 }
 
 /* ---------- acordo salvo ---------- */
@@ -95,7 +95,7 @@
   border:1px solid rgba(15,169,104,.25); border-radius:12px; padding:12px 16px;
   margin-top:14px; font-size:14px; line-height:1.45;
 }
-.resultIc{ color:var(--verde); font-weight:600; font-size:16px; }
+.resultIc{ color:var(--verde); font-weight:400; font-size:16px; }
 .result b{ color:var(--ink); }
 
 /* ---------- histórico ---------- */
@@ -107,8 +107,8 @@
 .hrow:first-child{ border-top:none; }
 .hhead{ background:var(--thead-bg); cursor:default; }
 .hhead span{ font-size:12px; color:var(--ash); }
-.hcomp{ font-family:var(--ff-display); font-weight:600; font-size:16px; text-transform:capitalize; }
-.pos{ color:var(--verde); font-weight:600; }
+.hcomp{ font-family:var(--ff-display); font-weight:400; font-size:16px; text-transform:capitalize; }
+.pos{ color:var(--verde); font-weight:400; }
 .chev{ color:var(--ash); text-align:center; }
 .detalhe{ background:var(--field-bg); padding:4px 16px 14px; }
 .detTit{ font-size:12px; color:var(--ash); margin:12px 0 8px; }
@@ -131,7 +131,7 @@
 .cobLink{ font-size:12.5px; font-weight:500; color:var(--coral-dark); white-space:nowrap; }
 
 .abSinal { display: flex; gap: 8px; margin: 10px 0; }
-.abSinalBtn { flex: 1; padding: 9px 10px; border: 1.5px solid rgba(var(--ink-rgb),.14); border-radius: 10px; background:var(--white); font: inherit; font-weight:600; font-size: 12.5px; color: var(--ash, #55627A); cursor: pointer; }
+.abSinalBtn { flex: 1; padding: 9px 10px; border: 1.5px solid rgba(var(--ink-rgb),.14); border-radius: 10px; background:var(--white); font: inherit; font-weight:400; font-size: 12.5px; color: var(--ash, #55627A); cursor: pointer; }
 .abSinalOn { background: var(--ok-bg); border-color: var(--ok-text); color: #0E7A50; }
 .abSinalOnNeg { background: var(--erro-bg); border-color: var(--erro-text); color: var(--erro-text); }
 .abOk { font-size:12.5px; color: #0E7A50; background: var(--ok-bg); border-radius: 10px; padding: 10px 12px; margin: 10px 0 0; }
@@ -145,13 +145,13 @@
 
 /* Accordion de ações do funcionário */
 .acaoBox { border: 1px solid rgba(var(--ink-rgb),.1); border-radius: 12px; margin-top: 10px; overflow: hidden; }
-.acaoH { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background:var(--white); border: none; font: inherit; font-weight:600; font-size:14px; color: var(--ink, #0F1B33); cursor: pointer; }
+.acaoH { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background:var(--white); border: none; font: inherit; font-weight:400; font-size:14px; color: var(--ink, #0F1B33); cursor: pointer; }
 .acaoH:hover { background: var(--cream, #F5F7FB); }
 .acaoHOn { background: var(--cream, #F5F7FB); }
 .acaoChev { color: var(--ash, #55627A); font-size:12.5px; }
 .acaoBody { padding: 14px; border-top: 1px solid rgba(var(--ink-rgb),.08); }
 
-.extRemover { margin-left: 8px; border: none; background: transparent; color: var(--ash, #55627A); font-size:16px; font-weight:600; cursor: pointer; padding: 0 4px; border-radius: 6px; line-height: 1; }
+.extRemover { margin-left: 8px; border: none; background: transparent; color: var(--ash, #55627A); font-size:16px; font-weight:400; cursor: pointer; padding: 0 4px; border-radius: 6px; line-height: 1; }
 .extRemover:hover:not(:disabled) { background: var(--erro-bg); color: var(--erro-text); }
 .extRemover:disabled { opacity: .5; cursor: default; }
 

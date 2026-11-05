@@ -10,7 +10,7 @@
 
 .ped{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:12px; padding:11px 14px; margin-bottom:8px; }
 .pedTop{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
-.quem{ font-weight:600; font-size:14px; margin-right:6px; min-width:0; max-width:40ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.quem{ font-weight:400; font-size:14px; margin-right:6px; min-width:0; max-width:40ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .quando{ font-size:12px; color:var(--ash); }
 .tipoTxt{ font-size:14px; font-weight:500; color:var(--ink); }
 .decisao{ font-size:12.5px; color:var(--ash); }
@@ -18,9 +18,9 @@
 .oQue{ font-size:12.5px; color:var(--ink); margin-bottom:4px; }
 .mono{ }
 .acoes{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
-.ok2{ background:var(--coral-acao); color:var(--on-coral); border:none; border-radius:var(--r-pill); padding:7px 16px; font:inherit; font-weight:600; font-size:12.5px; cursor:pointer; }
-.no{ background:transparent; color:var(--ash); border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:var(--r-pill); padding:7px 16px; font:inherit; font-weight:600; font-size:12.5px; cursor:pointer; }
-.cancelar{ background:transparent; color:var(--ash); border:none; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:underline; }
+.ok2{ background:var(--coral-acao); color:var(--on-coral); border:none; border-radius:var(--r-pill); padding:7px 16px; font:inherit; font-weight:400; font-size:12.5px; cursor:pointer; }
+.no{ background:transparent; color:var(--ash); border:1.5px solid rgba(var(--ink-rgb),.15); border-radius:var(--r-pill); padding:7px 16px; font:inherit; font-weight:400; font-size:12.5px; cursor:pointer; }
+.cancelar{ background:transparent; color:var(--ash); border:none; font:inherit; font-size:12.5px; font-weight:400; cursor:pointer; text-decoration:underline; }
 .recusa{ margin-top:11px; }
 .inp{ width:100%; background:var(--cream); border:1.5px solid rgba(var(--ink-rgb),.12); border-radius:11px; padding:10px 12px; font:inherit; font-size:14px; color:var(--ink); }
 
@@ -31,14 +31,14 @@
 .linhaBat{ display:flex; gap:5px; flex-wrap:wrap; }
 .bat{ display:inline-flex; flex-direction:column; align-items:center; gap:1px; background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.12); border-radius:8px; padding:3px 8px; min-width:54px; }
 .batPapel{ font-size:12px; color:var(--ash); }
-.batHora{ font-size:12.5px; font-weight:600; color:var(--ink); }
+.batHora{ font-size:12.5px; font-weight:400; color:var(--ink); }
 .batSai{ background:var(--erro-bg); border-color:rgba(36,87,214,.35); }
 .batSai .batHora{ color:var(--coral-dark); text-decoration:line-through; }
 .batEntra{ background:var(--ok-bg); border-color:var(--ok-border); }
 .batEntra .batHora{ color:var(--ink); }
 .seta{ align-self:center; color:var(--ash); font-size:18px; }
 .semBat{ font-size:12.5px; color:var(--ash); }
-.avisoImpar{ display:inline-block; margin-top:7px; font-size:12.5px; color:var(--aviso-text); font-weight:600; }
+.avisoImpar{ display:inline-block; margin-top:7px; font-size:12.5px; color:var(--aviso-text); font-weight:400; }
 .avisoOk{ display:inline-block; margin-top:7px; font-size:12.5px; color:var(--ash); }
 .detalhe{ font-size:12.5px; color:var(--ash); margin:0 0 10px; line-height:1.5; }
 .avisoLinha{ margin:0 0 14px; display:flex; gap:7px; align-items:flex-start; font-size:12.5px; line-height:1.5; color:var(--aviso-text); }
@@ -59,15 +59,15 @@
 .modalH{ font-family:var(--ff-display); font-weight:600; font-size:22px; margin:0; }
 .modalSub{ color:var(--ash); font-size:12.5px; margin:4px 0 16px; }
 .gX{ background:none; border:none; font-size:18px; color:var(--ash); cursor:pointer; line-height:1; padding:2px 6px; }
-.lb{ display:block; font-size:12.5px; font-weight:600; color:var(--ash); margin:12px 0 5px; }
+.lb{ display:block; font-size:12.5px; font-weight:500; color:var(--ash); margin:12px 0 5px; }
 .opts{ display:flex; gap:8px; }
-.optB{ flex:1; font:inherit; font-size:12.5px; font-weight:600; padding:9px; border-radius:10px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ash); cursor:pointer; }
+.optB{ flex:1; font:inherit; font-size:12.5px; font-weight:400; padding:9px; border-radius:10px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ash); cursor:pointer; }
 .optOn{ background:var(--peach); border-color:var(--coral); color:var(--coral-dark); }
 .dupla{ display:flex; gap:8px; }
 .batidas{ display:flex; gap:7px; flex-wrap:wrap; }
 .batB{ font-size:12.5px; padding:7px 12px; border-radius:9px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ink); cursor:pointer; }
 .batB:disabled{ opacity:.45; cursor:not-allowed; }
-.batOn{ background:var(--erro-bg); border-color:var(--erro-text); color:var(--erro-text); font-weight:600; }
+.batOn{ background:var(--erro-bg); border-color:var(--erro-text); color:var(--erro-text); font-weight:400; }
 .semBat{ font-size:12.5px; color:var(--ash); margin:0; }
 .erroModal{ background:var(--erro-bg); color:var(--erro-text); border-radius:10px; padding:9px 12px; font-size:12.5px; margin:12px 0 0; }
 
@@ -78,7 +78,7 @@
 .slots{ display:flex; gap:7px; flex-wrap:wrap; }
 .slot{ display:flex; flex-direction:column; align-items:center; gap:2px; border-radius:10px; padding:7px 10px; min-width:78px; font:inherit; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--white); cursor:default; }
 .slotLb{ font-size:12px; color:var(--ash); }
-.slotV{ font-size:14px; font-weight:600; color:var(--ink); }
+.slotV{ font-size:14px; font-weight:400; color:var(--ink); }
 .slotTag{ font-size:12px; padding:1px 6px; border-radius:5px; }
 .slotOk .slotTag{ color:var(--ash); padding:0; }
 .slotFalta{ border-style:dashed; border-color:rgba(36,87,214,.45); background:var(--aviso-bg); }
@@ -103,11 +103,11 @@
 .folgaTxt{ display:flex; flex-direction:column; min-width:0; flex:1; }
 .folgaTxt b{ font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .folgaTxt small{ font-size:12.5px; color:var(--ash); }
-.folgaDia{ font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
+.folgaDia{ font-size:14px; font-weight:400; font-variant-numeric:tabular-nums; }
 .folgaAcoes{ display:inline-flex; gap:8px; align-items:center; }
 
 .fixoLinha{ display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--cream); border-radius:11px; padding:10px 12px; font-size:14px; }
 
-.tagDada, .tagBanco{ display:inline-block; font-size:11.5px; font-weight:600; padding:1px 8px; border-radius:var(--r-pill); margin-right:4px; }
+.tagDada, .tagBanco{ display:inline-block; font-size:11.5px; font-weight:500; padding:1px 8px; border-radius:var(--r-pill); margin-right:4px; }
 .tagDada{ background:rgba(var(--ink-rgb),.08); color:var(--ink); }
 .tagBanco{ background:var(--aviso-bg); color:var(--aviso-text); }

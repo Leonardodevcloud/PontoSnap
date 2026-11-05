@@ -14,11 +14,11 @@
 .doc{ display:flex; gap:9px; align-items:center; min-width:0; }
 .doc > span:last-child, .doc > button{ min-width:0; }
 .doc small{ display:block; color:var(--ash); font-size:11.5px; }
-.ic{ width:30px; height:36px; flex:none; border-radius:6px; background:var(--peach); color:var(--coral-dark); font-size:12px; font-weight:600; display:grid; place-items:center; }
+.ic{ width:30px; height:36px; flex:none; border-radius:6px; background:var(--peach); color:var(--coral-dark); font-size:12px; font-weight:400; display:grid; place-items:center; }
 .icOff{ background:var(--thead-bg); color:var(--ash); opacity:.7; }
 .apagado{ color:var(--ash); }
 .nomeArq{ display:block; max-width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.up{ background:none; border:1.5px dashed rgba(var(--ink-rgb),.3); border-radius:999px; padding:5px 12px; font:inherit; font-weight:600; font-size:12.5px; color:var(--coral-dark); cursor:pointer; white-space:nowrap; }
+.up{ background:none; border:1.5px dashed rgba(var(--ink-rgb),.3); border-radius:999px; padding:5px 12px; font:inherit; font-weight:400; font-size:12.5px; color:var(--coral-dark); cursor:pointer; white-space:nowrap; }
 .up:hover{ background:var(--peach); border-color:var(--coral); }
 .up:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 
@@ -32,7 +32,7 @@
 @keyframes brilho{ to{ background-position:-200% 0; } }
 @media (prefers-reduced-motion: reduce){ .sk i{ animation:none; } }
 
-.erroRod{ color:var(--erro-text); font-weight:600; font-size:13px; max-width:420px; }
+.erroRod{ color:var(--erro-text); font-weight:400; font-size:13px; max-width:420px; }
 .erroTxt{ color:var(--erro-text); }
 
 /* lote */
@@ -65,9 +65,9 @@
 @media (max-width:760px){ .grade{ grid-template-columns:1fr; } }
 .col{ display:flex; flex-direction:column; gap:14px; min-width:0; }
 .grupo{ border:0; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
-.grupo legend{ font-weight:600; font-size:12.5px; margin-bottom:6px; }
+.grupo legend{ font-weight:400; font-size:12.5px; margin-bottom:6px; }
 .resumo{ background:var(--cream); border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
-.resumo h4{ margin:0 0 2px; font-size:14px; font-weight:600; }
+.resumo h4{ margin:0 0 2px; font-size:14px; font-weight:500; }
 .nota{ margin:2px 0 0; font-size:12.5px; color:var(--ash); line-height:1.45; }
 .alerta{ margin:2px 0 0; font-size:12.5px; line-height:1.45; background:var(--aviso-bg); color:var(--aviso-text); border-radius:10px; padding:8px 10px; }
 .resultado{ display:flex; flex-direction:column; gap:10px; }
@@ -79,13 +79,13 @@
 .cards{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media (max-width:760px){ .cards{ grid-template-columns:1fr; } }
 .card{ border:1px solid rgba(var(--ink-rgb),.12); border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; background:var(--white); }
-.card h4{ margin:0; font-size:15px; font-weight:600; }
+.card h4{ margin:0; font-size:15px; font-weight:500; }
 .arqLinha{ margin:0; display:flex; gap:9px; align-items:center; font-size:13px; min-width:0; }
 .arqLinha small{ color:var(--ash); margin-left:auto; white-space:nowrap; }
 .tl{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0; }
 .tl li{ display:flex; gap:10px; position:relative; padding-bottom:12px; }
 .tl li:not(:last-child)::after{ content:''; position:absolute; left:11px; top:24px; bottom:0; width:2px; background:var(--row-border); }
-.tl i{ width:24px; height:24px; flex:none; border-radius:50%; display:grid; place-items:center; font-style:normal; font-size:12px; font-weight:600; background:var(--thead-bg); color:var(--ash); }
+.tl i{ width:24px; height:24px; flex:none; border-radius:50%; display:grid; place-items:center; font-style:normal; font-size:12px; font-weight:400; background:var(--thead-bg); color:var(--ash); }
 .tl b{ display:block; font-size:13.5px; }
 .tl small{ display:block; color:var(--ash); font-size:12px; line-height:1.4; }
 .tlf i{ background:var(--ok-bg); color:var(--ok-text); }

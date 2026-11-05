@@ -2,7 +2,7 @@
 .cab h2{ font-size:28px; }
 .cab p{ margin:4px 0 0; color:var(--ash); font-size:16px; }
 
-.ok{ display:flex; align-items:center; gap:8px; background:var(--ok-bg); color:var(--ok-text); border-radius:12px; padding:11px 14px; font-weight:600; font-size:14px; }
+.ok{ display:flex; align-items:center; gap:8px; background:var(--ok-bg); color:var(--ok-text); border-radius:12px; padding:11px 14px; font-weight:400; font-size:14px; }
 
 .prontidao{
   display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:18px; align-items:center;
@@ -13,7 +13,7 @@
 .numOk{ background:var(--ok-bg); color:var(--ok-text); }
 .numAviso{ background:var(--aviso-bg); color:var(--aviso-text); }
 .prTxt{ min-width:0; }
-.prT{ font-family:var(--ff-display); font-weight:600; font-size:18px; margin:0; line-height:1.3; }
+.prT{ font-family:var(--ff-display); font-weight:400; font-size:18px; margin:0; line-height:1.3; }
 .prS{ margin:4px 0 0; color:var(--ash); font-size:14px; }
 
 .btnPri, .btnSec{ display:inline-flex; align-items:center; justify-content:center; min-height:40px; padding:8px 16px; border-radius:999px; font:inherit; font-weight:500; font-size:14px; cursor:pointer; text-decoration:none; white-space:nowrap;
@@ -60,20 +60,20 @@ details.grupo[open] > summary::after{ content:'Esconder'; }
 
 /* Completar batidas (painel lateral) */
 .mudo{ color:var(--ash); font-size:14px; }
-.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:10px; padding:10px 12px; font-size:14px; font-weight:600; margin:12px 0 0; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:10px; padding:10px 12px; font-size:14px; font-weight:400; margin:12px 0 0; }
 .cbPessoa{ margin-bottom:16px; }
 .cbPessoa h3{ font-size:16px; margin:0 0 8px; }
 .cbDia{ border:1px solid rgba(var(--ink-rgb),.12); border-radius:12px; padding:12px; margin-bottom:10px; }
 .cbDiaT{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px; font-size:14px; }
 .cbDiaT small{ font-size:12.5px; color:var(--ash); }
 .cbBat{ display:flex; flex-wrap:wrap; gap:8px; }
-.cbChip{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width:84px; padding:7px 10px; border-radius:10px; background:var(--cream); font-weight:600; font-size:14px;
+.cbChip{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width:84px; padding:7px 10px; border-radius:10px; background:var(--cream); font-weight:500; font-size:14px;
 }
-.cbChip small{ font-family:var(--ff-body); font-size:12.5px; font-weight:600; color:var(--ash); }
+.cbChip small{ font-family:var(--ff-body); font-size:12.5px; font-weight:500; color:var(--ash); }
 .cbFalta{ background:var(--white); border:1.5px dashed var(--erro-text); }
 .cbFalta input{ border:none; background:none; font:inherit; color:var(--ink); text-align:center; width:96px; }
 .cbMotivo{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
-.cbMotivo label{ font-weight:600; font-size:14px; }
+.cbMotivo label{ font-weight:500; font-size:14px; }
 .cbMotivo select, .cbMotivo input{ border:1px solid rgba(var(--ink-rgb),.24); border-radius:10px; padding:10px 12px; font:inherit; background:var(--white); color:var(--ink); }
 .cbMotivo p{ margin:0; color:var(--ash); font-size:12.5px; line-height:1.5; }
 

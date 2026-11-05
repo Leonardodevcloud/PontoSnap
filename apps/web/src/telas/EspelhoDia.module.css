@@ -1,6 +1,6 @@
 .h{ font-family:var(--ff-display); font-weight:600; font-size:24px; margin-top:6px; }
 .d{ font-size:12px; color:var(--ash); margin-top:2px; margin-bottom:18px; }
-.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:600; }
+.erro{ background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md); padding:10px 14px; font-size:13.5px; font-weight:400; }
 .vazio{ color:var(--ash); font-size:14.5px; }
 
 .row{
@@ -12,7 +12,7 @@
 .dot{ width:9px; height:9px; border-radius:50%; }
 .e{ background:var(--coral); }
 .s{ background:var(--ink); }
-.kk{ font-weight:600; font-size:14.5px; color:var(--ink); }
+.kk{ font-weight:400; font-size:14.5px; color:var(--ink); }
 .tt{ font-size:15px; color:var(--ink); }
 .pdf{ font-size:12px; color:var(--coral-dark); padding-left:6px; }
 
@@ -20,11 +20,11 @@
   background:var(--white); border:1.5px solid rgba(var(--ink-rgb),.1); border-radius:var(--r-md); padding:16px 18px; margin-top:18px;
   display:flex; justify-content:space-between; align-items:center;
 }
-.l{ font-size:13px; color:var(--ash); font-weight:600; }
+.l{ font-size:13px; color:var(--ash); font-weight:400; }
 .v{ font-family:var(--ff-display); font-weight:600; font-size:22px; color:var(--ink); }
 .afd{ font-size:12px; color:var(--ash); text-align:center; margin-top:14px; }
 .ok{ color:var(--ok-text); }
-.aviso{ font-size:13.5px; color:var(--aviso-text); font-weight:600; text-align:center; margin-top:12px; }
+.aviso{ font-size:13.5px; color:var(--aviso-text); font-weight:400; text-align:center; margin-top:12px; }
 .espaco{ flex:1; min-height:16px; }
 
 /* Navegação por dia — sem isso o funcionário não alcança os comprovantes
@@ -49,19 +49,19 @@
 .dataTxt{ font-size:13.5px; color:var(--ink); font-weight:500; }
 
 /* Pedido de ajuste de ponto */
-.pedirBtn{ width:100%; margin-top:14px; background:var(--white); color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.18); border-radius:var(--r-pill); padding:12px; font:inherit; font-weight:600; font-size:14px; cursor:pointer; }
+.pedirBtn{ width:100%; margin-top:14px; background:var(--white); color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.18); border-radius:var(--r-pill); padding:12px; font:inherit; font-weight:400; font-size:14px; cursor:pointer; }
 .form{ background:var(--white); border:1.5px solid var(--coral); border-radius:16px; padding:14px; margin-top:14px; }
 .opts{ display:flex; gap:8px; margin-bottom:12px; }
-.optB{ flex:1; font:inherit; font-size:12.5px; font-weight:600; padding:9px; border-radius:10px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ash); cursor:pointer; }
+.optB{ flex:1; font:inherit; font-size:12.5px; font-weight:400; padding:9px; border-radius:10px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ash); cursor:pointer; }
 .optOn{ background:var(--peach); border-color:var(--coral); color:var(--coral-dark); }
-.lbF{ display:block; font-size:12px; font-weight:600; color:var(--ash); margin:0 0 5px; }
+.lbF{ display:block; font-size:12px; font-weight:400; color:var(--ash); margin:0 0 5px; }
 .inpF{ width:100%; background:var(--cream); border:1.5px solid rgba(var(--ink-rgb),.12); border-radius:10px; padding:9px 11px; font:inherit; font-size:14px; color:var(--ink); margin-bottom:11px; }
 .dupla{ display:flex; gap:8px; }
 .batidas{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:11px; }
 .batB{ font-size:13px; padding:7px 12px; border-radius:9px; border:1.5px solid rgba(var(--ink-rgb),.12); background:var(--cream); color:var(--ink); cursor:pointer; }
-.batOn{ background:var(--erro-bg); border-color:var(--erro-text); color:var(--erro-text); font-weight:600; }
+.batOn{ background:var(--erro-bg); border-color:var(--erro-text); color:var(--erro-text); font-weight:400; }
 .formAcoes{ display:flex; gap:10px; align-items:center; }
-.cancelarF{ background:none; border:none; font:inherit; font-size:13px; font-weight:600; color:var(--ash); text-decoration:underline; cursor:pointer; }
+.cancelarF{ background:none; border:none; font:inherit; font-size:13px; font-weight:400; color:var(--ash); text-decoration:underline; cursor:pointer; }
 .okBox{ color:var(--ok-text); font-size:13.5px; font-weight:500; margin-top:14px; }
 .pedBox{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:12px; padding:11px 13px; font-size:13px; color:var(--ash); margin-top:12px; box-shadow:inset 3px 0 0 var(--aviso-border); }
 .pedOk{ box-shadow:none; }

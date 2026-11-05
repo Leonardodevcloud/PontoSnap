@@ -5,7 +5,7 @@
   padding:max(12px, env(safe-area-inset-top)) 20px 10px;
   max-width:440px; margin:0 auto; width:100%;
 }
-.logo{ display:flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; font-family:var(--ff-display); font-weight:600; font-size:17px; color:var(--ink); padding:0;
+.logo{ display:flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; font-family:var(--ff-display); font-weight:400; font-size:17px; color:var(--ink); padding:0;
 }
 .logo b{ color:var(--coral); }
 
@@ -49,7 +49,7 @@
 .abas button{ flex:1; min-width:0; max-width:200px; background:transparent; border:1.5px solid transparent; cursor:pointer; font:inherit; font-size:12px; font-weight:500; color:var(--ash); letter-spacing:-.01em; padding:10px 2px; border-radius:var(--r-pill); white-space:nowrap;
 }
 .comBolinha{ position:relative; }
-.bolinha{ position:absolute; top:1px; right:calc(50% - 30px); min-width:17px; height:17px; padding:0 4px; border-radius:999px; background:var(--coral-acao); color:#fff; font-size:10.5px; font-weight:600; display:grid; place-items:center; line-height:1; }
+.bolinha{ position:absolute; top:1px; right:calc(50% - 30px); min-width:17px; height:17px; padding:0 4px; border-radius:999px; background:var(--coral-acao); color:#fff; font-size:10.5px; font-weight:400; display:grid; place-items:center; line-height:1; }
 .faixaZona{ max-width:440px; margin:0 auto; padding:0 22px; }
 .abas .on{ background:var(--white); border-color:rgba(var(--ink-rgb),.1); color:var(--ink); }
 

@@ -1,4 +1,4 @@
-.voltar{ display:inline-block; background:none; border:0; padding:0; margin-bottom:4px; font:inherit; font-size:13px; font-weight:600; color:var(--coral-dark); cursor:pointer; text-decoration:none; }
+.voltar{ display:inline-block; background:none; border:0; padding:0; margin-bottom:4px; font:inherit; font-size:13px; font-weight:400; color:var(--coral-dark); cursor:pointer; text-decoration:none; }
 .voltar:hover{ text-decoration:underline; }
 .voltar:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; border-radius:4px; }
 .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
@@ -6,13 +6,13 @@
 .grade{ display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:12px; }
 .card{ background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:16px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; min-width:0; }
 .cardTopo{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.cardTopo h3{ margin:0; font-size:16px; font-weight:600; }
+.cardTopo h3{ margin:0; font-size:16px; font-weight:500; }
 .dl{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 14px; margin:0; font-size:13px; }
 .dl dt{ color:var(--ash); }
 .dl dd{ margin:0; text-align:right; overflow-wrap:anywhere; }
 .dl dd small{ color:var(--ash); }
 .desc{ line-height:1.55; }
-.ficha{ display:inline-block; font-size:12px; background:var(--peach); color:var(--coral-dark); border:0; border-radius:6px; padding:1px 6px; margin:0 1px; font-weight:600; }
+.ficha{ display:inline-block; font-size:12px; background:var(--peach); color:var(--coral-dark); border:0; border-radius:6px; padding:1px 6px; margin:0 1px; font-weight:400; }
 button.ficha{ cursor:pointer; padding:4px 9px; min-height:28px; }
 button.ficha:hover{ filter:brightness(.96); }
 button.ficha:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
@@ -26,7 +26,7 @@ button.ficha:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 .col textarea, .col input, .col select, .modal select{ font:inherit; font-size:14px; padding:8px 10px; border:1px solid rgba(var(--ink-rgb),.24); border-radius:10px; background:var(--white); color:var(--ink); min-width:0; }
 .col textarea{ resize:vertical; line-height:1.5; }
 .col input[aria-invalid="true"]{ border-color:var(--erro-text); }
-.secao{ margin:6px 0 0; font-size:12px; color:var(--ash); font-weight:600; }
+.secao{ margin:6px 0 0; font-size:12px; color:var(--ash); font-weight:400; }
 .codigo{ display:grid; grid-template-columns:140px minmax(0,1fr); gap:10px; }
 .chips{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
 .chips small{ color:var(--ash); font-size:12px; margin-right:2px; }
@@ -38,7 +38,7 @@ button.ficha:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 .opc input[type="radio"]{ margin-top:3px; accent-color:var(--coral); }
 .opc b{ display:block; font-size:14px; }
 .opc small{ display:block; color:var(--ash); font-size:12.5px; line-height:1.45; }
-.opc select{ padding:2px 6px; font-weight:600; font-size:14px; }
+.opc select{ padding:2px 6px; font-weight:400; font-size:14px; }
 .opcOn{ border-color:var(--coral); box-shadow:0 0 0 1px var(--coral); }
 
 

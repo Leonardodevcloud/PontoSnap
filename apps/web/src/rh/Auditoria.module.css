@@ -8,30 +8,30 @@
   padding:7px 10px; font:inherit; font-size:12.5px; color:var(--ink); outline:none; margin-left:5px;
 }
 .filtros input:focus{ border-color:var(--coral); }
-.limpar{ background:none; border:none; color:var(--coral-dark); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:underline; }
+.limpar{ background:none; border:none; color:var(--coral-dark); font:inherit; font-size:12.5px; font-weight:400; cursor:pointer; text-decoration:underline; }
 
 .linha{
   background:var(--white); border:1px solid rgba(var(--ink-rgb),.08);
   border-radius:11px; padding:11px 14px; margin-bottom:6px;
 }
 .linhaTop{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
-.acao{ font-size:14px; font-weight:600; color:var(--ink); }
+.acao{ font-size:14px; font-weight:400; color:var(--ink); }
 .quando{ font-size:12px; color:var(--ash); white-space:nowrap; }
 .meta{ display:flex; gap:8px; align-items:center; margin-top:5px; flex-wrap:wrap; }
 .quem{ font-size:12.5px; color:var(--ash); }
 .perfil{ font-size:12px; color:var(--ash); }
-.falhou{ font-size:12px; font-weight:600; color:var(--erro-text); background:var(--erro-bg); padding:2px 7px; border-radius:6px; }
+.falhou{ font-size:12px; font-weight:400; color:var(--erro-text); background:var(--erro-bg); padding:2px 7px; border-radius:6px; }
 
 .vazio{ color:var(--ash); font-size:14px; padding:16px 0; }
 .erro{
   background:var(--erro-bg); color:var(--erro-text); border-radius:var(--r-md);
-  padding:10px 14px; font-size:14px; font-weight:600; margin-bottom:12px;
+  padding:10px 14px; font-size:14px; font-weight:400; margin-bottom:12px;
 }
 .pessoas{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px; font-size:12.5px; color:var(--ash); }
-.pessoa{ font:inherit; font-size:12.5px; font-weight:600; padding:5px 11px; border-radius:var(--r-pill); border:1px solid rgba(var(--ink-rgb),.16); background:var(--white); color:var(--ink); cursor:pointer; }
+.pessoa{ font:inherit; font-size:12.5px; font-weight:400; padding:5px 11px; border-radius:var(--r-pill); border:1px solid rgba(var(--ink-rgb),.16); background:var(--white); color:var(--ink); cursor:pointer; }
 .pessoa:hover{ background:var(--cream); }
 .pessoa:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
 .pessoaOn{ background:var(--peach); border-color:var(--coral); color:var(--coral-dark); }
 .pessoaInativa{ opacity:.7; }
 .pessoaOutros{ border-style:dashed; }
-.quem b{ color:var(--ink); font-weight:600; }
+.quem b{ color:var(--ink); font-weight:400; }
