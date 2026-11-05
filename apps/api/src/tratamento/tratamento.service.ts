@@ -1194,10 +1194,13 @@ export class TratamentoService {
       const eventos: string[] = [];
       // Domingo/feriado trabalhado é verba própria (não "hora extra"): diz o nome e pra onde vai.
       const dfMin = d.extras.filter((e) => e.motivo === 'extra em domingo/feriado').reduce((a, e) => a + e.min, 0);
+      // Domingo/feriado trabalhado pago na folha é verba própria (100%): não é hora
+      // extra "positiva" nem entra no banco — por isso sai das colunas Positivas e Créd.
+      const dfNaFolha = dfMin > 0 && (ap.destinacao?.extra.destino === 'PAGA' || (ap.destinacao?.extra.domingoFeriadoPagoMin ?? 0) > 0);
+      const dfFolhaMin = dfNaFolha ? dfMin : 0;
       if (dfMin > 0) {
         const nomeDF = diaSemana(d.data) === 0 && !(ap.feriados ?? []).includes(d.data) ? 'Domingo trabalhado' : 'Feriado trabalhado';
-        const vaiPraFolha = ap.destinacao?.extra.destino === 'PAGA' || (ap.destinacao?.extra.domingoFeriadoPagoMin ?? 0) > 0;
-        eventos.push(`${nomeDF} ${hhmm(dfMin)}${vaiPraFolha ? ' · pago na folha' : ' · vai para o banco'}`);
+        eventos.push(`${nomeDF} ${hhmm(dfMin)}${dfNaFolha ? ' · pago na folha' : ' · vai para o banco'}`);
       } else if (d.ehDescansoDia && d.minutosTrabalhados > 0) eventos.push('Trabalho em descanso');
       const afast = afastPorDia.get(d.data);
       if (afast) eventos.push(afast === 'FERIAS' ? 'Férias' : afast === 'ATESTADO' ? 'Atestado' : afast === 'FOLGA' ? 'Folga concedida' : afast);
@@ -1219,11 +1222,11 @@ export class TratamentoService {
         marcacoesOriginais: originais || '—',
         jornadaRealizada: realizada || '—',
         horasRealizadas: d.minutosTrabalhados > 0 ? hhmm(d.minutosTrabalhados) : '',
-        horasPositivas: d.extrasTotalMin > 0 ? hhmm(d.extrasTotalMin) : d.saldoMin > 0 ? hhmm(d.saldoMin) : '',
+        horasPositivas: (() => { const pos = Math.max(0, (d.extrasTotalMin > 0 ? d.extrasTotalMin : Math.max(0, d.saldoMin)) - dfFolhaMin); return pos > 0 ? hhmm(pos) : ''; })(),
         atrasosFaltas: d.faltaMin > 0 ? hhmm(d.faltaMin) : d.atrasoMin > 0 ? hhmm(d.atrasoMin) : '',
         horaNoturna: d.minutosNoturnosLegais > 0 ? hhmm(d.minutosNoturnosLegais) : '',
         compensadasDebito: '',
-        compensadasCredito: r.bancoDeHorasMin > 0 && d.saldoMin > 0 ? hhmm(d.saldoMin) : '',
+        compensadasCredito: r.bancoDeHorasMin > 0 && (d.saldoMin - dfFolhaMin) > 0 ? hhmm(d.saldoMin - dfFolhaMin) : '',
         eventos: eventos.join(' · '),
       } satisfies LinhaEspelho;
     });
