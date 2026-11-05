@@ -17,6 +17,10 @@ export type FiltroApuracao = 'todos' | 'extras' | 'faltas' | 'sinais';
 
 const comSinal = (m: number) => `${m > 0 ? '+' : m < 0 ? '−' : ''}${minutosParaHhMm(Math.abs(m))}`;
 const hhOuTraco = (m: number) => (m > 0 ? minutosParaHhMm(m) : '—');
+// Domingo/feriado trabalhado pago na folha (100%) é verba própria: sai da coluna "Extras"
+// do espelho (igual ao PDF). A visão de apuração mostra Extra 50%/100% à parte e não mexe.
+const dfFolhaMin = (l: LinhaCompetencia) => (l.destinacao?.extra as { domingoFeriadoPagoMin?: number } | undefined)?.domingoFeriadoPagoMin ?? 0;
+const extrasEspelho = (l: LinhaCompetencia) => Math.max(0, l.extrasMin - dfFolhaMin(l));
 const fmtDia = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const ROTULO_AFAST: Record<string, string> = {
   FERIAS: 'férias', INSS: 'INSS', MATERNIDADE: 'lic. maternidade', PATERNIDADE: 'lic. paternidade', SUSPENSAO: 'suspensão', OUTRO: 'afastado', FOLGA: 'folga',
@@ -80,7 +84,7 @@ function colunas(modo: ModoTabela, hoje: string): Col[] {
   ];
   if (modo === 'espelho') {
     base.push(
-      { k: 'extras', t: 'Extras', n: true, v: (l) => l.extrasMin, cell: (l) => (l.extrasMin > 0 ? `+${minutosParaHhMm(l.extrasMin)}` : '—'), cls: (l) => (l.extrasMin > 0 ? vt.pos : vt.mute), tot: (r) => `+${minutosParaHhMm(r.totais.extrasMin)}` },
+      { k: 'extras', t: 'Extras', n: true, v: (l) => extrasEspelho(l), cell: (l) => (extrasEspelho(l) > 0 ? `+${minutosParaHhMm(extrasEspelho(l))}` : '—'), cls: (l) => (extrasEspelho(l) > 0 ? vt.pos : vt.mute), tot: (r) => `+${minutosParaHhMm(Math.max(0, r.totais.extrasMin - r.linhas.reduce((a, l) => a + dfFolhaMin(l), 0)))}` },
       { k: 'atrfal', t: 'Atr./Faltas', n: true, v: (l) => l.atrasoMin + l.faltaMin, cell: (l) => (l.atrasoMin + l.faltaMin > 0 ? `−${minutosParaHhMm(l.atrasoMin + l.faltaMin)}` : '—'), cls: (l) => (l.atrasoMin + l.faltaMin > 0 ? vt.neg : vt.mute), tot: (r) => `−${minutosParaHhMm(r.totais.atrasoMin + r.totais.faltaMin)}` },
     );
   } else {
