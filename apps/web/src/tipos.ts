@@ -325,7 +325,7 @@ export interface BatidaDia {
 export interface Destinacao {
   falta: { min: number; destino: 'DESCONTA' | 'BANCO' | 'ABONA' };
   atraso: { min: number; destino: 'DESCONTA' | 'BANCO' | 'TOLERA' };
-  extra: { min: number; destino: 'BANCO' | 'PAGA' };
+  extra: { min: number; destino: 'BANCO' | 'PAGA'; domingoFeriadoPagoMin?: number };
 }
 
 export interface ParEntradaSaida { entrada: string; saida: string; }
