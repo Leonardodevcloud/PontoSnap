@@ -168,6 +168,30 @@ export class HoleriteService {
     }
   }
 
+  /**
+   * Puxa pras Assinaturas os contracheques já importados na Folha CLT que ainda
+   * não viraram documento (ex.: importados antes da integração existir). Só cria
+   * os que faltam — nunca mexe num contracheque que já é documento aqui.
+   */
+  async sincronizarAssinaturas(tenantId: string, competencia: string) {
+    if (!/^\d{4}-\d{2}$/.test(competencia)) throw new BadRequestException('Competência inválida (use AAAA-MM)');
+    const jaTem = await this.assinaturas.empregadosComContracheque(tenantId, competencia);
+    const hols = await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ empregadoId: pontoHolerite.empregadoId, arquivo: pontoHolerite.arquivo }).from(pontoHolerite)
+        .where(and(eq(pontoHolerite.tenantId, tenantId), eq(pontoHolerite.competencia, competencia))));
+    let criados = 0;
+    const erros: { empregadoId: string; msg: string }[] = [];
+    for (const h of hols) {
+      if (jaTem.has(h.empregadoId)) continue;
+      try {
+        const bytes = this.cripto.decifrarBytes(h.arquivo);
+        await this.assinaturas.salvarContracheque(tenantId, { competencia, empregadoId: h.empregadoId, bytes, arquivoNome: `contracheque-${competencia}.pdf` });
+        criados++;
+      } catch (e) { erros.push({ empregadoId: h.empregadoId, msg: (e as Error).message }); }
+    }
+    return { criados, jaTinham: hols.length - criados - erros.length, total: hols.length, erros };
+  }
+
   /** Aviso no app (push), best-effort — nunca derruba o envio. */
   private async avisar(tenantId: string, empregadoId: string, competencia: string) {
     try {

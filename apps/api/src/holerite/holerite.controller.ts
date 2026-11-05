@@ -54,6 +54,13 @@ export class HoleriteController {
     return this.holerites.competencia(this.tenant(u), comp);
   }
 
+  /** Puxa pras Assinaturas os contracheques já importados que ainda não viraram documento. */
+  @Post('sincronizar-assinaturas')
+  @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)
+  sincronizarAssinaturas(@UsuarioAtual() u: PayloadAcesso, @Query('comp') comp: string) {
+    return this.holerites.sincronizarAssinaturas(this.tenant(u), comp);
+  }
+
   /** RH marca/desfaz o pagamento do líquido do holerite. */
   @Put(':id/pagamento')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH)

@@ -135,7 +135,13 @@ export function DocsAssinatura() {
   const [subindoPara, setSubindoPara] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
-    try { setD(await api.get<Painel>(`/assinaturas?comp=${mes}`)); setErro(null); }
+    try {
+      // Puxa da Folha CLT os contracheques que ainda não viraram documento aqui
+      // (ex.: importados antes da integração). Idempotente e best-effort.
+      const sync = await api.post<{ criados: number; erros: { empregadoId: string; msg: string }[] }>(`/holerites/sincronizar-assinaturas?comp=${mes}`, {}).catch(() => null);
+      setD(await api.get<Painel>(`/assinaturas?comp=${mes}`));
+      setErro(sync && sync.erros.length ? `Alguns contracheques não puderam ser puxados da Folha CLT: ${sync.erros[0]!.msg}` : null);
+    }
     catch (e) { setErro((e as Error).message); }
   }, [mes]);
   useEffect(() => { setD(null); setSel(new Set()); void carregar(); }, [carregar]);

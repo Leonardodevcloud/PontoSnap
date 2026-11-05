@@ -282,6 +282,14 @@ export class AssinaturaService {
     return this.visao(r!);
   }
 
+  /** EmpregadoIds que já têm documento de contracheque no mês (qualquer status). */
+  async empregadosComContracheque(tenantId: string, competencia: string) {
+    const rows = await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ empregadoId: assinaturaDocumento.empregadoId }).from(assinaturaDocumento)
+        .where(and(eq(assinaturaDocumento.tenantId, tenantId), eq(assinaturaDocumento.competencia, competencia), eq(assinaturaDocumento.tipo, 'CONTRACHEQUE'))));
+    return new Set(rows.map((r) => r.empregadoId));
+  }
+
   async removerContracheque(tenantId: string, id: string) {
     const d = await this.doc(tenantId, id);
     if (d.tipo !== 'CONTRACHEQUE' || !['RASCUNHO', 'ERRO', 'CANCELADO'].includes(d.status)) throw new BadRequestException('Só dá para remover contracheque ainda não enviado.');
