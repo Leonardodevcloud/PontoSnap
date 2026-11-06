@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lte, or, sql } from 'drizzle-orm';
 import {
   comTenant, comoMaster, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, pessoalFechamentoPessoa, usuario, type Db,
@@ -20,6 +20,8 @@ import {
 } from './calculo';
 
 const COMP_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** AAAA-MM-DD ± n dias. */
+const somarDias = (data: string, n: number) => { const d = new Date(`${data}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const reais = (c: number) => (c / 100).toFixed(2);
 
 export interface LinhaClt {
@@ -81,6 +83,12 @@ export interface LinhaClt {
   observacao: string | null;
   /** Sem escala/REP: a apuração falhou e os números do ponto ficaram zerados. */
   erro: string | null;
+  /**
+   * Saiu da empresa neste mês (transferência para outro CNPJ ou desligamento
+   * com data): o mês vai até o último dia aqui. Carga do mês seguinte, cesta e
+   * débitos do mês ficam com a empresa onde a pessoa termina o mês.
+   */
+  saida?: { ultimoDia: string; motivo: string | null };
 }
 export interface ConfigBeneficio { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number }
 export interface PadraoBeneficio extends ConfigBeneficio { vigenteDesde: string }
@@ -295,8 +303,10 @@ export class PessoalService {
     const fx = faixaDoMes(prox);
 
     const dados = await comTenant(this.db, tenantId, async (tx) => {
+      // Ativos + quem saiu (transferência) depois do início do mês: o mês da
+      // saída ainda é desta empresa até o último dia trabalhado aqui.
       const emps = await tx.select().from(empregado)
-        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true))).orderBy(asc(empregado.nome));
+        .where(and(eq(empregado.tenantId, tenantId), or(eq(empregado.ativo, true), gt(empregado.dataSaida, inicio)))).orderBy(asc(empregado.nome));
       const configs = await tx.select().from(pessoalCltConfig).where(eq(pessoalCltConfig.tenantId, tenantId));
       const padroesRows = await tx.select().from(pessoalPadrao).where(eq(pessoalPadrao.tenantId, tenantId));
       const valoresRows = await tx.select().from(pessoalPrestadorValor).where(eq(pessoalPrestadorValor.tenantId, tenantId));
@@ -382,6 +392,9 @@ export class PessoalService {
       const ex = exclusaoDe('CLT', e.id);
       if (ex) { foraDoMes.push({ exclusaoId: ex.id, pessoaTipo: 'CLT', pessoaId: e.id, nome: e.nome, escopo: ex.escopo as 'MES' | 'DIANTE', desde: ex.competencia }); continue; }
       if (e.dataInicioPonto && e.dataInicioPonto > fim) continue; // ainda não começou
+      // Sai no meio deste mês: data de saída = primeiro dia fora (já no destino).
+      const saiNoMes = !!e.dataSaida && e.dataSaida <= fim;
+      const ultimoDiaAqui = saiNoMes ? somarDias(e.dataSaida!, -1) : null;
 
       // Cargo e Pix são do cadastro (empregado, migration 0069) e valem para todos os meses.
       // A carga feita neste fechamento é do PRÓXIMO mês → vale o valor vigente nele.
@@ -431,12 +444,17 @@ export class PessoalService {
           }
         }
         bancoPassaMin = ap.banco?.acerto?.passaMin ?? 0;
-        const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim);
-        diasProxLista = apProx.diasPrevistos;
-        diasProxVrLista = diasComVr(apProx.diasPrevistos, apProx.jornadaEscala);
-        const previstosProx = new Set(apProx.diasPrevistos);
-        const fp = feriadosProxPara(e);
-        cargaFora = apProx.diasEscala.filter((d) => !previstosProx.has(d)).map((data) => ({ data, motivo: fp.has(data) ? 'feriado' as const : 'afastamento' as const }));
+        // Quem sai neste mês não tem carga do mês seguinte aqui: é do destino.
+        if (!saiNoMes) {
+          // Saiu no dia 1 do mês seguinte: este é o último mês aqui e a carga
+          // do seguinte ainda é desta empresa (o destino carrega a partir do outro).
+          const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim, [], { ignorarSaida: true });
+          diasProxLista = apProx.diasPrevistos;
+          diasProxVrLista = diasComVr(apProx.diasPrevistos, apProx.jornadaEscala);
+          const previstosProx = new Set(apProx.diasPrevistos);
+          const fp = feriadosProxPara(e);
+          cargaFora = apProx.diasEscala.filter((d) => !previstosProx.has(d)).map((data) => ({ data, motivo: fp.has(data) ? 'feriado' as const : 'afastamento' as const }));
+        }
       } catch (err) {
         erro = (err as Error).message || 'Sem escala ou REP configurado';
       }
@@ -464,18 +482,25 @@ export class PessoalService {
       const baseCesta = e.dataAdmissao ?? e.dataInicioPonto;
       const cestaAuto = baseCesta ? somarMeses(baseCesta.slice(0, 7), 3) : null;
       const cestaDesde = cestaManual ?? cestaAuto;
-      const ben = calcularBeneficio({
+      const benCalc = calcularBeneficio({
         vrDiaCent: config.vrDiaCent, cestaCent: cestaRecebe ? beneficioEm(e.id, comp).cestaCent : 0, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, diasProxVr: diasProxVrLista.length, pagos, pagosVr: pagosVr ?? undefined,
         diasProxVt: diasProxVtLista.length, pagosVt: pagosVt ?? undefined,
         previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados: feriadosPara(e), folgas: new Set(folgasDias),
         pagoCom: { vrDiaCent: pagoCom.vrDiaCent, vtTipo: pagoCom.vtTipo, vtValorCent: pagoCom.vtValorCent },
       });
+      // Saiu no meio do mês: sem carga seguinte para abater o acerto, e a cesta
+      // do mês é paga por quem tem a pessoa no fim dele (o destino).
+      const ben = saiNoMes ? {
+        ...benCalc, cestaCent: 0, cestaStatus: 'SEM_CESTA' as const, naoUsados: [], acertoVrCent: 0, acertoVtCent: 0, acertoCent: 0, cargaCent: 0,
+        conta: { ...benCalc.conta, diasAcertoVr: [], diasAcertoVt: [], vtFixoDiasAbatidos: 0 },
+      } : benCalc;
 
       if (salarioCent == null && e.salarioMensal != null) { salarioCent = centavos(e.salarioMensal); salarioFimMesCent = salarioCent; }
       const sal = salarioCent ?? 0;
       const diasMes = diasUteis.length;
-      const debitosCent = debitosDe('CLT', e.id);
+      // Débitos do mês de saída também ficam com o destino (eles seguem a pessoa).
+      const debitosCent = saiNoMes ? 0 : debitosDe('CLT', e.id);
       const liquidoSalarioCent = sal + proventosCent - descontosCent - debitosCent;
       const custoBrutoCent = sal + proventosCent - descontosCent + ben.vrProxCent + ben.cestaCent + ben.vtProxCent;
       const abatimentosCent = debitosCent + ben.acertoCent;
@@ -496,6 +521,7 @@ export class PessoalService {
         liquidoPagarCent: liquidoSalarioCent + ben.cargaCent,
         observacao: lancDe('CLT', e.id)?.observacao ?? null,
         erro,
+        ...(ultimoDiaAqui && { saida: { ultimoDia: ultimoDiaAqui, motivo: e.motivoSaida ?? null } }),
       });
     }
 
@@ -586,7 +612,7 @@ export class PessoalService {
     // ---------- débitos do mês ----------
     const nomeDe = (tipo: string, id: string) =>
       (tipo === 'CLT' ? dados.emps.find((e) => e.id === id)?.nome : dados.prest.find((p) => p.id === id)?.nome) ?? '—';
-    const ativos = new Set([...clt.map((c) => `CLT:${c.empregadoId}`), ...mei.map((m) => `MEI:${m.id}`), ...motoristas.map((m) => `MOTORISTA:${m.id}`)]);
+    const ativos = new Set([...clt.filter((c) => !c.saida).map((c) => `CLT:${c.empregadoId}`), ...mei.map((m) => `MEI:${m.id}`), ...motoristas.map((m) => `MOTORISTA:${m.id}`)]);
     const debitos: LinhaDebito[] = dados.debs.flatMap((d) => {
       const pc = parcelaNoMes(debParc(d), comp);
       if (!pc || !ativos.has(`${d.pessoaTipo}:${d.pessoaId}`)) return [];

@@ -1,24 +1,27 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNull, lte } from 'drizzle-orm';
 import {
   comoMaster, type Db,
   empregado, empregadoSalario, empregadoFoto, empregadoEscalaVigencia,
-  pessoalCltConfig, pessoalCltCesta, pessoalDebito, pessoalExclusao,
-  pessoalPrestador, pessoalPrestadorValor,
-  pontoPerfilRegra, pontoHorarioContratual, pontoMarcacao,
-  usuario, usuarioTenant, tenant,
+  pessoalCltConfig, pessoalCltCesta, pessoalDebito, pessoalExclusao, pessoalFechamento, pessoalLancamento,
+  pessoalPrestador, pessoalPrestadorValor, pessoalNota, pessoalNfArquivo, prestadorConvite,
+  pontoPerfilRegra, pontoHorarioContratual, pontoMarcacao, pontoCct, pontoEscala, pontoAfastamento,
+  notificacaoPreferencia, usuario, usuarioTenant, tenant,
 } from '@ponto/db';
 import { DB } from '../database/database.module';
 import { PlanoLimiteService } from '../cobranca/plano-limite.service';
+import { registrarEventoRep } from '../fiscal/evento-rep';
+import { centavos, parcelaNoMes } from '../pessoal/calculo';
 
 const RE_DATA = /^\d{4}-\d{2}-\d{2}$/;
-const RE_COMP = /^\d{4}-\d{2}$/;
+const RE_COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 type TxMaster = Parameters<Parameters<typeof comoMaster>[1]>[0];
+type DebitoRow = typeof pessoalDebito.$inferSelect;
 
 interface TransferirCltDto {
   destinoTenantId: string;
-  data: string;             // AAAA-MM-DD (data da transferência)
+  data: string;             // AAAA-MM-DD: primeiro dia no destino
   preservarAdmissao: boolean;
   novaAdmissao?: string | null;
   motivo: 'TRANSFERENCIA' | 'DESLIGAMENTO';
@@ -28,11 +31,33 @@ interface TransferirPrestadorDto {
   competencia: string;      // AAAA-MM (a partir de quando sai da origem / entra no destino)
 }
 
+const somarDias = (data: string, n: number) => { const d = new Date(`${data}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const mesLongo = (comp: string) => {
+  const M = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  return `${M[Number(comp.slice(5, 7)) - 1]} de ${comp.slice(0, 4)}`;
+};
+
+/**
+ * Débito que ainda tem desconto a partir de `comp` (parcela no mês, ou começa
+ * depois). Os já quitados ou encerrados antes não vão para o destino.
+ */
+function debitoAbertoEm(d: DebitoRow, comp: string): boolean {
+  if (d.competenciaInicio > comp) return true;
+  return parcelaNoMes({
+    valorTotalCent: centavos(d.valorTotal), parcelas: d.parcelas, competenciaInicio: d.competenciaInicio, parcelasPagas: d.parcelasPagas,
+    tipo: d.tipo === 'FIXO' ? 'FIXO' : 'PARCELADO', competenciaFim: d.competenciaFim,
+  }, comp) != null;
+}
+
 /**
  * Transferência de pessoa entre CNPJs do grupo. Mantém o histórico na origem e
  * recria a pessoa no destino (sem recadastrar), reaproveitando o mesmo login.
  * Roda tudo numa transação master (cruza duas empresas) para nunca deixar a
  * pessoa "no limbo".
+ *
+ * Regra do mês da transferência: tudo o que é "do mês" (cesta, débitos e a
+ * carga de benefícios do mês seguinte) fica com a empresa onde a pessoa
+ * termina o mês — o destino. A origem fica com o ponto até o último dia lá.
  */
 @Injectable()
 export class TransferenciaService {
@@ -55,6 +80,13 @@ export class TransferenciaService {
     if (!ids.has(origem) || !ids.has(destino)) throw new ForbiddenException('Empresa fora do seu acesso.');
   }
 
+  /** Mês fechado na Gestão de Pessoal (retrato): não dá para tirar nem pôr gente nele. */
+  private async exigirMesAberto(tx: TxMaster, tenantId: string, comp: string, quem: string) {
+    const f = (await tx.select({ id: pessoalFechamento.id }).from(pessoalFechamento)
+      .where(and(eq(pessoalFechamento.tenantId, tenantId), eq(pessoalFechamento.competencia, comp))).limit(1))[0];
+    if (f) throw new BadRequestException(`${mesLongo(comp)} já está fechado na ${quem}. Reabra o mês lá ou escolha uma data no mês seguinte.`);
+  }
+
   // ─────────────────────────── info (pro formulário) ───────────────────────────
 
   async info(origem: string, usuarioId: string, tipo: 'CLT' | 'PRESTADOR', id: string, data?: string) {
@@ -69,8 +101,10 @@ export class TransferenciaService {
       return comoMaster(this.db, async (tx) => {
         const e = (await tx.select().from(empregado).where(and(eq(empregado.tenantId, origem), eq(empregado.id, id))).limit(1))[0];
         if (!e) throw new NotFoundException('Funcionário não encontrado.');
+        const comp = data && RE_DATA.test(data) ? data.slice(0, 7) : null;
         const debitos = (await tx.select().from(pessoalDebito)
-          .where(and(eq(pessoalDebito.tenantId, origem), eq(pessoalDebito.pessoaTipo, 'CLT'), eq(pessoalDebito.pessoaId, id)))).length;
+          .where(and(eq(pessoalDebito.tenantId, origem), eq(pessoalDebito.pessoaTipo, 'CLT'), eq(pessoalDebito.pessoaId, id))))
+          .filter((d) => !comp || debitoAbertoEm(d, comp)).length;
         let batidasApos = 0;
         if (data && RE_DATA.test(data)) {
           batidasApos = (await tx.select({ id: pontoMarcacao.id }).from(pontoMarcacao)
@@ -119,6 +153,18 @@ export class TransferenciaService {
     return n!.id;
   }
 
+  /** Copia a CCT (convenção coletiva) pro destino (reaproveita se já existir uma com o mesmo nome). */
+  private async copiarCct(tx: TxMaster, destino: string, cctId: string): Promise<string | null> {
+    const c = (await tx.select().from(pontoCct).where(eq(pontoCct.id, cctId)).limit(1))[0];
+    if (!c) return null;
+    const existe = (await tx.select({ id: pontoCct.id }).from(pontoCct)
+      .where(and(eq(pontoCct.tenantId, destino), eq(pontoCct.nome, c.nome))).limit(1))[0];
+    if (existe) return existe.id;
+    const { id: _i, tenantId: _t, criadoEm: _c, ...rest } = c;
+    const [n] = await tx.insert(pontoCct).values({ ...rest, tenantId: destino } as typeof pontoCct.$inferInsert).returning({ id: pontoCct.id });
+    return n!.id;
+  }
+
   /** Copia o horário contratual pro destino (reaproveita se já existir um com o mesmo código). */
   private async copiarHorario(tx: TxMaster, destino: string, horarioId: string): Promise<string | null> {
     const h = (await tx.select().from(pontoHorarioContratual).where(eq(pontoHorarioContratual.id, horarioId)).limit(1))[0];
@@ -133,6 +179,18 @@ export class TransferenciaService {
     return n!.id;
   }
 
+  /** Débitos que ainda têm desconto a partir de `comp` seguem a pessoa (mesma numeração de parcelas). */
+  private async copiarDebitos(tx: TxMaster, origem: string, destino: string, tipo: string, deId: string, paraId: string, comp: string) {
+    let n = 0;
+    for (const d of await tx.select().from(pessoalDebito).where(and(eq(pessoalDebito.tenantId, origem), eq(pessoalDebito.pessoaTipo, tipo), eq(pessoalDebito.pessoaId, deId)))) {
+      if (!debitoAbertoEm(d, comp)) continue;
+      const { id: _i, tenantId: _t, pessoaId: _p, criadoEm: _c, ...rest } = d;
+      await tx.insert(pessoalDebito).values({ ...rest, tenantId: destino, pessoaId: paraId } as typeof pessoalDebito.$inferInsert);
+      n++;
+    }
+    return n;
+  }
+
   // ─────────────────────────── transferir CLT ───────────────────────────
 
   async transferirClt(origem: string, usuarioId: string, empregadoId: string, p: TransferirCltDto) {
@@ -140,17 +198,25 @@ export class TransferenciaService {
     if (!p.preservarAdmissao && p.novaAdmissao && !RE_DATA.test(p.novaAdmissao)) throw new BadRequestException('Data de admissão inválida.');
     await this.validarRota(usuarioId, origem, p.destinoTenantId);
     await this.limites.exigirVaga(p.destinoTenantId, 1);
+    const compEntrada = p.data.slice(0, 7);
 
     return comoMaster(this.db, async (tx) => {
       const e = (await tx.select().from(empregado).where(and(eq(empregado.tenantId, origem), eq(empregado.id, empregadoId))).limit(1))[0];
       if (!e) throw new NotFoundException('Funcionário não encontrado.');
       if (!e.ativo) throw new BadRequestException('Funcionário já está inativo na origem.');
+      if (e.dataInicioPonto && p.data <= e.dataInicioPonto) throw new BadRequestException('A transferência tem que ser depois do início dele no ponto da origem.');
       const jaLa = (await tx.select({ id: empregado.id }).from(empregado)
         .where(and(eq(empregado.tenantId, p.destinoTenantId), eq(empregado.cpf, e.cpf))).limit(1))[0];
       if (jaLa) throw new ConflictException('Esse CPF já tem cadastro na empresa de destino.');
+      // O mês da entrada não pode estar fechado em nenhum dos dois lados: na
+      // origem o retrato já teria a pessoa no mês inteiro; no destino, sem ela.
+      await this.exigirMesAberto(tx, origem, compEntrada, 'empresa de origem');
+      await this.exigirMesAberto(tx, p.destinoTenantId, compEntrada, 'empresa de destino');
 
-      // Definições por empresa: remapeia perfil de regra e horários.
+      const avisos: string[] = [];
+      // Definições por empresa: remapeia perfil de regra, CCT e horários.
       const novoPerfil = e.perfilRegraId ? await this.copiarPerfil(tx, p.destinoTenantId, e.perfilRegraId) : null;
+      const novaCct = e.cctId ? await this.copiarCct(tx, p.destinoTenantId, e.cctId) : null;
       const mapaHorario = new Map<string, string | null>();
       const copiarHorario = async (hid: string | null) => {
         if (!hid) return null;
@@ -161,14 +227,22 @@ export class TransferenciaService {
       };
       const novoHorarioEmp = await copiarHorario(e.horarioContratualId);
 
+      // Matrícula é única por empresa: se já existe no destino, entra sem.
+      let matricula = e.matricula;
+      if (matricula) {
+        const usada = (await tx.select({ id: empregado.id }).from(empregado)
+          .where(and(eq(empregado.tenantId, p.destinoTenantId), eq(empregado.matricula, matricula))).limit(1))[0];
+        if (usada) { avisos.push(`A matrícula ${matricula} já existe no destino: ele entrou sem matrícula (defina em Funcionários › Cadastro).`); matricula = null; }
+      }
+
       const dataAdmissao = p.preservarAdmissao ? e.dataAdmissao : (p.novaAdmissao ?? p.data);
       const [novo] = await tx.insert(empregado).values({
-        tenantId: p.destinoTenantId, cpf: e.cpf, nome: e.nome, pis: e.pis, matricula: e.matricula, pinHash: e.pinHash,
-        horarioContratualId: novoHorarioEmp, cctId: null, perfilRegraId: novoPerfil, matriculaEsocial: e.matriculaEsocial,
+        tenantId: p.destinoTenantId, cpf: e.cpf, nome: e.nome, pis: e.pis, matricula, pinHash: e.pinHash,
+        horarioContratualId: novoHorarioEmp, cctId: novaCct, perfilRegraId: novoPerfil, matriculaEsocial: e.matriculaEsocial,
         ativo: true, dataInicioPonto: p.data, dataAdmissao, cliente: e.cliente, cargo: e.cargo, chavePix: e.chavePix, salarioMensal: e.salarioMensal,
         celular: e.celular, emailPessoal: e.emailPessoal, contatoEmergencia: e.contatoEmergencia, avatarSemente: e.avatarSemente,
         trabalhoUf: e.trabalhoUf, trabalhoMunicipio: e.trabalhoMunicipio, trabalhoMunicipioNome: e.trabalhoMunicipioNome,
-        empregadoAnteriorId: e.id,
+        cadastroAtualizadoEm: e.cadastroAtualizadoEm, empregadoAnteriorId: e.id,
       }).returning({ id: empregado.id });
       const novoId = novo!.id;
 
@@ -177,15 +251,17 @@ export class TransferenciaService {
         const { id: _i, tenantId: _t, empregadoId: _e, criadoEm: _c, ...rest } = s;
         await tx.insert(empregadoSalario).values({ ...rest, tenantId: p.destinoTenantId, empregadoId: novoId } as typeof empregadoSalario.$inferInsert);
       }
-      // Benefícios (VR/VT/Pix/cargo)
+      // Benefícios (VR/VT, home office), com as vigências
       for (const c of await tx.select().from(pessoalCltConfig).where(and(eq(pessoalCltConfig.tenantId, origem), eq(pessoalCltConfig.empregadoId, empregadoId)))) {
         const { id: _i, tenantId: _t, empregadoId: _e, ...rest } = c;
         await tx.insert(pessoalCltConfig).values({ ...rest, tenantId: p.destinoTenantId, empregadoId: novoId } as typeof pessoalCltConfig.$inferInsert);
       }
-      // Carência da cesta
+      // Cesta: "recebe sim/não" sempre segue. O mês escolhido da carência só
+      // segue se a admissão foi mantida; com admissão nova, a carência recomeça.
       for (const c of await tx.select().from(pessoalCltCesta).where(and(eq(pessoalCltCesta.tenantId, origem), eq(pessoalCltCesta.empregadoId, empregadoId)))) {
-        const { id: _i, tenantId: _t, empregadoId: _e, atualizadoEm: _a, ...rest } = c;
-        await tx.insert(pessoalCltCesta).values({ ...rest, tenantId: p.destinoTenantId, empregadoId: novoId } as typeof pessoalCltCesta.$inferInsert);
+        const cestaDesde = p.preservarAdmissao ? c.cestaDesde : null;
+        if (c.recebe && !cestaDesde) continue; // recebe, no automático = sem linha
+        await tx.insert(pessoalCltCesta).values({ tenantId: p.destinoTenantId, empregadoId: novoId, recebe: c.recebe, cestaDesde });
       }
       // Escala (remapeia o horário contratual de cada vigência)
       for (const v of await tx.select().from(empregadoEscalaVigencia).where(and(eq(empregadoEscalaVigencia.tenantId, origem), eq(empregadoEscalaVigencia.empregadoId, empregadoId)))) {
@@ -194,10 +270,24 @@ export class TransferenciaService {
         if (!nh) continue;
         await tx.insert(empregadoEscalaVigencia).values({ ...rest, tenantId: p.destinoTenantId, empregadoId: novoId, horarioContratualId: nh } as typeof empregadoEscalaVigencia.$inferInsert);
       }
-      // Débitos em aberto (seguem a pessoa)
-      for (const d of await tx.select().from(pessoalDebito).where(and(eq(pessoalDebito.tenantId, origem), eq(pessoalDebito.pessoaTipo, 'CLT'), eq(pessoalDebito.pessoaId, empregadoId)))) {
-        const { id: _i, tenantId: _t, pessoaId: _p, criadoEm: _c, ...rest } = d;
-        await tx.insert(pessoalDebito).values({ ...rest, tenantId: p.destinoTenantId, pessoaId: novoId } as typeof pessoalDebito.$inferInsert);
+      // Dias da escala 12x36 já gerados a partir da data
+      const dias12 = await tx.select({ data: pontoEscala.data }).from(pontoEscala)
+        .where(and(eq(pontoEscala.tenantId, origem), eq(pontoEscala.empregadoId, empregadoId), gte(pontoEscala.data, p.data)));
+      if (dias12.length) await tx.insert(pontoEscala).values(dias12.map((x) => ({ tenantId: p.destinoTenantId, empregadoId: novoId, data: x.data })));
+      // Férias e afastamentos que ainda vão acontecer (o pedaço a partir da data)
+      for (const a of await tx.select().from(pontoAfastamento).where(and(eq(pontoAfastamento.tenantId, origem), eq(pontoAfastamento.empregadoId, empregadoId), gte(pontoAfastamento.dataFim, p.data)))) {
+        await tx.insert(pontoAfastamento).values({
+          tenantId: p.destinoTenantId, empregadoId: novoId, tipo: a.tipo, dataInicio: a.dataInicio > p.data ? a.dataInicio : p.data, dataFim: a.dataFim,
+          observacao: a.observacao, criadoPor: a.criadoPor,
+        });
+      }
+      // Débitos em aberto (seguem a pessoa; o do mês da entrada já é do destino)
+      const nDeb = await this.copiarDebitos(tx, origem, p.destinoTenantId, 'CLT', empregadoId, novoId, compEntrada);
+      // Lançamentos de meses que já são do destino (observação do mês)
+      const compPrimeiroDestinoInteiro = p.data.endsWith('-01') ? compEntrada : null;
+      if (compPrimeiroDestinoInteiro) {
+        await tx.update(pessoalLancamento).set({ tenantId: p.destinoTenantId, pessoaId: novoId })
+          .where(and(eq(pessoalLancamento.tenantId, origem), eq(pessoalLancamento.pessoaTipo, 'CLT'), eq(pessoalLancamento.pessoaId, empregadoId), gte(pessoalLancamento.competencia, compPrimeiroDestinoInteiro)));
       }
       // Foto
       const foto = (await tx.select().from(empregadoFoto).where(and(eq(empregadoFoto.tenantId, origem), eq(empregadoFoto.empregadoId, empregadoId))).limit(1))[0];
@@ -205,13 +295,27 @@ export class TransferenciaService {
         const { empregadoId: _e, tenantId: _t, ...rest } = foto;
         await tx.insert(empregadoFoto).values({ ...rest, tenantId: p.destinoTenantId, empregadoId: novoId } as typeof empregadoFoto.$inferInsert);
       }
+      // Preferências de notificação do app
+      const pref = (await tx.select().from(notificacaoPreferencia).where(eq(notificacaoPreferencia.empregadoId, empregadoId)).limit(1))[0];
+      if (pref) {
+        const { id: _i, tenantId: _t, empregadoId: _e, criadoEm: _c, atualizadoEm: _a, ...rest } = pref;
+        await tx.insert(notificacaoPreferencia).values({ ...rest, tenantId: p.destinoTenantId, empregadoId: novoId } as typeof notificacaoPreferencia.$inferInsert);
+      }
       // Login: a pessoa passa a ver o destino no app (mesmo e-mail e senha)
       await tx.update(usuario).set({ tenantId: p.destinoTenantId, empregadoId: novoId }).where(eq(usuario.empregadoId, empregadoId));
-      // Encerra o vínculo na origem (histórico preservado)
+      // Encerra o vínculo na origem (histórico preservado; o ponto vai até a véspera da data)
       await tx.update(empregado).set({ ativo: false, dataSaida: p.data, motivoSaida: p.motivo })
         .where(and(eq(empregado.tenantId, origem), eq(empregado.id, empregadoId)));
 
-      return { novoEmpregadoId: novoId, destinoTenantId: p.destinoTenantId };
+      // Registro 5 do AFD: exclusão no REP da origem, inclusão no REP do destino.
+      await registrarEventoRep(tx as never, origem, { tipo: 5, operacao: 'E', cpfEmpregado: e.cpf, nomeEmpregado: e.nome });
+      await registrarEventoRep(tx as never, p.destinoTenantId, { tipo: 5, operacao: 'I', cpfEmpregado: e.cpf, nomeEmpregado: e.nome });
+
+      avisos.push('O saldo do banco de horas não vai junto: acerte o saldo na origem (pagar ou compensar) antes de fechar o último mês dele lá.');
+      if (!p.data.endsWith('-01')) {
+        avisos.push(`Como a data não é dia 1, ${mesLongo(compEntrada)} fica dividido: a origem fica com o ponto até ${somarDias(p.data, -1).split('-').reverse().join('/')}; o destino, com o resto do mês, a cesta, os débitos e a carga de benefícios do mês seguinte.`);
+      }
+      return { novoEmpregadoId: novoId, destinoTenantId: p.destinoTenantId, debitosLevados: nDeb, avisos };
     });
   }
 
@@ -224,6 +328,34 @@ export class TransferenciaService {
     return comoMaster(this.db, async (tx) => {
       const pr = (await tx.select().from(pessoalPrestador).where(and(eq(pessoalPrestador.tenantId, origem), eq(pessoalPrestador.id, prestadorId))).limit(1))[0];
       if (!pr) throw new NotFoundException('Prestador não encontrado.');
+      if (p.competencia < pr.competenciaInicio) throw new BadRequestException(`Ele só entrou na origem em ${mesLongo(pr.competenciaInicio)}.`);
+      // Já saiu da origem (transferência anterior ou "tirar daqui em diante")?
+      const saiu = (await tx.select().from(pessoalExclusao).where(and(eq(pessoalExclusao.tenantId, origem), eq(pessoalExclusao.pessoaTipo, pr.tipo),
+        eq(pessoalExclusao.pessoaId, prestadorId), eq(pessoalExclusao.escopo, 'DIANTE'), lte(pessoalExclusao.competencia, p.competencia))).limit(1))[0];
+      if (saiu) throw new BadRequestException(`Ele já saiu da origem em ${mesLongo(saiu.competencia)}.`);
+      // Mesmo documento já ativo no destino: seria cadastro duplicado.
+      if (pr.documento) {
+        const jaLa = await tx.select({ id: pessoalPrestador.id }).from(pessoalPrestador)
+          .where(and(eq(pessoalPrestador.tenantId, p.destinoTenantId), eq(pessoalPrestador.tipo, pr.tipo), eq(pessoalPrestador.documento, pr.documento)));
+        for (const j of jaLa) {
+          const fora = (await tx.select({ id: pessoalExclusao.id }).from(pessoalExclusao).where(and(eq(pessoalExclusao.tenantId, p.destinoTenantId),
+            eq(pessoalExclusao.pessoaId, j.id), eq(pessoalExclusao.escopo, 'DIANTE'), lte(pessoalExclusao.competencia, p.competencia))).limit(1))[0];
+          if (!fora) throw new ConflictException('Esse documento já tem um prestador ativo na empresa de destino.');
+        }
+      }
+      await this.exigirMesAberto(tx, origem, p.competencia, 'empresa de origem');
+      await this.exigirMesAberto(tx, p.destinoTenantId, p.competencia, 'empresa de destino');
+      // Nota liberada, NF enviada ou pagamento já registrado na origem para um
+      // mês que passaria ao destino: o tomador da nota é a origem — não dá para
+      // mover sem desfazer lá primeiro.
+      const notas = await tx.select({ c: pessoalNota.competencia }).from(pessoalNota)
+        .where(and(eq(pessoalNota.tenantId, origem), eq(pessoalNota.pessoaId, prestadorId), gte(pessoalNota.competencia, p.competencia)));
+      const nfs = await tx.select({ c: pessoalNfArquivo.competencia }).from(pessoalNfArquivo)
+        .where(and(eq(pessoalNfArquivo.tenantId, origem), eq(pessoalNfArquivo.pessoaTipo, pr.tipo), eq(pessoalNfArquivo.pessoaId, prestadorId), gte(pessoalNfArquivo.competencia, p.competencia)));
+      const lancs = await tx.select().from(pessoalLancamento)
+        .where(and(eq(pessoalLancamento.tenantId, origem), eq(pessoalLancamento.pessoaTipo, pr.tipo), eq(pessoalLancamento.pessoaId, prestadorId), gte(pessoalLancamento.competencia, p.competencia)));
+      const travado = [...notas.map((x) => x.c), ...nfs.map((x) => x.c), ...lancs.filter((l) => l.pago || l.nfNumero).map((l) => l.competencia)].sort()[0];
+      if (travado) throw new BadRequestException(`Já tem nota, NF ou pagamento de ${mesLongo(travado)} na origem. Transfira a partir do mês seguinte ou desfaça esses registros lá.`);
 
       // Cria o prestador no destino a partir da competência escolhida.
       const { id: _i, tenantId: _t, criadoEm: _c, competenciaInicio: _ci, prestadorAnteriorId: _pa, ...rest } = pr;
@@ -237,18 +369,23 @@ export class TransferenciaService {
         const { id: _vi, tenantId: _vt, prestadorId: _vp, criadoEm: _vc, ...vrest } = v;
         await tx.insert(pessoalPrestadorValor).values({ ...vrest, tenantId: p.destinoTenantId, prestadorId: novoId } as typeof pessoalPrestadorValor.$inferInsert);
       }
-      // Débitos em aberto (seguem a pessoa)
-      for (const d of await tx.select().from(pessoalDebito).where(and(eq(pessoalDebito.tenantId, origem), eq(pessoalDebito.pessoaTipo, pr.tipo), eq(pessoalDebito.pessoaId, prestadorId)))) {
-        const { id: _di, tenantId: _dt, pessoaId: _dp, criadoEm: _dc, ...drest } = d;
-        await tx.insert(pessoalDebito).values({ ...drest, tenantId: p.destinoTenantId, pessoaId: novoId } as typeof pessoalDebito.$inferInsert);
+      // Débitos em aberto (seguem a pessoa, mesma numeração de parcelas)
+      const nDeb = await this.copiarDebitos(tx, origem, p.destinoTenantId, pr.tipo, prestadorId, novoId, p.competencia);
+      // Lançamentos ainda sem nota/pagamento dos meses que passam ao destino (extras, faltas, dias da semana)
+      if (lancs.length) {
+        await tx.update(pessoalLancamento).set({ tenantId: p.destinoTenantId, pessoaId: novoId })
+          .where(inArray(pessoalLancamento.id, lancs.map((l) => l.id)));
       }
-      // Login do portal (se houver)
-      await tx.update(usuario).set({ tenantId: p.destinoTenantId, empregadoId: novoId }).where(eq(usuario.empregadoId, prestadorId));
-      // Sai da folha da origem a partir da competência (os meses já fechados ficam na Tutts)
+      // Login do portal (se houver): o vínculo do prestador é usuario.prestador_id
+      await tx.update(usuario).set({ tenantId: p.destinoTenantId, prestadorId: novoId }).where(eq(usuario.prestadorId, prestadorId));
+      // Convite de primeiro acesso ainda não usado: passa a criar o acesso no destino
+      await tx.update(prestadorConvite).set({ tenantId: p.destinoTenantId, prestadorId: novoId })
+        .where(and(eq(prestadorConvite.prestadorId, prestadorId), isNull(prestadorConvite.usadoEm), gt(prestadorConvite.expiraEm, new Date())));
+      // Sai da folha da origem a partir da competência (os meses anteriores ficam na origem)
       await tx.insert(pessoalExclusao).values({ tenantId: origem, pessoaTipo: pr.tipo, pessoaId: prestadorId, competencia: p.competencia, escopo: 'DIANTE' })
         .onConflictDoUpdate({ target: [pessoalExclusao.tenantId, pessoalExclusao.pessoaTipo, pessoalExclusao.pessoaId, pessoalExclusao.competencia], set: { escopo: 'DIANTE' } });
 
-      return { novoPrestadorId: novoId, destinoTenantId: p.destinoTenantId };
+      return { novoPrestadorId: novoId, destinoTenantId: p.destinoTenantId, debitosLevados: nDeb, avisos: [] as string[] };
     });
   }
 }

@@ -756,6 +756,8 @@ export interface PessoalLinhaClt {
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null; erro: string | null;
+  /** Saiu neste mês (transferência ou desligamento com data): o mês vai até o último dia aqui. */
+  saida?: { ultimoDia: string; motivo: string | null };
 }
 export interface PessoalLancMei {
   heMin: number; faltas: number; feriadosTrab: number; metaCent: number; metaPaga: boolean; metaPagaEm: string | null;

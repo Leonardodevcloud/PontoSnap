@@ -41,6 +41,8 @@ export function Transferencias() {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  // Avisos da transferência feita (matrícula, banco de horas, mês dividido).
+  const [avisos, setAvisos] = useState<string[]>([]);
 
   // Carrega as listas (CLT e prestadores ativos da empresa atual).
   const carregar = useCallback(async () => {
@@ -74,13 +76,15 @@ export function Transferencias() {
 
   async function transferir() {
     if (!sel || !destino) { setErro('Escolha a empresa de destino.'); return; }
-    setEnviando(true); setErro(null);
+    setEnviando(true); setErro(null); setAvisos([]);
     try {
+      let r: { avisos?: string[] };
       if (sel.tipo === 'CLT') {
-        await api.post(`/transferencias/clt/${sel.id}`, { destinoTenantId: destino, data, preservarAdmissao: preservar, novaAdmissao: preservar ? null : novaAdmissao, motivo: preservar ? 'TRANSFERENCIA' : 'DESLIGAMENTO' });
+        r = await api.post<{ avisos?: string[] }>(`/transferencias/clt/${sel.id}`, { destinoTenantId: destino, data, preservarAdmissao: preservar, novaAdmissao: preservar ? null : novaAdmissao, motivo: preservar ? 'TRANSFERENCIA' : 'DESLIGAMENTO' });
       } else {
-        await api.post(`/transferencias/prestador/${sel.id}`, { destinoTenantId: destino, competencia });
+        r = await api.post<{ avisos?: string[] }>(`/transferencias/prestador/${sel.id}`, { destinoTenantId: destino, competencia });
       }
+      setAvisos(r?.avisos ?? []);
       const nome = sel.nome;
       setOk(`${nome} transferido para ${info?.destinos.find((d) => d.tenantId === destino)?.razaoSocial ?? 'o destino'}.`);
       setSel(null); setInfo(null);
@@ -105,6 +109,7 @@ export function Transferencias() {
       </header>
 
       {ok && <p className={css.ok} role="status">{ok}</p>}
+      {ok && avisos.length > 0 && <ul className={css.avisosFeita}>{avisos.map((a) => <li key={a}>{a}</li>)}</ul>}
       {erro && <p className={css.erro} role="alert">{erro}</p>}
 
       <div className={css.grid}>
@@ -176,10 +181,14 @@ export function Transferencias() {
                         {info.pessoa.cargo && <span className={css.chip}>{info.pessoa.cargo}</span>}
                         <span className={css.chip}>VR/VT</span>
                         {info.pessoa.chavePix && <span className={css.chip}>Chave Pix</span>}
+                        <span className={css.chip}>Cesta</span>
                         <span className={css.chip}>Escala</span>
-                        <span className={css.chip}>Regras de ponto</span>
-                        {info.pessoa.debitosAbertos > 0 && <span className={css.chip}>Débitos <b>{info.pessoa.debitosAbertos}</b></span>}
+                        <span className={css.chip}>Regras de ponto e CCT</span>
+                        <span className={css.chip}>Férias agendadas</span>
+                        <span className={css.chip}>Foto e acesso ao app</span>
+                        {info.pessoa.debitosAbertos > 0 && <span className={css.chip}>Débitos em aberto <b>{info.pessoa.debitosAbertos}</b></span>}
                       </div>
+                      <p className={css.aviso}>Não vai junto: o saldo do banco de horas (acerte na origem) e o histórico de batidas, espelhos e contracheques, que ficam na origem. O mês da data fica com o destino: cesta, débitos e a carga de benefícios do mês seguinte.</p>
                     </div>
                     {(info.pessoa.batidasApos ?? 0) > 0 && (
                       <div className={css.sec}>
@@ -202,8 +211,11 @@ export function Transferencias() {
                         <span className={css.chip}>Base {info.pessoa.baseDias === 'SEG_SEX' ? 'SEG–SEX' : 'SEG–SAB'}</span>
                         {info.pessoa.chavePix && <span className={css.chip}>Chave Pix</span>}
                         {info.pessoa.empresa && <span className={css.chip}>Tomador</span>}
-                        {info.pessoa.debitosAbertos > 0 && <span className={css.chip}>Débitos <b>{info.pessoa.debitosAbertos}</b></span>}
+                        <span className={css.chip}>Lançamentos sem nota</span>
+                        <span className={css.chip}>Acesso ao portal</span>
+                        {info.pessoa.debitosAbertos > 0 && <span className={css.chip}>Débitos em aberto <b>{info.pessoa.debitosAbertos}</b></span>}
                       </div>
+                      <p className={css.aviso}>Nota liberada, NF enviada ou pagamento já registrado na origem a partir deste mês impedem a transferência: o tomador dessas notas é a origem.</p>
                     </div>
                   </>
                 )}

@@ -776,7 +776,8 @@ function TabelaFolha({ linhas, d, holerites, onAbrir, onPix, onVerHolerite, onDe
           return (
             <Linha key={l.empregadoId} rotulo={`Abrir ${l.nome}`} onAbrir={(el) => onAbrir(l.empregadoId, el)}>
               <td className={`${vt.nome} ${vt.comAv}`}><Avatar id={l.empregadoId} nome={l.nome} tamanho={30} className={vt.avTd} trocavel /><span className={css.nomeTxt} title={l.nome}>{l.nome}</span>
-                {alerta ? <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro ?? undefined}>{alerta}</span> : <small>{l.config.cargo ?? 'CLT'}</small>}</td>
+                {l.saida ? <span className={`${vt.pill} ${vt.pillMute}`} title="Saiu no meio do mês: cesta, débitos e a carga do mês seguinte ficam com a empresa de destino">{l.saida.motivo === 'DESLIGAMENTO' ? 'desligado' : 'transferido'} · último dia {fmtDia(l.saida.ultimoDia)}</span>
+                  : alerta ? <span className={`${vt.pill} ${vt.pillWarn}`} title={l.erro ?? undefined}>{alerta}</span> : <small>{l.config.cargo ?? 'CLT'}</small>}</td>
               {comCliente && <td className={css.empresa} title={l.cliente ?? undefined}>{l.cliente ?? <span className={css.mute}>—</span>}</td>}
               <td className={vt.n}>{vr ? <DicaConta conta={vr} nome={l.nome}><ValorCel v={brl(vr.totalCent)} sub={vr.resumo} /></DicaConta> : <span className={css.mute}>—</span>}</td>
               <td className={vt.n}>{vtc ? <DicaConta conta={vtc} nome={l.nome}><ValorCel v={brl(vtc.totalCent)} sub={vtc.resumo} /></DicaConta> : <span className={css.mute}>—</span>}</td>

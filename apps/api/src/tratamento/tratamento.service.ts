@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, ConflictException, Optional } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray, lt, lte, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, isNull, or } from 'drizzle-orm';
 import {
   pontoHorarioContratual, pontoTratamento, pontoAusencia, pontoMarcacao, pontoRep, empregado, pontoFeriado, pontoEscala, pontoDocumento, pontoAfastamento, pontoAjuste, tenant, empregadoEscalaVigencia, usuario,
   pontoBancoMov, pontoBancoFechamento, espelhoAssinatura, empregadoSalario, pessoalPrestador,
@@ -609,6 +609,8 @@ export class TratamentoService {
    */
   async apurarPeriodoCLT(
     tenantId: string, empregadoId: string, inicioStr: string, fimStr: string, feriados: string[] = [],
+    /** ignorarSaida: conta os dias depois da saída (carga de benefício do mês seguinte, paga pela origem). */
+    opts: { ignorarSaida?: boolean } = {},
   ) {
     return comTenant(this.db, tenantId, async (tx) => {
       const emp = (await tx.select().from(empregado)
@@ -755,7 +757,10 @@ export class TratamentoService {
       // Data de início de uso do ponto: dias anteriores são ignorados por
       // completo (migração de sistema ou admissão no meio do período).
       const dataInicioPonto = emp.dataInicioPonto ?? null;
-      const antesDoInicio = (data: string) => dataInicioPonto != null && data < dataInicioPonto;
+      // Transferido para outro CNPJ (ou desligado com data): a partir da data
+      // de saída o dia é do destino — aqui ele também deixa de existir.
+      const dataSaida = opts.ignorarSaida ? null : emp.dataSaida ?? null;
+      const antesDoInicio = (data: string) => (dataInicioPonto != null && data < dataInicioPonto) || (dataSaida != null && data >= dataSaida);
 
       // Dias que ainda não aconteceram não viram falta: o funcionário ainda vai
       // bater ponto neles. O dia de hoje entra na apuração (pode ter batidas
@@ -1632,7 +1637,9 @@ export class TratamentoService {
   async relatorioCompetencia(tenantId: string, inicioStr: string, fimStr: string, hojeStr?: string) {
     const emps = await comTenant(this.db, tenantId, (tx) =>
       tx.select().from(empregado)
-        .where(and(eq(empregado.tenantId, tenantId), eq(empregado.ativo, true)))
+        // Ativos + quem saiu (transferência) depois do início do período: o mês
+        // da saída ainda é desta empresa até o último dia trabalhado aqui.
+        .where(and(eq(empregado.tenantId, tenantId), or(eq(empregado.ativo, true), gt(empregado.dataSaida, inicioStr))))
         .orderBy(asc(empregado.nome)));
 
     // Quem já assinou o espelho desta competência (só faz sentido se o

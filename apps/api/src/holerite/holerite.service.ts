@@ -76,12 +76,26 @@ export class HoleriteService {
     const { competencia, totalPaginas, blocos } = await lerHolerites(buf);
 
     const tenantIds = await this.tenantsDoUsuario(usuarioId, tenantAtual);
-    const empregados = await comoMaster(this.db, (tx) =>
-      tx.select({ id: empregado.id, tenantId: empregado.tenantId, nome: empregado.nome, cpf: empregado.cpf, razao: tenant.razaoSocial })
+    const todos = await comoMaster(this.db, (tx) =>
+      tx.select({ id: empregado.id, tenantId: empregado.tenantId, nome: empregado.nome, cpf: empregado.cpf, razao: tenant.razaoSocial,
+        ativo: empregado.ativo, inicio: empregado.dataInicioPonto, saida: empregado.dataSaida })
         .from(empregado).innerJoin(tenant, eq(tenant.id, empregado.tenantId))
-        .where(and(inArray(empregado.tenantId, tenantIds), eq(empregado.ativo, true))));
-
-    const porCpf = new Map(empregados.map((e) => [e.cpf, e]));
+        .where(inArray(empregado.tenantId, tenantIds)));
+    // Transferência entre CNPJs: o mesmo CPF tem um vínculo em cada empresa.
+    // O contracheque vai para o vínculo que cobre a competência dele (o de
+    // outubro fica na origem mesmo depois de a pessoa ir para o destino).
+    const ini = competencia ? `${competencia}-01` : null;
+    const fim = competencia ? `${competencia}-31` : null;
+    const cobre = (e: typeof todos[number]) => ini && fim
+      ? (!e.inicio || e.inicio <= fim) && (e.ativo ? !e.saida || e.saida > ini : !!e.saida && e.saida > ini)
+      : e.ativo;
+    const empregados = todos.filter(cobre);
+    const porCpf = new Map<string, typeof empregados[number]>();
+    for (const e of empregados) {
+      const ja = porCpf.get(e.cpf);
+      // Dois vínculos no mês (saiu no meio dele): fica o da empresa atual; senão, o de origem.
+      if (!ja || e.tenantId === tenantAtual || (ja.tenantId !== tenantAtual && !e.ativo)) porCpf.set(e.cpf, e);
+    }
     const usados = new Set<string>();
 
     const itens: BlocoPrevia[] = blocos.map((b): BlocoPrevia => {
