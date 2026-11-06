@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { Perfil } from '@ponto/shared';
 import { ArgosService } from './argos.service';
 import { VozArgosService } from './voz.service';
@@ -43,5 +44,19 @@ export class ArgosController {
   async falar(@Body() b: { texto?: string }) {
     const audioBase64 = await this.voz.falar((b.texto ?? '').trim());
     return { audioBase64 };
+  }
+
+  /** Texto -> voz em fluxo (mp3): a Pri começa a falar quase na hora. */
+  @Post('falar-fluxo')
+  async falarFluxo(@Body() b: { texto?: string }, @Res() res: Response) {
+    try {
+      const fluxo = await this.voz.falarFluxo((b.texto ?? '').trim());
+      res.setHeader('content-type', 'audio/mpeg');
+      res.setHeader('cache-control', 'no-store');
+      fluxo.on('error', () => { if (!res.headersSent) res.status(503); res.end(); });
+      fluxo.pipe(res);
+    } catch {
+      res.status(503).json({ message: 'Voz indisponível.' });
+    }
   }
 }

@@ -83,13 +83,47 @@ export class ArgosService {
     });
 
     const bruto = await this.ia.gerar({ sistema: SISTEMA_ARGOS, mensagens, json: true, temperatura: 0.1, maxTokens: 900, raciocinio: 'desligado' });
-    let out: { resposta?: string; fala?: string; fontes?: string[] };
-    try { out = JSON.parse(bruto) as { resposta?: string; fala?: string; fontes?: string[] }; }
-    catch { out = { resposta: bruto }; }
+    const out = this.interpretar(bruto);
     const resposta = restaurar((out.resposta ?? '').trim() || 'Não consegui montar a resposta.', mapa);
     const fala = restaurar((out.fala ?? '').trim(), mapa) || this.paraFala(resposta);
-    const fontes = Array.isArray(out.fontes) ? out.fontes.map((x) => String(x)) : [];
+    const fontes = out.fontes.length ? out.fontes : this.fontesNoTexto(resposta);
     return { resposta, fala, fontes, pessoa: pessoaNome, empregadoId: empregadoId || null, mes };
+  }
+
+  /**
+   * Lê o JSON da IA com tolerância: tira cercas ```json, recorta do primeiro { ao último },
+   * e, se o parse falhar (quebras de linha cruas dentro das aspas são o caso comum), extrai os
+   * campos na unha. Nunca devolve o JSON cru como resposta.
+   */
+  private interpretar(bruto: string): { resposta?: string; fala?: string; fontes: string[] } {
+    const semCerca = bruto.replace(/```(?:json)?/gi, '').trim();
+    const ini = semCerca.indexOf('{');
+    const fim = semCerca.lastIndexOf('}');
+    const cru = ini >= 0 && fim > ini ? semCerca.slice(ini, fim + 1) : semCerca;
+    for (const tentativa of [cru, cru.replace(/[\r\n\t]+/g, ' ')]) {
+      try {
+        const o = JSON.parse(tentativa) as { resposta?: string; fala?: string; fontes?: unknown };
+        if (o && (o.resposta || o.fala)) return { resposta: o.resposta, fala: o.fala, fontes: this.lerFontes(o.fontes) };
+      } catch { /* tenta o próximo */ }
+    }
+    const campo = (nome: string) => {
+      const m = cru.match(new RegExp(`"${nome}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`));
+      return m ? m[1]!.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\').trim() : undefined;
+    };
+    const resposta = campo('resposta');
+    if (resposta) return { resposta, fala: campo('fala'), fontes: this.fontesNoTexto(cru) };
+    // Sem JSON reconhecível: usa o texto limpo, nunca o bloco { ... }.
+    return { resposta: /^\s*\{/.test(bruto) ? '' : bruto.trim(), fontes: [] };
+  }
+
+  private lerFontes(v: unknown): string[] {
+    return Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : [];
+  }
+
+  /** Códigos de base citados no próprio texto (ex.: [SIS-INTERVALO]), como rede de segurança. */
+  private fontesNoTexto(texto: string): string[] {
+    const achados = texto.match(/\[([A-Z]{2,}-[A-Z0-9-]+)\]/g) ?? [];
+    return [...new Set(achados.map((c) => c.slice(1, -1)))];
   }
 
   /** Reduz a resposta escrita a algo falável, se a IA não mandou o campo "fala". */

@@ -63,7 +63,7 @@ export function EsferaArgos() {
     try {
       const r = await api.post<Resposta>('/argos/perguntar', { pergunta: q, historico });
       setTurnos((ts) => ts.map((t, i) => (i === ts.length - 1 ? { q, a: r.resposta, fontes: r.fontes, pessoa: r.pessoa } : t)));
-      if (!mudoRef.current) { setFase('falando'); await falar((r.fala || r.resposta).trim(), !!statusRef.current?.fala, () => { if (faseRef.current === 'falando') setFase('pronto'); }); }
+      if (!mudoRef.current) { await falar((r.fala || r.resposta).trim(), !!statusRef.current?.fala, () => setFase('pronto'), () => setFase('falando')); }
       else setFase('pronto');
     } catch (e) {
       const msg = (e as Error).message || 'Não consegui responder agora.';
@@ -146,7 +146,7 @@ export function EsferaArgos() {
 
   if (!aberto) {
     return (
-      <button className={css.bolha} onClick={() => { setAberto(true); void escutar(true); }} aria-label="Falar com o Argos (segure espaço)">
+      <button className={css.bolha} onClick={() => { setAberto(true); void escutar(true); }} aria-label="Falar com a Pri (segure espaço)">
         <Orbe estado="parado" nivel={nivel} tamanho={48} movimento={movimento} />
       </button>
     );
@@ -154,9 +154,9 @@ export function EsferaArgos() {
 
   const ouvindo = fase === 'ouvindo';
   return (
-    <div className={css.painel} role="dialog" aria-label="Argos">
+    <div className={css.painel} role="dialog" aria-label="Pri">
       <header className={css.cab}>
-        <span className={css.tit}><b>Argos</b><small>{ROTULO[fase]}</small></span>
+        <span className={css.tit}><b>Pri</b><small>{ROTULO[fase]}</small></span>
         <button className={css.icone} onClick={alternarMudo} aria-pressed={mudo} title={mudo ? 'Ligar a voz' : 'Silenciar'}>{mudo ? '🔇' : '🔊'}</button>
         {turnos.length > 0 && <button className={css.icone} onClick={() => { setTurnos([]); setFase('pronto'); }} title="Nova conversa">↺</button>}
         <button className={css.icone} onClick={() => { pararFala(); gravadorRef.current?.cancelar(); gravadorRef.current = null; setFase('pronto'); setAberto(false); }} title="Fechar">✕</button>
@@ -169,7 +169,7 @@ export function EsferaArgos() {
           <Orbe estado={ESTADO[fase]} nivel={nivel} tamanho={148} movimento={movimento} />
         </button>
         {turnos.length === 0 && (fase === 'pronto' || fase === 'ouvindo') && (
-          <p className={css.dica}>{fase === 'ouvindo' ? 'Pode falar…' : 'Pergunte livremente: “por que a Bianca ficou com essas horas extras em outubro?”. Ele entende a pessoa e o mês pela frase.'}</p>
+          <p className={css.dica}>{fase === 'ouvindo' ? 'Pode falar…' : 'Pergunte livremente: “por que a Bianca ficou com essas horas extras em outubro?”. Ela entende a pessoa e o mês pela frase.'}</p>
         )}
         {turnos.map((t, i) => (
           <div key={i} className={css.turno}>

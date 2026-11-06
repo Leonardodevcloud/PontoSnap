@@ -66,6 +66,17 @@ export const api = {
   patch: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PATCH', body })),
   del: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'DELETE', body })),
   put: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PUT', body })),
+  /** POST que devolve a resposta crua (para ler o corpo em fluxo, ex.: a voz da Pri). */
+  async fluxo(path: string, body: unknown, retry = true): Promise<Response> {
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(acesso ? { Authorization: `Bearer ${acesso}` } : {}) },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401 && retry && (await tentarRefresh())) return this.fluxo(path, body, false);
+    if (!res.ok) throw new Error(`voz ${res.status}`);
+    return res;
+  },
   /** Baixa binário (ex.: comprovante PDF) já com o token. */
   baixar(path: string): Promise<Blob> { return rastrear(this._baixar(path)); },
   async _baixar(path: string): Promise<Blob> {
