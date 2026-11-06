@@ -4,10 +4,11 @@ import { TratamentoModule } from '../tratamento/tratamento.module';
 import { ArgosService } from './argos.service';
 import { ArgosController } from './argos.controller';
 import { DeepSeekService } from './deepseek.service';
+import { VozArgosService } from './voz.service';
 
 @Module({
   imports: [AuthModule, TratamentoModule],
   controllers: [ArgosController],
-  providers: [ArgosService, DeepSeekService],
+  providers: [ArgosService, DeepSeekService, VozArgosService],
 })
 export class ArgosModule {}

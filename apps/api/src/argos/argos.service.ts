@@ -38,7 +38,7 @@ export class ArgosService {
     const pergunta = (p.pergunta ?? '').trim();
     if (!pergunta) throw new BadRequestException('Pergunta vazia.');
 
-    const mes = /^\d{4}-\d{2}$/.test(p.mes ?? '') ? p.mes! : new Date().toISOString().slice(0, 7);
+    const mes = /^\d{4}-\d{2}$/.test(p.mes ?? '') ? p.mes! : (this.inferirMes(pergunta) ?? new Date().toISOString().slice(0, 7));
     const empregadoId = p.empregadoId || (await this.acharPessoa(tenantId, pergunta));
 
     const mapa: MapaMascara = new Map();
@@ -93,6 +93,25 @@ export class ArgosService {
   private periodo(mes: string) {
     const [a, m] = mes.split('-').map(Number);
     return { inicio: `${mes}-01`, fim: new Date(Date.UTC(a!, m!, 0)).toISOString().slice(0, 10) };
+  }
+
+  /** Entende o mês pela própria pergunta ("em outubro", "mês passado", "09/2026"). */
+  private inferirMes(pergunta: string): string | null {
+    const t = pergunta.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const agora = new Date();
+    if (/mes passado|mes anterior/.test(t)) { const d = new Date(agora.getFullYear(), agora.getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+    if (/esse mes|este mes|mes atual/.test(t)) return agora.toISOString().slice(0, 7);
+    let m = t.match(/\b(\d{4})-(\d{2})\b/); if (m) return `${m[1]}-${m[2]}`;
+    m = t.match(/\b(\d{1,2})\/(\d{4})\b/); if (m) return `${m[2]}-${m[1]!.padStart(2, '0')}`;
+    const meses = ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    for (let i = 0; i < 12; i++) {
+      if (new RegExp(`\\b${meses[i]}\\b`).test(t)) {
+        const anoM = t.match(new RegExp(`${meses[i]}\\s+de\\s+(\\d{4})`)) ?? t.match(/\b(20\d{2})\b/);
+        const ano = anoM ? Number(anoM[1]) : (i > agora.getMonth() ? agora.getFullYear() - 1 : agora.getFullYear());
+        return `${ano}-${String(i + 1).padStart(2, '0')}`;
+      }
+    }
+    return null;
   }
 
   /** Acha o funcionário citado na pergunta pelo nome (fallback quando não vem o id). */

@@ -8,6 +8,7 @@ import { Icone, type NomeIcone } from '../components/Icone';
 import { Avatar, ProvedorAvatares } from '../components/Avatar';
 import { AjudaDaTela, ProvedorAjuda } from './ajuda/PainelAjuda';
 import { buscarArtigos } from './ajuda/artigos';
+import { EsferaArgos } from '../components/argos/EsferaArgos';
 import type { Empregado, RespAtencao } from '../tipos';
 import css from './LayoutRH.module.css';
 
@@ -27,7 +28,9 @@ interface ItemMenu {
 interface GrupoMenu { titulo: string | null; itens: ItemMenu[] }
 
 const GRUPOS: GrupoMenu[] = [
-  { titulo: null, itens: [{ to: '/rh', rotulo: 'Início', icone: 'inicio', fim: true, badge: 'TOTAL' }] },
+  { titulo: null, itens: [
+    { to: '/rh', rotulo: 'Início', icone: 'inicio', fim: true, badge: 'TOTAL' },
+  ] },
   {
     titulo: 'Dia a dia',
     itens: [
@@ -389,6 +392,7 @@ export function LayoutRH() {
       )}
 
       <Busca aberta={busca} onFechar={() => setBusca(false)} />
+      <EsferaArgos />
     </div>
     </ProvedorAjuda>
     </ProvedorAvatares>

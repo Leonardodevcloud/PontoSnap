@@ -22,7 +22,6 @@ import { Espelhos } from './rh/Espelhos';
 import { ApuracaoCLT } from './rh/ApuracaoCLT';
 import { GestaoPessoal } from './rh/GestaoPessoal';
 import { Transferencias } from './rh/Transferencias';
-import { Argos } from './rh/Argos';
 import { Feriados } from './rh/Feriados';
 import { Fiscal } from './rh/Fiscal';
 import { Relatorios } from './rh/Relatorios';
@@ -152,7 +151,6 @@ export function App() {
         <Route index element={<Inicio />} />
         <Route path="funcionarios" element={<Funcionarios />} />
         <Route path="transferencias" element={<Transferencias />} />
-        <Route path="argos" element={<Argos />} />
         <Route path="escalas" element={<Escalas />} />
         <Route path="espelhos" element={<ComMesPadrao><Espelhos /></ComMesPadrao>} />
         <Route path="apuracao" element={<ComMesPadrao><ApuracaoCLT /></ComMesPadrao>} />
