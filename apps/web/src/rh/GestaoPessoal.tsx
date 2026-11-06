@@ -651,7 +651,7 @@ function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite
 function StatusCesta({ l }: { l: PessoalLinhaClt }) {
   const b = l.beneficios;
   if (b.cestaRecebe === false) return <span className={`${vt.pill} ${vt.pillMute}`} title="Marcada para não receber cesta">não recebe</span>;
-  if (b.cestaStatus === 'SEM_CESTA' && l.config.origem !== 'PROPRIO') return <span title="Segue o padrão da empresa, que não paga cesta">—</span>;
+  if (b.cestaStatus === 'SEM_CESTA') return <span className={`${vt.pill} ${vt.pillMute}`} title={l.config.origem === 'PROPRIO' ? 'Valor próprio sem cesta' : 'Segue o padrão da empresa, que não paga cesta'}>não recebe</span>;
   if (b.cestaStatus === 'PAGA') return <>{brl(b.cestaCent)}</>;
   if (b.cestaStatus === 'PERDIDA_FALTA') return <span className={`${vt.pill} ${vt.pillErr}`} title="Faltou no mês: a cesta não é paga">perdida · falta {l.faltasDias.slice(0, 1).map(fmtDia).join('')}</span>;
   if (b.cestaStatus === 'CARENCIA') return <span className={`${vt.pill} ${vt.pillMute}`} title="Ainda na carência">a partir de {b.cestaDesde ? mesCurto(b.cestaDesde) : '—'}</span>;
