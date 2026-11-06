@@ -74,7 +74,7 @@ const CONFIG: ItemMenu[] = [
 /** Telas que dividem um item do menu: abas no topo. */
 const SECOES: { rotas: { to: string; rotulo: string }[] }[] = [
   { rotas: [{ to: '/rh/espelhos', rotulo: 'Espelhos' }, { to: '/rh/apuracao', rotulo: 'Apuração CLT' }] },
-  { rotas: [{ to: '/rh/pessoal', rotulo: 'Folha CLT' }, { to: '/rh/debitos', rotulo: 'Débitos' }, { to: '/rh/prestadores', rotulo: 'Prestadores' }] },
+  { rotas: [{ to: '/rh/pessoal', rotulo: 'Folha CLT' }, { to: '/rh/prestadores', rotulo: 'Prestadores' }, { to: '/rh/debitos', rotulo: 'Débitos' }] },
   { rotas: [{ to: '/rh/ajustes', rotulo: 'Ajustes de ponto' }, { to: '/rh/atestados', rotulo: 'Atestados' }] },
   { rotas: [{ to: '/rh/relatorios', rotulo: 'Relatórios' }, { to: '/rh/fiscal', rotulo: 'Arquivos fiscais' }] },
 ];
@@ -97,6 +97,11 @@ const NOME_PERFIL: Record<string, string> = {
 
 /** Contexto que o Início usa para atualizar o número do menu depois de resolver algo. */
 export interface ContextoRH { atencao: RespAtencao | null; recarregarAtencao: () => Promise<void> }
+
+const CHAVE_GRUPOS = 'pontosnap:menu-grupos';
+const lerGruposMenu = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem(CHAVE_GRUPOS) ?? '{}') as Record<string, boolean>; } catch { return {}; }
+};
 
 const ativo = (pathname: string, i: ItemMenu) =>
   (i.fim ? pathname === i.to || pathname === `${i.to}/` : pathname === i.to || pathname.startsWith(`${i.to}/`))
@@ -240,12 +245,25 @@ export function LayoutRH() {
   const [mais, setMais] = useState(false);
   const noConfig = CONFIG.some((i) => ativo(rota.pathname, i));
   const [config, setConfig] = useState(noConfig);
+  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>(lerGruposMenu);
+
+  const alternarGrupo = useCallback((titulo: string) => {
+    setGruposAbertos((g) => {
+      const n = { ...g, [titulo]: g[titulo] === false };
+      try { localStorage.setItem(CHAVE_GRUPOS, JSON.stringify(n)); } catch { /* vale só nesta sessão */ }
+      return n;
+    });
+  }, []);
 
   const recarregarAtencao = useCallback(async () => {
     try { setAtencao(await api.get<RespAtencao>('/atencao')); } catch { /* o menu funciona sem o número */ }
   }, []);
   useEffect(() => { void recarregarAtencao(); const t = setInterval(() => void recarregarAtencao(), 5 * 60_000); return () => clearInterval(t); }, [recarregarAtencao]);
   useEffect(() => { if (noConfig) setConfig(true); }, [noConfig]);
+  useEffect(() => {
+    const g = GRUPOS.find((gr) => gr.titulo && gr.itens.some((i) => ativo(rota.pathname, i)));
+    if (g?.titulo) setGruposAbertos((s) => (s[g.titulo!] === false ? { ...s, [g.titulo!]: true } : s));
+  }, [rota.pathname]);
   useEffect(() => { setMais(false); }, [rota.pathname]);
   useEffect(() => {
     const nome = NOMES[rota.pathname.replace(/\/$/, '') || '/rh'];
@@ -280,12 +298,22 @@ export function LayoutRH() {
 
   const navegacao = (
     <nav className={css.nav} aria-label="Menu principal">
-      {GRUPOS.map((g) => (
-        <div key={g.titulo ?? 'topo'} className={css.grupo}>
-          {g.titulo && <div className={css.grupoTit}>{g.titulo}</div>}
-          {g.itens.filter((i) => !i.soAdmin || perfil === 'ADMIN_CLIENTE').map((i) => link(i))}
-        </div>
-      ))}
+      {GRUPOS.map((g) => {
+        const itens = g.itens.filter((i) => !i.soAdmin || perfil === 'ADMIN_CLIENTE');
+        if (!itens.length) return null;
+        if (!g.titulo) return <div key="topo" className={css.grupo}>{itens.map((i) => link(i))}</div>;
+        const aberto = gruposAbertos[g.titulo] !== false;
+        const id = `grp-${g.titulo.replace(/\s+/g, '-').toLowerCase()}`;
+        return (
+          <div key={g.titulo} className={css.grupo}>
+            <button className={css.grupoTitBtn} onClick={() => alternarGrupo(g.titulo!)} aria-expanded={aberto} aria-controls={id}>
+              {g.titulo}
+              <span className={`${css.cfgSeta} ${aberto ? css.cfgSetaOn : ''}`} aria-hidden="true"><Icone nome="seta" tamanho={14} /></span>
+            </button>
+            {aberto && <div id={id}>{itens.map((i) => link(i))}</div>}
+          </div>
+        );
+      })}
       <div className={css.grupo}>
         <button className={`${css.link} ${css.cfgBtn}`} onClick={() => setConfig((c) => !c)} aria-expanded={config} aria-controls="menu-config">
           <Icone nome="engrenagem" className={css.ic} /><span className={css.rot}>Configurações</span>

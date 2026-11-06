@@ -3,7 +3,7 @@ const CHAVE_REFRESH = 'pontosnap.refresh';
 
 let acesso: string | null = null;
 
-export function definirAcesso(token: string | null) { acesso = token; }
+export function definirAcesso(token: string | null) { acesso = token; limparCacheGet(); }
 export function definirRefresh(token: string | null) {
   if (token) localStorage.setItem(CHAVE_REFRESH, token);
   else localStorage.removeItem(CHAVE_REFRESH);
@@ -60,12 +60,40 @@ async function req<T>(path: string, opts: Opts = {}, retry = true): Promise<T> {
   return (ct.includes('application/json') ? res.json() : (res as unknown)) as T;
 }
 
+// --- Cache de GET: deixa a navegação instantânea. ---
+// Guarda a resposta de cada GET por alguns segundos e junta chamadas idênticas em voo.
+// Qualquer escrita (POST/PATCH/PUT/DELETE) limpa o cache, então depois de editar algo os
+// próximos GET voltam a buscar do servidor. Telas que precisam de dado ao vivo seguem
+// pedindo normalmente — o cache é curto.
+const TTL_GET = 15_000;
+const cacheGet = new Map<string, { quando: number; dado: unknown }>();
+const emVooGet = new Map<string, Promise<unknown>>();
+
+/** Esquece o que estiver no cache (por prefixo, ou tudo). Chamado em toda escrita. */
+export function limparCacheGet(prefixo?: string) {
+  if (!prefixo) { cacheGet.clear(); return; }
+  for (const k of cacheGet.keys()) if (k.startsWith(prefixo)) cacheGet.delete(k);
+}
+
+function obterGet<T>(p: string): Promise<T> {
+  const c = cacheGet.get(p);
+  if (c && Date.now() - c.quando < TTL_GET) return Promise.resolve(c.dado as T);
+  const voo = emVooGet.get(p);
+  if (voo) return voo as Promise<T>;
+  const prom = rastrear(req<T>(p)).then(
+    (d) => { cacheGet.set(p, { quando: Date.now(), dado: d }); emVooGet.delete(p); return d; },
+    (e) => { emVooGet.delete(p); throw e; },
+  );
+  emVooGet.set(p, prom as Promise<unknown>);
+  return prom;
+}
+
 export const api = {
-  get: <T>(p: string) => rastrear(req<T>(p)),
-  post: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'POST', body })),
-  patch: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PATCH', body })),
-  del: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'DELETE', body })),
-  put: <T>(p: string, body?: unknown) => rastrear(req<T>(p, { method: 'PUT', body })),
+  get: <T>(p: string) => obterGet<T>(p),
+  post: <T>(p: string, body?: unknown) => { limparCacheGet(); return rastrear(req<T>(p, { method: 'POST', body })); },
+  patch: <T>(p: string, body?: unknown) => { limparCacheGet(); return rastrear(req<T>(p, { method: 'PATCH', body })); },
+  del: <T>(p: string, body?: unknown) => { limparCacheGet(); return rastrear(req<T>(p, { method: 'DELETE', body })); },
+  put: <T>(p: string, body?: unknown) => { limparCacheGet(); return rastrear(req<T>(p, { method: 'PUT', body })); },
   /** POST que devolve a resposta crua (para ler o corpo em fluxo, ex.: a voz da Pri). */
   async fluxo(path: string, body: unknown, retry = true): Promise<Response> {
     const res = await fetch(`${BASE}${path}`, {
