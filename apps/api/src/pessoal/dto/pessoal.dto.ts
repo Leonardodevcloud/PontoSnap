@@ -123,8 +123,14 @@ export class CompetenciaDto {
 }
 
 export class InicioCestaDto {
-  /** YYYY-MM a partir do qual a cesta é paga. null = automático (3 meses após o início no ponto). */
-  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(COMP) cestaDesde!: string | null;
+  /** false = não recebe cesta (mesmo que o padrão da empresa pague). Ausente = true. */
+  @IsOptional() @IsBoolean() recebe?: boolean;
+  /** YYYY-MM a partir do qual a cesta é paga. null = automático (3 meses após a admissão). */
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(COMP) cestaDesde?: string | null;
+  /** Valor mensal da cesta — só para quem tem valor próprio. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) cestaMensal?: number;
+  /** Mês do benefício a partir do qual o novo valor da cesta vale (com cestaMensal). */
+  @IsOptional() @Matches(COMP) vigenteDesde?: string;
 }
 
 export class NfArquivoDto {

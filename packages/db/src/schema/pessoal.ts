@@ -182,12 +182,18 @@ export const pessoalPrestadorValor = pgTable('pessoal_prestador_valor', {
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique('uq_pessoal_prestador_valor').on(t.tenantId, t.prestadorId, t.vigenteDesde)]);
 
-/** Mês a partir do qual a cesta básica é paga (carência) — migration 0042. */
+/**
+ * Cesta básica da pessoa — migration 0042 (carência) e 0069 (recebe sim/não).
+ * Sem linha = recebe, a partir do automático (3 meses depois da admissão).
+ */
 export const pessoalCltCesta = pgTable('pessoal_clt_cesta', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull().references(() => tenant.id),
   empregadoId: uuid('empregado_id').notNull().references(() => empregado.id),
-  cestaDesde: varchar('cesta_desde', { length: 7 }).notNull(),
+  /** false = não recebe cesta, mesmo que o padrão da empresa pague. */
+  recebe: boolean('recebe').notNull().default(true),
+  /** Mês a partir do qual recebe. Nulo = automático. */
+  cestaDesde: varchar('cesta_desde', { length: 7 }),
   atualizadoEm: timestamp('atualizado_em', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique('uq_pessoal_clt_cesta').on(t.tenantId, t.empregadoId)]);
 

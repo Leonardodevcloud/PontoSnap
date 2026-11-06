@@ -15,7 +15,15 @@ import { randomBytes } from 'node:crypto';
 export interface CriarEmpregadoParams {
   cpf: string; nome: string; matricula?: string; pin?: string; pis?: string; salarioMensal?: number; dataInicioPonto?: string | null;
   email?: string;
+  cargo?: string; dataAdmissao?: string; cliente?: string; chavePix?: string;
 }
+
+export interface CadastroEmpregado {
+  nome?: string; matricula?: string | null; cargo?: string | null; dataAdmissao?: string | null; cliente?: string | null; chavePix?: string | null;
+}
+
+const hoje = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+const textoOuNulo = (v: string | null | undefined) => (v == null ? null : v.trim() || null);
 
 /** Senha provisória legível: sem 0/O/1/l/I para não confundir na hora de digitar. */
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -49,12 +57,21 @@ export class EmpregadoService {
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.cpf, p.cpf))).limit(1);
       if (dup[0]) throw new ConflictException('Já existe empregado com este CPF');
 
+      if (p.dataAdmissao && p.dataAdmissao > hoje()) throw new BadRequestException('A admissão não pode ser no futuro.');
+      const matricula = textoOuNulo(p.matricula);
+      if (matricula) {
+        const mat = await tx.select({ id: empregado.id }).from(empregado)
+          .where(and(eq(empregado.tenantId, tenantId), eq(empregado.matricula, matricula))).limit(1);
+        if (mat[0]) throw new ConflictException('Já existe funcionário com esta matrícula');
+      }
       const pinHash = p.pin ? await hashPin(p.pin) : null;
       const rows = await tx.insert(empregado).values({
-        tenantId, cpf: p.cpf, nome: p.nome,
-        matricula: p.matricula ?? null, pinHash, pis: p.pis ?? null,
+        tenantId, cpf: p.cpf, nome: p.nome.trim(),
+        matricula, pinHash, pis: p.pis ?? null,
         salarioMensal: p.salarioMensal != null ? String(p.salarioMensal) : null,
         dataInicioPonto: p.dataInicioPonto ?? null,
+        dataAdmissao: p.dataAdmissao || null,
+        cargo: textoOuNulo(p.cargo), cliente: textoOuNulo(p.cliente), chavePix: textoOuNulo(p.chavePix),
       }).returning();
       if (p.salarioMensal != null) {
         await tx.insert(empregadoSalario).values({ tenantId, empregadoId: rows[0]!.id, vigenteDesde: '2000-01-01', salarioMensal: String(p.salarioMensal) });
@@ -119,6 +136,44 @@ export class EmpregadoService {
     await this.email.enviar({ para: resultado.email, assunto, html });
 
     return resultado;
+  }
+
+  /**
+   * Aba Cadastro: dados que valem para todos os meses. Mudar o nome gera o
+   * registro 5 (alteração) do AFD, como na inclusão. CPF não muda.
+   */
+  async atualizarCadastro(tenantId: string, id: string, d: CadastroEmpregado) {
+    if (d.dataAdmissao && d.dataAdmissao > hoje()) throw new BadRequestException('A admissão não pode ser no futuro.');
+    return comTenant(this.db, tenantId, async (tx) => {
+      const atual = (await tx.select().from(empregado).where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!atual) throw new NotFoundException('Empregado não encontrado');
+      const set: Partial<typeof empregado.$inferInsert> = {};
+      if (d.nome !== undefined) {
+        const nome = d.nome.trim().replace(/\s+/g, ' ');
+        if (nome.length < 2) throw new BadRequestException('Informe o nome completo.');
+        if (nome !== atual.nome) set.nome = nome;
+      }
+      if (d.matricula !== undefined) {
+        const matricula = textoOuNulo(d.matricula);
+        if (matricula && matricula !== atual.matricula) {
+          const dup = await tx.select({ id: empregado.id }).from(empregado)
+            .where(and(eq(empregado.tenantId, tenantId), eq(empregado.matricula, matricula))).limit(1);
+          if (dup[0] && dup[0].id !== id) throw new ConflictException('Já existe funcionário com esta matrícula');
+        }
+        set.matricula = matricula;
+      }
+      if (d.cargo !== undefined) set.cargo = textoOuNulo(d.cargo);
+      if (d.dataAdmissao !== undefined) set.dataAdmissao = d.dataAdmissao || null;
+      if (d.cliente !== undefined) set.cliente = textoOuNulo(d.cliente);
+      if (d.chavePix !== undefined) set.chavePix = textoOuNulo(d.chavePix);
+      if (Object.keys(set).length === 0) return this.semSegredos(atual);
+      const [r] = await tx.update(empregado).set(set).where(and(eq(empregado.id, id), eq(empregado.tenantId, tenantId))).returning();
+      if (set.nome) {
+        // Registro 5 do AFD: alteração de empregado no REP.
+        await registrarEventoRep(tx as never, tenantId, { tipo: 5, operacao: 'A', cpfEmpregado: atual.cpf, nomeEmpregado: set.nome });
+      }
+      return this.semSegredos(r!);
+    });
   }
 
   /** Indica quais empregados já têm login (para a tela do RH). */

@@ -100,13 +100,13 @@ async function main() {
   let caioC = c1.clt.find((c) => c.empregadoId === caio.id)!;
   ok(caioC.beneficios.cestaStatus === 'CARENCIA' && caioC.beneficios.cestaDesde === '2026-11' && caioC.beneficios.cestaDesdeOrigem === 'AUTO',
     `Caio começou em agosto: cesta só a partir de novembro (${caioC.beneficios.cestaStatus} / ${caioC.beneficios.cestaDesde})`);
-  await pes.definirInicioCesta(t.id, caio.id, '2026-09');
+  await pes.definirCesta(t.id, caio.id, { cestaDesde: '2026-09' });
   c1 = await pes.competencia(t.id, '2026-09');
   caioC = c1.clt.find((c) => c.empregadoId === caio.id)!;
   ok(caioC.beneficios.cestaStatus === 'PAGA' && caioC.beneficios.cestaCent === 8000 && caioC.beneficios.cestaDesdeOrigem === 'MANUAL',
     `início definido em setembro e sem falta: cesta paga (${caioC.beneficios.cestaCent})`);
   ok(caioC.beneficios.cargaCent === caioC.beneficios.vrProxCent + 8000 - caioC.beneficios.acertoCent, 'cesta entra na carga');
-  await pes.definirInicioCesta(t.id, caio.id, null);
+  await pes.definirCesta(t.id, caio.id, { cestaDesde: null });
   ok((await pes.competencia(t.id, '2026-09')).clt.find((c) => c.empregadoId === caio.id)!.beneficios.cestaDesde === '2026-11', 'limpar volta ao automático (3 meses)');
   // admissão real antes do ponto: a carência conta da admissão
   await pes.definirAdmissao(t.id, caio.id, '2025-01-10');
@@ -115,7 +115,7 @@ async function main() {
     `admitido em jan/2025: carência já passou, cesta paga (${caioAdm.beneficios.cestaDesde})`);
   ok((await erroDe(() => pes.definirAdmissao(t.id, caio.id, '2099-01-01'))).includes('futuro'), 'admissão no futuro é recusada');
   await pes.definirAdmissao(t.id, caio.id, null);
-  await pes.definirInicioCesta(t.id, caio.id, '2026-09');
+  await pes.definirCesta(t.id, caio.id, { cestaDesde: '2026-09' });
 
   // ── cliente do CLT (cadastro, aparece na linha) ──
   await pes.definirCliente(t.id, caio.id, '  Auto Norte Maceió ');

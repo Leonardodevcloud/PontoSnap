@@ -473,13 +473,18 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
 
       {painel && d && (
         <PainelLateral onFechar={tentarFechar} largo={!!(linhaClt || linhaMei || linhaMot)}
+          largura={linhaClt && painel.tipo === 'clt' && painel.modo !== 'detalhe' ? 1040 : undefined}
+          acao={linhaClt ? <Link className={css.btnCadastro} to={`/rh/funcionarios?ficha=${linhaClt.empregadoId}&aba=cadastro`}>
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+            Editar cadastro</Link> : undefined}
           foto={linhaClt ? <Avatar id={linhaClt.empregadoId} nome={linhaClt.nome} tamanho={104} /> : (linhaMei ?? linhaMot) ? <Avatar id={(linhaMei ?? linhaMot)!.id} tipo="PRESTADOR" nome={(linhaMei ?? linhaMot)!.nome} tamanho={104} /> : undefined}
           chips={(linhaMei ?? linhaMot) ? <ChipsPrestador l={(linhaMei ?? linhaMot)!} mes={mes} fechado={fechado} /> : undefined}
           abas={(linhaMei || linhaMot) ? [{ id: 'lanc', rotulo: linhaMot ? 'Semanas e pagamento' : 'Lançamentos' }, { id: 'dados', rotulo: 'Dados e acesso' }] : undefined}
           aba={abaPainel} onAba={(x) => setAbaPainel(x as 'lanc' | 'dados')}
           titulo={
           linhaClt?.nome ?? linhaMei?.nome ?? linhaMot?.nome ?? (painel.tipo === 'padrao' ? 'Padrão de benefícios' : painel.tipo === 'debito' && painel.editar ? 'Editar débito' : 'Adicionar débito')}
-          sub={linhaClt ? `${linhaClt.config.cargo ? `${linhaClt.config.cargo} · ` : ''}CLT · ${mesLongo(mes)}` : linhaMei ? `MEI · ${fmtDoc(linhaMei.documento) ?? 'sem CNPJ'} · ${mesLongo(mes)}`
+          sub={linhaClt ? [linhaClt.config.cargo, 'CLT', linhaClt.admissao ? `admitido em ${linhaClt.admissao.split('-').reverse().join('/')}` : null,
+              painel.tipo === 'clt' && painel.modo !== 'detalhe' ? `benefícios de ${mesLongo(mes)}` : mesLongo(mes)].filter(Boolean).join(' · ') : linhaMei ? `MEI · ${fmtDoc(linhaMei.documento) ?? 'sem CNPJ'} · ${mesLongo(mes)}`
             : linhaMot ? ['Motorista', linhaMot.empresa, linhaMot.baseDias === 'SEG_SAB' ? 'seg–sáb' : 'seg–sex', mesLongo(mes)].filter(Boolean).join(' · ')
             : painel.tipo === 'padrao' ? 'Vale para todos os CLT sem valor próprio' : painel.tipo === 'debito' && painel.editar ? `${painel.editar.nome} · ${ROT_TIPO[painel.editar.pessoaTipo]}` : `Parcelado ou fixo mensal · a partir de ${mesCurto(mes)}`}>
           {painel.tipo === 'padrao' && <PainelPadrao d={d} onSalvo={async (msg) => { await recarregar(); fecharPainel(); avisar(msg); }} />}
@@ -490,7 +495,7 @@ export function GestaoPessoal({ soDebitos = false }: { soDebitos?: boolean } = {
                 onPix={() => setPix(pixClt(linhaClt, d.debitos, holerites.get(linhaClt.empregadoId)))}
                 onDesfazerPago={(h) => registrarPagamentoHolerite({ pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome, holeriteId: h.id, pago: false, valorPagoCent: null, pagoEm: null }, false, null)} />
             : linhaClt && <PainelClt l={linhaClt} d={d} mes={mes} fechado={fechado}
-                onSalvo={recarregar} onAviso={avisar}
+                onSalvo={recarregar} onAviso={avisar} onIrPadrao={() => setPainel({ tipo: 'padrao' })}
                 onTirar={() => setDialogo({ tipo: 'tirar', pessoaTipo: 'CLT', pessoaId: linhaClt.empregadoId, nome: linhaClt.nome })} />}
           {linhaMei && <PainelMei key={linhaMei.id} aba={abaPainel} l={linhaMei} mes={mes} fechado={fechado} empresas={empresas}
             onFecharPessoa={(motivo) => setFecharP({ tipo: 'MEI', id: linhaMei.id, motivo })} onReabrirPessoa={reabrirPessoa} onContrato={async () => { await recarregar(); avisar(`Contrato de ${linhaMei.nome} atualizado.`); }} onSalvo={async () => { await recarregar(); fecharPainel(); avisar(`Lançamento de ${linhaMei.nome} salvo.`); }} onRecarregar={recarregar} onAviso={avisar}
@@ -645,6 +650,7 @@ function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite
 /** Cesta do mês: paga, perdida por falta, em carência ou sem cesta. */
 function StatusCesta({ l }: { l: PessoalLinhaClt }) {
   const b = l.beneficios;
+  if (b.cestaRecebe === false) return <span className={`${vt.pill} ${vt.pillMute}`} title="Marcada para não receber cesta">não recebe</span>;
   if (b.cestaStatus === 'PAGA') return <>{brl(b.cestaCent)}</>;
   if (b.cestaStatus === 'PERDIDA_FALTA') return <span className={`${vt.pill} ${vt.pillErr}`} title="Faltou no mês: a cesta não é paga">perdida · falta {l.faltasDias.slice(0, 1).map(fmtDia).join('')}</span>;
   if (b.cestaStatus === 'CARENCIA') return <span className={`${vt.pill} ${vt.pillMute}`} title="Ainda na carência">a partir de {b.cestaDesde ? mesCurto(b.cestaDesde) : '—'}</span>;
@@ -816,12 +822,17 @@ function TabelaDebitos({ d, busca, fechado, onAbrir, onEditar, onRemover, onEnce
 // =================== painel lateral e diálogos ===================
 
 /** Antes painel lateral; agora modal largo e centralizado (com foto quando é uma pessoa). */
-function PainelLateral({ titulo, sub, onFechar, children, foto, chips, abas, aba, onAba, largo }: {
+function PainelLateral({ titulo, sub, onFechar, children, foto, chips, abas, aba, onAba, largo, largura, acao }: {
   titulo: string; sub: string; onFechar: () => void; children: ReactNode;
   foto?: ReactNode; chips?: ReactNode; abas?: AbaModal[]; aba?: string; onAba?: (id: string) => void; largo?: boolean;
+  /** Largura própria (px), quando o conteúdo pede mais que o "largo". */
+  largura?: number;
+  /** Botão no topo, ao lado do fechar (ex.: Editar cadastro). */
+  acao?: ReactNode;
 }) {
   return (
-    <ModalPessoa aberto onFechar={onFechar} foto={foto} titulo={titulo} meta={sub} chips={chips} abas={abas} aba={aba} onAba={onAba} largura={largo ? 1000 : 640}>
+    <ModalPessoa aberto onFechar={onFechar} foto={foto} titulo={titulo} meta={sub} chips={chips} abas={abas} aba={aba} onAba={onAba} acao={acao}
+      largura={largura ?? (largo ? 1000 : 640)} compacto={!!largura}>
       <div className={largo ? css.mCorpo2 : css.mCorpo1}>{children}</div>
     </ModalPessoa>
   );
@@ -978,12 +989,32 @@ function Observacao({ pessoaTipo, pessoaId, mes, inicial, disabled }: { pessoaTi
 type FormBen = { vrDiaCent: number; cestaCent: number; vtTipo: VtTipo; vtValorCent: number };
 
 /** Campos de VR/VA, cesta e transporte (usados no padrão da empresa e no valor próprio). */
-function CamposBeneficio({ f, set, disabled, prefixo }: { f: FormBen; set: (f: FormBen) => void; disabled?: boolean; prefixo: string }) {
+function CamposBeneficio({ f, set, disabled, prefixo, semCesta, compacto }: {
+  f: FormBen; set: (f: FormBen) => void; disabled?: boolean; prefixo: string;
+  /** A cesta tem bloco próprio (Sim/Não): aqui ficam só VR/VA e transporte. */
+  semCesta?: boolean;
+  /** Sem cesta, em pouco espaço: tipo de transporte em cima, VR/VA e VT lado a lado. */
+  compacto?: boolean;
+}) {
+  if (compacto) {
+    return (
+      <>
+        <Alternar<VtTipo> rotulo="Transporte" valor={f.vtTipo} disabled={disabled} onChange={(v) => set({ ...f, vtTipo: v })}
+          opcoes={[['DIA', 'VT por dia'], ['FIXO', 'Combustível fixo'], ['NENHUM', 'Não recebe']]} />
+        <div className={css.grade2}>
+          <CampoReais id={`${prefixo}-vr`} rotulo="VR/VA por dia" valorCent={f.vrDiaCent} onChange={(c) => set({ ...f, vrDiaCent: c })} disabled={disabled} />
+          {f.vtTipo !== 'NENHUM' && <CampoReais id={`${prefixo}-vt`} rotulo={f.vtTipo === 'DIA' ? 'VT por dia' : 'Combustível (mensal)'} valorCent={f.vtValorCent}
+            onChange={(c) => set({ ...f, vtValorCent: c })} disabled={disabled} />}
+        </div>
+        {f.vtTipo !== 'NENHUM' && <small className={css.formula}>{f.vtTipo === 'FIXO' ? 'Combustível: cada falta abate 1/30. Feriado não abate.' : 'VT multiplica pelos dias de trabalho. Faltas e feriados abatem.'}</small>}
+      </>
+    );
+  }
   return (
     <>
       <div className={css.grade2}>
         <CampoReais id={`${prefixo}-vr`} rotulo="VR/VA por dia" valorCent={f.vrDiaCent} onChange={(c) => set({ ...f, vrDiaCent: c })} disabled={disabled} />
-        <CampoReais id={`${prefixo}-cesta`} rotulo="Cesta básica (mensal)" valorCent={f.cestaCent} onChange={(c) => set({ ...f, cestaCent: c })} disabled={disabled} />
+        {!semCesta && <CampoReais id={`${prefixo}-cesta`} rotulo="Cesta básica (mensal)" valorCent={f.cestaCent} onChange={(c) => set({ ...f, cestaCent: c })} disabled={disabled} />}
       </div>
       <Alternar<VtTipo> rotulo="Transporte" valor={f.vtTipo} disabled={disabled} onChange={(v) => set({ ...f, vtTipo: v })}
         opcoes={[['DIA', 'VT por dia'], ['FIXO', 'Combustível fixo'], ['NENHUM', 'Não recebe']]} />
@@ -1013,6 +1044,8 @@ function ValeAPartir({ id, prox, mes, valor, onChange }: { id: string; prox: str
 function PainelPadrao({ d, onSalvo }: { d: PessoalCompetencia; onSalvo: (msg: string) => Promise<void> }) {
   const base: FormBen = d.padrao ?? { vrDiaCent: 0, cestaCent: 0, vtTipo: 'DIA', vtValorCent: 0 };
   const [f, setF] = useState<FormBen>({ vrDiaCent: base.vrDiaCent, cestaCent: base.cestaCent, vtTipo: base.vtTipo, vtValorCent: base.vtValorCent });
+  // "A empresa paga cesta?" — Não = valor 0 (ninguém do padrão recebe).
+  const [pagaCesta, setPagaCesta] = useState(base.cestaCent > 0);
   // Primeira vez: começa no mês atual — é o que já foi pago, e o acerto de
   // feriado/falta deste mês precisa saber o valor.
   const primeira = d.padroes.length === 0;
@@ -1021,20 +1054,29 @@ function PainelPadrao({ d, onSalvo }: { d: PessoalCompetencia; onSalvo: (msg: st
   const [salvando, setSalvando] = useState(false);
   const seguem = d.clt.filter((c) => c.config.origem !== 'PROPRIO').length;
   async function salvar() {
+    if (pagaCesta && f.cestaCent <= 0) { setErro('Informe o valor mensal da cesta, ou marque que a empresa não paga cesta.'); return; }
     setSalvando(true); setErro(null);
     try {
-      await api.put('/pessoal/padrao', { vrDia: f.vrDiaCent / 100, cestaMensal: f.cestaCent / 100, vtTipo: f.vtTipo, vtValor: f.vtValorCent / 100, vigenteDesde: vig });
+      await api.put('/pessoal/padrao', { vrDia: f.vrDiaCent / 100, cestaMensal: pagaCesta ? f.cestaCent / 100 : 0, vtTipo: f.vtTipo, vtValor: f.vtValorCent / 100, vigenteDesde: vig });
       await onSalvo(`Padrão salvo a partir de ${mesLongo(vig)}.`);
     } catch (e) { setErro((e as Error).message); setSalvando(false); }
   }
   return (
     <>
       <div className={css.pCorpo}>
-        <p className={css.hint}>Defina uma vez: todo CLT sem valor próprio recebe estes valores, todo mês, até você mudar. Hoje {seguem === 1 ? '1 pessoa segue' : `${seguem} pessoas seguem`} o padrão.</p>
-        <p className={css.formula}>Cesta básica: só é paga no mês sem falta e depois da carência (3 meses após o início no ponto, ou o mês definido no painel de cada pessoa).</p>
         <section className={css.bloco}>
-          <span className={css.lb}>Valores</span>
-          <CamposBeneficio f={f} set={setF} prefixo="pd" />
+          <span className={css.lb}>Valores · hoje {seguem === 1 ? '1 pessoa segue' : `${seguem} pessoas seguem`} o padrão</span>
+          <CamposBeneficio f={f} set={setF} prefixo="pd" semCesta compacto />
+          <hr className={css.divisor} />
+          <Alternar<'SIM' | 'NAO'> rotulo="A empresa paga cesta básica?" valor={pagaCesta ? 'SIM' : 'NAO'} onChange={(v) => setPagaCesta(v === 'SIM')}
+            opcoes={[['SIM', 'Sim'], ['NAO', 'Não']]} />
+          {pagaCesta
+            ? <div className={css.painelSuave}>
+                <div className={css.grade2}><CampoReais id="pd-cesta" rotulo="Valor mensal da cesta" valorCent={f.cestaCent} onChange={(c) => setF({ ...f, cestaCent: c })} /></div>
+                <small className={css.formula}>Paga só no mês sem falta e depois da carência (3 meses após a admissão, ou o mês escolhido na pessoa). Quem estiver marcado "não recebe" fica de fora.</small>
+              </div>
+            : <p className={`${css.formula} ${css.painelSuave}`}>Ninguém do padrão recebe cesta. Quem tiver valor próprio com cesta continua recebendo.</p>}
+          <hr className={css.divisor} />
           <ValeAPartir id="pd-vig" prox={d.proxima} mes={primeira ? d.competencia : undefined} valor={vig} onChange={setVig} />
         </section>
         {d.padroes.length > 0 && (
@@ -1109,14 +1151,17 @@ function PainelCltDetalhe({ l, d, mes, holerite, onVerHolerite, onSubir, onIrCon
   );
 }
 
-function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
+function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar, onIrPadrao }: {
   l: PessoalLinhaClt; d: PessoalCompetencia; mes: string; fechado: boolean;
-  onSalvo: () => Promise<void>; onAviso: (m: string) => void; onTirar: () => void;
+  onSalvo: () => Promise<void>; onAviso: (m: string) => void; onTirar: () => void; onIrPadrao: () => void;
 }) {
+  // Cesta tem bloco próprio: aqui ela só é carregada junto (valor próprio
+  // mantém a cesta que já tinha; quem vem do padrão começa com a do padrão).
+  const cestaBase = l.config.origem === 'PROPRIO' ? l.config.cestaCent : d.padrao?.cestaCent ?? 0;
   const inicial = () => ({
     modo: (l.config.origem === 'PROPRIO' ? 'PROPRIO' : 'PADRAO') as 'PADRAO' | 'PROPRIO',
-    ben: { vrDiaCent: l.config.vrDiaCent, cestaCent: l.config.cestaCent, vtTipo: l.config.vtTipo === 'NENHUM' && l.config.origem !== 'PROPRIO' ? 'DIA' as VtTipo : l.config.vtTipo, vtValorCent: l.config.vtValorCent },
-    cargo: l.config.cargo ?? '', pix: l.config.chavePix ?? '', vig: d.proxima, semVt: [...(l.config.vtSemDias ?? [])].sort(),
+    ben: { vrDiaCent: l.config.vrDiaCent, cestaCent: cestaBase, vtTipo: l.config.vtTipo === 'NENHUM' && l.config.origem !== 'PROPRIO' ? 'DIA' as VtTipo : l.config.vtTipo, vtValorCent: l.config.vtValorCent },
+    vig: d.proxima, semVt: [...(l.config.vtSemDias ?? [])].sort(),
   });
   const [f, setF] = useState(inicial);
   const [salvando, setSalvando] = useState(false);
@@ -1129,7 +1174,7 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
     try {
       const proprio = f.modo === 'PROPRIO';
       await api.put(`/pessoal/clt/${l.empregadoId}/config`, {
-        cargo: f.cargo, chavePix: f.pix, vigenteDesde: f.vig, usaPadrao: !proprio,
+        vigenteDesde: f.vig, usaPadrao: !proprio,
         vrDia: proprio ? f.ben.vrDiaCent / 100 : 0, cestaMensal: proprio ? f.ben.cestaCent / 100 : 0,
         vtTipo: proprio ? f.ben.vtTipo : 'NENHUM', vtValor: proprio && f.ben.vtTipo !== 'NENHUM' ? f.ben.vtValorCent / 100 : 0,
         vtSemDias: f.semVt,
@@ -1138,88 +1183,141 @@ function PainelClt({ l, d, mes, fechado, onSalvo, onAviso, onTirar }: {
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
   }
+  const hoje = l.config.origem === 'PROPRIO' ? 'valor próprio' : l.config.origem === 'PADRAO' ? 'padrão da empresa' : 'sem benefício';
   return (
-    <>
-      <div className={css.pCorpo}>
-        {l.erro && <p className={css.alerta}>Sem números do ponto: {l.erro}. Confira a escala em Funcionários.</p>}
-        <p className={css.formula}>Só a configuração desta pessoa. Os valores que ela recebe (contracheque, prévia, benefícios carregados) ficam no detalhamento, na aba Salários.</p>
+    <div className={`${css.pCorpo} ${css.cltCorpo}`}>
+      {l.erro && <p className={`${css.alerta} ${css.cheio}`}>Sem números do ponto: {l.erro}. Confira a escala em Funcionários.</p>}
 
-        <section className={css.bloco}>
+      <section className={css.bloco}>
+        <div className={css.blocoTopo}>
           <span className={css.lb}>Benefícios</span>
-          <p className={css.formula}>Hoje: {l.config.origem === 'PROPRIO' ? 'valor próprio' : l.config.origem === 'PADRAO' ? 'padrão da empresa' : 'sem benefício'}{l.config.vigenteDesde ? ` desde ${mesLongo(l.config.vigenteDesde)}` : ''} · {resumoBen(l.config)}</p>
-          <Alternar<'PADRAO' | 'PROPRIO'> rotulo="De onde vem o valor" valor={f.modo} disabled={fechado} onChange={(v) => setF({ ...f, modo: v })}
-            opcoes={[['PADRAO', d.padrao ? 'Padrão da empresa' : 'Padrão da empresa (não definido)'], ['PROPRIO', 'Valor próprio']]} />
-          {f.modo === 'PADRAO'
-            ? <p className={css.hint}>{d.padrao ? `${resumoBen(d.padrao)}. Se o padrão mudar, muda pra esta pessoa também.` : 'Defina o padrão em Benefícios → "Definir padrão da empresa".'}</p>
-            : <CamposBeneficio f={f.ben} set={(ben) => setF({ ...f, ben })} disabled={fechado} prefixo="pp" />}
-          <div className={css.campo} role="group" aria-label="Dias em home office (sem vale-transporte)">
-            <span>Home office (sem VT)</span>
-            <div className={css.diasSemana}>
-              {DIAS_SEMANA.map(([n, t]) => {
-                const on = f.semVt.includes(n);
-                return <button key={n} type="button" disabled={fechado} aria-pressed={on}
-                  onClick={() => setF({ ...f, semVt: on ? f.semVt.filter((x) => x !== n) : [...f.semVt, n].sort() })}>{t}</button>;
-              })}
-            </div>
-            <small>Marque os dias em que trabalha de casa: nesses dias não recebe VT (VR/VA continua). Meio período presencial recebe VT normalmente.</small>
+          <small className={css.mute}>Hoje: {hoje}{l.config.vigenteDesde ? ` desde ${mesCurto(l.config.vigenteDesde).slice(0, 3)}/${l.config.vigenteDesde.slice(0, 4)}` : ''}</small>
+        </div>
+        {l.config.origem !== 'NENHUM' && (
+          <div className={css.chipsRes}>
+            {l.config.vrDiaCent > 0 && <span className={css.chipRes}><b>VR/VA</b> {brl(l.config.vrDiaCent)}/dia</span>}
+            {l.config.vtTipo !== 'NENHUM' && <span className={css.chipRes}><b>{l.config.vtTipo === 'FIXO' ? 'Combustível' : 'VT'}</b> {brl(l.config.vtValorCent)}{l.config.vtTipo === 'FIXO' ? '/mês' : '/dia'}</span>}
           </div>
-          <div className={css.grade2}>
-            <CampoTexto id="cargo" rotulo="Cargo" valor={f.cargo} onChange={(v) => setF({ ...f, cargo: v })} placeholder="Auxiliar de logística" disabled={fechado} />
-            <CampoTexto id="pix" rotulo="Chave Pix (opcional)" valor={f.pix} onChange={(v) => setF({ ...f, pix: v })} disabled={fechado} />
+        )}
+        <Alternar<'PADRAO' | 'PROPRIO'> rotulo="De onde vem o valor" valor={f.modo} disabled={fechado} onChange={(v) => setF({ ...f, modo: v })}
+          opcoes={[['PADRAO', d.padrao ? 'Padrão da empresa' : 'Padrão da empresa (não definido)'], ['PROPRIO', 'Valor próprio']]} />
+        {f.modo === 'PADRAO'
+          ? <p className={css.formula}>{d.padrao ? 'Segue o padrão da empresa. Se o padrão mudar, muda pra esta pessoa também.' : <>O padrão ainda não foi definido. <button type="button" className={css.link} onClick={onIrPadrao}>Definir padrão da empresa</button></>}</p>
+          : <div className={css.painelSuave}><CamposBeneficio f={f.ben} set={(ben) => setF({ ...f, ben })} disabled={fechado} prefixo="pp" semCesta compacto /></div>}
+        <div className={css.campo} role="group" aria-label="Dias em home office (sem vale-transporte)">
+          <span>Home office (sem VT)</span>
+          <div className={css.diasSemana}>
+            {DIAS_SEMANA.map(([n, t]) => {
+              const on = f.semVt.includes(n);
+              return <button key={n} type="button" disabled={fechado} aria-pressed={on}
+                onClick={() => setF({ ...f, semVt: on ? f.semVt.filter((x) => x !== n) : [...f.semVt, n].sort() })}>{t}</button>;
+            })}
           </div>
-          {!fechado && <ValeAPartir id="pp-vig" prox={d.proxima} valor={f.vig} onChange={(v) => setF({ ...f, vig: v })} />}
-          {erro && <p className={css.alerta}>{erro}</p>}
-          {!fechado && <Botao variante="coral" className={css.btnPri} disabled={!mudou || salvando} onClick={salvar}>{salvando ? 'Salvando…' : `Salvar a partir de ${mesCurto(f.vig)}`}</Botao>}
+          <small>Nos dias marcados não recebe VT. VR/VA continua.</small>
+        </div>
+        {!fechado && (
+          <div className={css.salvarLinha}>
+            <ValeAPartir id="pp-vig" prox={d.proxima} valor={f.vig} onChange={(v) => setF({ ...f, vig: v })} />
+            <Botao variante="coral" className={css.btnPri} disabled={!mudou || salvando} onClick={salvar}>{salvando ? 'Salvando…' : `Salvar a partir de ${mesCurto(f.vig).slice(0, 3)}.`}</Botao>
+          </div>
+        )}
+        {erro && <p className={css.alerta}>{erro}</p>}
+      </section>
+
+      <div className={css.coluna}>
+        <CestaClt l={l} d={d} fechado={fechado} onSalvo={onSalvo} onAviso={onAviso} onIrPadrao={onIrPadrao} />
+        <section className={css.bloco}>
+          <Observacao pessoaTipo="CLT" pessoaId={l.empregadoId} mes={mes} inicial={l.observacao} disabled={fechado} />
         </section>
-
-        <ClienteClt l={l} clientes={[...new Set(d.clt.map((x) => x.cliente).filter((x): x is string => !!x))].sort()} onSalvo={onSalvo} onAviso={onAviso} />
-        <Admissao l={l} onSalvo={onSalvo} onAviso={onAviso} />
-        <InicioCesta l={l} fechado={fechado} onSalvo={onSalvo} onAviso={onAviso} />
-
-        <Observacao pessoaTipo="CLT" pessoaId={l.empregadoId} mes={mes} inicial={l.observacao} disabled={fechado} />
-        {!fechado && <ZonaTirar nome={l.nome} mes={mes} onTirar={onTirar} />}
       </div>
-    </>
+
+      {!fechado && (
+        <div className={`${css.cheio} ${css.rodapeTirar}`}>
+          <button type="button" className={css.linkPerigo} onClick={onTirar}>Tirar {l.nome.split(' ')[0]} de {mesCurto(mes)}…</button>
+          <small className={css.mute}>Os meses anteriores nunca mudam.</small>
+        </div>
+      )}
+    </div>
   );
 }
 
-/** Mês a partir do qual a cesta é paga (carência). Vazio = automático. */
-function InicioCesta({ l, fechado, onSalvo, onAviso }: { l: PessoalLinhaClt; fechado: boolean; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
+/**
+ * Cesta básica da pessoa: recebe sim/não; se sim, a partir de quando e o
+ * valor (do padrão da empresa, ou digitado quando a pessoa tem valor próprio).
+ */
+function CestaClt({ l, d, fechado, onSalvo, onAviso, onIrPadrao }: {
+  l: PessoalLinhaClt; d: PessoalCompetencia; fechado: boolean;
+  onSalvo: () => Promise<void>; onAviso: (m: string) => void; onIrPadrao: () => void;
+}) {
   const b = l.beneficios;
-  const [valor, setValor] = useState(b.cestaDesde ?? '');
-  const [erro, setErro] = useState<string | null>(null);
+  const recebeIni = b.cestaRecebe !== false;
+  const proprio = l.config.origem === 'PROPRIO';
+  const padraoCent = d.padrao?.cestaCent ?? 0;
+  // Automático = 3 meses depois da admissão (ou do início no ponto, que só o servidor sabe).
+  const autoMes = b.cestaDesdeOrigem === 'AUTO' ? b.cestaDesde : l.admissao ? somarMes(l.admissao.slice(0, 7), 3) : null;
+  const desdeIni = b.cestaDesde ?? '';
+  const [recebe, setRecebe] = useState(recebeIni);
+  const [desde, setDesde] = useState(desdeIni);
+  const [valor, setValor] = useState(l.config.cestaCent);
   const [salvando, setSalvando] = useState(false);
-  useEffect(() => { setValor(b.cestaDesde ?? ''); }, [b.cestaDesde]);
-  async function salvar(v: string | null) {
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => { setRecebe(recebeIni); setDesde(desdeIni); setValor(l.config.cestaCent); setErro(null); }, [recebeIni, desdeIni, l.config.cestaCent]);
+  const mudouValor = recebe && proprio && valor !== l.config.cestaCent;
+  const mudou = recebe !== recebeIni || (recebe && desde !== desdeIni) || mudouValor;
+
+  async function salvar() {
+    if (recebe && proprio && valor <= 0) { setErro('Informe o valor mensal da cesta.'); return; }
     setSalvando(true); setErro(null);
     try {
-      await api.put(`/pessoal/clt/${l.empregadoId}/cesta`, { cestaDesde: v });
-      await onSalvo(); onAviso(v ? `Cesta de ${l.nome} a partir de ${mesLongo(v)}.` : `Cesta de ${l.nome} volta ao automático.`);
+      const corpo: Record<string, unknown> = { recebe };
+      if (recebe) {
+        // O mês automático não vira "escolhido": continua acompanhando a admissão.
+        corpo.cestaDesde = desde && !(desde === autoMes && b.cestaDesdeOrigem !== 'MANUAL') ? desde : null;
+        if (mudouValor) { corpo.cestaMensal = valor / 100; corpo.vigenteDesde = d.proxima; }
+      }
+      await api.put(`/pessoal/clt/${l.empregadoId}/cesta`, corpo);
+      await onSalvo();
+      onAviso(!recebe ? `${l.nome}: não recebe cesta.` : `${l.nome}: cesta a partir de ${mesLongo(desde || autoMes || d.competencia)}${mudouValor ? `, ${brl(valor)} por mês` : ''}.`);
     } catch (e) { setErro((e as Error).message); }
     finally { setSalvando(false); }
   }
+
+  const status = !recebeIni ? 'Sem cesta' : b.cestaDesde ? `Recebe desde ${mesCurto(b.cestaDesde).slice(0, 3)}/${b.cestaDesde.slice(0, 4)}` : 'Recebe';
   return (
     <section className={css.bloco}>
       <span className={css.lb}>Cesta básica</span>
-      <p className={css.formula}>
-        {b.cestaDesde
-          ? `Recebe a partir de ${mesLongo(b.cestaDesde)}${b.cestaDesdeOrigem === 'AUTO' ? ` (automático: 3 meses depois ${l.admissao ? 'da admissão' : 'do início no ponto'})` : ' (definido aqui)'}.`
-          : 'Sem carência: recebe desde já.'} Mês com falta não paga a cesta.
-      </p>
-      {!fechado && (
-        <>
-          <label className={css.campo} htmlFor="cesta-desde">
-            <span>Recebe a partir de</span>
-            <span className={css.input}><input id="cesta-desde" type="month" value={valor} onChange={(e) => setValor(e.target.value)} /></span>
-          </label>
-          {erro && <p className={css.alerta}>{erro}</p>}
-          <div className={css.acoes}>
-            <Botao variante="ghost" className={css.btnSec} disabled={salvando || !valor || (valor === b.cestaDesde && b.cestaDesdeOrigem === 'MANUAL')} onClick={() => salvar(valor)}>
-              {salvando ? 'Salvando…' : valor ? `Cesta a partir de ${mesCurto(valor)}` : 'Escolha o mês'}
-            </Botao>
-            {b.cestaDesdeOrigem === 'MANUAL' && <button className={css.link} onClick={() => salvar(null)}>Voltar ao automático</button>}
+      <Alternar<'SIM' | 'NAO'> rotulo="Recebe cesta básica?" valor={recebe ? 'SIM' : 'NAO'} disabled={fechado} onChange={(v) => setRecebe(v === 'SIM')}
+        opcoes={[['SIM', 'Sim'], ['NAO', 'Não']]} />
+      {recebe ? (
+        <div className={css.painelSuave}>
+          <div className={css.grade2}>
+            <label className={css.campo} htmlFor="cesta-desde">
+              <span>A partir de</span>
+              <span className={css.input}><input id="cesta-desde" type="month" value={desde} disabled={fechado} onChange={(e) => setDesde(e.target.value)} /></span>
+            </label>
+            {proprio
+              ? <CampoReais id="cesta-valor" rotulo="Valor mensal" valorCent={valor} onChange={setValor} disabled={fechado} />
+              : <div className={css.campo}><span>Valor mensal</span>
+                  <span className={css.valorLeitura}>{padraoCent > 0 ? <>{brl(padraoCent)}<small>do padrão da empresa</small></> : <span className={css.mute}>—</span>}</span></div>}
           </div>
-        </>
+          {!proprio && padraoCent <= 0 && (
+            <p className={css.avisoCesta} role="alert">O padrão da empresa não paga cesta, então ela não sai. <button type="button" className={css.link} onClick={onIrPadrao}>Alterar padrão da empresa</button> ou use Valor próprio.</p>
+          )}
+          <small className={css.formula}>
+            {autoMes ? `Automático: ${mesLongo(autoMes)} (3 meses depois da ${l.admissao ? 'admissão' : 'entrada no ponto'}).` : 'Sem admissão no cadastro: recebe desde já.'} Mês com falta não paga a cesta.
+            {b.cestaDesdeOrigem === 'MANUAL' && autoMes && desde !== autoMes && !fechado && <> <button type="button" className={css.link} onClick={() => setDesde(autoMes)}>Voltar ao automático</button></>}
+          </small>
+        </div>
+      ) : (
+        <p className={`${css.formula} ${css.painelSuave}`}>Não recebe cesta. Nenhum mês dela entra na carga, mesmo que o padrão da empresa tenha cesta.</p>
+      )}
+      {erro && <p className={css.alerta}>{erro}</p>}
+      {!fechado && (
+        <div className={css.acoesFim}>
+          {mudou
+            ? <Botao variante="coral" className={css.btnPri} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : recebe ? 'Salvar cesta' : 'Salvar: não recebe'}</Botao>
+            : <small className={css.mute} role="status">{status}</small>}
+        </div>
       )}
     </section>
   );
@@ -2568,64 +2666,6 @@ function PagoInfo({ pago, valorPagoCent, liquidoCent, pagoEm }: { pago: boolean;
 
 /** Admissão real do CLT (pode ser antes do ponto). Base da carência da cesta. */
 /** Cliente a que o CLT pertence: texto livre, com os já usados como sugestão. Vale pra todos os meses. */
-function ClienteClt({ l, clientes, onSalvo, onAviso }: { l: PessoalLinhaClt; clientes: string[]; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
-  const [valor, setValor] = useState(l.cliente ?? '');
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  useEffect(() => { setValor(l.cliente ?? ''); }, [l.cliente]);
-  const mudou = valor.trim() !== (l.cliente ?? '');
-  async function salvar() {
-    setSalvando(true); setErro(null);
-    try {
-      await api.put(`/pessoal/clt/${l.empregadoId}/cliente`, { cliente: valor.trim() || null });
-      await onSalvo(); onAviso(valor.trim() ? `${l.nome}: cliente ${valor.trim()}.` : `Cliente de ${l.nome} apagado.`);
-    } catch (e) { setErro((e as Error).message); }
-    finally { setSalvando(false); }
-  }
-  return (
-    <section className={css.bloco}>
-      <span className={css.lb}>Cliente</span>
-      <div className={css.linhaCampo}>
-        <label className={css.campo} htmlFor="cli"><span>Trabalha para o cliente</span>
-          <span className={css.input}><input id="cli" value={valor} list="cli-lista" maxLength={120} autoComplete="off" placeholder="Ex.: Auto Norte Maceió"
-            onChange={(e) => setValor(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && mudou && !salvando) void salvar(); }} /></span>
-          <datalist id="cli-lista">{clientes.map((c) => <option key={c} value={c} />)}</datalist>
-          <small>{clientes.length ? 'Escolha um que já usou ou digite um novo.' : 'Aparece na tabela, depois do nome.'}</small>
-        </label>
-        <Botao variante="ghost" className={css.btnSec} disabled={salvando || !mudou} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar cliente'}</Botao>
-      </div>
-      {erro && <p className={css.alerta}>{erro}</p>}
-    </section>
-  );
-}
-
-function Admissao({ l, onSalvo, onAviso }: { l: PessoalLinhaClt; onSalvo: () => Promise<void>; onAviso: (m: string) => void }) {
-  const [valor, setValor] = useState(l.admissao ?? '');
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  useEffect(() => { setValor(l.admissao ?? ''); }, [l.admissao]);
-  async function salvar() {
-    setSalvando(true); setErro(null);
-    try {
-      await api.put(`/pessoal/clt/${l.empregadoId}/admissao`, { dataAdmissao: valor || null });
-      await onSalvo(); onAviso(valor ? `Admissão de ${l.nome}: ${new Date(`${valor}T12:00:00`).toLocaleDateString('pt-BR')}.` : `Admissão de ${l.nome} apagada.`);
-    } catch (e) { setErro((e as Error).message); }
-    finally { setSalvando(false); }
-  }
-  return (
-    <section className={css.bloco}>
-      <span className={css.lb}>Admissão</span>
-      <p className={css.formula}>Data real de entrada na empresa, mesmo que antes de usar o ponto. Conta a carência da cesta e aparece no histórico.</p>
-      <div className={css.linhaCampo}>
-        <label className={css.campo} htmlFor="adm"><span>Admitido em</span>
-          <span className={css.input}><input id="adm" type="date" value={valor} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setValor(e.target.value)} /></span></label>
-        <Botao variante="ghost" className={css.btnSec} disabled={salvando || valor === (l.admissao ?? '')} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar admissão'}</Botao>
-      </div>
-      {erro && <p className={css.alerta}>{erro}</p>}
-    </section>
-  );
-}
-
 /** Faixa de resumo: poucos números, um por bloco. Mesma peça em todas as abas e no histórico. */
 function Resumo({ itens }: { itens: { k: string; v: ReactNode; s?: string; tom?: 'ok' | 'neg' }[] }) {
   return (

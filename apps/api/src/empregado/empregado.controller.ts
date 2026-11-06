@@ -9,7 +9,7 @@ interface RespostaHttp {
 import { BadRequestException } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { EmpregadoService } from './empregado.service';
-import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, DefinirDataInicioPontoDto, AcessoDto } from './dto/empregado.dto';
+import { CriarEmpregadoDto, DefinirPinDto, AtivoDto, DefinirHorarioDto, DefinirSalarioDto, DefinirDataInicioPontoDto, AcessoDto, AtualizarCadastroDto } from './dto/empregado.dto';
 
 import { DefinirPerfilDto } from '../perfil-regra/dto/perfil-regra.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -61,6 +61,10 @@ export class EmpregadoController {
   }
   @Get(':id') obter(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
     return this.empregados.obter(this.tenant(u), id);
+  }
+  /** Aba Cadastro: nome, matrícula, cargo, admissão, cliente e chave Pix. */
+  @Patch(':id/cadastro') cadastro(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: AtualizarCadastroDto) {
+    return this.empregados.atualizarCadastro(this.tenant(u), id, dto);
   }
   @Patch(':id/pin') definirPin(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Body() dto: DefinirPinDto) {
     return this.empregados.definirPin(this.tenant(u), id, dto.pin);

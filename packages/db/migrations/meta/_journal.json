@@ -484,6 +484,13 @@
       "when": 1785450000000,
       "tag": "0068_transferencia_empresa",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1785460000000,
+      "tag": "0069_cadastro_e_cesta",
+      "breakpoints": true
     }
   ]
 }

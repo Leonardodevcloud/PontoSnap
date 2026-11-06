@@ -47,7 +47,7 @@ export class PessoalController {
     return this.pessoal.definirCliente(this.tenant(u), id, dto.cliente ?? null);
   }
   @Put('clt/:empregadoId/cesta') inicioCesta(@UsuarioAtual() u: PayloadAcesso, @Param('empregadoId') id: string, @Body() dto: InicioCestaDto) {
-    return this.pessoal.definirInicioCesta(this.tenant(u), id, dto.cestaDesde ?? null);
+    return this.pessoal.definirCesta(this.tenant(u), id, dto);
   }
   @Put('padrao') padrao(@UsuarioAtual() u: PayloadAcesso, @Body() dto: PadraoDto) {
     return this.pessoal.salvarPadrao(this.tenant(u), dto);

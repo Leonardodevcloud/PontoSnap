@@ -461,3 +461,34 @@ label.pixItem:hover{ background:var(--cream); }
 .desfazer{ background:none; border:0; padding:0; font:inherit; font-size:11.5px; color:var(--ash); cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
 .desfazer:hover{ color:var(--coral-dark); }
 .desfazer:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+
+/* ---------- Benefícios da pessoa (CLT): só o que é do mês; cadastro fica em Funcionários ---------- */
+.mCorpo2 .cltCorpo{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); }
+.coluna{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.blocoTopo{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.blocoTopo small{ font-size:12.5px; }
+.chipsRes{ display:flex; gap:8px; flex-wrap:wrap; }
+.chipRes{ display:inline-flex; gap:6px; align-items:center; background:var(--cream); border:1px solid var(--row-border); border-radius:var(--r-pill); padding:5px 11px; font-size:12.5px; font-variant-numeric:tabular-nums; }
+.chipRes b{ font-weight:500; color:var(--ash); }
+.painelSuave{ display:flex; flex-direction:column; gap:10px; padding:12px; margin:0; background:var(--field-bg); border-radius:12px; }
+.salvarLinha{ display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--row-border); }
+.salvarLinha > .campo{ flex:1 1 260px; }
+.salvarLinha > .btnPri{ min-height:44px; }
+.valorLeitura{ min-height:40px; display:flex; flex-direction:column; justify-content:center; font-size:14px; font-variant-numeric:tabular-nums; }
+.valorLeitura small{ font-size:12px; color:var(--ash); }
+.avisoCesta{ margin:0; font-size:13px; line-height:1.5; color:var(--aviso-text); background:var(--aviso-bg); border:1px solid var(--aviso-border); border-radius:10px; padding:9px 12px; }
+.avisoCesta .link{ color:inherit; }
+.acoesFim{ display:flex; justify-content:flex-end; align-items:center; min-height:40px; }
+.acoesFim small{ font-size:12.5px; }
+.divisor{ border:0; height:1px; background:var(--row-border); margin:2px 0; width:100%; }
+.rodapeTirar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--row-border); }
+.rodapeTirar small{ font-size:12.5px; }
+.linkPerigo{ background:none; border:0; padding:6px 0; font:inherit; font-size:13.5px; font-weight:500; color:var(--erro-text); cursor:pointer; min-height:36px; }
+.linkPerigo:hover{ text-decoration:underline; text-underline-offset:3px; }
+.linkPerigo:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; border-radius:4px; }
+.btnCadastro{ display:inline-flex; align-items:center; gap:8px; min-height:40px; padding:8px 16px; border-radius:999px; border:1.5px solid rgba(var(--ink-rgb),.2); background:var(--white); color:var(--ink); font-size:14px; font-weight:500; text-decoration:none; white-space:nowrap; }
+.btnCadastro:hover{ background:var(--cream); }
+.btnCadastro:focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+@media (max-width:820px){
+  .mCorpo2 .cltCorpo{ grid-template-columns:minmax(0,1fr); }
+}

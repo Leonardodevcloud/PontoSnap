@@ -21,6 +21,9 @@ export const empregado = pgTable('empregado', {
   dataAdmissao: date('data_admissao'),
   /** Gestão de pessoal: cliente (loja/empresa atendida) a que o CLT pertence. Texto livre. */
   cliente: varchar('cliente', { length: 120 }),
+  /** Cadastro (migration 0069): cargo e chave Pix valem para todos os meses. */
+  cargo: varchar('cargo', { length: 80 }),
+  chavePix: varchar('chave_pix', { length: 120 }),
   salarioMensal: numeric('salario_mensal', { precision: 12, scale: 2 }),
   /** Atualização cadastral feita pelo próprio funcionário no app (migration 0053). */
   celular: varchar('celular', { length: 20 }),

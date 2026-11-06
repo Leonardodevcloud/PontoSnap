@@ -8,6 +8,7 @@ import { RevisarFotos } from './RevisarFotos';
 import { api } from '../lib/api';
 import { soDigitos } from '../lib/download';
 import { lerReais } from '../lib/formato';
+import { normalizarChave } from '../lib/pix';
 import type { Empregado, Horario } from '../tipos';
 import { Botao } from '../components/Botao';
 import { Campo } from '../components/Campo';
@@ -63,8 +64,8 @@ export function Funcionarios() {
   const [regioes, setRegioes] = useState<RegioesResumo | null>(null);
   // Ficha da pessoa e a ação aberta a partir dela (a ficha some enquanto a ação está aberta).
   const [fichaId, setFichaIdSt] = useState<string | null>(null);
-  const [fichaAba, setFichaAba] = useState<AbaFicha>('jornada');
-  const setFichaId = (id: string | null) => { setFichaIdSt(id); if (id) setFichaAba('jornada'); };
+  const [fichaAba, setFichaAba] = useState<AbaFicha>('cadastro');
+  const setFichaId = (id: string | null) => { setFichaIdSt(id); if (id) setFichaAba('cadastro'); };
   const [acao, setAcao] = useState<{ tipo: Acao; e: Empregado } | null>(null);
   const [regrasDe, setRegrasDe] = useState<PerfilResumo | null | undefined>(undefined);
   // Seleção (cidade em lote).
@@ -82,6 +83,18 @@ export function Funcionarios() {
   const { dados: avs, trocarDesenho } = useAvatares();
   const [params, setParams] = useSearchParams();
   const revisarAberto = params.get('revisar') === '1';
+  // Vindo da Folha ("Editar cadastro"): ?ficha=<id>&aba=cadastro abre a ficha direto.
+  useEffect(() => {
+    const id = params.get('ficha');
+    if (!id || !lista) return;
+    if (lista.some((e) => e.id === id)) {
+      setFichaIdSt(id);
+      const a = params.get('aba') as AbaFicha | null;
+      setFichaAba(a && ABAS_FICHA.includes(a) ? a : 'cadastro');
+    }
+    setParams((p) => { const n = new URLSearchParams(p); n.delete('ficha'); n.delete('aba'); return n; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lista]);
   const abrirRevisar = (v: boolean) => setParams((p) => { const n = new URLSearchParams(p); if (v) n.set('revisar', '1'); else n.delete('revisar'); return n; });
   const avisar = (m: string) => { setMsgOk(m); setTimeout(() => setMsgOk(null), 6000); };
 
@@ -125,6 +138,7 @@ export function Funcionarios() {
   const ficha = lista?.find((e) => e.id === fichaId) ?? null;
   const abrir = (tipo: Acao, e: Empregado) => setAcao({ tipo, e });
   const fecharAcao = (recarregar?: boolean) => { setAcao(null); if (recarregar) void carregar(); };
+  const clientes = [...new Set((lista ?? []).map((e) => e.cliente).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   return (
     <div className={css.pagina}>
@@ -209,14 +223,14 @@ export function Funcionarios() {
 
       {ficha && !acao && regrasDe === undefined && (
         <FichaFuncionario e={ficha} comp={compDe(ficha.id)} perfis={perfis} empresa={comp?.empresa ?? null} foto={avs?.empregados[ficha.id]}
-          cidade={cidadeDe(ficha) ? `${cidadeDe(ficha)}${ficha.trabalhoMunicipio ? `-${ficha.trabalhoUf}` : empresaCidade ? `-${empresaCidade.uf}` : ''}` : ''} cidadePropria={!!ficha.trabalhoMunicipio}
+          regioes={regioes} clientes={clientes} onCadastroSalvo={(m) => { avisar(m); void carregar(); }}
           aba={fichaAba} onAba={setFichaAba}
           onFechar={() => setFichaId(null)} onAcao={(t) => abrir(t, ficha)} onRegras={(p) => setRegrasDe(p)}
           onTrocarDesenho={() => void trocarDesenho('CLT', ficha.id)} onRevisarFoto={() => abrirRevisar(true)}
           onAtivo={async () => { await api.patch(`/empregados/${ficha.id}/ativo`, { ativo: !ficha.ativo }).catch(() => {}); avisar(`${ficha.nome} ${ficha.ativo ? 'inativado' : 'reativado'}.`); void carregar(); }} />
       )}
 
-      {addAberto && <ModalAdicionar onFechar={() => setAddAberto(false)} onCriado={() => { setAddAberto(false); void carregar(); }} />}
+      {addAberto && <ModalAdicionar regioes={regioes} clientes={clientes} onFechar={() => setAddAberto(false)} onCriado={() => { setAddAberto(false); void carregar(); }} />}
       {importarAberto && <ModalImportar onFechar={() => setImportarAberto(false)} onImportado={() => void carregar()} />}
       {acao?.tipo === 'PIN' && <ModalPin empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
       {acao?.tipo === 'ESCALA' && <ModalEscala empregado={acao.e} onFechar={() => fecharAcao()} onSalvo={() => fecharAcao(true)} />}
@@ -237,16 +251,18 @@ export function Funcionarios() {
 }
 
 /** Ficha da pessoa: tudo dela em abas; as ações abrem a partir daqui. */
-type AbaFicha = 'jornada' | 'regras' | 'salario' | 'acesso';
-function FichaFuncionario({ e, comp: c, perfis, empresa, foto, cidade, cidadePropria, aba, onAba, onFechar, onAcao, onRegras, onTrocarDesenho, onRevisarFoto, onAtivo }: {
+type AbaFicha = 'cadastro' | 'jornada' | 'regras' | 'salario' | 'acesso';
+const ABAS_FICHA: AbaFicha[] = ['cadastro', 'jornada', 'regras', 'salario', 'acesso'];
+function FichaFuncionario({ e, comp: c, perfis, empresa, foto, regioes, clientes, onCadastroSalvo, aba, onAba, onFechar, onAcao, onRegras, onTrocarDesenho, onRevisarFoto, onAtivo }: {
   aba: AbaFicha; onAba: (a: AbaFicha) => void;
   e: Empregado; comp?: Compensacao; perfis: PerfilResumo[]; empresa: EmpresaBanco | null;
   foto?: { foto?: string | null; status?: string | null; temApp?: boolean; motivo?: string | null };
-  cidade: string; cidadePropria: boolean;
+  regioes: RegioesResumo | null; clientes: string[]; onCadastroSalvo: (m: string) => void;
   onFechar: () => void; onAcao: (t: Acao) => void; onRegras: (p: PerfilResumo | null) => void;
   onTrocarDesenho: () => void; onRevisarFoto: () => void; onAtivo: () => Promise<void>;
 }) {
   const [confirmar, setConfirmar] = useState(false);
+  const [cad, setCad] = useState({ sujo: false, salvando: false });
   const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
   const padrao = perfis.find((x) => x.padrao);
   const efetivo = p ?? padrao;
@@ -258,13 +274,13 @@ function FichaFuncionario({ e, comp: c, perfis, empresa, foto, cidade, cidadePro
     <ModalPessoa aberto onFechar={onFechar} largura={760}
       foto={<Avatar id={e.id} nome={e.nome} tamanho={84} />}
       titulo={e.nome}
-      meta={[e.matricula ? `Mat. ${e.matricula}` : null, fmtCpf(e.cpf), e.dataInicioPonto ? `ponto desde ${e.dataInicioPonto.split('-').reverse().join('/')}` : null].filter(Boolean).join(' · ')}
+      meta={[e.cargo, e.matricula ? `Mat. ${e.matricula}` : null, fmtCpf(e.cpf), e.dataInicioPonto ? `ponto desde ${e.dataInicioPonto.split('-').reverse().join('/')}` : null].filter(Boolean).join(' · ')}
       chips={<>
         {!e.ativo && <span className={`${css.pillN} ${css['pill-cz']}`}>Inativo</span>}
         {!e.horarioContratualId && <span className={`${css.pillN} ${css['pill-er']}`}>Sem escala</span>}
         {at && <span className={`${css.pillN} ${css['pill-er']}`}>Horas sem compensar</span>}
       </>}
-      abas={[{ id: 'jornada', rotulo: 'Jornada' }, { id: 'regras', rotulo: 'Banco e regras' }, { id: 'salario', rotulo: 'Salário' }, { id: 'acesso', rotulo: 'Acesso e foto' }]}
+      abas={[{ id: 'cadastro', rotulo: 'Cadastro' }, { id: 'jornada', rotulo: 'Jornada' }, { id: 'regras', rotulo: 'Banco e regras' }, { id: 'salario', rotulo: 'Salário' }, { id: 'acesso', rotulo: 'Acesso e foto' }]}
       aba={aba} onAba={(x) => onAba(x as AbaFicha)}
       rodape={<>
         {confirmar
@@ -274,12 +290,14 @@ function FichaFuncionario({ e, comp: c, perfis, empresa, foto, cidade, cidadePro
           : <button type="button" className={`${css.fLk} ${e.ativo ? css.fPerigo : ''}`} onClick={() => setConfirmar(true)}>{e.ativo ? 'Inativar…' : 'Reativar'}</button>}
         <span style={{ flex: 1 }} />
         <button type="button" className={css.btnSecN} onClick={onFechar}>Fechar</button>
+        {aba === 'cadastro' && <button type="submit" form="form-cadastro" className={css.btnPriN} disabled={!cad.sujo || cad.salvando}>{cad.salvando ? 'Salvando…' : 'Salvar cadastro'}</button>}
       </>}>
+      {/* Fica montada (escondida) para não perder o que foi digitado ao trocar de aba. */}
+      <AbaCadastro e={e} regioes={regioes} clientes={clientes} oculto={aba !== 'cadastro'} onEstado={setCad} onSalvo={onCadastroSalvo} onAba={(x) => onAba(x)} />
       {aba === 'jornada' && (
         <div className={css.fGrupo}>
           <Linha k="Escala" v={e.escalaCodigo ?? (e.horarioContratualId ? 'Horário vinculado' : <span className={css.fAlerta}>Sem escala: o ponto não é calculado</span>)} acao={e.horarioContratualId ? 'Trocar' : 'Definir'} onClick={() => onAcao('ESCALA')} />
           <Linha k="Tipo de jornada" v={c?.jornada === 'CONTRATO_HORAS' ? 'Contrato de horas' : c?.jornada === '12X36' ? '12x36' : ehContratoHoras(efetivo?.config, e.escalaFlexivel) ? 'Contrato de horas' : 'Horário fixo'} />
-          <Linha k="Cidade de trabalho" v={cidade ? <>{cidade}{!cidadePropria && <span className={css.fMute}> (da empresa)</span>}</> : 'Sem cidade · só feriado nacional'} acao="Trocar" onClick={() => onAcao('CIDADE')} />
           <Linha k="Início do ponto" v={e.dataInicioPonto ? e.dataInicioPonto.split('-').reverse().join('/') : 'Desde o cadastro'} acao="Alterar" onClick={() => onAcao('INICIO')} />
           {c?.jornada === '12X36' && <Linha k="Escala 12x36" v="Dias de trabalho alternados" acao="Gerar dias" onClick={() => onAcao('ESCALA12')} />}
           {c?.jornada !== '12X36' && <p className={css.fNota}>Escala 12x36? <button type="button" className={css.fLk} onClick={() => onAcao('ESCALA12')}>Gerar os dias da escala</button></p>}
@@ -412,33 +430,158 @@ function ModalImportar({ onFechar, onImportado }: { onFechar: () => void; onImpo
   );
 }
 
-function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado: () => void }) {
-  const [nome, setNome] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [matricula, setMatricula] = useState('');
-  const [pin, setPin] = useState('');
-  const [salario, setSalario] = useState('');
-  const [dataInicio, setDataInicio] = useState('');
-  const [email, setEmail] = useState('');
+/** Campo com rótulo em cima (padrão dos formulários de cadastro). */
+function CampoCad({ id, rotulo, opcional, ajuda, erro, children }: { id: string; rotulo: string; opcional?: boolean; ajuda?: ReactNode; erro?: string; children: ReactNode }) {
+  return (
+    <label className={css.cadCampo} htmlFor={id}>
+      <span>{rotulo}{opcional && <i> (opcional)</i>}</span>
+      {children}
+      {erro ? <small className={css.cadErro}>{erro}</small> : ajuda && <small>{ajuda}</small>}
+    </label>
+  );
+}
+
+const rotuloEmpresa = (r: RegioesResumo | null) => r?.empresa?.municipioIbge ? `${r.empresa.municipioNome}-${r.empresa.uf}` : null;
+const emUsoDe = (r: RegioesResumo | null) => (r?.cidades ?? []).map((c) => ({ municipio: c.municipio, nome: c.nome, uf: c.uf, pessoas: c.funcionarios + c.prestadores }));
+const erroPix = (v: string) => (v.trim() && !normalizarChave(v) ? 'Não reconheci essa chave Pix.' : '');
+const hojeIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+
+/**
+ * Aba Cadastro da ficha: dados que valem para todos os meses (nome, matrícula,
+ * cargo, admissão, onde trabalha, cliente e chave Pix). CPF não muda: está nas
+ * batidas já gravadas. Salário e acesso continuam nas abas deles.
+ */
+function AbaCadastro({ e, regioes, clientes, oculto, onEstado, onSalvo, onAba }: {
+  e: Empregado; regioes: RegioesResumo | null; clientes: string[]; oculto: boolean;
+  onEstado: (s: { sujo: boolean; salvando: boolean }) => void; onSalvo: (m: string) => void; onAba: (a: AbaFicha) => void;
+}) {
+  const inicial = () => ({
+    nome: e.nome, matricula: e.matricula ?? '', cargo: e.cargo ?? '', dataAdmissao: e.dataAdmissao ?? '', cliente: e.cliente ?? '', chavePix: e.chavePix ?? '',
+    cidade: (e.trabalhoMunicipio ? { municipio: e.trabalhoMunicipio, municipioNome: e.trabalhoMunicipioNome ?? '', uf: e.trabalhoUf ?? '' } : null) as Cidade | null,
+  });
+  const [f, setF] = useState(inicial);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  useEffect(() => { setF(inicial()); setErro(null); }, [e]);
+  const base = inicial();
+  const sujo = JSON.stringify(f) !== JSON.stringify(base);
+  useEffect(() => { onEstado({ sujo, salvando }); }, [sujo, salvando]);
+  const emp = rotuloEmpresa(regioes);
+  const pixErro = erroPix(f.chavePix);
+
+  async function salvar(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (f.nome.trim().length < 2) { setErro('Informe o nome completo.'); return; }
+    if (pixErro) { setErro(pixErro); return; }
+    setSalvando(true); setErro(null);
+    try {
+      const corpo: Record<string, string | null> = {};
+      if (f.nome.trim() !== base.nome) corpo.nome = f.nome.trim();
+      for (const k of ['matricula', 'cargo', 'dataAdmissao', 'cliente', 'chavePix'] as const) {
+        if (f[k].trim() !== base[k]) corpo[k] = f[k].trim() || null;
+      }
+      if (Object.keys(corpo).length) await api.patch(`/empregados/${e.id}/cadastro`, corpo);
+      if ((f.cidade?.municipio ?? null) !== (base.cidade?.municipio ?? null)) {
+        await api.post('/tratamento/feriados/local-pessoas', { empregadoIds: [e.id], municipio: f.cidade?.municipio ?? null, municipioNome: f.cidade?.municipioNome ?? null });
+      }
+      onSalvo(`Cadastro de ${f.nome.trim()} salvo.`);
+    } catch (x) { setErro((x as Error).message); }
+    finally { setSalvando(false); }
+  }
+
+  return (
+    <form id="form-cadastro" className={css.cadGrid} onSubmit={salvar} hidden={oculto} noValidate>
+      <div className={css.cadCol}>
+        <section className={css.cadCard}>
+          <span className={css.cadLb}>Identificação</span>
+          <CampoCad id="cad-nome" rotulo="Nome completo">
+            <input id="cad-nome" className={css.cadInput} value={f.nome} maxLength={52} onChange={(x) => setF({ ...f, nome: x.target.value })} />
+          </CampoCad>
+          <div className={css.cadG2}>
+            <CampoCad id="cad-cpf" rotulo="CPF"><input id="cad-cpf" className={css.cadInput} value={fmtCpf(e.cpf)} disabled /></CampoCad>
+            <CampoCad id="cad-mat" rotulo="Matrícula" opcional>
+              <input id="cad-mat" className={css.cadInput} value={f.matricula} maxLength={30} placeholder="Ex.: 014" onChange={(x) => setF({ ...f, matricula: x.target.value })} />
+            </CampoCad>
+          </div>
+          <small className={css.cadNota}>O CPF não muda: ele está nas batidas já gravadas.</small>
+        </section>
+        <section className={css.cadCard}>
+          <span className={css.cadLb}>Contrato</span>
+          <div className={css.cadG2}>
+            <CampoCad id="cad-cargo" rotulo="Cargo">
+              <input id="cad-cargo" className={css.cadInput} value={f.cargo} maxLength={80} placeholder="Auxiliar de logística" onChange={(x) => setF({ ...f, cargo: x.target.value })} />
+            </CampoCad>
+            <CampoCad id="cad-adm" rotulo="Admitido em">
+              <input id="cad-adm" type="date" className={css.cadInput} value={f.dataAdmissao} max={hojeIso()} onChange={(x) => setF({ ...f, dataAdmissao: x.target.value })} />
+            </CampoCad>
+          </div>
+          <small className={css.cadNota}>Data real de entrada, mesmo antes de usar o ponto. Conta a carência da cesta básica.</small>
+        </section>
+      </div>
+      <div className={css.cadCol}>
+        <section className={css.cadCard}>
+          <span className={css.cadLb}>Onde trabalha</span>
+          <div className={css.cadCampo}>
+            <span id="cad-cid-rot">Cidade de trabalho</span>
+            <SeletorCidade valor={f.cidade} onChange={(c) => setF({ ...f, cidade: c })} emUso={emUsoDe(regioes)} id="cad-cid"
+              rotuloVazio={emp ? `Mesma da empresa (${emp})` : 'Mesma da empresa'} />
+            <small>Define os feriados estaduais e municipais. Vazio = a cidade da empresa.</small>
+          </div>
+          <CampoCad id="cad-cli" rotulo="Trabalha para o cliente" opcional ajuda="Aparece na Folha, ao lado do nome.">
+            <input id="cad-cli" className={css.cadInput} value={f.cliente} list="cad-cli-lista" maxLength={120} autoComplete="off" placeholder="Ex.: Auto Norte Maceió"
+              onChange={(x) => setF({ ...f, cliente: x.target.value })} />
+            <datalist id="cad-cli-lista">{clientes.map((c) => <option key={c} value={c} />)}</datalist>
+          </CampoCad>
+        </section>
+        <section className={css.cadCard}>
+          <span className={css.cadLb}>Pagamento</span>
+          <CampoCad id="cad-pix" rotulo="Chave Pix" opcional erro={pixErro} ajuda="Usada no botão Pix da Folha. CPF, celular, e-mail ou aleatória.">
+            <input id="cad-pix" className={css.cadInput} value={f.chavePix} maxLength={120} autoComplete="off" aria-invalid={!!pixErro || undefined}
+              onChange={(x) => setF({ ...f, chavePix: x.target.value })} />
+          </CampoCad>
+        </section>
+        <p className={css.cadRodNota}>Salário fica na aba <button type="button" className={css.fLk} onClick={() => onAba('salario')}>Salário</button>, com a data em que passa a valer. E-mail e senha do app em <button type="button" className={css.fLk} onClick={() => onAba('acesso')}>Acesso e foto</button>.</p>
+      </div>
+      {erro && <p className={`${css.erro} ${css.cadCheio}`} role="alert">{erro}</p>}
+    </form>
+  );
+}
+
+function ModalAdicionar({ regioes, clientes, onFechar, onCriado }: { regioes: RegioesResumo | null; clientes: string[]; onFechar: () => void; onCriado: () => void }) {
+  const [f, setF] = useState({ nome: '', cpf: '', matricula: '', cargo: '', salario: '', dataAdmissao: '', dataInicio: '', cliente: '', chavePix: '', email: '', pin: '' });
+  const [cidade, setCidade] = useState<Cidade | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [acessoCriado, setAcessoCriado] = useState<{ email: string; senhaProvisoria: string } | null>(null);
+  const emp = rotuloEmpresa(regioes);
+  const pixErro = erroPix(f.chavePix);
+  const campo = (k: keyof typeof f) => ({ value: f[k], onChange: (x: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: x.target.value }) });
 
-  async function salvar() {
+  async function salvar(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (pixErro) { setErro(pixErro); return; }
     setErro(null); setEnviando(true);
     try {
-      const sal = salario ? lerReais(salario) : undefined;
-      const r = await api.post<{ acesso?: { email: string; senhaProvisoria: string } }>('/empregados', {
-        nome: nome.trim(), cpf: soDigitos(cpf),
-        matricula: matricula.trim() || undefined,
-        pin: pin.trim() || undefined,
+      const sal = f.salario ? lerReais(f.salario) : undefined;
+      const r = await api.post<{ id: string; acesso?: { email: string; senhaProvisoria: string } }>('/empregados', {
+        nome: f.nome.trim(), cpf: soDigitos(f.cpf),
+        matricula: f.matricula.trim() || undefined,
+        pin: f.pin.trim() || undefined,
         salarioMensal: sal,
-        dataInicioPonto: dataInicio || undefined,
-        email: email.trim() || undefined,
+        dataInicioPonto: f.dataInicio || undefined,
+        email: f.email.trim() || undefined,
+        cargo: f.cargo.trim() || undefined,
+        dataAdmissao: f.dataAdmissao || undefined,
+        cliente: f.cliente.trim() || undefined,
+        chavePix: f.chavePix.trim() || undefined,
       });
+      if (cidade) {
+        // Cidade de trabalho (feriados). Se falhar, o funcionário já existe: dá pra trocar na ficha.
+        await api.post('/tratamento/feriados/local-pessoas', { empregadoIds: [r.id], municipio: cidade.municipio, municipioNome: cidade.municipioNome }).catch(() => {});
+      }
       if (r.acesso) { setAcessoCriado(r.acesso); return; }
       onCriado();
-    } catch (e) { setErro((e as Error).message); setEnviando(false); }
+    } catch (x) { setErro((x as Error).message); setEnviando(false); }
   }
 
   if (acessoCriado) {
@@ -451,22 +594,64 @@ function ModalAdicionar({ onFechar, onCriado }: { onFechar: () => void; onCriado
   }
 
   return (
-    <Modal titulo="Adicionar funcionário" onFechar={onFechar}>
-      <div className={css.formGrid}>
-        <div className={css.spanFull}><Campo rotulo="Nome completo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Maria Silva" /></div>
-        <Campo rotulo="CPF" inputMode="numeric" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
-        <Campo rotulo="Matrícula (opcional)" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="001" />
-        <Campo rotulo="PIN do quiosque (opcional)" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="4 a 8 dígitos" />
-        <Campo rotulo="Salário mensal (opcional)" inputMode="decimal" value={salario} onChange={(e) => setSalario(e.target.value)} placeholder="Ex.: 2200.00" />
-        <Campo rotulo="Começa a bater ponto em (opcional)" type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-        <Campo rotulo="E-mail para acesso ao app (opcional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="maria@empresa.com.br" />
-      </div>
-      <p className={css.aviso}>Sem e-mail → bate ponto só no quiosque (matrícula + PIN). Com data de início → a apuração ignora dias anteriores.</p>
-      {erro && <p className={css.erro}>{erro}</p>}
-      <Botao variante="coral" onClick={salvar} disabled={enviando || !nome || cpf.length < 11}>
-        {enviando ? 'Salvando…' : 'Adicionar'}
-      </Botao>
-    </Modal>
+    <ModalPessoa aberto onFechar={onFechar} titulo="Adicionar funcionário" compacto largura={980}
+      meta="Só nome e CPF são obrigatórios. O resto dá pra completar depois, na aba Cadastro."
+      rodape={<>
+        <span style={{ flex: 1 }} />
+        <button type="button" className={css.btnSecN} onClick={onFechar}>Cancelar</button>
+        <button type="submit" form="form-novo" className={css.btnPriN} disabled={enviando || f.nome.trim().length < 2 || soDigitos(f.cpf).length !== 11}>
+          {enviando ? 'Salvando…' : 'Adicionar funcionário'}
+        </button>
+      </>}>
+      <form id="form-novo" className={css.cadGrid} onSubmit={salvar} noValidate>
+        <div className={css.cadCol}>
+          <section className={css.cadCard}>
+            <span className={css.cadLb}>Identificação</span>
+            <CampoCad id="n-nome" rotulo="Nome completo"><input id="n-nome" className={css.cadInput} maxLength={52} placeholder="Maria Silva" data-autofoco {...campo('nome')} /></CampoCad>
+            <div className={css.cadG2}>
+              <CampoCad id="n-cpf" rotulo="CPF"><input id="n-cpf" className={css.cadInput} inputMode="numeric" placeholder="000.000.000-00" {...campo('cpf')} /></CampoCad>
+              <CampoCad id="n-mat" rotulo="Matrícula" opcional><input id="n-mat" className={css.cadInput} maxLength={30} placeholder="001" {...campo('matricula')} /></CampoCad>
+            </div>
+          </section>
+          <section className={css.cadCard}>
+            <span className={css.cadLb}>Contrato</span>
+            <div className={css.cadG2}>
+              <CampoCad id="n-cargo" rotulo="Cargo" opcional><input id="n-cargo" className={css.cadInput} maxLength={80} placeholder="Auxiliar de logística" {...campo('cargo')} /></CampoCad>
+              <CampoCad id="n-sal" rotulo="Salário mensal" opcional><input id="n-sal" className={css.cadInput} inputMode="decimal" placeholder="Ex.: 2.200,00" {...campo('salario')} /></CampoCad>
+              <CampoCad id="n-adm" rotulo="Admitido em" opcional><input id="n-adm" type="date" className={css.cadInput} max={hojeIso()} {...campo('dataAdmissao')} /></CampoCad>
+              <CampoCad id="n-ini" rotulo="Início do ponto" opcional><input id="n-ini" type="date" className={css.cadInput} {...campo('dataInicio')} /></CampoCad>
+            </div>
+            <small className={css.cadNota}>Admissão conta a carência da cesta. Início do ponto: a apuração ignora os dias antes dele.</small>
+          </section>
+        </div>
+        <div className={css.cadCol}>
+          <section className={css.cadCard}>
+            <span className={css.cadLb}>Onde trabalha</span>
+            <div className={css.cadCampo}>
+              <span>Cidade de trabalho</span>
+              <SeletorCidade valor={cidade} onChange={setCidade} emUso={emUsoDe(regioes)} id="n-cid" rotuloVazio={emp ? `Mesma da empresa (${emp})` : 'Mesma da empresa'} />
+              <small>Define os feriados estaduais e municipais.</small>
+            </div>
+            <CampoCad id="n-cli" rotulo="Trabalha para o cliente" opcional>
+              <input id="n-cli" className={css.cadInput} list="n-cli-lista" maxLength={120} autoComplete="off" placeholder="Ex.: Auto Norte Maceió" {...campo('cliente')} />
+              <datalist id="n-cli-lista">{clientes.map((c) => <option key={c} value={c} />)}</datalist>
+            </CampoCad>
+          </section>
+          <section className={css.cadCard}>
+            <span className={css.cadLb}>Pagamento e acesso</span>
+            <CampoCad id="n-pix" rotulo="Chave Pix" opcional erro={pixErro}>
+              <input id="n-pix" className={css.cadInput} maxLength={120} autoComplete="off" placeholder="CPF, celular, e-mail ou aleatória" {...campo('chavePix')} />
+            </CampoCad>
+            <div className={css.cadG2}>
+              <CampoCad id="n-mail" rotulo="E-mail do app" opcional><input id="n-mail" type="email" className={css.cadInput} placeholder="maria@empresa.com.br" {...campo('email')} /></CampoCad>
+              <CampoCad id="n-pin" rotulo="PIN do quiosque" opcional><input id="n-pin" className={css.cadInput} inputMode="numeric" maxLength={8} placeholder="4 a 8 dígitos" {...campo('pin')} /></CampoCad>
+            </div>
+            <small className={css.cadNota}>Com e-mail, a senha provisória aparece ao salvar. Sem e-mail, bate ponto só no quiosque.</small>
+          </section>
+        </div>
+        {erro && <p className={`${css.erro} ${css.cadCheio}`} role="alert">{erro}</p>}
+      </form>
+    </ModalPessoa>
   );
 }
 

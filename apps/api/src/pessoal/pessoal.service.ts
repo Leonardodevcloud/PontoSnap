@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import {
   comTenant, comoMaster, empregado, pessoalCltConfig, pessoalPadrao, pessoalPrestadorValor, pessoalCltCesta, pessoalNfArquivo, pessoalPrestador, pessoalExclusao, pessoalLancamento,
   pessoalDebito, pessoalFechamento, pessoalFechamentoPessoa, usuario, type Db,
@@ -70,6 +70,8 @@ export interface LinhaClt {
     cestaCent: number; cestaStatus: 'PAGA' | 'PERDIDA_FALTA' | 'CARENCIA' | 'SEM_CESTA';
     /** Mês a partir do qual a cesta é paga; origem MANUAL (definido no painel) ou AUTO (3 meses após o início no ponto). */
     cestaDesde: string | null; cestaDesdeOrigem: 'MANUAL' | 'AUTO' | null;
+    /** false = marcada "não recebe cesta" (mesmo que o padrão pague). Fechamentos antigos não têm (= true). */
+    cestaRecebe?: boolean;
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null;
@@ -371,10 +373,9 @@ export class PessoalService {
       if (ex) { foraDoMes.push({ exclusaoId: ex.id, pessoaTipo: 'CLT', pessoaId: e.id, nome: e.nome, escopo: ex.escopo as 'MES' | 'DIANTE', desde: ex.competencia }); continue; }
       if (e.dataInicioPonto && e.dataInicioPonto > fim) continue; // ainda não começou
 
-      // Cargo e Pix não têm vigência: vale o último informado.
-      const ultimo = dados.configs.filter((c) => c.empregadoId === e.id).sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde))[0];
+      // Cargo e Pix são do cadastro (empregado, migration 0069) e valem para todos os meses.
       // A carga feita neste fechamento é do PRÓXIMO mês → vale o valor vigente nele.
-      const config = { ...beneficioEm(e.id, prox), cargo: ultimo?.cargo ?? null, chavePix: ultimo?.chavePix ?? null, vtSemDias: semVtEm(e.id, prox) };
+      const config = { ...beneficioEm(e.id, prox), cargo: e.cargo ?? null, chavePix: e.chavePix ?? null, vtSemDias: semVtEm(e.id, prox) };
       let salarioCent: number | null = null;
       let salarioPartes: LinhaClt['salarioPartes'] = [];
       let salarioFimMesCent = 0;
@@ -442,13 +443,15 @@ export class PessoalService {
       // anterior, ou (sem fechamento) o valor vigente neste mês.
       const pagoCom = linhaAnt?.config ?? beneficioEm(e.id, comp);
       // Cesta: valor vigente NESTE mês; liberada depois da carência.
-      const cestaManual = dados.cestaRows.find((c) => c.empregadoId === e.id)?.cestaDesde ?? null;
+      const cestaRow = dados.cestaRows.find((c) => c.empregadoId === e.id);
+      const cestaRecebe = cestaRow?.recebe ?? true;
+      const cestaManual = cestaRow?.cestaDesde ?? null;
       // Carência conta da admissão real; sem ela, do início no ponto.
       const baseCesta = e.dataAdmissao ?? e.dataInicioPonto;
       const cestaAuto = baseCesta ? somarMeses(baseCesta.slice(0, 7), 3) : null;
       const cestaDesde = cestaManual ?? cestaAuto;
       const ben = calcularBeneficio({
-        vrDiaCent: config.vrDiaCent, cestaCent: beneficioEm(e.id, comp).cestaCent, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
+        vrDiaCent: config.vrDiaCent, cestaCent: cestaRecebe ? beneficioEm(e.id, comp).cestaCent : 0, cestaLiberada: !cestaDesde || comp >= cestaDesde, vtTipo: config.vtTipo, vtValorCent: config.vtValorCent,
         diasProx: diasProxLista.length, diasProxVr: diasProxVrLista.length, pagos, pagosVr: pagosVr ?? undefined,
         diasProxVt: diasProxVtLista.length, pagosVt: pagosVt ?? undefined,
         previstosMes: new Set(diasPrevistos), faltas: new Set(faltasDias), feriados: feriadosPara(e), folgas: new Set(folgasDias),
@@ -473,7 +476,7 @@ export class PessoalService {
         feriadoTrabMin, feriadoTrabCent: Math.round((feriadoTrabPesoMin / 60) * (salarioFimMesCent / 220)),
         beneficios: {
           ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, diasProxVt: diasProxVtLista.length, diasProxVtLista, pagosEstimado: !pagosSnap,
-          cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null,
+          cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null, cestaRecebe,
         },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,
         liquidoPagarCent: liquidoSalarioCent + ben.cargaCent,
@@ -632,12 +635,17 @@ export class PessoalService {
   }) {
     await this.exigirVigenciaAberta(tenantId, d.vigenteDesde);
     return comTenant(this.db, tenantId, async (tx) => {
-      const e = (await tx.select({ id: empregado.id }).from(empregado)
+      const e = (await tx.select({ id: empregado.id, cargo: empregado.cargo, chavePix: empregado.chavePix }).from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!e) throw new NotFoundException('Funcionário não encontrado');
+      // Cargo e Pix são do cadastro. Cliente antigo que ainda manda: grava no cadastro também.
+      const cad: { cargo?: string | null; chavePix?: string | null } = {};
+      if (d.cargo !== undefined) cad.cargo = d.cargo?.trim() || null;
+      if (d.chavePix !== undefined) cad.chavePix = d.chavePix?.trim() || null;
+      if (Object.keys(cad).length) await tx.update(empregado).set(cad).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId)));
       const v = {
-        cargo: d.cargo?.trim() || null, vrDia: reais(centavos(d.vrDia)), cestaMensal: reais(centavos(d.cestaMensal)),
-        vtTipo: d.vtTipo, vtValor: reais(centavos(d.vtValor)), chavePix: d.chavePix?.trim() || null,
+        cargo: cad.cargo !== undefined ? cad.cargo : e.cargo, vrDia: reais(centavos(d.vrDia)), cestaMensal: reais(centavos(d.cestaMensal)),
+        vtTipo: d.vtTipo, vtValor: reais(centavos(d.vtValor)), chavePix: cad.chavePix !== undefined ? cad.chavePix : e.chavePix,
         usaPadrao: !!d.usaPadrao, atualizadoEm: new Date(),
         vtSemDias: [...new Set(d.vtSemDias ?? [])].filter((n) => n >= 0 && n <= 6).sort().join(','),
       };
@@ -673,19 +681,50 @@ export class PessoalService {
     });
   }
 
-  async definirInicioCesta(tenantId: string, empregadoId: string, cestaDesde: string | null) {
+  /**
+   * Cesta básica da pessoa:
+   *  - recebe=false → não recebe (guarda o "a partir de" para quando voltar);
+   *  - recebe=true + cestaDesde → recebe a partir do mês escolhido;
+   *  - recebe=true sem cestaDesde → automático (3 meses depois da admissão).
+   * cestaMensal (só para quem tem valor próprio): muda o valor da cesta a partir
+   * de vigenteDesde, mantendo VR/VT da linha própria vigente.
+   * Meses fechados não mudam (são retrato).
+   */
+  async definirCesta(tenantId: string, empregadoId: string, d: { recebe?: boolean; cestaDesde?: string | null; cestaMensal?: number; vigenteDesde?: string }) {
+    const recebe = d.recebe ?? true;
+    if (d.cestaDesde) this.validarComp(d.cestaDesde);
+    if (d.cestaMensal != null) {
+      if (!d.vigenteDesde) throw new BadRequestException('Informe a partir de quando vale o valor da cesta.');
+      await this.exigirVigenciaAberta(tenantId, d.vigenteDesde);
+    }
     return comTenant(this.db, tenantId, async (tx) => {
       const e = (await tx.select({ id: empregado.id }).from(empregado)
         .where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!e) throw new NotFoundException('Funcionário não encontrado');
-      if (cestaDesde == null) {
+      const atual = (await tx.select().from(pessoalCltCesta)
+        .where(and(eq(pessoalCltCesta.tenantId, tenantId), eq(pessoalCltCesta.empregadoId, empregadoId))).limit(1))[0];
+      // Desligar guarda o mês que já estava (volta igual se ligar de novo sem mudar).
+      const cestaDesde = recebe ? (d.cestaDesde ?? null) : (d.cestaDesde !== undefined ? d.cestaDesde : atual?.cestaDesde ?? null);
+      if (recebe && !cestaDesde) {
+        // Recebe no automático = o mesmo que não ter linha.
         await tx.delete(pessoalCltCesta).where(and(eq(pessoalCltCesta.tenantId, tenantId), eq(pessoalCltCesta.empregadoId, empregadoId)));
-        return { cestaDesde: null };
+      } else {
+        await tx.insert(pessoalCltCesta).values({ tenantId, empregadoId, recebe, cestaDesde })
+          .onConflictDoUpdate({ target: [pessoalCltCesta.tenantId, pessoalCltCesta.empregadoId], set: { recebe, cestaDesde, atualizadoEm: new Date() } });
       }
-      this.validarComp(cestaDesde);
-      await tx.insert(pessoalCltCesta).values({ tenantId, empregadoId, cestaDesde })
-        .onConflictDoUpdate({ target: [pessoalCltCesta.tenantId, pessoalCltCesta.empregadoId], set: { cestaDesde, atualizadoEm: new Date() } });
-      return { cestaDesde };
+
+      if (recebe && d.cestaMensal != null) {
+        const vig = d.vigenteDesde!;
+        const linha = (await tx.select().from(pessoalCltConfig)
+          .where(and(eq(pessoalCltConfig.tenantId, tenantId), eq(pessoalCltConfig.empregadoId, empregadoId), lte(pessoalCltConfig.vigenteDesde, vig)))
+          .orderBy(desc(pessoalCltConfig.vigenteDesde)).limit(1))[0];
+        if (!linha || linha.usaPadrao) throw new BadRequestException('Esta pessoa segue o padrão da empresa: o valor da cesta vem do padrão. Para um valor só dela, escolha "Valor próprio" em Benefícios.');
+        const cestaMensal = reais(centavos(d.cestaMensal));
+        const { id: _i, tenantId: _t, empregadoId: _e, vigenteDesde: _v, atualizadoEm: _a, ...resto } = linha;
+        await tx.insert(pessoalCltConfig).values({ ...resto, tenantId, empregadoId, vigenteDesde: vig, cestaMensal })
+          .onConflictDoUpdate({ target: [pessoalCltConfig.tenantId, pessoalCltConfig.empregadoId, pessoalCltConfig.vigenteDesde], set: { cestaMensal, atualizadoEm: new Date() } });
+      }
+      return { recebe, cestaDesde };
     });
   }
 

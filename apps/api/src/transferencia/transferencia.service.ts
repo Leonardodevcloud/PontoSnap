@@ -69,8 +69,6 @@ export class TransferenciaService {
       return comoMaster(this.db, async (tx) => {
         const e = (await tx.select().from(empregado).where(and(eq(empregado.tenantId, origem), eq(empregado.id, id))).limit(1))[0];
         if (!e) throw new NotFoundException('Funcionário não encontrado.');
-        const cfg = (await tx.select({ cargo: pessoalCltConfig.cargo, chavePix: pessoalCltConfig.chavePix })
-          .from(pessoalCltConfig).where(and(eq(pessoalCltConfig.tenantId, origem), eq(pessoalCltConfig.empregadoId, id))).limit(1))[0];
         const debitos = (await tx.select().from(pessoalDebito)
           .where(and(eq(pessoalDebito.tenantId, origem), eq(pessoalDebito.pessoaTipo, 'CLT'), eq(pessoalDebito.pessoaId, id)))).length;
         let batidasApos = 0;
@@ -82,8 +80,8 @@ export class TransferenciaService {
           origem: origemInfo, destinos,
           pessoa: {
             tipo: 'CLT' as const, nome: e.nome, documento: e.cpf,
-            cargo: cfg?.cargo ?? null, salarioMensal: e.salarioMensal, dataAdmissao: e.dataAdmissao,
-            chavePix: cfg?.chavePix ?? null, debitosAbertos: debitos, batidasApos,
+            cargo: e.cargo ?? null, salarioMensal: e.salarioMensal, dataAdmissao: e.dataAdmissao,
+            chavePix: e.chavePix ?? null, debitosAbertos: debitos, batidasApos,
           },
         };
       });
@@ -167,7 +165,7 @@ export class TransferenciaService {
       const [novo] = await tx.insert(empregado).values({
         tenantId: p.destinoTenantId, cpf: e.cpf, nome: e.nome, pis: e.pis, matricula: e.matricula, pinHash: e.pinHash,
         horarioContratualId: novoHorarioEmp, cctId: null, perfilRegraId: novoPerfil, matriculaEsocial: e.matriculaEsocial,
-        ativo: true, dataInicioPonto: p.data, dataAdmissao, cliente: e.cliente, salarioMensal: e.salarioMensal,
+        ativo: true, dataInicioPonto: p.data, dataAdmissao, cliente: e.cliente, cargo: e.cargo, chavePix: e.chavePix, salarioMensal: e.salarioMensal,
         celular: e.celular, emailPessoal: e.emailPessoal, contatoEmergencia: e.contatoEmergencia, avatarSemente: e.avatarSemente,
         trabalhoUf: e.trabalhoUf, trabalhoMunicipio: e.trabalhoMunicipio, trabalhoMunicipioNome: e.trabalhoMunicipioNome,
         empregadoAnteriorId: e.id,

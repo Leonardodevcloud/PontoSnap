@@ -71,6 +71,8 @@ export interface Empregado {
   dataInicioPonto?: string | null;
   /** Cidade de trabalho (feriados estaduais/municipais). Vazio = a da empresa. */
   trabalhoUf?: string | null; trabalhoMunicipio?: number | null; trabalhoMunicipioNome?: string | null;
+  /** Cadastro (aba Cadastro): valem para todos os meses. */
+  cargo?: string | null; dataAdmissao?: string | null; cliente?: string | null; chavePix?: string | null;
 }
 
 export interface InfoCertificado {
@@ -742,6 +744,8 @@ export interface PessoalLinhaClt {
     /** Cesta do mês apurado: paga só sem falta e depois da carência. */
     cestaCent: number; cestaStatus: 'PAGA' | 'PERDIDA_FALTA' | 'CARENCIA' | 'SEM_CESTA';
     cestaDesde: string | null; cestaDesdeOrigem: 'MANUAL' | 'AUTO' | null;
+    /** false = marcada "não recebe cesta". Ausente (fechamento antigo) = recebe. */
+    cestaRecebe?: boolean;
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null; erro: string | null;

@@ -11,13 +11,15 @@ export interface AbaModal { id: string; rotulo: string }
  * rodapé. Prende o foco, fecha no Esc ou clicando fora e devolve o foco a quem
  * abriu. No celular ocupa a tela inteira.
  */
-export function ModalPessoa({ aberto, onFechar, foto, titulo, meta, chips, abas, aba, onAba, rodape, children, largura = 980, compacto }: {
+export function ModalPessoa({ aberto, onFechar, foto, titulo, meta, chips, abas, aba, onAba, rodape, children, largura = 980, compacto, acao }: {
   aberto: boolean; onFechar: () => void;
   foto?: ReactNode; titulo: string; meta?: ReactNode; chips?: ReactNode;
   abas?: AbaModal[]; aba?: string; onAba?: (id: string) => void;
   rodape?: ReactNode; children: ReactNode; largura?: number;
   /** Cabeçalho menor (ex.: um passo dentro do fluxo). */
   compacto?: boolean;
+  /** Ação no topo, à esquerda do fechar (ex.: "Editar cadastro"). */
+  acao?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const voltar = useRef<HTMLElement | null>(null);
@@ -61,6 +63,7 @@ export function ModalPessoa({ aberto, onFechar, foto, titulo, meta, chips, abas,
             {meta && <p>{meta}</p>}
             {chips && <div className={css.chips}>{chips}</div>}
           </div>
+          {acao && <div className={css.acao}>{acao}</div>}
           <button type="button" className={css.x} onClick={onFechar} aria-label="Fechar"><Icone nome="x" /></button>
         </header>
         {abas && abas.length > 1 && (
