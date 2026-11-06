@@ -78,6 +78,9 @@ async function main() {
   ok(a.beneficios.acertoCent === 2 * 2500 + 2 * 1000, `acerto = 2 dias × (VR + VT) = R$ 70 (${a.beneficios.acertoCent})`);
   ok(a.beneficios.cargaCent === 21 * 3500 - 7000, `carga = R$ 735 − R$ 70 (${a.beneficios.cargaCent})`);
   ok(a.custoBrutoCent === 210000 + 0 - a.descontosCent + 21 * 3500, 'custo bruto não tira o acerto (já foi pago)');
+  ok(a.beneficios.conta?.diasAcertoVr.join() === '2026-09-07,2026-09-15' && a.beneficios.conta?.diasAcertoVt.join() === '2026-09-07,2026-09-15'
+    && a.beneficios.conta?.vrDiaPagoCent === 2500 && a.beneficios.conta?.vtValorPagoCent === 1000, `conta do acerto: dias e valor por dia (${a.beneficios.conta?.diasAcertoVr.join()})`);
+  ok(a.beneficios.cargaFora?.map((x) => `${x.data}:${x.motivo}`).join() === '2026-10-12:feriado', `carga de outubro sem o feriado 12/10 (${a.beneficios.cargaFora?.map((x) => x.data).join()})`);
   ok(a.config.origem === 'PROPRIO', `Ana usa valor próprio (${a.config.origem})`);
   const b = set.clt.find((c) => c.empregadoId === beto.id)!;
   ok(b.config.origem === 'PADRAO' && b.config.vrDiaCent === 2000 && b.config.vtValorCent === 800, 'Beto, sem valor próprio, herda o padrão da empresa');

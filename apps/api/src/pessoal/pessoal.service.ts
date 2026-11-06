@@ -16,7 +16,7 @@ import { mesPadrao, compAnterior as mesAnteriorDe, type MesPadrao } from './mes-
 import { congelarMei, congelarMot, debitosDepois, type MotivoFechamento, type OpcoesFechamento } from './fechamento-pessoa';
 import {
   calcularBeneficio, calcularMei, calcularSemanaMotorista, centavos, diasBase, diasComVr, diasComVt, lerDiasSemana, faixaDoMes, parcelaNoMes, situacaoDebito,
-  semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type VtTipo,
+  semanasDoMes, somarMeses, type BaseDias, type MotivoNaoUso, type PessoaTipo, type ResultadoBeneficio, type VtTipo,
 } from './calculo';
 
 const COMP_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -72,6 +72,10 @@ export interface LinhaClt {
     cestaDesde: string | null; cestaDesdeOrigem: 'MANUAL' | 'AUTO' | null;
     /** false = marcada "não recebe cesta" (mesmo que o padrão pague). Fechamentos antigos não têm (= true). */
     cestaRecebe?: boolean;
+    /** A conta do acerto (dias e valor por dia de cada benefício). Fechamentos antigos não têm. */
+    conta?: ResultadoBeneficio['conta'];
+    /** Dias da escala do próximo mês que ficaram fora da carga (feriado, férias/afastamento). */
+    cargaFora?: { data: string; motivo: 'feriado' | 'afastamento' }[];
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null;
@@ -333,10 +337,16 @@ export class PessoalService {
 
     // Feriados por região: cada pessoa tem os da cidade dela (sem cidade, a da empresa).
     const fersMes = await this.trat.listarFeriados(tenantId, inicio, fim);
+    // Feriados do mês da carga: só para explicar quais dias ficaram fora dela.
+    const fersProx = opts.soPrestadores ? [] : await this.trat.listarFeriados(tenantId, fx.inicio, fx.fim);
     const localEmpresa = await this.trat.localDaEmpresa(tenantId);
     const feriadosPara = (p: { trabalhoUf: string | null; trabalhoMunicipio: number | null }) => {
       const local = localEfetivo(p.trabalhoMunicipio ? { uf: p.trabalhoUf, municipioIbge: p.trabalhoMunicipio } : null, localEmpresa);
       return new Set(fersMes.filter((f) => feriadoValePara({ tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio }, local)).map((f) => f.data));
+    };
+    const feriadosProxPara = (p: { trabalhoUf: string | null; trabalhoMunicipio: number | null }) => {
+      const local = localEfetivo(p.trabalhoMunicipio ? { uf: p.trabalhoUf, municipioIbge: p.trabalhoMunicipio } : null, localEmpresa);
+      return new Set(fersProx.filter((f) => feriadoValePara({ tipo: f.tipo, uf: f.uf, municipioIbge: f.municipio }, local)).map((f) => f.data));
     };
     const cidadeDe = (p: { trabalhoUf: string | null; trabalhoMunicipio: number | null; trabalhoMunicipioNome: string | null }) =>
       p.trabalhoMunicipio ? { uf: p.trabalhoUf, municipio: p.trabalhoMunicipio, municipioNome: p.trabalhoMunicipioNome } : null;
@@ -384,6 +394,7 @@ export class PessoalService {
       let diasUteis: string[] = [], diasPrevistos: string[] = [], diasEscala: string[] = [];
       let diasProxLista: string[] = [];
       let diasProxVrLista: string[] = [];
+      let cargaFora: { data: string; motivo: 'feriado' | 'afastamento' }[] = [];
       let jornadaMes: Record<string, number> = {};
       let heMin = 0, heNoBancoMin = 0, proventosCent = 0, descontosCent = 0, indenizacaoMin = 0, indenizacaoCent = 0;
       let bancoAcertoMin = 0, bancoAcertoCent = 0, bancoPassaMin = 0;
@@ -423,6 +434,9 @@ export class PessoalService {
         const apProx = await this.trat.apurarPeriodoCLT(tenantId, e.id, fx.inicio, fx.fim);
         diasProxLista = apProx.diasPrevistos;
         diasProxVrLista = diasComVr(apProx.diasPrevistos, apProx.jornadaEscala);
+        const previstosProx = new Set(apProx.diasPrevistos);
+        const fp = feriadosProxPara(e);
+        cargaFora = apProx.diasEscala.filter((d) => !previstosProx.has(d)).map((data) => ({ data, motivo: fp.has(data) ? 'feriado' as const : 'afastamento' as const }));
       } catch (err) {
         erro = (err as Error).message || 'Sem escala ou REP configurado';
       }
@@ -476,7 +490,7 @@ export class PessoalService {
         feriadoTrabMin, feriadoTrabCent: Math.round((feriadoTrabPesoMin / 60) * (salarioFimMesCent / 220)),
         beneficios: {
           ...ben, diasProx: diasProxLista.length, diasProxLista, diasProxVr: diasProxVrLista.length, diasProxVrLista, diasProxVt: diasProxVtLista.length, diasProxVtLista, pagosEstimado: !pagosSnap,
-          cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null, cestaRecebe,
+          cestaDesde, cestaDesdeOrigem: cestaManual ? 'MANUAL' : cestaAuto ? 'AUTO' : null, cestaRecebe, cargaFora,
         },
         liquidoSalarioCent, custoBrutoCent, abatimentosCent,
         liquidoPagarCent: liquidoSalarioCent + ben.cargaCent,

@@ -746,6 +746,13 @@ export interface PessoalLinhaClt {
     cestaDesde: string | null; cestaDesdeOrigem: 'MANUAL' | 'AUTO' | null;
     /** false = marcada "não recebe cesta". Ausente (fechamento antigo) = recebe. */
     cestaRecebe?: boolean;
+    /** A conta do acerto: dias devolvidos de cada benefício e o valor por dia pago. Fechamentos antigos não têm. */
+    conta?: {
+      vrDiaPagoCent: number; vtTipoPago: VtTipo; vtValorPagoCent: number;
+      diasAcertoVr: string[]; diasAcertoVt: string[]; vtFixoDiasAbatidos: number;
+    };
+    /** Dias da escala do mês da carga que ficaram fora dela (feriado, férias/afastamento). */
+    cargaFora?: { data: string; motivo: 'feriado' | 'afastamento' }[];
   };
   liquidoSalarioCent: number; custoBrutoCent: number; abatimentosCent: number; liquidoPagarCent: number;
   observacao: string | null; erro: string | null;

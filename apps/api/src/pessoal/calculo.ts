@@ -161,6 +161,16 @@ export interface ResultadoBeneficio {
   acertoCent: number;
   /** O que vai ser carregado: VR + VT do próximo mês − acerto do mês apurado. */
   cargaCent: number;
+  /**
+   * A conta do acerto, para mostrar na tela: dias devolvidos de cada benefício
+   * e o valor por dia com que foram pagos (o da carga anterior).
+   */
+  conta: {
+    vrDiaPagoCent: number; vtTipoPago: VtTipo; vtValorPagoCent: number;
+    diasAcertoVr: string[]; diasAcertoVt: string[];
+    /** Combustível fixo: dias que abatem 1/30 (feriado não abate). */
+    vtFixoDiasAbatidos: number;
+  };
 }
 
 /**
@@ -191,18 +201,26 @@ export function calcularBeneficio(e: EntradaBeneficio): ResultadoBeneficio {
   const n = naoUsados.length;
   // VR só volta dos dias em que foi pago (sábado de meio turno não teve VR).
   const pagosVr = e.pagosVr ? new Set(e.pagosVr) : null;
-  const nVr = pagosVr ? naoUsados.filter((x) => pagosVr.has(x.data)).length : n;
+  const diasAcertoVr = (pagosVr ? naoUsados.filter((x) => pagosVr.has(x.data)) : naoUsados).map((x) => x.data);
+  const nVr = pagosVr ? diasAcertoVr.length : n;
   const acertoVrCent = pg.vrDiaCent > 0 ? nVr * pg.vrDiaCent : 0;
   const semFeriado = naoUsados.filter((x) => x.motivo !== 'feriado').length;
   // VT por dia só volta dos dias em que foi pago (home office não teve VT).
   const pagosVt = e.pagosVt ? new Set(e.pagosVt) : null;
-  const nVt = pagosVt ? naoUsados.filter((x) => pagosVt.has(x.data)).length : n;
+  const diasAcertoVt = (pagosVt ? naoUsados.filter((x) => pagosVt.has(x.data)) : naoUsados).map((x) => x.data);
+  const nVt = pagosVt ? diasAcertoVt.length : n;
   const acertoVtCent = pg.vtTipo === 'DIA' ? nVt * pg.vtValorCent
     : pg.vtTipo === 'FIXO' ? Math.round((semFeriado * pg.vtValorCent) / 30) : 0;
   const acertoCent = acertoVrCent + acertoVtCent;
   return {
     vrProxCent, cestaCent, cestaStatus, vtProxCent, naoUsados, acertoVrCent, acertoVtCent, acertoCent,
     cargaCent: Math.max(0, vrProxCent + cestaCent + vtProxCent - acertoCent),
+    conta: {
+      vrDiaPagoCent: pg.vrDiaCent, vtTipoPago: pg.vtTipo, vtValorPagoCent: pg.vtValorCent,
+      diasAcertoVr: pg.vrDiaCent > 0 ? diasAcertoVr : [],
+      diasAcertoVt: pg.vtTipo === 'DIA' ? diasAcertoVt : [],
+      vtFixoDiasAbatidos: pg.vtTipo === 'FIXO' ? semFeriado : 0,
+    },
   };
 }
 

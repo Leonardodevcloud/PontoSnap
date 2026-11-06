@@ -495,3 +495,42 @@ label.pixItem:hover{ background:var(--cream); }
 
 .cestaSituacao{ display:flex; flex-direction:column; gap:2px; padding:12px; background:var(--field-bg); border-radius:12px; font-size:13px; color:var(--ash); line-height:1.5; }
 .cestaSituacao strong{ font-size:14px; font-weight:500; color:var(--ink); }
+
+/* ---------- Folha CLT: de que mês é cada valor, e a conta de cada um ---------- */
+.compRot{ font-size:13px; color:var(--ash); white-space:nowrap; padding-left:4px; }
+.periodos{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); background:var(--white); border:1px solid rgba(var(--ink-rgb),.1); border-radius:14px; overflow:hidden; margin:0 0 12px; }
+.periodos > div{ padding:12px 16px; display:flex; flex-direction:column; gap:3px; min-width:0; }
+.periodos > div + div{ border-left:1px solid var(--row-border); }
+.periodos b{ font-size:14px; font-weight:500; }
+.periodos small{ font-size:12px; color:var(--ash); line-height:1.45; }
+@media (max-width:820px){ .periodos{ grid-template-columns:minmax(0,1fr); } .periodos > div + div{ border-left:0; border-top:1px solid var(--row-border); } }
+.thMes{ display:block; font-size:10.5px; font-weight:400; color:var(--ash); margin-top:2px; text-transform:none; letter-spacing:0; }
+.celV{ display:inline-flex; flex-direction:column; align-items:flex-end; gap:1px; }
+.celV small{ font-size:11px; color:var(--ash); white-space:nowrap; }
+.linkMini{ background:none; border:0; padding:0; font:inherit; font-size:11.5px; color:var(--coral-dark); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.dicaAlvo{ display:inline-flex; cursor:help; border-radius:6px; outline-offset:2px; }
+.dicaAlvo > .celV > span:first-child, .dicaAlvo > span:only-child:not(.celV){ border-bottom:1px dashed rgba(var(--ink-rgb),.35); }
+.dicaAlvo:focus-visible{ outline:2px solid var(--coral); }
+.dica{ position:fixed; z-index:120; width:340px; background:var(--fundo-escuro); color:var(--sobre-escuro); border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.5; box-shadow:0 16px 40px rgba(var(--ink-rgb),.35); display:flex; flex-direction:column; gap:7px; pointer-events:none; text-align:left; white-space:normal; font-variant-numeric:tabular-nums; }
+.dicaTit{ font-size:11.5px; font-weight:500; color:var(--marca-clara); }
+.dicaLinha{ display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+.dicaLinha small{ display:block; font-size:11.5px; color:rgba(232,237,247,.68); }
+.dicaLinha b{ font-weight:500; white-space:nowrap; }
+.dicaNeg{ color:#FFB2AA; }
+.dicaNota{ font-size:11.5px; color:rgba(232,237,247,.68); }
+.dicaTot{ display:flex; justify-content:space-between; gap:12px; border-top:1px solid rgba(232,237,247,.2); padding-top:7px; font-weight:600; }
+/* Detalhe da pessoa no fechamento */
+.mCorpo2 .detCorpo{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+.grupoConta{ display:flex; flex-direction:column; gap:6px; padding:10px 12px; background:var(--field-bg); border-radius:10px; }
+.grupoTit{ display:flex; justify-content:space-between; font-size:13.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+.l2Det{ display:block; font-size:12px; color:var(--ash); font-weight:400; }
+.resumoPessoa{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; border-radius:14px; background:var(--peach); color:var(--coral-dark); font-size:13.5px; font-variant-numeric:tabular-nums; }
+.resumoPessoa b{ font-weight:600; color:var(--ink); }
+/* Pix: de onde vem o valor e o que fica fora */
+.pixComp{ display:flex; flex-direction:column; gap:7px; border:1px solid rgba(var(--ink-rgb),.1); border-radius:12px; padding:12px 14px; }
+.pixCompLinha{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:13.5px; }
+.pixCompLinha small{ display:block; font-size:12px; color:var(--ash); }
+.pixCompLinha b{ font-size:13px; white-space:nowrap; }
+.pixFora{ display:flex; flex-direction:column; gap:7px; margin-top:12px; border:1px dashed rgba(var(--ink-rgb),.22); border-radius:12px; padding:12px 14px; background:var(--field-bg); }
+.pixFora .lb{ color:var(--ash); }
+.pixFora .pixCompLinha{ color:var(--ash); }
