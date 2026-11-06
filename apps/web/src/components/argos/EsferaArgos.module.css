@@ -2,19 +2,22 @@
   position: fixed;
   right: 20px;
   bottom: 20px;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
   border: none;
   padding: 0;
   display: grid;
   place-items: center;
   cursor: pointer;
-  background: transparent;
+  /* Disco escuro atrás: as partículas somam luz, então precisam de fundo escuro
+     para aparecer também no tema claro. */
+  background: radial-gradient(circle at 50% 40%, rgba(26, 22, 54, 0.96), rgba(9, 10, 22, 0.98));
+  box-shadow: 0 8px 24px rgba(16, 12, 48, 0.4), inset 0 0 0 1px rgba(150, 140, 255, 0.32);
   z-index: 3000;
-  transition: transform 0.18s ease;
-  filter: drop-shadow(0 6px 18px rgba(80, 60, 200, 0.45));
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.bolha:hover { transform: scale(1.1); }
+.bolha:hover { transform: scale(1.1); box-shadow: 0 12px 30px rgba(90, 70, 210, 0.5), inset 0 0 0 1px rgba(170, 160, 255, 0.45); }
 
 .painel {
   position: fixed;

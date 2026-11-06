@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 
 /**
@@ -61,7 +61,7 @@ function escurecer(hex: string, f: number) {
 }
 
 /** Desenho do rosto a partir da semente: fundo, pele, cabelo, roupa e penteado. */
-export function Caricatura({ semente }: { semente: number }) {
+export const Caricatura = memo(function Caricatura({ semente }: { semente: number }) {
   let s = semente >>> 0 || 1;
   const prox = (n: number) => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return (s >>> 8) % n; };
   const fundo = FUNDOS[prox(FUNDOS.length)]!;
@@ -97,10 +97,10 @@ export function Caricatura({ semente }: { semente: number }) {
       {sorriso === 2 && <path d="M43 54c3 2 11 2 14 0" stroke={boca} strokeWidth="2.4" fill="none" strokeLinecap="round" />}
     </svg>
   );
-}
+});
 
 /** Rosto pronto: foto se houver, senão a caricatura da pessoa. */
-export function Avatar({ id, nome, tipo = 'CLT', tamanho = 36, className, titulo, trocavel }: {
+export const Avatar = memo(function Avatar({ id, nome, tipo = 'CLT', tamanho = 36, className, titulo, trocavel }: {
   id: string; nome: string; tipo?: TipoPessoa; tamanho?: number; className?: string; titulo?: boolean;
   /** Sem foto, clicar no desenho sorteia outro (RH). */
   trocavel?: boolean;
@@ -126,4 +126,4 @@ export function Avatar({ id, nome, tipo = 'CLT', tamanho = 36, className, titulo
         : <Caricatura semente={semente} />}
     </span>
   );
-}
+});

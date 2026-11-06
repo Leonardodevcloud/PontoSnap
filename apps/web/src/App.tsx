@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react';
 import { useAuth } from './lib/auth';
 import type { Perfil } from './tipos';
 import { Login } from './telas/Login';
@@ -18,21 +18,14 @@ import { LayoutRH } from './rh/LayoutRH';
 import { Inicio } from './rh/Inicio';
 import { Funcionarios } from './rh/Funcionarios';
 import { Escalas } from './rh/Escalas';
-import { Espelhos } from './rh/Espelhos';
-import { ApuracaoCLT } from './rh/ApuracaoCLT';
-import { GestaoPessoal } from './rh/GestaoPessoal';
 import { Transferencias } from './rh/Transferencias';
 import { Feriados } from './rh/Feriados';
-import { Fiscal } from './rh/Fiscal';
-import { Relatorios } from './rh/Relatorios';
 import { Local } from './rh/Local';
-import { BancoHoras } from './rh/BancoHoras';
 import { Atestados } from './rh/Atestados';
 import { Afastamentos } from './rh/Afastamentos';
 import Perfis from './rh/Perfis';
 import AjustesPonto from './rh/AjustesPonto';
 import { BatidasFaltando } from './rh/BatidasFaltando';
-import { Auditoria } from './rh/Auditoria';
 import { Usuarios } from './rh/Usuarios';
 import { UsuariosCliente } from './master/UsuariosCliente';
 import { Dispositivos } from './rh/Dispositivos';
@@ -52,19 +45,47 @@ import { LayoutPrestador } from './prestador/LayoutPrestador';
 import { InicioPrestador, NotasPrestador, NotaPrestador, MenuPrestador } from './prestador/TelasPrestador';
 import { EnviarNota } from './prestador/EnviarNota';
 import { PrimeiroAcesso } from './prestador/PrimeiroAcesso';
-import { Prestadores } from './rh/Prestadores';
 import { ComMesPadrao } from './lib/mesPadrao';
-import { DocsAssinatura } from './rh/DocsAssinatura';
 import { Integracoes } from './rh/Integracoes';
 import { MeusDocumentos } from './telas/MeusDocumentos';
 import { MeusHolerites } from './telas/MeusHolerites';
 import { CentralAjuda } from './rh/ajuda/CentralAjuda';
 import { ArtigoPagina } from './rh/ajuda/ArtigoPagina';
 import { Assistente } from './rh/ajuda/Assistente';
-import { ConferirNotas } from './rh/ConferirNotas';
-import { ModelosNota } from './rh/ModelosNota';
 import { Flash } from './components/Flash';
 import { BarraProgresso } from './components/BarraProgresso';
+
+// Telas pesadas carregam em pedaços próprios (code splitting): o pacote inicial
+// fica pequeno e cada tela só traz seu código e suas libs (QR, PDF…) quando precisa.
+// O prefetch ocioso (abaixo) já baixa esses pedaços logo após o login, então ao
+// clicar a tela já está pronta — sem espera e sem o monólito pesando em tudo.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const lazyRh = <T extends Record<string, unknown>>(carregar: () => Promise<T>, nome: keyof T) =>
+  lazy(() => carregar().then((m) => ({ default: m[nome] as ComponentType<any> })));
+
+const Espelhos = lazyRh(() => import('./rh/Espelhos'), 'Espelhos');
+const ApuracaoCLT = lazyRh(() => import('./rh/ApuracaoCLT'), 'ApuracaoCLT');
+const GestaoPessoal = lazyRh(() => import('./rh/GestaoPessoal'), 'GestaoPessoal');
+const Prestadores = lazyRh(() => import('./rh/Prestadores'), 'Prestadores');
+const BancoHoras = lazyRh(() => import('./rh/BancoHoras'), 'BancoHoras');
+const Relatorios = lazyRh(() => import('./rh/Relatorios'), 'Relatorios');
+const Fiscal = lazyRh(() => import('./rh/Fiscal'), 'Fiscal');
+const Auditoria = lazyRh(() => import('./rh/Auditoria'), 'Auditoria');
+const DocsAssinatura = lazyRh(() => import('./rh/DocsAssinatura'), 'DocsAssinatura');
+const ConferirNotas = lazyRh(() => import('./rh/ConferirNotas'), 'ConferirNotas');
+const ModelosNota = lazyRh(() => import('./rh/ModelosNota'), 'ModelosNota');
+
+/** Baixa os pedaços das telas pesadas no tempo ocioso, para o clique ser instantâneo. */
+function prefetchTelasRh() {
+  const chunks = [
+    () => import('./rh/Espelhos'), () => import('./rh/ApuracaoCLT'), () => import('./rh/GestaoPessoal'),
+    () => import('./rh/Prestadores'), () => import('./rh/BancoHoras'), () => import('./rh/Relatorios'),
+    () => import('./rh/Fiscal'), () => import('./rh/DocsAssinatura'), () => import('./rh/Auditoria'),
+  ];
+  const ocioso = (cb: () => void) =>
+    (typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(cb, { timeout: 2500 }) : window.setTimeout(cb, 500));
+  for (const c of chunks) ocioso(() => { void c().catch(() => undefined); });
+}
 
 const rotaInicial = (p: Perfil) => (p === 'COLABORADOR' || p === 'PRESTADOR' ? '/' : p === 'MASTER' ? '/master' : '/rh');
 
@@ -98,6 +119,11 @@ const PERFIS_RH: Perfil[] = ['RH', 'ADMIN_CLIENTE'];
 
 export function App() {
   const { sessao, carregando } = useAuth();
+  // Login feito e é RH/Admin: baixa os pedaços das telas pesadas no tempo ocioso,
+  // para que ao navegar elas já estejam prontas (clique instantâneo).
+  useEffect(() => {
+    if (sessao?.perfil === 'RH' || sessao?.perfil === 'ADMIN_CLIENTE') prefetchTelasRh();
+  }, [sessao?.perfil]);
   // As rotas do "/" dependem do perfil (funcionário x prestador): espera a
   // sessão voltar antes de montar, senão um link direto (/notas, /avisos/…)
   // cairia no "*" e voltaria para o início.
@@ -105,6 +131,7 @@ export function App() {
   return (
     <>
     <BarraProgresso />
+    <Suspense fallback={<Splash />}>
     <Routes>
       <Route path="/login" element={carregando ? <Splash /> : sessao ? <Navigate to={rotaInicial(sessao.perfil)} replace /> : <Login />} />
       <Route path="/trocar-senha" element={<SoLogado><TrocarSenha /></SoLogado>} />
@@ -196,6 +223,7 @@ export function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
     </>
   );
 }

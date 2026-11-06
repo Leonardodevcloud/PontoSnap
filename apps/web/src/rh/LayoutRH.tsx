@@ -6,7 +6,7 @@ import { api } from '../lib/api';
 import { BotaoTema } from '../components/BotaoTema';
 import { Icone, type NomeIcone } from '../components/Icone';
 import { Avatar, ProvedorAvatares } from '../components/Avatar';
-import { AjudaDaTela, ProvedorAjuda } from './ajuda/PainelAjuda';
+import { ProvedorAjuda } from './ajuda/PainelAjuda';
 import { buscarArtigos } from './ajuda/artigos';
 import { EsferaArgos } from '../components/argos/EsferaArgos';
 import type { Empregado, RespAtencao } from '../tipos';
@@ -380,7 +380,6 @@ export function LayoutRH() {
           </div>
         )}
         <Outlet context={contexto} />
-        <div className={css.ajudaTela}><AjudaDaTela /></div>
       </main>
 
       {/* Celular: barra de baixo */}
