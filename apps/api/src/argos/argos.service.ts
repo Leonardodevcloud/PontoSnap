@@ -64,6 +64,11 @@ export class ArgosService {
           partes.push(`APURAÇÃO DE ${mes}: não consegui calcular agora (${(e as Error).message}).`);
         }
       }
+    } else if (this.pareceSobreEquipe(pergunta)) {
+      // Sem ninguém citado, mas a pergunta é sobre a equipe ("quem teve mais hora extra?"):
+      // traz o consolidado do mês inteiro para a Pri poder comparar e ranquear.
+      const eq = await this.resumoEquipe(tenantId, mes);
+      if (eq) { nomes.push(...eq.nomes); partes.push(`RESUMO DA EQUIPE (mês ${mes}, calculado pelo sistema, uma linha por funcionário):\n${eq.texto}`); }
     }
 
     const itens = buscarConhecimento(pergunta);
@@ -145,6 +150,39 @@ export class ArgosService {
   private periodo(mes: string) {
     const [a, m] = mes.split('-').map(Number);
     return { inicio: `${mes}-01`, fim: new Date(Date.UTC(a!, m!, 0)).toISOString().slice(0, 10) };
+  }
+
+  /** A pergunta é sobre a equipe/ranking (quem teve mais extra, média, todos)? */
+  private pareceSobreEquipe(pergunta: string): boolean {
+    const t = pergunta.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const comparativo = /\b(quem|qual|quais|ranking|rankear|ranquear|mais|menos|maior|menores?|maiores?|top|todos|todas|equipe|time|pessoal|galera|ninguem|cada um|media|total|geral|lista)\b/.test(t);
+    const tema = /\b(hora|extra|atraso|falta|faltas|banco|noturno|saldo|ponto|intervalo|jornada|trabalh|dsr|folga)\b/.test(t);
+    return comparativo && tema;
+  }
+
+  /** minutos -> "3h12" para o resumo da equipe caber em poucos tokens. */
+  private hhmm(min: number): string {
+    const m = Math.max(0, Math.round(min));
+    return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+  }
+
+  /** Consolidado do mês inteiro (uma linha por funcionário), ordenado por horas extras. */
+  private async resumoEquipe(tenantId: string, mes: string): Promise<{ texto: string; nomes: string[] } | null> {
+    const { inicio, fim } = this.periodo(mes);
+    let rel: Awaited<ReturnType<TratamentoService['relatorioCompetencia']>>;
+    try { rel = await this.tratamento.relatorioCompetencia(tenantId, inicio, fim); }
+    catch { return null; }
+    if (!rel.linhas.length) return null;
+    const ord = [...rel.linhas].sort((a, b) => b.extrasMin - a.extrasMin);
+    const cap = 60;
+    const linhas = ord.slice(0, cap).map((l) =>
+      `${l.nome}: extras ${this.hhmm(l.extrasMin)} (50% ${this.hhmm(l.extra50Min)}, 100% ${this.hhmm(l.extra100Min)}), ` +
+      `atrasos ${this.hhmm(l.atrasoMin)}, faltas ${this.hhmm(l.faltaMin)}, noturno ${this.hhmm(l.noturnoMin)}, ` +
+      `saldo do mês ${l.saldoMesMin >= 0 ? '+' : '-'}${this.hhmm(Math.abs(l.saldoMesMin))}${l.banco ? `, banco ${this.hhmm(l.banco.saldoAcumuladoMin)}` : ''}`);
+    const t = rel.totais;
+    const cab = `${rel.linhas.length} funcionários ativos no mês. Totais — extras ${this.hhmm(t.extrasMin)}, atrasos ${this.hhmm(t.atrasoMin)}, faltas ${this.hhmm(t.faltaMin)}, noturno ${this.hhmm(t.noturnoMin)}.`;
+    const nota = ord.length > cap ? `\n(lista limitada aos ${cap} com mais horas extras, de ${ord.length} no total)` : '';
+    return { texto: `${cab}\n${linhas.join('\n')}${nota}`, nomes: ord.map((l) => l.nome) };
   }
 
   /** Entende o mês pela própria pergunta ("em outubro", "mês passado", "09/2026"). */
