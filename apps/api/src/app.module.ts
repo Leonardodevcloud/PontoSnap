@@ -16,6 +16,7 @@ import { AjusteModule } from './ajuste/ajuste.module';
 import { DocumentoModule } from './documento/documento.module';
 import { HoleriteModule } from './holerite/holerite.module';
 import { TransferenciaModule } from './transferencia/transferencia.module';
+import { VinculoModule } from './vinculo/vinculo.module';
 import { ArgosModule } from './argos/argos.module';
 import { AfastamentoModule } from './afastamento/afastamento.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
@@ -35,7 +36,7 @@ import { AjudaModule } from './ajuda/ajuda.module';
   imports: [
     DatabaseModule, EmailModule, AuthModule, TenantModule, UsuariosModule, EmpregadoModule, CertificadoModule,
     MarcacaoModule, TratamentoModule,
-    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, HoleriteModule, TransferenciaModule, ArgosModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule, ComunicacaoModule, PortalModule, AssinaturaModule, AjudaModule,
+    BancoModule, CctModule, PerfilRegraModule, EspelhoAssinaturaModule, AjusteModule, DocumentoModule, HoleriteModule, TransferenciaModule, VinculoModule, ArgosModule, AfastamentoModule, AuditoriaModule, CobrancaModule, FiscalModule, HealthModule, JobsModule, NotificacaoModule, PessoalModule, CadastroModule, ComunicacaoModule, PortalModule, AssinaturaModule, AjudaModule,
   ],
 })
 export class AppModule {}

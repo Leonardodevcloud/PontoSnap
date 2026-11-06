@@ -5,6 +5,7 @@ import { fmtHora, hojeSP, minutosParaHhMm } from '../lib/formato';
 import type { ApuracaoResp, TipoDiaFora } from '../tipos';
 import { ContaMes } from '../components/ContaMes';
 import { Explica } from '../components/Explica';
+import { dataBR, empresaCurta, paramVinculo, ultimoDia, useVinculos, vinculosDoMes, type Vinculo } from '../lib/vinculos';
 import css from './EspelhoMes.module.css';
 
 /** Primeiro e último dia da competência YYYY-MM, no calendário de Brasília. */
@@ -44,19 +45,28 @@ export function EspelhoMes() {
   const [comp, setComp] = useState(competenciaDe(hojeSP()));
   const [dados, setDados] = useState<ApuracaoResp | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const vinculos = useVinculos();
+  // Transferido no grupo: o mês é da empresa em que a pessoa estava. Se o mês
+  // tem as duas (troca no meio do mês), dá para alternar entre elas.
+  const doMes = vinculos ? vinculosDoMes(vinculos, comp) : [];
+  const [escolhido, setEscolhido] = useState<string | null>(null);
+  const vinculo: Vinculo | null = doMes.find((v) => v.tenantId === escolhido) ?? doMes[0] ?? null;
+  const qv = paramVinculo(vinculo, '&');
 
-  const carregar = useCallback(async (c: string) => {
+  const carregar = useCallback(async (c: string, q: string) => {
     setCarregando(true);
     setErro(null);
     try {
       const { inicio, fim } = limitesDoMes(c);
-      setDados(await api.get<ApuracaoResp>(`/marcacao/minha-apuracao?inicio=${inicio}&fim=${fim}`));
+      setDados(await api.get<ApuracaoResp>(`/marcacao/minha-apuracao?inicio=${inicio}&fim=${fim}${q}`));
     } catch (e) { setErro((e as Error).message); }
     finally { setCarregando(false); }
   }, []);
 
-  useEffect(() => { void carregar(comp); }, [carregar, comp]);
+  // Espera os vínculos para não mostrar o mês da empresa errada por um instante.
+  useEffect(() => { if (vinculos) void carregar(comp, qv); }, [carregar, comp, qv, vinculos]);
+  const mudarMes = (n: number) => { setEscolhido(null); setDados(null); setComp((c) => deslocarMes(c, n)); };
 
   const r = dados?.resultado;
 
@@ -74,10 +84,12 @@ export function EspelhoMes() {
       <div className={css.h}>Meu espelho <Explica lado="dir">Toque num dia pra ver as batidas e baixar os comprovantes. A conta completa do mês fica no fim da lista.</Explica></div>
 
       <div className={css.nav}>
-        <button onClick={() => setComp((c) => deslocarMes(c, -1))} aria-label="Mês anterior">‹</button>
+        <button onClick={() => mudarMes(-1)} aria-label="Mês anterior">‹</button>
         <span>{rotuloMes(comp)}</span>
-        <button onClick={() => setComp((c) => deslocarMes(c, 1))} disabled={ehMesAtual} aria-label="Próximo mês">›</button>
+        <button onClick={() => mudarMes(1)} disabled={ehMesAtual} aria-label="Próximo mês">›</button>
       </div>
+
+      <FaixaEmpresa doMes={doMes} vinculo={vinculo} comp={comp} onEscolher={(t) => { setEscolhido(t); setDados(null); }} />
 
       {erro && <p className={css.erro}>{erro}</p>}
       {carregando && !r && <div className={css.vazio}>Carregando…</div>}
@@ -112,7 +124,7 @@ export function EspelhoMes() {
 
           {dias.length === 0 && <div className={css.vazio}>Nenhum dia apurado neste mês.</div>}
 
-          <BlocoAssinatura competencia={comp} podeAssinar={!ehMesAtual} />
+          <BlocoAssinatura competencia={comp} podeAssinar={!ehMesAtual} vinculo={vinculo} />
 
           {dias.map((d) => {
             const dia = new Date(`${d.data}T12:00:00-0300`);
@@ -166,8 +178,42 @@ interface StatusAssinatura {
   via?: string;
 }
 
+/**
+ * Mês de empresa anterior do grupo (transferência): avisa de quem são os
+ * números. Troca no meio do mês: as duas empresas, para alternar.
+ */
+function FaixaEmpresa({ doMes, vinculo, comp, onEscolher }: {
+  doMes: Vinculo[]; vinculo: Vinculo | null; comp: string; onEscolher: (tenantId: string) => void;
+}) {
+  if (!vinculo) return null;
+  const mes = rotuloMes(comp).split(' de ')[0]!;
+  const Mes = mes.charAt(0).toUpperCase() + mes.slice(1);
+  if (doMes.length > 1) {
+    return (
+      <div className={css.faixa}>
+        <div>Em {mes} você esteve em duas empresas do grupo. Cada uma tem o espelho dos seus dias.</div>
+        <div className={css.trocaEmp} role="tablist" aria-label="Empresa">
+          {doMes.map((v) => (
+            <button key={v.tenantId} type="button" role="tab" aria-selected={v.tenantId === vinculo.tenantId}
+              className={v.tenantId === vinculo.tenantId ? css.trocaOn : ''} onClick={() => onEscolher(v.tenantId)}>
+              {empresaCurta(v.empresa)}
+              <small>{v.atual ? (v.inicio ? `desde ${dataBR(v.inicio).slice(0, 5)}` : 'atual') : v.saida ? `até ${dataBR(ultimoDia(v.saida)).slice(0, 5)}` : 'anterior'}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (vinculo.atual) return null;
+  return (
+    <div className={css.faixa}>
+      <div>{Mes} foi na <b>{empresaCurta(vinculo.empresa)}</b>, sua empresa anterior do grupo. Os números são os de lá.</div>
+    </div>
+  );
+}
+
 /** Bloco de concordância do funcionário com o espelho do mês. */
-function BlocoAssinatura({ competencia, podeAssinar }: { competencia: string; podeAssinar: boolean }) {
+function BlocoAssinatura({ competencia, podeAssinar, vinculo }: { competencia: string; podeAssinar: boolean; vinculo: Vinculo | null }) {
   const [status, setStatus] = useState<StatusAssinatura | null>(null);
   const [modal, setModal] = useState(false);
   const [pin, setPin] = useState('');
@@ -175,16 +221,16 @@ function BlocoAssinatura({ competencia, podeAssinar }: { competencia: string; po
   const [enviando, setEnviando] = useState(false);
 
   const carregar = useCallback(async () => {
-    try { setStatus(await api.get<StatusAssinatura>(`/espelho-assinatura/status?competencia=${competencia}`)); }
+    try { setStatus(await api.get<StatusAssinatura>(`/espelho-assinatura/status?competencia=${competencia}${paramVinculo(vinculo, '&')}`)); }
     catch { setStatus(null); }
-  }, [competencia]);
+  }, [competencia, vinculo]);
   useEffect(() => { void carregar(); }, [carregar]);
 
   async function assinar() {
     if (pin.length < 4) { setErro('Digite seu PIN.'); return; }
     setErro(null); setEnviando(true);
     try {
-      await api.post('/espelho-assinatura/assinar', { competencia, pin });
+      await api.post('/espelho-assinatura/assinar', { competencia, pin, ...(vinculo && !vinculo.atual ? { vinculo: vinculo.tenantId } : {}) });
       setModal(false); setPin('');
       await carregar();
     } catch (e) { setErro((e as Error).message); }
@@ -232,7 +278,9 @@ function BlocoAssinatura({ competencia, podeAssinar }: { competencia: string; po
   return (
     <div className={css.assinPend}>
       <div className={css.assinTit}>Confira e assine seu espelho</div>
-      <div className={css.assinSub}>Depois de conferir os dias abaixo, assine para registrar sua concordância.</div>
+      <div className={css.assinSub}>{vinculo && !vinculo.atual
+        ? `A assinatura vai para a ${empresaCurta(vinculo.empresa)}, que fechou este mês. Use o seu PIN de hoje.`
+        : 'Depois de conferir os dias abaixo, assine para registrar sua concordância.'}</div>
       <button className={css.assinBtn} onClick={() => setModal(true)}>Concordo e assino</button>
       {modal && <ModalPin pin={pin} setPin={setPin} erro={erro} enviando={enviando} onCancelar={() => { setModal(false); setErro(null); }} onConfirmar={assinar} />}
     </div>

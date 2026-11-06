@@ -93,11 +93,16 @@ export class MarcacaoService {
   }
 
   /** Lista as marcações do próprio usuário autenticado (opcionalmente de um dia). */
-  async listarDoUsuario(usuarioId: string, tenantId: string, dataStr?: string) {
+  async listarDoUsuario(usuarioId: string, tenantId: string, dataStr?: string, empregadoIdVinculo?: string) {
     return comTenant(this.db, tenantId, async (tx) => {
-      const us = (await tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
-      if (!us?.empregadoId) throw new BadRequestException('Usuário não vinculado a um empregado');
-      const e = (await tx.select().from(empregado).where(eq(empregado.id, us.empregadoId)).limit(1))[0];
+      // Vínculo anterior (transferência): o empregado da empresa pedida, já validado pelo controller.
+      let empId = empregadoIdVinculo ?? null;
+      if (!empId) {
+        const us = (await tx.select().from(usuario).where(eq(usuario.id, usuarioId)).limit(1))[0];
+        if (!us?.empregadoId) throw new BadRequestException('Usuário não vinculado a um empregado');
+        empId = us.empregadoId;
+      }
+      const e = (await tx.select().from(empregado).where(and(eq(empregado.id, empId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!e) throw new NotFoundException('Empregado não encontrado');
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não configurado');
@@ -239,13 +244,15 @@ export class MarcacaoService {
   }
 
   /** Comprovante em PDF; assina em PAdES se o tenant tiver certificado. */
-  async gerarComprovantePdf(tenantId: string, nsr: number): Promise<Buffer> {
+  async gerarComprovantePdf(tenantId: string, nsr: number, soDoCpf?: string): Promise<Buffer> {
     const pdf = await comTenant(this.db, tenantId, async (tx) => {
       const rep = (await tx.select().from(pontoRep).where(eq(pontoRep.tenantId, tenantId)).limit(1))[0];
       if (!rep) throw new NotFoundException('REP-P não encontrado');
       const m = (await tx.select().from(pontoMarcacao)
         .where(and(eq(pontoMarcacao.repId, rep.id), eq(pontoMarcacao.nsr, nsr))).limit(1))[0];
       if (!m) throw new NotFoundException('Marcação não encontrada');
+      // Funcionário só baixa o comprovante das próprias batidas.
+      if (soDoCpf && m.cpf !== soDoCpf) throw new NotFoundException('Marcação não encontrada');
       const emp = (await tx.select().from(empregado)
         .where(and(eq(empregado.tenantId, tenantId), eq(empregado.cpf, m.cpf))).limit(1))[0];
       const ten = (await tx.select().from(tenant).where(eq(tenant.id, tenantId)).limit(1))[0];

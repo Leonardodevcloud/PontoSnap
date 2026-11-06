@@ -28,3 +28,11 @@
 .btn1, .btn2{ width:100%; border-radius:var(--r-pill); padding:13px; font:inherit; font-weight:500; font-size:15px; cursor:pointer; margin-top:4px; }
 .btn1{ background:var(--coral-acao); color:var(--on-coral); border:none; }
 .btn2{ background:var(--white); color:var(--ink); border:1.5px solid rgba(var(--ink-rgb),.2); }
+
+/* Agrupado por empresa do grupo (funcionário transferido). */
+.vazioGrupo{ font-size:13px; color:var(--ash); background:var(--white); border:1px dashed rgba(var(--ink-rgb),.18); border-radius:14px; padding:12px 14px; line-height:1.5; margin:0 0 7px; }
+.nota{ font-size:12px; color:var(--ash); line-height:1.5; margin:8px 2px 0; }
+.situacao{ display:inline-block; font-size:10.5px; font-weight:500; padding:1px 7px; border-radius:999px; margin-right:6px; vertical-align:1px; }
+.situacaoPend{ background:var(--tag-yellow-bg); color:var(--tag-yellow-text); }
+.situacaoOk{ background:var(--tag-green-bg); color:var(--tag-green-text); }
+.situacaoEr{ background:var(--erro-bg); color:var(--erro-text); }

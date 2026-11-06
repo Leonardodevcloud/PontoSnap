@@ -14,3 +14,6 @@
 .sk { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 .sk i { height: 68px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--field-bg), var(--row-border), var(--field-bg)); background-size: 200% 100%; animation: sk 1.2s infinite; }
 @keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.vazioGrupo { font-size: 13px; color: var(--ash); background: var(--white); border: 1px dashed rgba(var(--ink-rgb), .18); border-radius: var(--r-md); padding: 12px 14px; line-height: 1.5; margin: 0 0 10px; }
+.nota { font-size: 12px; color: var(--ash); line-height: 1.5; margin: 6px 2px 0; }

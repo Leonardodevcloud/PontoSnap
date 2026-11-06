@@ -5,6 +5,7 @@ import { Coletor, Perfil } from '@ponto/shared';
 import { MarcacaoService } from './marcacao.service';
 import { TratamentoService } from '../tratamento/tratamento.service';
 import { BancoService } from '../banco/banco.service';
+import { VinculoService } from '../vinculo/vinculo.service';
 import { BaterDto, LocalDto } from './dto/bater.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -19,6 +20,7 @@ export class MarcacaoController {
     private readonly marcacao: MarcacaoService,
     private readonly tratamento: TratamentoService,
     private readonly banco: BancoService,
+    private readonly vinculos: VinculoService,
   ) {}
 
   /** Colaborador bate ponto pelo próprio app. */
@@ -61,12 +63,14 @@ export class MarcacaoController {
     @UsuarioAtual() u: PayloadAcesso,
     @Query('inicio') inicio?: string,
     @Query('fim') fim?: string,
+    @Query('vinculo') vinculo?: string,
   ) {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     if (!inicio || !fim) throw new BadRequestException('Informe inicio e fim (YYYY-MM-DD)');
-    const empregadoId = await this.marcacao.empregadoDoUsuario(u.sub, u.tenantId);
+    // Mês de uma empresa anterior do grupo (transferência): apura lá, com o cadastro de lá.
+    const v = await this.vinculos.resolver(u.sub, u.tenantId, vinculo);
     // Feriados da região do funcionário: a apuração busca sozinha.
-    return this.tratamento.apurarPeriodoCLT(u.tenantId, empregadoId, inicio, fim);
+    return this.tratamento.apurarPeriodoCLT(v.tenantId, v.empregadoId, inicio, fim);
   }
 
   /** O próprio banco de horas. Vazio e inativo quando a empresa não tem acordo. */
@@ -122,16 +126,27 @@ export class MarcacaoController {
 
   /** Lista as batidas do próprio colaborador (para home e espelho do dia). */
   @Get('minhas')
-  async minhas(@UsuarioAtual() u: PayloadAcesso, @Query('data') data?: string) {
+  async minhas(@UsuarioAtual() u: PayloadAcesso, @Query('data') data?: string, @Query('vinculo') vinculo?: string) {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
+    if (vinculo && vinculo !== u.tenantId) {
+      const v = await this.vinculos.resolver(u.sub, u.tenantId, vinculo);
+      return this.marcacao.listarDoUsuario(u.sub, v.tenantId, data, v.empregadoId);
+    }
     return this.marcacao.listarDoUsuario(u.sub, u.tenantId, data);
   }
 
   /** Baixa o comprovante em PDF de uma marcação. */
   @Get(':nsr/comprovante')
-  async comprovante(@UsuarioAtual() u: PayloadAcesso, @Param('nsr', ParseIntPipe) nsr: number) {
+  async comprovante(@UsuarioAtual() u: PayloadAcesso, @Param('nsr', ParseIntPipe) nsr: number, @Query('vinculo') vinculo?: string) {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
-    const pdf = await this.marcacao.gerarComprovantePdf(u.tenantId, nsr);
+    let pdf: Buffer;
+    if (u.perfil === Perfil.COLABORADOR) {
+      // Funcionário: só as próprias batidas, na empresa do vínculo (atual ou anterior).
+      const v = await this.vinculos.resolver(u.sub, u.tenantId, vinculo);
+      pdf = await this.marcacao.gerarComprovantePdf(v.tenantId, nsr, v.cpf);
+    } else {
+      pdf = await this.marcacao.gerarComprovantePdf(u.tenantId, nsr);
+    }
     return new StreamableFile(pdf, {
       type: 'application/pdf',
       disposition: `inline; filename="comprovante-${nsr}.pdf"`,

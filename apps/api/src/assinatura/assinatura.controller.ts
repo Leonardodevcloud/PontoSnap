@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import type { PayloadAcesso } from '../auth/token';
+import { VinculoService } from '../vinculo/vinculo.service';
 import { AssinaturaService } from './assinatura.service';
 import { ConfigAutentiqueDto, ConfirmarLoteDto, ContrachequeDto, EnviarDto, IdsDocsDto, LoteDto } from './assinatura.dto';
 
@@ -50,12 +51,27 @@ export class AssinaturaRhController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Perfis(Perfil.COLABORADOR)
 export class AssinaturaMeusController {
-  constructor(private readonly svc: AssinaturaService) {}
-  @Get() meus(@UsuarioAtual() u: PayloadAcesso) { return this.svc.meus(t(u), u.sub); }
-  @Post(':id/link') link(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.svc.linkMeu(t(u), u.sub, id); }
-  @Post(':id/conferir') conferir(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return this.svc.conferirMeu(t(u), u.sub, id); }
+  constructor(private readonly svc: AssinaturaService, private readonly vinculos: VinculoService) {}
+  /** Os da empresa atual e os das anteriores do grupo (o que ainda falta assinar lá continua aqui). */
+  @Get() async meus(@UsuarioAtual() u: PayloadAcesso) {
+    t(u);
+    const vs = await this.vinculos.meus(u.sub);
+    const rs = await Promise.all(vs.map(async (v) => {
+      const r = await this.svc.meus(v.tenantId, v.empregadoId);
+      return { pendentes: r.pendentes, documentos: r.documentos.map((d) => ({ ...d, tenantId: v.tenantId, empresa: v.empresa, atual: v.atual })) };
+    }));
+    return { documentos: rs.flatMap((r) => r.documentos), pendentes: rs.reduce((s, r) => s + r.pendentes, 0) };
+  }
+  @Post(':id/link') async link(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Query('vinculo') vinculo?: string) {
+    const v = await this.vinculos.resolver(u.sub, t(u), vinculo); return this.svc.linkMeu(v.tenantId, v.empregadoId, id);
+  }
+  @Post(':id/conferir') async conferir(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Query('vinculo') vinculo?: string) {
+    const v = await this.vinculos.resolver(u.sub, t(u), vinculo); return this.svc.conferirMeu(v.tenantId, v.empregadoId, id);
+  }
   @Get(':id/arquivo') @Header('Cache-Control', 'private, no-store')
-  async arquivo(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string) { return pdf(await this.svc.arquivoMeu(t(u), u.sub, id)); }
+  async arquivo(@UsuarioAtual() u: PayloadAcesso, @Param('id', ParseUUIDPipe) id: string, @Query('vinculo') vinculo?: string) {
+    const v = await this.vinculos.resolver(u.sub, t(u), vinculo); return pdf(await this.svc.arquivoMeu(v.tenantId, v.empregadoId, id));
+  }
 }
 
 /** Webhook público da Autentique: o token na URL identifica a empresa (+ HMAC, se configurado). */

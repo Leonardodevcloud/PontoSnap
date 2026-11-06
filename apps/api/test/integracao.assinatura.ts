@@ -165,14 +165,14 @@ async function main() {
   ok(env.enviados === 2, 'reenvia o contracheque novo e o espelho recusado (regerado)');
 
   // ── app do funcionário ──
-  const meus = await svc.meus(t.id, uCaio.id);
+  const meus = await svc.meus(t.id, caio.id);
   ok(meus.documentos.length === 2 && meus.pendentes === 2, 'Caio vê os 2 documentos pendentes no app');
-  const lk = await svc.linkMeu(t.id, uCaio.id, meus.documentos[0]!.id);
+  const lk = await svc.linkMeu(t.id, caio.id, meus.documentos[0]!.id);
   ok(lk.link.startsWith('https://assina.ae/pub-'), 'gera o link de assinatura para o próprio funcionário');
-  ok(!!(await falha(svc.linkMeu(t.id, uCaio.id, ccAna2.id))), 'não abre documento de outra pessoa');
-  ok((await svc.arquivoMeu(t.id, uCaio.id, meus.documentos[0]!.id)).buffer.subarray(0, 5).toString() === '%PDF-', 'baixa o próprio PDF');
+  ok(!!(await falha(svc.linkMeu(t.id, caio.id, ccAna2.id))), 'não abre documento de outra pessoa');
+  ok((await svc.arquivoMeu(t.id, caio.id, meus.documentos[0]!.id)).buffer.subarray(0, 5).toString() === '%PDF-', 'baixa o próprio PDF');
   await svc.salvarConfig(t.id, { mostrarApp: false });
-  ok((await svc.meus(t.id, uCaio.id)).documentos.length === 0, '"mostrar no app" desligado: não aparece');
+  ok((await svc.meus(t.id, caio.id)).documentos.length === 0, '"mostrar no app" desligado: não aparece');
 
   console.log(falhas ? `\n${falhas} falha(s)` : '\nTudo certo');
   await client.end();

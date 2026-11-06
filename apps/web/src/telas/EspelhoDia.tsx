@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { empresaCurta, paramVinculo, useVinculos, vinculoDoDia } from '../lib/vinculos';
 import { api } from '../lib/api';
 import { fmtDataCurta, fmtHora, hojeSP, minutosParaHhMm, rotuloMarcacaoPorHora } from '../lib/formato';
 import type { MinhasMarcacoes, AjusteMeu } from '../tipos';
@@ -19,7 +20,7 @@ export function EspelhoDia() {
   const [data, setData] = useState(params.get('data') ?? hojeSP());
   const [dados, setDados] = useState<MinhasMarcacoes | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [pedindo, setPedindo] = useState(false);
   const [tipo, setTipo] = useState<'INCLUSAO' | 'DESCONSIDERAR'>('INCLUSAO');
   const [hora, setHora] = useState('');
@@ -29,19 +30,25 @@ export function EspelhoDia() {
   const [enviando, setEnviando] = useState(false);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [meus, setMeus] = useState<AjusteMeu[]>([]);
+  const vinculos = useVinculos();
+  // Dia em que a pessoa estava numa empresa anterior do grupo: as batidas e os
+  // comprovantes são de lá (o registro nunca muda de empresa).
+  const vinculo = vinculos ? vinculoDoDia(vinculos, data) : null;
+  const anterior = vinculo && !vinculo.atual ? vinculo : null;
+  const qv = paramVinculo(vinculo, '&');
 
-  const carregar = useCallback(async (d: string) => {
+  const carregar = useCallback(async (d: string, q: string) => {
     setCarregando(true);
     setErro(null);
     try {
-      setDados(await api.get<MinhasMarcacoes>(`/marcacao/minhas?data=${d}`));
-      setMeus(await api.get<AjusteMeu[]>('/ajustes/meus').catch(() => []));
+      setDados(await api.get<MinhasMarcacoes>(`/marcacao/minhas?data=${d}${q}`));
+      setMeus(q ? [] : await api.get<AjusteMeu[]>('/ajustes/meus').catch(() => []));
     }
     catch (e) { setErro((e as Error).message); }
     finally { setCarregando(false); }
   }, []);
 
-  useEffect(() => { void carregar(data); }, [carregar, data]);
+  useEffect(() => { if (vinculos) void carregar(data, qv); }, [carregar, data, qv, vinculos]);
 
   const ehHoje = data === hojeSP();
 
@@ -70,14 +77,14 @@ export function EspelhoDia() {
       });
       setOkMsg('Pedido enviado! O RH vai analisar.');
       setPedindo(false); setObs(''); setHora(''); setNsrAlvo(null);
-      await carregar(data);
+      await carregar(data, qv);
     } catch (e) { setErro((e as Error).message); }
     finally { setEnviando(false); }
   }
 
   async function baixarComprovante(nsr: number) {
     try {
-      const blob = await api.baixar(`/marcacao/${nsr}/comprovante`);
+      const blob = await api.baixar(`/marcacao/${nsr}/comprovante${paramVinculo(vinculo)}`);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `comprovante-${nsr}.pdf`; a.click();
@@ -109,6 +116,8 @@ export function EspelhoDia() {
           disabled={ehHoje} aria-label="Próximo dia"
         >›</button>
       </div>
+
+      {anterior && <div className={css.faixaEmp}>Neste dia você estava na <b>{empresaCurta(anterior.empresa)}</b>, sua empresa anterior do grupo. As batidas e os comprovantes são de lá.</div>}
 
       {erro && <p className={css.erro}>{erro}</p>}
       {carregando && marcs.length === 0 && <div className={css.vazio}>Carregando…</div>}
@@ -167,7 +176,9 @@ export function EspelhoDia() {
         );
       })}
 
-      {!pedindo ? (
+      {anterior ? (
+        <div className={css.notaEmp}>Para pedir ajuste deste dia, fale com o RH da {empresaCurta(anterior.empresa)}.</div>
+      ) : !pedindo ? (
         <button className={css.pedirBtn} onClick={() => { setPedindo(true); setOkMsg(null); }}>
           Pedir ajuste deste dia
         </button>

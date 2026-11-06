@@ -65,13 +65,16 @@ export class EspelhoAssinaturaService {
    * Funcionário concorda e assina, validando o PIN. Grava o hash do espelho
    * conferido. Se já havia assinatura da competência, substitui (reassinatura).
    */
-  async assinar(tenantId: string, empregadoId: string, competencia: string, pin: string, ip?: string) {
+  async assinar(tenantId: string, empregadoId: string, competencia: string, pin: string, ip?: string, pinHashVigente?: string | null) {
     return comTenant(this.db, tenantId, async (tx) => {
       const emp = (await tx.select({ id: empregado.id, nome: empregado.nome, cpf: empregado.cpf, pinHash: empregado.pinHash })
         .from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
       if (!emp) throw new NotFoundException('Empregado não encontrado');
-      if (!emp.pinHash) throw new ForbiddenException('Você ainda não tem PIN definido. Procure o RH para cadastrar.');
-      if (!(await verificarPin(pin, emp.pinHash))) throw new UnauthorizedException('PIN incorreto.');
+      // Mês de empresa anterior do grupo: vale o PIN de hoje (o da empresa atual),
+      // que é o que a pessoa conhece; o da anterior pode ter ficado velho.
+      const hashPin = pinHashVigente !== undefined ? pinHashVigente : emp.pinHash;
+      if (!hashPin) throw new ForbiddenException('Você ainda não tem PIN definido. Procure o RH para cadastrar.');
+      if (!(await verificarPin(pin, hashPin))) throw new UnauthorizedException('PIN incorreto.');
 
       const hash = await this.hashDoEspelho(tenantId, empregadoId, competencia);
       const id = crypto.randomUUID();
@@ -83,6 +86,13 @@ export class EspelhoAssinaturaService {
       });
       return { assinado: true, em: new Date(), nome: emp.nome };
     });
+  }
+
+  /** PIN (hash) do cadastro, para conferir a assinatura de um mês de empresa anterior. */
+  async pinHashDe(tenantId: string, empregadoId: string): Promise<string | null> {
+    const e = (await comTenant(this.db, tenantId, (tx) =>
+      tx.select({ pinHash: empregado.pinHash }).from(empregado).where(eq(empregado.id, empregadoId)).limit(1)))[0];
+    return e?.pinHash ?? null;
   }
 
   /** Dados da assinatura para o carimbo do PDF (usado pelo RH ao baixar). */

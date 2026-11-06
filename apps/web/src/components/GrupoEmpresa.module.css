@@ -1,0 +1,6 @@
+.grupo{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:16px 2px 8px; }
+.grupo:first-of-type{ margin-top:4px; }
+.grupo b{ font-size:13px; font-weight:600; color:var(--ink); min-width:0; }
+.grupo small{ font-size:11.5px; color:var(--ash); flex:none; }
+.etiqueta{ display:inline-block; font-size:10.5px; font-weight:500; padding:2px 8px; border-radius:999px; background:var(--thead-bg); color:var(--ash); margin-left:6px; vertical-align:1px; }
+.etiquetaAtual{ background:var(--tag-green-bg); color:var(--tag-green-text); }

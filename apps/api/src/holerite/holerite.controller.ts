@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { Perfil } from '@ponto/shared';
 import { HoleriteService } from './holerite.service';
+import { VinculoService } from '../vinculo/vinculo.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Perfis } from '../common/decorators/roles.decorator';
@@ -19,7 +20,7 @@ interface PagamentoDto { pago: boolean; valorPago?: number | null }
 @Controller('holerites')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class HoleriteController {
-  constructor(private readonly holerites: HoleriteService) {}
+  constructor(private readonly holerites: HoleriteService, private readonly vinculos: VinculoService) {}
   private tenant(u: PayloadAcesso): string {
     if (!u.tenantId) throw new BadRequestException('Usuário sem tenant');
     return u.tenantId;
@@ -39,12 +40,18 @@ export class HoleriteController {
     return this.holerites.confirmar(this.tenant(u), u.sub, dto);
   }
 
-  /** Holerites do próprio funcionário. */
+  /**
+   * Holerites do próprio funcionário: os da empresa atual e os das empresas
+   * anteriores do grupo (transferência). Cada um continua na empresa que o emitiu.
+   */
   @Get('meus')
   @Perfis(Perfil.COLABORADOR)
   async meus(@UsuarioAtual() u: PayloadAcesso) {
-    const t = this.tenant(u);
-    return this.holerites.meus(t, await this.holerites.empregadoDoUsuario(u.sub, t));
+    this.tenant(u);
+    const vs = await this.vinculos.meus(u.sub);
+    const listas = await Promise.all(vs.map(async (v) => (await this.holerites.meus(v.tenantId, v.empregadoId))
+      .map((h) => ({ ...h, tenantId: v.tenantId, empresa: v.empresa, atual: v.atual }))));
+    return listas.flat();
   }
 
   /** Mapa de bruto/líquido/pagamento do mês, para a Folha CLT. */
@@ -73,11 +80,16 @@ export class HoleriteController {
   @Get(':id/arquivo')
   @Perfis(Perfil.ADMIN_CLIENTE, Perfil.RH, Perfil.COLABORADOR)
   @Header('Cache-Control', 'private, no-store')
-  async arquivo(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string) {
+  async arquivo(@UsuarioAtual() u: PayloadAcesso, @Param('id') id: string, @Query('vinculo') vinculo?: string) {
     const t = this.tenant(u);
-    const dono = u.perfil === Perfil.COLABORADOR
-      ? await this.holerites.empregadoDoUsuario(u.sub, t) : undefined;
-    const a = await this.holerites.baixar(t, id, dono);
+    let a: { bytes: Buffer; nome: string };
+    if (u.perfil === Perfil.COLABORADOR) {
+      // Funcionário: só o próprio, na empresa do vínculo (atual ou anterior).
+      const v = await this.vinculos.resolver(u.sub, t, vinculo);
+      a = await this.holerites.baixar(v.tenantId, id, v.empregadoId);
+    } else {
+      a = await this.holerites.baixar(t, id);
+    }
     return new StreamableFile(a.bytes, { type: 'application/pdf', disposition: `inline; filename="${a.nome}"` });
   }
 }

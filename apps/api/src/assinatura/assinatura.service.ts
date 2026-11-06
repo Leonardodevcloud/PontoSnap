@@ -581,14 +581,11 @@ export class AssinaturaService {
 
   // ───────────────────────── funcionário (app) ─────────────────────────
 
-  private async empregadoDe(tenantId: string, usuarioId: string) {
-    const u = (await comTenant(this.db, tenantId, (tx) => tx.select({ e: usuario.empregadoId }).from(usuario).where(eq(usuario.id, usuarioId)).limit(1)))[0];
-    if (!u?.e) throw new ForbiddenException('Este acesso não está ligado a um funcionário.');
-    return u.e;
-  }
-
-  async meus(tenantId: string, usuarioId: string) {
-    const emp = await this.empregadoDe(tenantId, usuarioId);
+  /**
+   * Documentos do funcionário numa empresa (vínculo atual ou anterior, por
+   * transferência). O controller resolve o vínculo; aqui só tenant + empregado.
+   */
+  async meus(tenantId: string, emp: string) {
     const integ = await this.integracao(tenantId);
     if (integ && !integ.mostrarApp) return { documentos: [], pendentes: 0 };
     const docs = await comTenant(this.db, tenantId, (tx) => tx.select().from(assinaturaDocumento).where(and(
@@ -598,9 +595,8 @@ export class AssinaturaService {
     return { documentos, pendentes: documentos.filter((d) => PENDENTES.includes(d.status)).length };
   }
 
-  /** Link de assinatura para o próprio funcionário (abre a Autentique). */
-  async linkMeu(tenantId: string, usuarioId: string, id: string) {
-    const emp = await this.empregadoDe(tenantId, usuarioId);
+  /** Link de assinatura para o próprio funcionário (abre a Autentique da empresa do documento). */
+  async linkMeu(tenantId: string, emp: string, id: string) {
     const d = await this.doc(tenantId, id);
     if (d.empregadoId !== emp) throw new ForbiddenException();
     if (!PENDENTES.includes(d.status as Status) || !d.assinaturaPublicId) throw new BadRequestException('Este documento não está esperando assinatura.');
@@ -609,16 +605,14 @@ export class AssinaturaService {
     catch (e) { throw new BadRequestException((e as Error).message); }
   }
 
-  async arquivoMeu(tenantId: string, usuarioId: string, id: string) {
-    const emp = await this.empregadoDe(tenantId, usuarioId);
+  async arquivoMeu(tenantId: string, emp: string, id: string) {
     const d = await this.doc(tenantId, id);
     if (d.empregadoId !== emp || d.status === 'RASCUNHO' || d.status === 'CANCELADO') throw new ForbiddenException();
     return this.arquivo(tenantId, id, d.status === 'ASSINADO');
   }
 
   /** O funcionário acabou de assinar pelo link: confere na hora (sem esperar o webhook). */
-  async conferirMeu(tenantId: string, usuarioId: string, id: string) {
-    const emp = await this.empregadoDe(tenantId, usuarioId);
+  async conferirMeu(tenantId: string, emp: string, id: string) {
     const d = await this.doc(tenantId, id);
     if (d.empregadoId !== emp) throw new ForbiddenException();
     await this.sincronizar(tenantId, [id]);
