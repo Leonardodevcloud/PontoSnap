@@ -651,6 +651,7 @@ function TabelaFolha({ linhas, debitos, holerites, onAbrir, onPix, onVerHolerite
 function StatusCesta({ l }: { l: PessoalLinhaClt }) {
   const b = l.beneficios;
   if (b.cestaRecebe === false) return <span className={`${vt.pill} ${vt.pillMute}`} title="Marcada para não receber cesta">não recebe</span>;
+  if (b.cestaStatus === 'SEM_CESTA' && l.config.origem !== 'PROPRIO') return <span title="Segue o padrão da empresa, que não paga cesta">—</span>;
   if (b.cestaStatus === 'PAGA') return <>{brl(b.cestaCent)}</>;
   if (b.cestaStatus === 'PERDIDA_FALTA') return <span className={`${vt.pill} ${vt.pillErr}`} title="Faltou no mês: a cesta não é paga">perdida · falta {l.faltasDias.slice(0, 1).map(fmtDia).join('')}</span>;
   if (b.cestaStatus === 'CARENCIA') return <span className={`${vt.pill} ${vt.pillMute}`} title="Ainda na carência">a partir de {b.cestaDesde ? mesCurto(b.cestaDesde) : '—'}</span>;
@@ -1283,6 +1284,24 @@ function CestaClt({ l, d, fechado, onSalvo, onAviso, onIrPadrao }: {
   }
 
   const status = !recebeIni ? 'Sem cesta' : b.cestaDesde ? `Recebe desde ${mesCurto(b.cestaDesde).slice(0, 3)}/${b.cestaDesde.slice(0, 4)}` : 'Recebe';
+
+  // Segue o padrão e o padrão não paga cesta: não há o que escolher aqui —
+  // mostra a situação real e os dois caminhos para ela passar a receber.
+  if (!proprio && padraoCent <= 0) {
+    return (
+      <section className={css.bloco}>
+        <span className={css.lb}>Cesta básica</span>
+        <div className={css.cestaSituacao}>
+          <strong>Não recebe</strong>
+          <span>Segue o padrão da empresa, e o padrão não paga cesta.</span>
+        </div>
+        {!fechado && (
+          <p className={css.formula}>Para receber: <button type="button" className={css.link} onClick={onIrPadrao}>ligue a cesta no padrão da empresa</button> (vale para todos do padrão) ou escolha Valor próprio em Benefícios (só para esta pessoa).</p>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section className={css.bloco}>
       <span className={css.lb}>Cesta básica</span>
@@ -1298,11 +1317,8 @@ function CestaClt({ l, d, fechado, onSalvo, onAviso, onIrPadrao }: {
             {proprio
               ? <CampoReais id="cesta-valor" rotulo="Valor mensal" valorCent={valor} onChange={setValor} disabled={fechado} />
               : <div className={css.campo}><span>Valor mensal</span>
-                  <span className={css.valorLeitura}>{padraoCent > 0 ? <>{brl(padraoCent)}<small>do padrão da empresa</small></> : <span className={css.mute}>—</span>}</span></div>}
+                  <span className={css.valorLeitura}>{brl(padraoCent)}<small>do padrão da empresa</small></span></div>}
           </div>
-          {!proprio && padraoCent <= 0 && (
-            <p className={css.avisoCesta} role="alert">O padrão da empresa não paga cesta, então ela não sai. <button type="button" className={css.link} onClick={onIrPadrao}>Alterar padrão da empresa</button> ou use Valor próprio.</p>
-          )}
           <small className={css.formula}>
             {autoMes ? `Automático: ${mesLongo(autoMes)} (3 meses depois da ${l.admissao ? 'admissão' : 'entrada no ponto'}).` : 'Sem admissão no cadastro: recebe desde já.'} Mês com falta não paga a cesta.
             {b.cestaDesdeOrigem === 'MANUAL' && autoMes && desde !== autoMes && !fechado && <> <button type="button" className={css.link} onClick={() => setDesde(autoMes)}>Voltar ao automático</button></>}

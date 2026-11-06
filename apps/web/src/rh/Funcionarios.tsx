@@ -223,7 +223,7 @@ export function Funcionarios() {
 
       {ficha && !acao && regrasDe === undefined && (
         <FichaFuncionario e={ficha} comp={compDe(ficha.id)} perfis={perfis} empresa={comp?.empresa ?? null} foto={avs?.empregados[ficha.id]}
-          regioes={regioes} clientes={clientes} onCadastroSalvo={(m) => { avisar(m); void carregar(); }}
+          regioes={regioes} clientes={clientes} onCadastroSalvo={() => { void carregar(); }}
           aba={fichaAba} onAba={setFichaAba}
           onFechar={() => setFichaId(null)} onAcao={(t) => abrir(t, ficha)} onRegras={(p) => setRegrasDe(p)}
           onTrocarDesenho={() => void trocarDesenho('CLT', ficha.id)} onRevisarFoto={() => abrirRevisar(true)}
@@ -257,12 +257,12 @@ function FichaFuncionario({ e, comp: c, perfis, empresa, foto, regioes, clientes
   aba: AbaFicha; onAba: (a: AbaFicha) => void;
   e: Empregado; comp?: Compensacao; perfis: PerfilResumo[]; empresa: EmpresaBanco | null;
   foto?: { foto?: string | null; status?: string | null; temApp?: boolean; motivo?: string | null };
-  regioes: RegioesResumo | null; clientes: string[]; onCadastroSalvo: (m: string) => void;
+  regioes: RegioesResumo | null; clientes: string[]; onCadastroSalvo: () => void;
   onFechar: () => void; onAcao: (t: Acao) => void; onRegras: (p: PerfilResumo | null) => void;
   onTrocarDesenho: () => void; onRevisarFoto: () => void; onAtivo: () => Promise<void>;
 }) {
   const [confirmar, setConfirmar] = useState(false);
-  const [cad, setCad] = useState({ sujo: false, salvando: false });
+  const [cad, setCad] = useState({ sujo: false, salvando: false, salvo: false });
   const p = e.perfilRegraId ? perfis.find((x) => x.id === e.perfilRegraId) : undefined;
   const padrao = perfis.find((x) => x.padrao);
   const efetivo = p ?? padrao;
@@ -289,6 +289,12 @@ function FichaFuncionario({ e, comp: c, perfis, empresa, foto, regioes, clientes
               <button type="button" className={css.fLk} onClick={() => setConfirmar(false)}>Cancelar</button></span>
           : <button type="button" className={`${css.fLk} ${e.ativo ? css.fPerigo : ''}`} onClick={() => setConfirmar(true)}>{e.ativo ? 'Inativar…' : 'Reativar'}</button>}
         <span style={{ flex: 1 }} />
+        {aba === 'cadastro' && cad.salvo && !cad.sujo && (
+          <span className={css.cadSalvo} role="status">
+            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            Alterações salvas
+          </span>
+        )}
         <button type="button" className={css.btnSecN} onClick={onFechar}>Fechar</button>
         {aba === 'cadastro' && <button type="submit" form="form-cadastro" className={css.btnPriN} disabled={!cad.sujo || cad.salvando}>{cad.salvando ? 'Salvando…' : 'Salvar cadastro'}</button>}
       </>}>
@@ -453,7 +459,7 @@ const hojeIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0,
  */
 function AbaCadastro({ e, regioes, clientes, oculto, onEstado, onSalvo, onAba }: {
   e: Empregado; regioes: RegioesResumo | null; clientes: string[]; oculto: boolean;
-  onEstado: (s: { sujo: boolean; salvando: boolean }) => void; onSalvo: (m: string) => void; onAba: (a: AbaFicha) => void;
+  onEstado: (s: { sujo: boolean; salvando: boolean; salvo: boolean }) => void; onSalvo: () => void; onAba: (a: AbaFicha) => void;
 }) {
   const inicial = () => ({
     nome: e.nome, matricula: e.matricula ?? '', cargo: e.cargo ?? '', dataAdmissao: e.dataAdmissao ?? '', cliente: e.cliente ?? '', chavePix: e.chavePix ?? '',
@@ -462,10 +468,14 @@ function AbaCadastro({ e, regioes, clientes, oculto, onEstado, onSalvo, onAba }:
   const [f, setF] = useState(inicial);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Confirmação dentro do modal (some quando a pessoa volta a editar).
+  const [salvo, setSalvo] = useState(false);
   useEffect(() => { setF(inicial()); setErro(null); }, [e]);
   const base = inicial();
   const sujo = JSON.stringify(f) !== JSON.stringify(base);
-  useEffect(() => { onEstado({ sujo, salvando }); }, [sujo, salvando]);
+  useEffect(() => { if (sujo) setSalvo(false); }, [sujo]);
+  useEffect(() => { setSalvo(false); }, [e.id]);
+  useEffect(() => { onEstado({ sujo, salvando, salvo }); }, [sujo, salvando, salvo]);
   const emp = rotuloEmpresa(regioes);
   const pixErro = erroPix(f.chavePix);
 
@@ -484,7 +494,8 @@ function AbaCadastro({ e, regioes, clientes, oculto, onEstado, onSalvo, onAba }:
       if ((f.cidade?.municipio ?? null) !== (base.cidade?.municipio ?? null)) {
         await api.post('/tratamento/feriados/local-pessoas', { empregadoIds: [e.id], municipio: f.cidade?.municipio ?? null, municipioNome: f.cidade?.municipioNome ?? null });
       }
-      onSalvo(`Cadastro de ${f.nome.trim()} salvo.`);
+      setSalvo(true);
+      onSalvo();
     } catch (x) { setErro((x as Error).message); }
     finally { setSalvando(false); }
   }

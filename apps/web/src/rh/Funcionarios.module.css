@@ -298,3 +298,5 @@
 @media (max-width:760px){
   .cadGrid, .cadG2{ grid-template-columns:minmax(0,1fr); }
 }
+
+.cadSalvo{ display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--ok-text); background:var(--ok-bg); border-radius:999px; padding:8px 14px; }
