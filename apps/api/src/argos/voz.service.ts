@@ -14,8 +14,8 @@ export class VozArgosService {
   private readonly ttsChave = process.env.OPENAI_CHAVE ?? '';
   private readonly ttsModelo = process.env.OPENAI_TTS_MODELO ?? 'gpt-4o-mini-tts';
   private readonly ttsBase = (process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
-  private readonly voz = process.env.ARGOS_VOZ ?? 'coral';
-  private readonly velocidade = Number(process.env.ARGOS_VELOCIDADE ?? '1.05');
+  private readonly voz = process.env.ARGOS_VOZ ?? 'marin';
+  private readonly velocidade = Number(process.env.ARGOS_VELOCIDADE ?? '1.18');
 
   get transcricaoAtiva(): boolean { return !!this.groqChave; }
   get falaAtiva(): boolean { return !!this.ttsChave; }
@@ -54,11 +54,21 @@ export class VozArgosService {
   /** Texto -> fala (mp3 em base64). OpenAI gpt-4o-mini-tts. */
   async falar(texto: string): Promise<string> {
     if (!this.ttsChave) throw new ServiceUnavailableException('Voz natural desligada (falta OPENAI_CHAVE).');
+    const limpo = texto
+      .replace(/\[[A-Z_]+-?[A-Z0-9_]*\]/g, '')
+      .replace(/\[(\d+)\]/g, '')
+      .replace(/[*_`>#|]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([.,;:!?])/g, '$1')
+      .trim();
     const corpo = {
       model: this.ttsModelo,
       voice: this.voz,
-      input: texto.slice(0, 1200),
-      instructions: 'Fale em português do Brasil, com sotaque natural. Tom de colega de trabalho simpático e seguro: caloroso, direto, nunca robótico. Ritmo ágil, pausas curtas. Diga números como uma pessoa diria.',
+      input: limpo.slice(0, 1200),
+      instructions:
+        'Fale em português do Brasil, com sotaque brasileiro natural. Tom de um colega de trabalho simpático e seguro: ' +
+        'caloroso, direto, conversado, nunca robótico nem de locutor. Ritmo ágil, frases fluidas, pausas curtas. ' +
+        'Diga números e valores como uma pessoa diria ("três horas e doze minutos", "noventa e um por cento").',
       speed: this.velocidade,
       response_format: 'mp3',
     };

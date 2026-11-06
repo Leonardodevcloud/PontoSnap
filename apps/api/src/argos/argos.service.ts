@@ -17,6 +17,7 @@ export interface PerguntaArgos {
 
 export interface RespostaArgos {
   resposta: string;
+  fala: string;
   fontes: string[];
   pessoa: string | null;
   empregadoId: string | null;
@@ -81,13 +82,30 @@ export class ArgosService {
         `Materiais:\n${embrulhar(materiais)}\n\nPergunta:\n${embrulhar(mascarar(pergunta, nomes, mapa))}`,
     });
 
-    const bruto = await this.ia.gerar({ sistema: SISTEMA_ARGOS, mensagens, json: true, temperatura: 0.1, maxTokens: 1400, raciocinio: 'desligado' });
-    let out: { resposta?: string; fontes?: string[] };
-    try { out = JSON.parse(bruto) as { resposta?: string; fontes?: string[] }; }
+    const bruto = await this.ia.gerar({ sistema: SISTEMA_ARGOS, mensagens, json: true, temperatura: 0.1, maxTokens: 900, raciocinio: 'desligado' });
+    let out: { resposta?: string; fala?: string; fontes?: string[] };
+    try { out = JSON.parse(bruto) as { resposta?: string; fala?: string; fontes?: string[] }; }
     catch { out = { resposta: bruto }; }
     const resposta = restaurar((out.resposta ?? '').trim() || 'Não consegui montar a resposta.', mapa);
+    const fala = restaurar((out.fala ?? '').trim(), mapa) || this.paraFala(resposta);
     const fontes = Array.isArray(out.fontes) ? out.fontes.map((x) => String(x)) : [];
-    return { resposta, fontes, pessoa: pessoaNome, empregadoId: empregadoId || null, mes };
+    return { resposta, fala, fontes, pessoa: pessoaNome, empregadoId: empregadoId || null, mes };
+  }
+
+  /** Reduz a resposta escrita a algo falável, se a IA não mandou o campo "fala". */
+  private paraFala(markdown: string, limite = 320): string {
+    const limpo = markdown
+      .replace(/\[[A-Z_]+-?[A-Z0-9_]*\]/g, '')
+      .replace(/\[(\d+)\]/g, '')
+      .replace(/[*_`>#|]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([.,;:!?])/g, '$1')
+      .trim();
+    if (limpo.length <= limite) return limpo;
+    const frases = limpo.match(/[^.!?]+[.!?]+/g) ?? [limpo];
+    let saida = '';
+    for (const f of frases) { if ((saida + f).length > limite) break; saida += f; }
+    return (saida || `${limpo.slice(0, limite - 1)}…`).trim();
   }
 
   private periodo(mes: string) {
