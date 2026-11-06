@@ -556,6 +556,9 @@ export class BancoService {
   ): Promise<{ fechadas: string[] }> {
     const cfg = cfgPronta ?? await this.configBanco(tenantId, empregadoId);
     if (!cfg.ativo) return { fechadas: [] };
+    // Veio transferido de outra empresa do grupo: traz o que sobrou lá.
+    try { await this.trazerSaldoDaTransferencia(tenantId, empregadoId, hoje); }
+    catch (e) { this.log.warn(`Saldo da transferência do empregado ${empregadoId} não veio: ${(e as Error).message}`); }
 
     const primeira = await this.primeiraCompetencia(tenantId, empregadoId);
     if (!primeira) return { fechadas: [] };
@@ -590,6 +593,87 @@ export class BancoService {
       comp = somarMesesComp(comp, 1);
     }
     return { fechadas };
+  }
+
+  /**
+   * Transferência entre CNPJs do grupo: o saldo do banco de horas vai junto.
+   *
+   * O extrato não muda de empresa (cada uma responde pelo que apurou). O que
+   * sobra na origem sai de lá num lançamento "levado para" e entra no destino:
+   *  - crédito, lote a lote, com a data original (vence no mesmo dia que
+   *    venceria lá); na regra que compensa no mês, num lançamento só, no mês
+   *    em aberto (é lá que o acerto acontece);
+   *  - débito (devendo), num lançamento só, no mês em aberto.
+   * Os lançamentos ficam sempre em mês em aberto dos dois lados, para não mexer
+   * no acerto de mês já fechado.
+   *
+   * Roda em toda sincronização do destino (consulta de saldo e cron de 6h), e
+   * por isso pega também o que a origem só fecha depois: o último mês dela
+   * (transferência no meio do mês) entra quando o mês vira. Idempotente: com a
+   * origem zerada, não faz nada. Vale para quem já tinha sido transferido.
+   * Devolve os minutos trazidos (negativo = débito).
+   */
+  async trazerSaldoDaTransferencia(tenantId: string, empregadoId: string, hoje: string): Promise<number> {
+    const elo = await comoMaster(this.db, async (tx) => {
+      const novo = (await tx.select({ anterior: empregado.empregadoAnteriorId, inicio: empregado.dataInicioPonto })
+        .from(empregado).where(and(eq(empregado.id, empregadoId), eq(empregado.tenantId, tenantId))).limit(1))[0];
+      if (!novo?.anterior) return null;
+      const ant = (await tx.select({ id: empregado.id, tenantId: empregado.tenantId, saida: empregado.dataSaida })
+        .from(empregado).where(eq(empregado.id, novo.anterior)).limit(1))[0];
+      if (!ant?.saida) return null;
+      const nomes = await tx.select({ id: tenant.id, nome: tenant.razaoSocial }).from(tenant);
+      const nome = (id: string) => nomes.find((n) => n.id === id)?.nome ?? 'outra empresa do grupo';
+      return { antId: ant.id, antTenant: ant.tenantId, saida: ant.saida, inicio: novo.inicio ?? ant.saida, origemNome: nome(ant.tenantId), destinoNome: nome(tenantId) };
+    });
+    if (!elo) return 0;
+    const cfgO = await this.configBanco(elo.antTenant, elo.antId);
+    const cfgD = await this.configBanco(tenantId, empregadoId);
+    // Sem banco em algum dos lados, o saldo fica na origem (e é acertado lá).
+    if (!cfgO.ativo || cfgO.prazoMeses == null || !cfgD.ativo || cfgD.prazoMeses == null) return 0;
+    // Fecha o que já dá para fechar na origem (e, numa cadeia, traz o da anterior a ela).
+    await this.sincronizar(elo.antTenant, elo.antId, hoje, cfgO);
+
+    const abertoDesde = `${competenciaDe(hoje)}-01`;
+    const maior = (a: string, b: string) => (a > b ? a : b);
+    const d = new Date(`${elo.saida}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1);
+    const dataOrigem = maior(d.toISOString().slice(0, 10), abertoDesde);
+    const dataDestino = maior(elo.inicio, abertoDesde);
+    const br = (x: string) => `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}`;
+    const curto = (n: string) => n.slice(0, 60);
+
+    return comoMaster(this.db, async (tx) => {
+      // Cron e consulta ao mesmo tempo não podem levar o saldo duas vezes.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'banco-transf:' + elo.antId}))`);
+      let movs: MovimentoBanco[] = (await tx.select().from(pontoBancoMov)
+        .where(and(eq(pontoBancoMov.tenantId, elo.antTenant), eq(pontoBancoMov.empregadoId, elo.antId))))
+        .map((l) => ({ data: l.data, minutos: l.minutos, tipo: l.tipo as TipoMovBanco }));
+      if (cfgO.formaCalculo === 'INTRA_MES') {
+        const comps = (await tx.select({ c: pontoBancoFechamento.competencia }).from(pontoBancoFechamento).where(and(
+          eq(pontoBancoFechamento.tenantId, elo.antTenant), eq(pontoBancoFechamento.empregadoId, elo.antId),
+          isNotNull(pontoBancoFechamento.acertoMin)))).map((x) => x.c);
+        const desde = inicioJanela(comps, competenciaDe(hoje));
+        movs = movs.filter((m) => m.data >= desde);
+      }
+      const s = calcularBanco(movs, cfgO.prazoMeses!, hoje);
+      if (s.saldoMin === 0) return 0;
+
+      const descDestino = `trazido de ${curto(elo.origemNome)} (transferência)`;
+      const novos: (typeof pontoBancoMov.$inferInsert)[] = [];
+      if (s.saldoMin > 0 && cfgD.formaCalculo !== 'INTRA_MES') {
+        for (const l of s.lotes.filter((x) => x.minutosRestantes > 0)) {
+          novos.push({ tenantId, empregadoId, data: l.data, minutos: l.minutosRestantes, tipo: 'AJUSTE', descricao: `Crédito de ${br(l.data)} ${descDestino}`.slice(0, 160) });
+        }
+      } else {
+        novos.push({ tenantId, empregadoId, data: dataDestino, minutos: s.saldoMin, tipo: 'AJUSTE',
+          descricao: `${s.saldoMin > 0 ? 'Saldo' : 'Saldo negativo'} ${descDestino}`.slice(0, 160) });
+      }
+      await tx.insert(pontoBancoMov).values(novos);
+      await tx.insert(pontoBancoMov).values({
+        tenantId: elo.antTenant, empregadoId: elo.antId, data: dataOrigem, minutos: -s.saldoMin, tipo: 'AJUSTE',
+        descricao: `Saldo levado para ${curto(elo.destinoNome)} (transferência)`.slice(0, 160),
+      });
+      return s.saldoMin;
+    });
   }
 
   /**

@@ -14,7 +14,7 @@ interface Info {
     tipo: 'CLT' | 'MEI' | 'MOTORISTA'; nome: string; documento: string | null;
     cargo?: string | null; salarioMensal?: string | null; dataAdmissao?: string | null;
     valorMensal?: string | null; baseDias?: string | null; chavePix?: string | null; empresa?: string | null;
-    debitosAbertos: number; batidasApos?: number;
+    debitosAbertos: number; batidasApos?: number; bancoSaldoMin?: number | null;
   };
 }
 
@@ -22,6 +22,7 @@ const hoje = () => new Date().toISOString().slice(0, 10);
 const mesHoje = () => new Date().toISOString().slice(0, 7);
 const reais = (v?: string | null) => v == null ? '—' : `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const dataBR = (d?: string | null) => d ? d.split('-').reverse().join('/') : '—';
+const horasSinal = (m: number) => `${m < 0 ? '−' : m > 0 ? '+' : ''}${Math.floor(Math.abs(m) / 60)}h${String(Math.abs(m) % 60).padStart(2, '0')}`;
 const iniciais = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
 /** Transferência de pessoas (CLT e prestadores) entre CNPJs do grupo. */
@@ -185,10 +186,12 @@ export function Transferencias() {
                         <span className={css.chip}>Escala</span>
                         <span className={css.chip}>Regras de ponto e CCT</span>
                         <span className={css.chip}>Férias agendadas</span>
-                        <span className={css.chip}>Foto e acesso ao app</span>
+                        {info.pessoa.bancoSaldoMin != null && <span className={css.chip}>Banco de horas <b>{horasSinal(info.pessoa.bancoSaldoMin)}</b></span>}
+                        <span className={css.chip}>Folgas, atestados e ajustes já marcados</span>
+                        <span className={css.chip}>Foto, acesso ao app e notificações</span>
                         {info.pessoa.debitosAbertos > 0 && <span className={css.chip}>Débitos em aberto <b>{info.pessoa.debitosAbertos}</b></span>}
                       </div>
-                      <p className={css.aviso}>Não vai junto: o saldo do banco de horas (acerte na origem) e o histórico de batidas, espelhos e contracheques, que ficam na origem. O mês da data fica com o destino: cesta, débitos e a carga de benefícios do mês seguinte.</p>
+                      <p className={css.aviso}>O banco de horas vai com o vencimento original de cada crédito; o que ele ainda fizer na origem até a data vai quando o mês fechar lá. Ficam na origem, por lei, as batidas, espelhos e contracheques já emitidos: ele continua vendo tudo no app. O mês da data fica com o destino: cesta, débitos e a carga de benefícios do mês seguinte.</p>
                     </div>
                     {(info.pessoa.batidasApos ?? 0) > 0 && (
                       <div className={css.sec}>
@@ -212,7 +215,7 @@ export function Transferencias() {
                         {info.pessoa.chavePix && <span className={css.chip}>Chave Pix</span>}
                         {info.pessoa.empresa && <span className={css.chip}>Tomador</span>}
                         <span className={css.chip}>Lançamentos sem nota</span>
-                        <span className={css.chip}>Acesso ao portal</span>
+                        <span className={css.chip}>Foto, acesso ao portal e notificações</span>
                         {info.pessoa.debitosAbertos > 0 && <span className={css.chip}>Débitos em aberto <b>{info.pessoa.debitosAbertos}</b></span>}
                       </div>
                       <p className={css.aviso}>Nota liberada, NF enviada ou pagamento já registrado na origem a partir deste mês impedem a transferência: o tomador dessas notas é a origem.</p>

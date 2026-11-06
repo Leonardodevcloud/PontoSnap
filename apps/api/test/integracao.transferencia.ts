@@ -8,6 +8,7 @@ import {
 } from '@ponto/db';
 import { and, eq } from 'drizzle-orm';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
+import { BancoService } from '../src/banco/banco.service';
 import { PessoalService } from '../src/pessoal/pessoal.service';
 import { CriptoService } from '../src/common/cripto.service';
 import { TransferenciaService } from '../src/transferencia/transferencia.service';
@@ -28,7 +29,7 @@ const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', use
 const db = drizzle(client, { schema });
 const trat = new TratamentoService(db);
 const pes = new PessoalService(db, trat, new CriptoService());
-const svc = new TransferenciaService(db as never, { exigirVaga: async () => {} } as never);
+const svc = new TransferenciaService(db as never, { exigirVaga: async () => {} } as never, new BancoService(db as never, trat));
 
 let falhas = 0;
 const ok = (c: boolean, m: string) => { if (!c) falhas++; console.log(`${c ? 'OK  ' : 'FALHA'} — ${m}`); };

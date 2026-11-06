@@ -6,6 +6,7 @@ import { schema, comoMaster, tenant, empregado, pontoRep, pontoHorarioContratual
 import { eq } from 'drizzle-orm';
 import { Perfil } from '@ponto/shared';
 import { TratamentoService } from '../src/tratamento/tratamento.service';
+import { BancoService } from '../src/banco/banco.service';
 import { CriptoService } from '../src/common/cripto.service';
 import { TransferenciaService } from '../src/transferencia/transferencia.service';
 import { VinculoService } from '../src/vinculo/vinculo.service';
@@ -35,7 +36,7 @@ const client = postgres({ host: process.env.PGSOCKET!, database: 'postgres', use
 const db = drizzle(client, { schema });
 const trat = new TratamentoService(db);
 const cripto = new CriptoService();
-const transf = new TransferenciaService(db as never, { exigirVaga: async () => {} } as never);
+const transf = new TransferenciaService(db as never, { exigirVaga: async () => {} } as never, new BancoService(db as never, trat));
 const vinc = new VinculoService(db as never);
 const push = { enviarParaEmpregado: async () => {}, enviar: async () => {} } as never;
 const assin = new AssinaturaService(db as never, cripto, trat, push);
